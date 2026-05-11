@@ -7,154 +7,114 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root {
-    --bg: #1a1c1e;
-    --panel: #23262a;
-    --panel2: #2c3036;
-    --border: #3a3f47;
-    --accent: #f07800;
-    --accent2: #ffa040;
-    --text: #e8eaed;
-    --text2: #9aa0aa;
-    --danger: #e05050;
-    --green: #4caf7d;
-    --blue: #4a9eda;
-    --toolbar-h: 64px;
-    --sub-toolbar-h: 52px;
+    --bg: #1a1c1e; --panel: #23262a; --panel2: #2c3036; --border: #3a3f47;
+    --accent: #f07800; --accent2: #ffa040; --text: #e8eaed; --text2: #9aa0aa;
+    --danger: #e05050; --blue: #4a9eda;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: 'Helvetica Neue', Arial, sans-serif; overflow: hidden; height: 100dvh; display: flex; flex-direction: column; }
 
-  /* ===== TOP TOOLBAR ===== */
+  /* TOP TOOLBAR */
   #toolbar {
-    height: var(--toolbar-h);
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 8px; padding: 0 12px;
-    flex-shrink: 0; z-index: 100;
+    height: 60px; background: var(--panel); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    flex-shrink: 0; z-index: 100; overflow-x: auto;
   }
-  #toolbar .app-title {
-    font-size: 13px; font-weight: 700; color: var(--accent);
-    letter-spacing: 0.08em; text-transform: uppercase;
-    padding-right: 12px; border-right: 1px solid var(--border);
-    white-space: nowrap;
-  }
-  #toolbar .spacer { flex: 1; }
+  #toolbar::-webkit-scrollbar { display: none; }
+  .app-title { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .08em; text-transform: uppercase; padding-right: 10px; border-right: 1px solid var(--border); white-space: nowrap; }
+  .spacer { flex: 1; min-width: 8px; }
   .tb-btn {
-    background: var(--panel2); border: 1px solid var(--border);
-    color: var(--text); padding: 8px 14px; border-radius: 8px;
-    font-size: 13px; cursor: pointer; white-space: nowrap;
-    display: flex; align-items: center; gap: 6px;
-    transition: background 0.15s, border-color 0.15s;
-    -webkit-user-select: none; user-select: none;
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    white-space: nowrap; display: flex; align-items: center; gap: 5px;
+    -webkit-user-select: none; user-select: none; flex-shrink: 0;
+    transition: background .15s;
   }
   .tb-btn:active { background: var(--border); }
   .tb-btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
-  .tb-btn.accent:active { background: var(--accent2); }
   .tb-btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
-
-  /* page nav */
-  #page-info { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); }
-  #page-num { background: var(--panel2); border: 1px solid var(--border); color: var(--text); width: 42px; text-align: center; padding: 6px 4px; border-radius: 6px; font-size: 13px; }
+  #page-info { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text2); flex-shrink: 0; }
+  #page-num { background: var(--panel2); border: 1px solid var(--border); color: var(--text); width: 40px; text-align: center; padding: 6px 4px; border-radius: 6px; font-size: 13px; }
   #page-num:focus { outline: none; border-color: var(--accent); }
+  #file-name { font-size: 11px; color: var(--text2); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
 
-  /* ===== SUB TOOLBAR (drawing tools) ===== */
+  /* SUB TOOLBAR */
   #subtoolbar {
-    height: var(--sub-toolbar-h);
-    background: var(--panel);
-    border-bottom: 2px solid var(--border);
-    display: flex; align-items: center; gap: 6px; padding: 0 10px;
+    height: 52px; background: var(--panel); border-bottom: 2px solid var(--border);
+    display: flex; align-items: center; gap: 5px; padding: 0 10px;
     flex-shrink: 0; overflow-x: auto;
   }
   #subtoolbar::-webkit-scrollbar { display: none; }
   .tool-btn {
-    background: transparent; border: 2px solid transparent;
-    color: var(--text2); padding: 6px 12px; border-radius: 8px;
-    font-size: 20px; cursor: pointer; flex-shrink: 0;
-    transition: all 0.15s;
-    -webkit-user-select: none; user-select: none;
+    background: transparent; border: 2px solid transparent; color: var(--text2);
+    padding: 6px 10px; border-radius: 8px; font-size: 19px; cursor: pointer;
+    flex-shrink: 0; -webkit-user-select: none; user-select: none;
     display: flex; align-items: center; justify-content: center;
-    min-width: 44px; min-height: 40px;
+    min-width: 42px; min-height: 38px; transition: all .15s;
   }
   .tool-btn.active { background: var(--panel2); border-color: var(--accent); color: var(--accent); }
-  .tool-btn:active { background: var(--panel2); }
-  .tool-sep { width: 1px; height: 28px; background: var(--border); flex-shrink: 0; margin: 0 4px; }
-
-  /* color swatches */
+  .tool-sep { width: 1px; height: 26px; background: var(--border); flex-shrink: 0; margin: 0 3px; }
   .color-swatch {
-    width: 28px; height: 28px; border-radius: 50%; border: 3px solid transparent;
-    cursor: pointer; flex-shrink: 0; transition: transform 0.15s, border-color 0.15s;
+    width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent;
+    cursor: pointer; flex-shrink: 0; transition: transform .15s, border-color .15s;
   }
-  .color-swatch.active { border-color: #fff; transform: scale(1.2); }
-  .color-swatch:active { transform: scale(0.9); }
-
-  /* stroke size */
-  #stroke-slider { -webkit-appearance: none; width: 80px; height: 4px; background: var(--border); border-radius: 2px; cursor: pointer; flex-shrink: 0; }
-  #stroke-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; }
-
-  /* opacity */
-  #opacity-slider { -webkit-appearance: none; width: 70px; height: 4px; background: var(--border); border-radius: 2px; cursor: pointer; flex-shrink: 0; }
-  #opacity-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; }
-
-  /* size label */
+  .color-swatch.active { border-color: #fff; transform: scale(1.25); }
+  #stroke-slider, #opacity-slider {
+    -webkit-appearance: none; height: 4px; background: var(--border); border-radius: 2px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  #stroke-slider { width: 80px; }
+  #opacity-slider { width: 70px; }
+  #stroke-slider::-webkit-slider-thumb,
+  #opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+  }
+  #stroke-slider::-webkit-slider-thumb { background: var(--accent); }
+  #opacity-slider::-webkit-slider-thumb { background: var(--blue); }
   .slider-label { font-size: 11px; color: var(--text2); flex-shrink: 0; }
 
-  /* ===== CANVAS AREA ===== */
+  /* CANVAS AREA */
   #canvas-area {
-    flex: 1; overflow: auto; position: relative;
-    background: #111;
+    flex: 1; overflow: auto; background: #111;
     display: flex; justify-content: center; align-items: flex-start;
-    padding: 16px;
+    padding: 16px; position: relative;
   }
-  #canvas-area::-webkit-scrollbar { width: 6px; height: 6px; }
-  #canvas-area::-webkit-scrollbar-track { background: #111; }
+  #canvas-area::-webkit-scrollbar { width: 5px; height: 5px; }
   #canvas-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-  #canvas-wrapper {
-    position: relative; display: inline-block;
-    box-shadow: 0 4px 40px #000a;
-  }
+  #canvas-wrapper { position: relative; display: inline-block; box-shadow: 0 4px 40px #000a; transform-origin: top left; }
   #pdf-canvas { display: block; }
-  #draw-canvas {
-    position: absolute; top: 0; left: 0;
-    cursor: crosshair; touch-action: none;
+  #draw-canvas { position: absolute; top: 0; left: 0; touch-action: none; }
+
+  /* ZOOM BADGE */
+  #zoom-badge {
+    position: fixed; bottom: 16px; right: 16px; z-index: 200;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 6px 12px; font-size: 12px; color: var(--text2);
+    pointer-events: none; transition: opacity .3s;
+  }
+  /* 2本指モード中は指示表示 */
+  #gesture-hint {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    background: #000c; border-radius: 14px; padding: 12px 24px;
+    font-size: 14px; color: #fff; pointer-events: none; z-index: 300;
   }
 
-  /* ===== ZOOM CONTROLS ===== */
-  #zoom-controls {
-    position: fixed; bottom: 20px; right: 16px;
-    display: flex; flex-direction: column; gap: 6px; z-index: 200;
-  }
-  .zoom-btn {
-    width: 48px; height: 48px; border-radius: 12px;
-    background: var(--panel); border: 1px solid var(--border);
-    color: var(--text); font-size: 22px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 12px #0006;
-    -webkit-user-select: none; user-select: none;
-    transition: background 0.15s;
-  }
-  .zoom-btn:active { background: var(--border); }
-  #zoom-label { text-align: center; font-size: 11px; color: var(--text2); padding: 2px 0; }
-
-  /* ===== DROP ZONE ===== */
+  /* DROP ZONE */
   #drop-zone {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 20px; z-index: 50;
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px; z-index: 50;
   }
-  #drop-zone .icon { font-size: 64px; opacity: 0.4; }
+  #drop-zone .icon { font-size: 60px; opacity: .4; }
   #drop-zone .msg { font-size: 18px; color: var(--text2); font-weight: 600; }
-  #drop-zone .sub { font-size: 14px; color: var(--text2); opacity: 0.6; }
-  #file-input { display: none; }
+  #drop-zone .sub { font-size: 13px; color: var(--text2); opacity: .6; }
   #open-btn-main {
     background: var(--accent); color: #fff; border: none;
-    padding: 16px 40px; border-radius: 12px; font-size: 16px; font-weight: 700;
+    padding: 16px 36px; border-radius: 12px; font-size: 16px; font-weight: 700;
     cursor: pointer; box-shadow: 0 4px 20px #f0780040;
-    transition: background 0.15s, transform 0.1s;
   }
-  #open-btn-main:active { background: var(--accent2); transform: scale(0.97); }
+  #file-input { display: none; }
 
-  /* ===== TEXT INPUT OVERLAY ===== */
+  /* TEXT OVERLAY */
   #text-input-overlay {
     display: none; position: fixed; inset: 0; z-index: 500;
     background: #000a; align-items: center; justify-content: center;
@@ -176,37 +136,31 @@
   #text-cancel { background: var(--panel2); color: var(--text2); }
   #text-ok { background: var(--accent); color: #fff; }
 
-  /* toast */
+  /* TOAST */
   #toast {
-    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: 56px; left: 50%; transform: translateX(-50%);
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    padding: 10px 20px; font-size: 13px; color: var(--text);
-    opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 999;
-    white-space: nowrap;
+    padding: 9px 18px; font-size: 13px; color: var(--text);
+    opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 999; white-space: nowrap;
   }
   #toast.show { opacity: 1; }
 
-  /* loading */
+  /* LOADING */
   #loading {
     display: none; position: fixed; inset: 0; z-index: 600;
-    background: #000b; align-items: center; justify-content: center;
-    flex-direction: column; gap: 16px;
+    background: #000b; align-items: center; justify-content: center; flex-direction: column; gap: 14px;
   }
   #loading.show { display: flex; }
-  .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .spinner { width: 38px; height: 38px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* file name display */
-  #file-name { font-size: 12px; color: var(--text2); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
 
-<!-- TOP TOOLBAR -->
 <div id="toolbar">
   <div class="app-title">⚙ 鉄骨図面</div>
-  <span id="file-name">ファイル未選択</span>
-  <button class="tb-btn accent" onclick="document.getElementById('file-input').click()">📂 PDF開く</button>
+  <span id="file-name">未選択</span>
+  <button class="tb-btn accent" onclick="document.getElementById('file-input').click()">📂 開く</button>
   <input type="file" id="file-input" accept="application/pdf">
   <div class="spacer"></div>
   <div id="page-info">
@@ -216,29 +170,30 @@
     <button class="tb-btn" onclick="changePage(1)">▶</button>
   </div>
   <div class="spacer"></div>
-  <button class="tb-btn" onclick="undoStroke()">↩ 元に戻す</button>
-  <button class="tb-btn danger" onclick="clearAnnotations()">🗑 消去</button>
+  <button class="tb-btn" onclick="undoStroke()">↩ 戻す</button>
+  <button class="tb-btn danger" onclick="clearAnnotations()">🗑</button>
   <button class="tb-btn accent" onclick="saveImage()">💾 保存</button>
 </div>
 
-<!-- SUB TOOLBAR (drawing tools) -->
 <div id="subtoolbar">
-  <button class="tool-btn active" id="tool-pen"     onclick="setTool('pen')"        title="ペン">✏️</button>
-  <button class="tool-btn"        id="tool-marker"  onclick="setTool('marker')"     title="マーカー">🖊</button>
-  <button class="tool-btn"        id="tool-arrow"   onclick="setTool('arrow')"      title="矢印">➡️</button>
-  <button class="tool-btn"        id="tool-rect"    onclick="setTool('rect')"       title="四角形">⬜</button>
-  <button class="tool-btn"        id="tool-circle"  onclick="setTool('circle')"     title="円">⭕</button>
-  <button class="tool-btn"        id="tool-text"    onclick="setTool('text')"       title="テキスト">T</button>
-  <button class="tool-btn"        id="tool-eraser"  onclick="setTool('eraser')"     title="消しゴム">🧹</button>
+  <!-- 移動モード -->
+  <button class="tool-btn" id="tool-move"   onclick="setTool('move')"   title="移動(スクロール)">🖐</button>
   <div class="tool-sep"></div>
-  <!-- colors -->
+  <button class="tool-btn active" id="tool-pen"    onclick="setTool('pen')"    title="ペン">✏️</button>
+  <button class="tool-btn" id="tool-marker" onclick="setTool('marker')" title="マーカー">🖊</button>
+  <button class="tool-btn" id="tool-arrow"  onclick="setTool('arrow')"  title="矢印">➡️</button>
+  <button class="tool-btn" id="tool-rect"   onclick="setTool('rect')"   title="四角">⬜</button>
+  <button class="tool-btn" id="tool-circle" onclick="setTool('circle')" title="円">⭕</button>
+  <button class="tool-btn" id="tool-text"   onclick="setTool('text')"   title="文字">T</button>
+  <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')" title="消しゴム">🧹</button>
+  <div class="tool-sep"></div>
   <div class="color-swatch active" style="background:#f07800" data-color="#f07800" onclick="setColor(this)"></div>
   <div class="color-swatch" style="background:#e03030" data-color="#e03030" onclick="setColor(this)"></div>
   <div class="color-swatch" style="background:#30a0e0" data-color="#30a0e0" onclick="setColor(this)"></div>
   <div class="color-swatch" style="background:#30c060" data-color="#30c060" onclick="setColor(this)"></div>
   <div class="color-swatch" style="background:#f0e030" data-color="#f0e030" onclick="setColor(this)"></div>
-  <div class="color-swatch" style="background:#ffffff" data-color="#ffffff" onclick="setColor(this)"></div>
-  <div class="color-swatch" style="background:#000000; border:2px solid #555" data-color="#000000" onclick="setColor(this)"></div>
+  <div class="color-swatch" style="background:#fff"    data-color="#ffffff" onclick="setColor(this)"></div>
+  <div class="color-swatch" style="background:#000;border:2px solid #555" data-color="#000000" onclick="setColor(this)"></div>
   <div class="tool-sep"></div>
   <span class="slider-label">太さ</span>
   <input type="range" id="stroke-slider" min="1" max="20" value="3" oninput="strokeSize=+this.value">
@@ -246,15 +201,12 @@
   <input type="range" id="opacity-slider" min="10" max="100" value="100" oninput="strokeOpacity=this.value/100">
 </div>
 
-<!-- MAIN CANVAS AREA -->
 <div id="canvas-area">
-  <!-- Drop zone shown when no PDF -->
   <div id="drop-zone">
     <div class="icon">📄</div>
     <div class="msg">PDFファイルを開いてください</div>
     <div class="sub">タップして選択 または ドラッグ＆ドロップ</div>
     <button id="open-btn-main" onclick="document.getElementById('file-input').click()">📂 PDFを開く</button>
-    <input type="file" id="file-input2" accept="application/pdf" style="display:none">
   </div>
   <div id="canvas-wrapper" style="display:none">
     <canvas id="pdf-canvas"></canvas>
@@ -262,15 +214,9 @@
   </div>
 </div>
 
-<!-- ZOOM CONTROLS -->
-<div id="zoom-controls">
-  <button class="zoom-btn" onclick="setZoom(scale*1.25)">＋</button>
-  <div id="zoom-label">100%</div>
-  <button class="zoom-btn" onclick="setZoom(scale*0.8)">－</button>
-  <button class="zoom-btn" onclick="fitPage()" title="全体表示">⊡</button>
-</div>
+<div id="zoom-badge">100%</div>
+<div id="gesture-hint">🤏 ピンチ: ズーム　✌️ 2本指ドラッグ: スクロール</div>
 
-<!-- TEXT INPUT OVERLAY -->
 <div id="text-input-overlay">
   <div id="text-popup">
     <h3>テキスト入力</h3>
@@ -282,115 +228,102 @@
   </div>
 </div>
 
-<!-- LOADING -->
 <div id="loading"><div class="spinner"></div><span>読み込み中...</span></div>
-<!-- TOAST -->
 <div id="toast"></div>
 
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// State
+// ===== STATE =====
 let pdfDoc = null, currentPage = 1, totalPages = 0;
 let scale = 1.0;
 let currentTool = 'pen';
-let strokeColor = '#f07800';
-let strokeSize = 3;
-let strokeOpacity = 1.0;
-let isDrawing = false;
-let lastX = 0, lastY = 0;
-let strokes = {}; // page -> [{type, points, color, size, opacity, ...}]
-let currentStroke = null;
-let startX = 0, startY = 0;
+let strokeColor = '#f07800', strokeSize = 3, strokeOpacity = 1.0;
+let isDrawing = false, lastX = 0, lastY = 0;
+let strokes = {}, currentStroke = null;
 let textPendingX = 0, textPendingY = 0;
 
-const pdfCanvas = document.getElementById('pdf-canvas');
+// Pinch state
+let pinchActive = false;
+let pinchStartDist = 0, pinchStartScale = 1;
+let pinchStartMidX = 0, pinchStartMidY = 0;
+let pinchStartScrollX = 0, pinchStartScrollY = 0;
+let panActive = false;
+let panStartX = 0, panStartY = 0, panScrollX = 0, panScrollY = 0;
+let renderTimer = null;
+
+const pdfCanvas  = document.getElementById('pdf-canvas');
 const drawCanvas = document.getElementById('draw-canvas');
-const pdfCtx = pdfCanvas.getContext('2d');
-const drawCtx = drawCanvas.getContext('2d');
+const pdfCtx     = pdfCanvas.getContext('2d');
+const drawCtx    = drawCanvas.getContext('2d');
+const canvasArea = document.getElementById('canvas-area');
+const wrapper    = document.getElementById('canvas-wrapper');
+const zoomBadge  = document.getElementById('zoom-badge');
 
-// ===== FILE OPEN =====
-function setupFileInput(el) {
-  el.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') loadPDF(file);
-    el.value = '';
-  });
-}
-setupFileInput(document.getElementById('file-input'));
-setupFileInput(document.getElementById('file-input2'));
-
-// Drag & drop
-const dropZone = document.getElementById('canvas-area');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); });
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if (file && file.type === 'application/pdf') loadPDF(file);
+// ===== FILE =====
+document.getElementById('file-input').addEventListener('change', e => {
+  const f = e.target.files[0]; if (f) loadPDF(f); e.target.value = '';
 });
+canvasArea.addEventListener('dragover', e => e.preventDefault());
+canvasArea.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type==='application/pdf') loadPDF(f); });
 
 async function loadPDF(file) {
   showLoading(true);
   try {
-    const buf = await file.arrayBuffer();
-    pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+    pdfDoc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     totalPages = pdfDoc.numPages;
     document.getElementById('total-pages').textContent = totalPages;
     document.getElementById('file-name').textContent = file.name;
-    currentPage = 1;
-    strokes = {};
+    currentPage = 1; strokes = {};
     document.getElementById('drop-zone').style.display = 'none';
-    document.getElementById('canvas-wrapper').style.display = 'inline-block';
+    wrapper.style.display = 'inline-block';
     await renderPage(currentPage);
     fitPage();
-  } catch(e) {
-    showToast('PDFの読み込みに失敗しました');
-  }
+  } catch { showToast('PDFの読み込みに失敗しました'); }
   showLoading(false);
 }
 
 async function renderPage(num) {
-  showLoading(true);
+  if (!pdfDoc) return;
   const page = await pdfDoc.getPage(num);
   const vp = page.getViewport({ scale });
-  pdfCanvas.width = vp.width;
-  pdfCanvas.height = vp.height;
-  drawCanvas.width = vp.width;
-  drawCanvas.height = vp.height;
+  pdfCanvas.width = drawCanvas.width = vp.width;
+  pdfCanvas.height = drawCanvas.height = vp.height;
+  wrapper.style.transform = ''; // CSSスケールをリセット
   await page.render({ canvasContext: pdfCtx, viewport: vp }).promise;
   redrawAnnotations();
   document.getElementById('page-num').value = num;
-  showLoading(false);
+  updateZoomBadge();
 }
 
 // ===== PAGE NAV =====
-async function changePage(delta) {
+async function changePage(d) {
   if (!pdfDoc) return;
-  const n = currentPage + delta;
+  const n = currentPage + d;
   if (n < 1 || n > totalPages) return;
-  currentPage = n;
-  await renderPage(currentPage);
+  currentPage = n; await renderPage(currentPage);
 }
 async function jumpPage(v) {
   if (!pdfDoc) return;
-  const n = Math.max(1, Math.min(totalPages, parseInt(v) || 1));
-  currentPage = n;
+  currentPage = Math.max(1, Math.min(totalPages, parseInt(v)||1));
   await renderPage(currentPage);
 }
 
 // ===== ZOOM =====
-async function setZoom(z) {
-  scale = Math.max(0.3, Math.min(5, z));
-  document.getElementById('zoom-label').textContent = Math.round(scale*100)+'%';
-  if (pdfDoc) await renderPage(currentPage);
+async function setZoom(z, rerender=true) {
+  scale = Math.max(0.2, Math.min(6, z));
+  updateZoomBadge();
+  if (rerender && pdfDoc) await renderPage(currentPage);
 }
 async function fitPage() {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(currentPage);
   const vp = page.getViewport({ scale: 1 });
-  const area = document.getElementById('canvas-area');
-  const s = Math.min((area.clientWidth - 32) / vp.width, (area.clientHeight - 32) / vp.height);
+  const s = Math.min((canvasArea.clientWidth - 32) / vp.width, (canvasArea.clientHeight - 32) / vp.height);
   await setZoom(s);
+}
+function updateZoomBadge() {
+  zoomBadge.textContent = Math.round(scale * 100) + '%';
 }
 
 // ===== TOOLS =====
@@ -398,38 +331,136 @@ function setTool(t) {
   currentTool = t;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tool-'+t)?.classList.add('active');
-  drawCanvas.style.cursor = t === 'eraser' ? 'cell' : (t === 'text' ? 'text' : 'crosshair');
+  const cur = t==='eraser'?'cell': t==='text'?'text': t==='move'?'grab':'crosshair';
+  drawCanvas.style.cursor = cur;
 }
 function setColor(el) {
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-  el.classList.add('active');
-  strokeColor = el.dataset.color;
+  el.classList.add('active'); strokeColor = el.dataset.color;
 }
 
-// ===== DRAWING =====
-function getPos(e) {
+// ===== TOUCH: PINCH & PAN =====
+function getTouchDist(t) {
+  const dx = t[1].clientX - t[0].clientX, dy = t[1].clientY - t[0].clientY;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+function getTouchMid(t) {
+  return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
+}
+
+// 2本指タッチ開始
+function onPinchStart(e) {
+  pinchActive = true; isDrawing = false; currentStroke = null;
+  pinchStartDist  = getTouchDist(e.touches);
+  pinchStartScale = scale;
+  const mid = getTouchMid(e.touches);
+  pinchStartMidX  = mid.x; pinchStartMidY = mid.y;
+  pinchStartScrollX = canvasArea.scrollLeft;
+  pinchStartScrollY = canvasArea.scrollTop;
+  document.getElementById('gesture-hint').style.display = 'block';
+}
+function onPinchMove(e) {
+  if (!pinchActive) return;
+  const dist = getTouchDist(e.touches);
+  const ratio = dist / pinchStartDist;
+  const newScale = Math.max(0.2, Math.min(6, pinchStartScale * ratio));
+
+  // CSS transform でリアルタイムプレビュー（再レンダリングなし）
+  const cssRatio = newScale / scale;
+  wrapper.style.transformOrigin = 'top left';
+  wrapper.style.transform = `scale(${cssRatio})`;
+
+  // スケール変化に合わせてスクロール位置も追従
+  const mid = getTouchMid(e.touches);
+  const dx = mid.x - pinchStartMidX;
+  const dy = mid.y - pinchStartMidY;
+  canvasArea.scrollLeft = pinchStartScrollX * cssRatio - dx;
+  canvasArea.scrollTop  = pinchStartScrollY * cssRatio - dy;
+
+  // バッジ更新（表示のみ）
+  zoomBadge.textContent = Math.round(newScale*100) + '%';
+  // 遅延レンダリング
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(async () => {
+    await setZoom(newScale);
+  }, 300);
+}
+function onPinchEnd() {
+  pinchActive = false;
+  document.getElementById('gesture-hint').style.display = 'none';
+}
+
+// 1本指パン（moveモード時 or 移動ツール時）
+function onPanStart(e) {
+  panActive = true;
+  panStartX = e.touches[0].clientX;
+  panStartY = e.touches[0].clientY;
+  panScrollX = canvasArea.scrollLeft;
+  panScrollY = canvasArea.scrollTop;
+}
+function onPanMove(e) {
+  if (!panActive) return;
+  const dx = panStartX - e.touches[0].clientX;
+  const dy = panStartY - e.touches[0].clientY;
+  canvasArea.scrollLeft = panScrollX + dx;
+  canvasArea.scrollTop  = panScrollY + dy;
+}
+function onPanEnd() { panActive = false; }
+
+// ===== DRAW (canvas touch) =====
+function getPos(e, idx=0) {
   const rect = drawCanvas.getBoundingClientRect();
-  const scaleX = drawCanvas.width / rect.width;
-  const scaleY = drawCanvas.height / rect.height;
-  if (e.touches) {
-    return {
-      x: (e.touches[0].clientX - rect.left) * scaleX,
-      y: (e.touches[0].clientY - rect.top) * scaleY
-    };
-  }
-  return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY
-  };
+  const sx = drawCanvas.width / rect.width, sy = drawCanvas.height / rect.height;
+  const src = e.touches ? e.touches[idx] : e;
+  return { x: (src.clientX - rect.left) * sx, y: (src.clientY - rect.top) * sy };
 }
 
-function onStart(e) {
+// Apple Pencil 判定
+function isStylus(e) {
+  return e.touches && e.touches[0] && e.touches[0].touchType === 'stylus';
+}
+
+drawCanvas.addEventListener('touchstart', e => {
   if (!pdfDoc) return;
   e.preventDefault();
+
+  if (e.touches.length >= 2) {
+    // 2本指 → ピンチ開始、描画キャンセル
+    isDrawing = false; currentStroke = null;
+    onPinchStart(e);
+    return;
+  }
+
+  // 移動ツール or 1本指（スタイラスでない場合で moveツール）
+  if (currentTool === 'move' && !isStylus(e)) {
+    onPanStart(e); return;
+  }
+
+  // 描画開始
+  startDraw(e);
+}, { passive: false });
+
+drawCanvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length >= 2) { onPinchMove(e); return; }
+  if (panActive) { onPanMove(e); return; }
+  if (isDrawing) moveDraw(e);
+}, { passive: false });
+
+drawCanvas.addEventListener('touchend', e => {
+  if (pinchActive && e.touches.length < 2) { onPinchEnd(); return; }
+  if (panActive) { onPanEnd(); return; }
+  if (isDrawing) endDraw(e);
+});
+
+// マウス対応（PCでのテスト用）
+drawCanvas.addEventListener('mousedown', e => { if (!pdfDoc) return; startDraw(e); });
+drawCanvas.addEventListener('mousemove', e => { if (isDrawing) moveDraw(e); });
+drawCanvas.addEventListener('mouseup',   e => endDraw(e));
+
+function startDraw(e) {
   const pos = getPos(e);
-  isDrawing = true;
-  lastX = pos.x; lastY = pos.y;
-  startX = pos.x; startY = pos.y;
+  isDrawing = true; lastX = pos.x; lastY = pos.y;
 
   if (currentTool === 'text') {
     isDrawing = false;
@@ -438,24 +469,20 @@ function onStart(e) {
     document.getElementById('text-input-overlay').classList.add('show');
     return;
   }
-
   if (currentTool === 'pen' || currentTool === 'marker') {
     currentStroke = { type: currentTool, points: [[pos.x, pos.y]], color: strokeColor, size: strokeSize, opacity: strokeOpacity };
   } else if (currentTool === 'eraser') {
     currentStroke = { type: 'eraser', points: [[pos.x, pos.y]], size: strokeSize * 4 };
-  } else {
+  } else if (currentTool !== 'move') {
     currentStroke = { type: currentTool, x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y, color: strokeColor, size: strokeSize, opacity: strokeOpacity };
   }
 }
 
-function onMove(e) {
-  if (!isDrawing || !currentStroke) return;
-  e.preventDefault();
+function moveDraw(e) {
+  if (!currentStroke) return;
   const pos = getPos(e);
-
   if (currentTool === 'pen' || currentTool === 'marker' || currentTool === 'eraser') {
     currentStroke.points.push([pos.x, pos.y]);
-    // live draw
     drawCtx.save();
     if (currentTool === 'eraser') {
       drawCtx.globalCompositeOperation = 'destination-out';
@@ -465,25 +492,19 @@ function onMove(e) {
       drawCtx.globalAlpha = currentTool === 'marker' ? currentStroke.opacity * 0.5 : currentStroke.opacity;
       drawCtx.strokeStyle = currentStroke.color;
       drawCtx.lineWidth = currentStroke.size;
-      drawCtx.lineCap = 'round';
-      drawCtx.lineJoin = 'round';
+      drawCtx.lineCap = 'round'; drawCtx.lineJoin = 'round';
     }
-    drawCtx.beginPath();
-    drawCtx.moveTo(lastX, lastY);
-    drawCtx.lineTo(pos.x, pos.y);
-    drawCtx.stroke();
+    drawCtx.beginPath(); drawCtx.moveTo(lastX, lastY); drawCtx.lineTo(pos.x, pos.y); drawCtx.stroke();
     drawCtx.restore();
     lastX = pos.x; lastY = pos.y;
   } else {
-    // shape preview
     currentStroke.x2 = pos.x; currentStroke.y2 = pos.y;
-    redrawAnnotations();
-    drawShapePreview(currentStroke);
+    redrawAnnotations(); drawShapePreview(currentStroke);
   }
 }
 
-function onEnd(e) {
-  if (!isDrawing || !currentStroke) return;
+function endDraw(e) {
+  if (!isDrawing || !currentStroke) { isDrawing = false; return; }
   isDrawing = false;
   if (!strokes[currentPage]) strokes[currentPage] = [];
   strokes[currentPage].push({ ...currentStroke, points: currentStroke.points ? [...currentStroke.points] : undefined });
@@ -491,97 +512,61 @@ function onEnd(e) {
   redrawAnnotations();
 }
 
-drawCanvas.addEventListener('mousedown', onStart);
-drawCanvas.addEventListener('mousemove', onMove);
-drawCanvas.addEventListener('mouseup', onEnd);
-drawCanvas.addEventListener('touchstart', onStart, { passive: false });
-drawCanvas.addEventListener('touchmove', onMove, { passive: false });
-drawCanvas.addEventListener('touchend', onEnd);
-
-// ===== DRAW SHAPE PREVIEW =====
+// ===== SHAPES =====
 function drawShapePreview(s) {
   drawCtx.save();
-  drawCtx.globalAlpha = s.opacity;
-  drawCtx.strokeStyle = s.color;
-  drawCtx.lineWidth = s.size;
-  drawCtx.lineCap = 'round';
+  drawCtx.globalAlpha = s.opacity; drawCtx.strokeStyle = s.color;
+  drawCtx.lineWidth = s.size; drawCtx.lineCap = 'round';
   if (s.type === 'rect') {
-    drawCtx.strokeRect(s.x1, s.y1, s.x2 - s.x1, s.y2 - s.y1);
+    drawCtx.strokeRect(s.x1, s.y1, s.x2-s.x1, s.y2-s.y1);
   } else if (s.type === 'circle') {
-    const rx = (s.x2 - s.x1) / 2, ry = (s.y2 - s.y1) / 2;
-    drawCtx.beginPath();
-    drawCtx.ellipse(s.x1 + rx, s.y1 + ry, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2);
-    drawCtx.stroke();
+    const rx=(s.x2-s.x1)/2, ry=(s.y2-s.y1)/2;
+    drawCtx.beginPath(); drawCtx.ellipse(s.x1+rx, s.y1+ry, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2); drawCtx.stroke();
   } else if (s.type === 'arrow') {
     drawArrow(drawCtx, s.x1, s.y1, s.x2, s.y2, s.size);
   }
   drawCtx.restore();
 }
-
 function drawArrow(ctx, x1, y1, x2, y2, lw) {
-  const headLen = Math.max(lw * 4, 16);
-  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const hl = Math.max(lw*4, 16), ang = Math.atan2(y2-y1, x2-x1);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6), y2 - headLen * Math.sin(angle - Math.PI/6));
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6), y2 - headLen * Math.sin(angle + Math.PI/6));
+  ctx.moveTo(x2,y2); ctx.lineTo(x2-hl*Math.cos(ang-Math.PI/6), y2-hl*Math.sin(ang-Math.PI/6));
+  ctx.moveTo(x2,y2); ctx.lineTo(x2-hl*Math.cos(ang+Math.PI/6), y2-hl*Math.sin(ang+Math.PI/6));
   ctx.stroke();
 }
 
-// ===== REDRAW ALL ANNOTATIONS =====
+// ===== REDRAW =====
 function redrawAnnotations() {
   drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-  const list = strokes[currentPage] || [];
-  for (const s of list) {
+  for (const s of (strokes[currentPage] || [])) {
     drawCtx.save();
     if (s.type === 'eraser') {
       drawCtx.globalCompositeOperation = 'destination-out';
-      drawCtx.lineWidth = s.size;
-      drawCtx.lineCap = 'round';
-      drawCtx.lineJoin = 'round';
+      drawCtx.lineWidth = s.size; drawCtx.lineCap = 'round'; drawCtx.lineJoin = 'round';
       drawCtx.beginPath();
-      for (let i = 0; i < s.points.length; i++) {
-        i === 0 ? drawCtx.moveTo(...s.points[i]) : drawCtx.lineTo(...s.points[i]);
-      }
+      s.points.forEach((p,i) => i===0 ? drawCtx.moveTo(...p) : drawCtx.lineTo(...p));
       drawCtx.stroke();
-    } else if (s.type === 'pen' || s.type === 'marker') {
+    } else if (s.type==='pen'||s.type==='marker') {
       drawCtx.globalCompositeOperation = 'source-over';
-      drawCtx.globalAlpha = s.type === 'marker' ? s.opacity * 0.5 : s.opacity;
-      drawCtx.strokeStyle = s.color;
-      drawCtx.lineWidth = s.size;
-      drawCtx.lineCap = 'round';
-      drawCtx.lineJoin = 'round';
+      drawCtx.globalAlpha = s.type==='marker' ? s.opacity*0.5 : s.opacity;
+      drawCtx.strokeStyle = s.color; drawCtx.lineWidth = s.size;
+      drawCtx.lineCap = 'round'; drawCtx.lineJoin = 'round';
       drawCtx.beginPath();
-      for (let i = 0; i < s.points.length; i++) {
-        i === 0 ? drawCtx.moveTo(...s.points[i]) : drawCtx.lineTo(...s.points[i]);
-      }
+      s.points.forEach((p,i) => i===0 ? drawCtx.moveTo(...p) : drawCtx.lineTo(...p));
       drawCtx.stroke();
-    } else if (s.type === 'text') {
-      drawCtx.globalAlpha = s.opacity;
-      drawCtx.fillStyle = s.color;
-      drawCtx.font = `bold ${s.size * 6}px 'Helvetica Neue', Arial, sans-serif`;
-      const lines = s.text.split('\n');
-      lines.forEach((line, i) => drawCtx.fillText(line, s.x, s.y + i * s.size * 7));
+    } else if (s.type==='text') {
+      drawCtx.globalAlpha = s.opacity; drawCtx.fillStyle = s.color;
+      drawCtx.font = `bold ${s.size*6}px 'Helvetica Neue',Arial,sans-serif`;
+      s.text.split('\n').forEach((l,i) => drawCtx.fillText(l, s.x, s.y + i*s.size*7));
     } else {
-      drawCtx.globalAlpha = s.opacity;
-      drawCtx.strokeStyle = s.color;
-      drawCtx.lineWidth = s.size;
-      drawCtx.lineCap = 'round';
-      if (s.type === 'rect') {
-        drawCtx.strokeRect(s.x1, s.y1, s.x2 - s.x1, s.y2 - s.y1);
-      } else if (s.type === 'circle') {
-        const rx = (s.x2 - s.x1) / 2, ry = (s.y2 - s.y1) / 2;
-        drawCtx.beginPath();
-        drawCtx.ellipse(s.x1 + rx, s.y1 + ry, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2);
-        drawCtx.stroke();
-      } else if (s.type === 'arrow') {
-        drawArrow(drawCtx, s.x1, s.y1, s.x2, s.y2, s.size);
-      }
+      drawCtx.globalAlpha = s.opacity; drawCtx.strokeStyle = s.color;
+      drawCtx.lineWidth = s.size; drawCtx.lineCap = 'round';
+      if (s.type==='rect') drawCtx.strokeRect(s.x1,s.y1,s.x2-s.x1,s.y2-s.y1);
+      else if (s.type==='circle') {
+        const rx=(s.x2-s.x1)/2, ry=(s.y2-s.y1)/2;
+        drawCtx.beginPath(); drawCtx.ellipse(s.x1+rx,s.y1+ry,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2); drawCtx.stroke();
+      } else if (s.type==='arrow') drawArrow(drawCtx,s.x1,s.y1,s.x2,s.y2,s.size);
     }
     drawCtx.restore();
   }
@@ -593,63 +578,45 @@ function confirmText() {
   const txt = document.getElementById('text-input-field').value.trim();
   if (txt) {
     if (!strokes[currentPage]) strokes[currentPage] = [];
-    strokes[currentPage].push({ type: 'text', text: txt, x: textPendingX, y: textPendingY, color: strokeColor, size: Math.max(strokeSize, 2), opacity: strokeOpacity });
+    strokes[currentPage].push({ type:'text', text:txt, x:textPendingX, y:textPendingY, color:strokeColor, size:Math.max(strokeSize,2), opacity:strokeOpacity });
     redrawAnnotations();
   }
   cancelText();
 }
 document.getElementById('text-input-field').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.ctrlKey) confirmText();
-  if (e.key === 'Escape') cancelText();
+  if (e.key==='Enter'&&e.ctrlKey) confirmText();
+  if (e.key==='Escape') cancelText();
 });
 
-// ===== UNDO =====
+// ===== UNDO / CLEAR / SAVE =====
 function undoStroke() {
-  if (!strokes[currentPage] || strokes[currentPage].length === 0) { showToast('元に戻す操作がありません'); return; }
-  strokes[currentPage].pop();
-  redrawAnnotations();
+  if (!(strokes[currentPage]||[]).length) { showToast('元に戻す操作がありません'); return; }
+  strokes[currentPage].pop(); redrawAnnotations();
 }
-
-// ===== CLEAR =====
 function clearAnnotations() {
   if (!confirm('このページの書き込みをすべて消去しますか？')) return;
-  strokes[currentPage] = [];
-  redrawAnnotations();
+  strokes[currentPage] = []; redrawAnnotations();
 }
-
-// ===== SAVE =====
 function saveImage() {
   if (!pdfDoc) { showToast('PDFが開かれていません'); return; }
-  const merged = document.createElement('canvas');
-  merged.width = pdfCanvas.width;
-  merged.height = pdfCanvas.height;
-  const mCtx = merged.getContext('2d');
-  mCtx.drawImage(pdfCanvas, 0, 0);
-  mCtx.drawImage(drawCanvas, 0, 0);
-  const link = document.createElement('a');
-  link.download = `図面_p${currentPage}_${new Date().toISOString().slice(0,10)}.png`;
-  link.href = merged.toDataURL('image/png');
-  link.click();
-  showToast('画像を保存しました');
+  const m = document.createElement('canvas');
+  m.width = pdfCanvas.width; m.height = pdfCanvas.height;
+  const c = m.getContext('2d');
+  c.drawImage(pdfCanvas, 0, 0); c.drawImage(drawCanvas, 0, 0);
+  const a = document.createElement('a');
+  a.download = `図面_p${currentPage}_${new Date().toISOString().slice(0,10)}.png`;
+  a.href = m.toDataURL('image/png'); a.click();
+  showToast('PNG保存しました');
 }
 
 // ===== HELPERS =====
-let toastTimer = null;
+let toastTimer;
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
-function showLoading(show) {
-  document.getElementById('loading').classList.toggle('show', show);
-}
-
-// Prevent default scroll when drawing
-document.getElementById('canvas-area').addEventListener('touchmove', e => {
-  if (isDrawing) e.preventDefault();
-}, { passive: false });
+function showLoading(v) { document.getElementById('loading').classList.toggle('show', v); }
 </script>
 </body>
 </html>
