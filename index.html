@@ -3,282 +3,123 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>鉄骨図面ビューア Pro</title>
+<title>鉄骨図面ビューア - 修正版</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-/* CSSは基本そのまま、変数を追加してメンテナンス性を向上 */
 :root {
-  --bg: #1e2228; --pan: #262c34; --pan2: #2e363f; --brd: #4a5a6a;
-  --acc: #f07800; --tx: #ffffff; --tx2: #c8d8e4; --red: #c02020;
-  --shadow: 0 4px 24px #0008;
+  --bg: #1e2228; --pan: #262c34; --acc: #f07800; --tx: #ffffff; --brd: #4a5a6a;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-body { 
-  background: var(--bg); color: var(--tx); font-family: system-ui, -apple-system, sans-serif;
-  display: flex; flex-direction: column; height: 100dvh; overflow: hidden;
-  user-select: none; -webkit-user-select: none;
-}
+body { background: var(--bg); color: var(--tx); font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
 
-/* UIパーツの共通化 */
+/* ヘッダー：スクロール可能にしてボタンが消えないように改善 */
+#hdr { background: var(--pan); border-bottom: 2px solid var(--acc); flex-shrink: 0; }
+.hr { display: flex; align-items: center; gap: 6px; padding: 6px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+.hr::-webkit-scrollbar { height: 4px; }
+.hr::-webkit-scrollbar-thumb { background: var(--brd); }
+
 .btn { 
-  height: 38px; padding: 0 12px; border: 2px solid var(--brd); background: var(--pan2);
-  color: var(--tx); border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
-  display: flex; align-items: center; gap: 4px; transition: all .1s;
+  padding: 8px 12px; background: #3a424b; border: 1px solid var(--brd); color: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; flex-shrink: 0;
 }
-.btn:active { transform: scale(0.95); opacity: 0.8; }
 .btn.on { background: var(--acc); border-color: var(--acc); }
-.btn.rd { background: var(--red); border-color: var(--red); }
 
-/* ヘッダー構成 */
-#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); }
-.hr { height: 46px; display: flex; align-items: center; gap: 4px; padding: 0 8px; overflow-x: auto; }
-.hr::-webkit-scrollbar { display: none; }
-.logo { font-size: 14px; font-weight: 800; color: var(--acc); padding-right: 8px; border-right: 2px solid var(--brd); white-space: nowrap; }
-.vs { width: 2px; height: 28px; background: var(--brd); margin: 0 4px; }
+#ca { flex: 1; position: relative; background: #444; overflow: hidden; touch-action: none; }
+#cw { position: absolute; transform-origin: 0 0; background: #fff; }
+canvas { position: absolute; top: 0; left: 0; }
 
-/* キャンバスエリア */
-#ca { flex: 1; position: relative; background: #444; touch-action: none; }
-#cw { position: absolute; top: 0; left: 0; transform-origin: 0 0; background: #fff; }
-#pdfcvs, #drawcvs, #selcvs { position: absolute; top: 0; left: 0; }
-#selcvs { pointer-events: none; }
-
-/* ドロップゾーン */
-#dz { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--bg); z-index: 10; }
-.dzb { background: var(--acc); border: none; padding: 14px 32px; border-radius: 12px; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
-
-/* サブウィンドウ共通 */
-.swn { position: fixed; z-index: 200; background: var(--pan); border: 3px solid var(--acc); border-radius: 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
-.swn-tb { height: 34px; background: var(--pan2); display: flex; align-items: center; justify-content: space-between; padding: 0 10px; cursor: grab; border-bottom: 2px solid var(--brd); }
-
-/* その他UI要素 (計算機・トースト等は元のスタイルを維持) */
-#calc { display: none; position: fixed; z-index: 400; background: var(--pan); border: 2px solid var(--brd); border-radius: 14px; width: 300px; box-shadow: var(--shadow); bottom: 20px; right: 16px; }
-#toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--pan); border: 2px solid var(--brd); border-radius: 10px; padding: 9px 18px; opacity: 0; transition: 0.3s; z-index: 999; }
+/* サブウィンドウのスタイル */
+.swn { position: fixed; z-index: 1000; background: #fff; border: 2px solid var(--acc); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.swn-tb { height: 30px; background: var(--pan); display: flex; justify-content: space-between; align-items: center; padding: 0 10px; cursor: move; }
 </style>
 </head>
 <body>
 
 <div id="hdr">
   <div class="hr">
-    <span class="logo">⚙鉄骨Pro</span>
-    <input type="file" id="fi" accept="application/pdf" style="display:none">
-    <button class="btn" onclick="UI.openFile()">📂 開く</button>
-    <span id="fnlbl">ファイル未選択</span>
-    <div class="vs"></div>
-    <button class="btn" onclick="Core.changePage(-1)">◀</button>
-    <input id="pgn" class="pgni" type="number" min="1" value="1" style="width:50px">
-    <span class="pgtot">/<span id="tpn">0</span></span>
-    <button class="btn" onclick="Core.changePage(1)">▶</button>
-    <div class="vs"></div>
-    <button class="btn" onclick="Core.zoom(0.8)">－</button>
-    <span id="zlbl" style="min-width:40px; text-align:center">100%</span>
-    <button class="btn" onclick="Core.zoom(1.2)">＋</button>
-    <div class="vs"></div>
-    <button class="btn rd" onclick="Core.undo()">↩ 戻す</button>
-    <button class="btn rd" onclick="Core.clearAll()">全消去</button>
-    <div class="vs"></div>
-    <button class="btn on" onclick="Exporter.save()">💾 保存</button>
-    <button class="btn" id="calcbtn" onclick="UI.toggleCalc()">🧮 計算</button>
+    <button class="btn" onclick="document.getElementById('fi').click()">📂 開く</button>
+    <input type="file" id="fi" style="display:none" accept=".pdf">
+    <button class="btn" onclick="changePage(-1)">◀</button>
+    <span id="pgn_disp">1 / 1</span>
+    <button class="btn" onclick="changePage(1)">▶</button>
+    <button class="btn" onclick="zoom(0.8)">－</button>
+    <button class="btn" onclick="zoom(1.2)">＋</button>
   </div>
   <div class="hr">
-    <button class="btn on tool-btn" data-tool="pen" onclick="UI.setTool('pen')">✏️ ペン</button>
-    <button class="btn tool-btn" data-tool="hl" onclick="UI.setTool('hl')">蛍光ペン</button>
-    <button class="btn tool-btn" data-tool="text" onclick="UI.setTool('text')">文字</button>
-    <button class="btn tool-btn" data-tool="eraser" onclick="UI.setTool('eraser')">消しゴム</button>
-    <div class="vs"></div>
-    <div id="color-pal" style="display:flex; gap:8px">
-      <div class="csw on" style="background:#1a1a1a; width:28px; height:28px; border-radius:50%; border:2px solid #888" data-color="#1a1a1a"></div>
-      <div class="csw" style="background:#cc2020; width:28px; height:28px; border-radius:50%" data-color="#cc2020"></div>
-    </div>
-    <div class="vs"></div>
-    <span style="font-size:12px">太さ</span>
-    <input type="range" id="stroke-width" min="1" max="20" value="3" style="width:60px">
+    <button class="btn on" id="btn-pen" onclick="setTool('pen')">✏️ ペン</button>
+    <button class="btn" id="btn-eraser" onclick="setTool('eraser')"> eraser</button>
+    <button class="btn" id="btn-subwin" onclick="setTool('subwin')" style="border: 2px solid #00d4ff;">🗔 サブ窓</button>
+    <button class="btn" onclick="clearDraw()">全消去</button>
   </div>
 </div>
 
 <div id="ca">
   <div id="cw" style="display:none">
-    <canvas id="pdfcvs"></canvas>
-    <canvas id="drawcvs"></canvas>
-    <canvas id="selcvs"></canvas>
-  </div>
-  <div id="dz">
-    <div style="font-size:48px">📄</div>
-    <div class="dzm">PDFをドロップまたはボタンから選択</div>
-    <button class="dzb" onclick="UI.openFile()">📂 PDFを開く</button>
+    <canvas id="pdfCvs"></canvas>
+    <canvas id="drawCvs"></canvas>
+    <canvas id="tempCvs"></canvas>
   </div>
 </div>
 
-<div id="calc">...</div>
-<div id="toast"></div>
-
 <script>
-/**
- * 定数・設定管理
- */
-const CONFIG = {
-  MAX_CANVAS_SIZE: 4000,
-  DEFAULT_ZOOM: 1.0,
-  HL_ALPHA: 0.38,
-  DB_NAME: 'TekkoV11',
-  DB_VERSION: 1
+// 基本設定と状態管理
+let pdfDoc = null, pageNum = 1, scale = 1.0, currentTool = 'pen';
+const ca = document.getElementById('ca'), cw = document.getElementById('cw');
+const pdfCvs = document.getElementById('pdfCvs'), drawCvs = document.getElementById('drawCvs'), tempCvs = document.getElementById('tempCvs');
+
+// ツール切り替え
+function setTool(t) {
+  currentTool = t;
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('on'));
+  document.getElementById('btn-' + t)?.classList.add('on');
+  if(t === 'subwin') alert("図面上の拡大したい範囲を指で囲ってください");
+}
+
+// ファイル読み込み
+document.getElementById('fi').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const data = await file.arrayBuffer();
+  pdfDoc = await pdfjsLib.getDocument({data}).promise;
+  renderPage(1);
 };
 
-/**
- * 状態管理 (State)
- */
-const State = {
-  pdfDoc: null,
-  pageNum: 1,
-  scale: 1.0,
-  currentTool: 'pen',
-  currentColor: '#1a1a1a',
-  currentSize: 3,
-  strokes: {}, // ページごとのストローク
-  undoStack: []
+async function renderPage(num) {
+  pageNum = num;
+  const page = await pdfDoc.getPage(num);
+  const vp = page.getViewport({scale});
+  [pdfCvs, drawCvs, tempCvs].forEach(c => { c.width = vp.width; c.height = vp.height; });
+  cw.style.width = vp.width + 'px'; cw.style.height = vp.height + 'px';
+  cw.style.display = 'block';
+  await page.render({canvasContext: pdfCvs.getContext('2d'), viewport: vp}).promise;
+  document.getElementById('pgn_disp').textContent = `${num} / ${pdfDoc.numPages}`;
+}
+
+// ズーム・ページ移動
+function zoom(f) { scale *= f; renderPage(pageNum); }
+function changePage(d) { if(pdfDoc && pageNum+d > 0 && pageNum+d <= pdfDoc.numPages) renderPage(pageNum+d); }
+function clearDraw() { drawCvs.getContext('2d').clearRect(0,0,drawCvs.width,drawCvs.height); }
+
+// 描画・サブ窓ロジック (簡易版)
+let isDown = false, x1, y1;
+ca.onpointerdown = (e) => {
+  isDown = true;
+  const r = cw.getBoundingClientRect();
+  x1 = (e.clientX - r.left) / scale; y1 = (e.clientY - r.top) / scale;
 };
-
-/**
- * 描画コアロジック (Core)
- */
-const Core = {
-  async loadPDF(data) {
-    State.pdfDoc = await pdfjsLib.getDocument({data}).promise;
-    document.getElementById('tpn').textContent = State.pdfDoc.numPages;
-    this.renderPage(1);
-  },
-
-  async renderPage(num) {
-    State.pageNum = num;
-    const page = await State.pdfDoc.getPage(num);
-    const viewport = page.getViewport({ scale: State.scale });
-    
-    const cvs = document.getElementById('pdfcvs');
-    const ctx = cvs.getContext('2d');
-    cvs.width = viewport.width;
-    cvs.height = viewport.height;
-    
-    // PDF描画
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    
-    // UI更新
-    document.getElementById('pgn').value = num;
-    document.getElementById('cw').style.display = 'block';
-    document.getElementById('dz').style.display = 'none';
-    
-    this.drawStrokes();
-  },
-
-  drawStrokes() {
-    const cvs = document.getElementById('drawcvs');
-    const ctx = cvs.getContext('2d');
-    const viewport = cvs.getBoundingClientRect(); // 実際はPDFに合わせる
-    cvs.width = document.getElementById('pdfcvs').width;
-    cvs.height = document.getElementById('pdfcvs').height;
-    
-    const list = State.strokes[State.pageNum] || [];
-    list.forEach(s => this.drawOne(ctx, s));
-  },
-
-  drawOne(ctx, s) {
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    
-    if (s.type === 'pen' || s.type === 'hl') {
-      ctx.globalAlpha = s.type === 'hl' ? CONFIG.HL_ALPHA : 1.0;
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.size;
-      ctx.beginPath();
-      s.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-      ctx.stroke();
-    }
-    // ... 他の図形描画
-    ctx.restore();
-  },
-
-  zoom(factor) {
-    State.scale *= factor;
-    document.getElementById('zlbl').textContent = Math.round(State.scale * 100) + '%';
-    this.renderPage(State.pageNum);
-  },
-
-  changePage(delta) {
-    const newPage = State.pageNum + delta;
-    if (newPage > 0 && newPage <= State.pdfDoc.numPages) {
-      this.renderPage(newPage);
-    }
-  },
-
-  undo() {
-    const list = State.strokes[State.pageNum];
-    if (list && list.length > 0) {
-      list.pop();
-      this.drawStrokes();
-    }
+ca.onpointermove = (e) => {
+  if(!isDown) return;
+  const r = cw.getBoundingClientRect();
+  const x2 = (e.clientX - r.left) / scale, y2 = (e.clientY - r.top) / scale;
+  const ctx = currentTool === 'pen' ? drawCvs.getContext('2d') : tempCvs.getContext('2d');
+  
+  if(currentTool === 'pen') {
+    ctx.lineTo(x2, y2); ctx.stroke();
+  } else if(currentTool === 'subwin') {
+    const tctx = tempCvs.getContext('2d');
+    tctx.clearRect(0,0,tempCvs.width,tempCvs.height);
+    tctx.strokeStyle = '#00d4ff'; tctx.strokeRect(x1, y1, x2-x1, y2-y1);
   }
 };
-
-/**
- * UI操作・イベント管理 (UI)
- */
-const UI = {
-  init() {
-    // カラーパレットのイベント設定
-    document.querySelectorAll('.csw').forEach(el => {
-      el.onclick = () => {
-        document.querySelectorAll('.csw').forEach(c => c.classList.remove('on'));
-        el.classList.add('on');
-        State.currentColor = el.dataset.color;
-      };
-    });
-
-    // 太さスライダー
-    document.getElementById('stroke-width').oninput = (e) => {
-      State.currentSize = parseInt(e.target.value);
-    };
-
-    // ファイル入力
-    document.getElementById('fi').onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => Core.loadPDF(ev.target.result);
-      reader.readAsArrayBuffer(file);
-    };
-  },
-
-  openFile() {
-    document.getElementById('fi').click();
-  },
-
-  setTool(tool) {
-    State.currentTool = tool;
-    document.querySelectorAll('.tool-btn').forEach(b => {
-      b.classList.toggle('on', b.dataset.tool === tool);
-    });
-  },
-
-  showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.style.opacity = 1;
-    setTimeout(() => t.style.opacity = 0, 2000);
-  }
-};
-
-/**
- * 保存・書き出し (Exporter)
- */
-const Exporter = {
-  save() {
-    UI.showToast("保存中...");
-    // 保存ロジック (jsPDF) をここに集約
-  }
-};
-
-// 初期化実行
-UI.init();
+ca.onpointerup = (e) => { isDown = false; tempCvs.getContext('2d').clearRect(0,0,tempCvs.width,tempCvs.height); };
 </script>
 </body>
 </html>
