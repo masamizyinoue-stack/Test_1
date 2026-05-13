@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V2.04</title>
+<title>M_Viewer V2.05</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -176,7 +176,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 <div id="hdr">
 <!-- 行1: ロゴ/開く/ファイル名 | Undo/Save/スクショ/印刷/計算 | Close(右端) -->
 <div class="hr">
-  <span class="logo">M_Viewer <span style="font-size:10px">V2.04</span></span>
+  <span class="logo">M_Viewer <span style="font-size:10px">V2.05</span></span>
   <input type="file" id="fi" accept="application/pdf" style="display:none">
   <button class="btn" onclick="openFile()">📂 開く</button>
   <span id="fnlbl">ファイル未選択</span>
@@ -385,7 +385,7 @@ function schedSave(){
   autoSvTm=setTimeout(async()=>{
     if(!A.pdfDoc||!A.origBuf)return;
     const d={buf:A.origBuf.slice(0),file:A.fileName,
-      strokes:JSON.parse(JSON.stringify(A.strokes)),page:A.currentPage,scale:A.scale,ts:Date.now()};
+      strokes:(typeof structuredClone==='function'?structuredClone(A.strokes):JSON.parse(JSON.stringify(A.strokes))),page:A.currentPage,scale:A.scale,ts:Date.now()};
     await IDB.set('last',d);await IDB.set('f:'+safeKey(A.fileName),d);
   },1200);
 }
@@ -467,6 +467,8 @@ class SubWin{
     this.pinch=null;this.panSt=null;
     this.curStroke=null;this.isDrawing=false;this.lastX=0;this.lastY=0;
     this._rv=0;this._pdfCache=null;this._pdfCacheSc=0;this._pdfCachePg=0;
+    this._annCvs=null;this._annDirty=true; // アノテーションキャッシュ
+    this._cleanups=[]; // ドキュメントリスナー解放用
     // ★ サブ窓固有カラー (枠色=メインオーバーレイ色と一致)
     const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
     const SW_FILLS=['rgba(240,120,0,0.12)','rgba(0,160,255,0.12)','rgba(0,200,80,0.12)','rgba(255,80,160,0.12)','rgba(200,200,0,0.12)'];
@@ -519,14 +521,21 @@ class SubWin{
       await page.render({canvasContext:pctx,viewport:vp}).promise;
       this._pdfCache=pdfOff;this._pdfCacheSc=sc;this._pdfCachePg=this.pageNum;
     }
-    const annOff=document.createElement('canvas');annOff.width=vp.width;annOff.height=vp.height;
-    const actx=annOff.getContext('2d');
-    (this.strokes[this.pageNum]||[]).forEach(s=>drawOne(s,actx,sc));
+    // アノテーション層: キャッシュ使用(サイズ変化またはdirtyの時のみ再描画)
+    const needAnn=this._annDirty||!this._annCvs||this._annCvs.width!==vp.width||this._annCvs.height!==vp.height;
+    if(needAnn){
+      if(!this._annCvs)this._annCvs=document.createElement('canvas');
+      this._annCvs.width=vp.width;this._annCvs.height=vp.height;
+      const actx=this._annCvs.getContext('2d');
+      actx.clearRect(0,0,vp.width,vp.height);
+      (this.strokes[this.pageNum]||[]).forEach(s=>drawOne(s,actx,sc));
+      this._annDirty=false;
+    }
     if(ver!==this._rv)return;
     this.cvs.width=vp.width;this.cvs.height=vp.height;
     this.cvs.style.width=vp.width+'px';this.cvs.style.height=vp.height+'px';
     this.ctx.clearRect(0,0,vp.width,vp.height);
-    this.ctx.drawImage(pdfOff,0,0);this.ctx.drawImage(annOff,0,0);
+    this.ctx.drawImage(pdfOff,0,0);this.ctx.drawImage(this._annCvs,0,0);
     this._updateXf();
     this.zlEl.textContent=Math.round(sc*100)+'%';
   }
@@ -663,7 +672,7 @@ class SubWin{
     if(!this.strokes[this.pageNum])this.strokes[this.pageNum]=[];
     const s=this.curStroke;
     this.strokes[this.pageNum].push({...s,points:s.points?[...s.points]:undefined});
-    this.curStroke=null;
+    this.curStroke=null;this._annDirty=true; // アノテーションキャッシュ無効化
     if(this.sel)this.selCtx.clearRect(0,0,this.sel.width,this.sel.height);
     this.render();A.redraw();schedSave();
   }
@@ -675,8 +684,16 @@ class SubWin{
     h.addEventListener('touchstart',st,{passive:false});h.addEventListener('mousedown',st);
     const mv=e=>{if(!d)return;const s=e.touches?e.touches[0]:e;
       this.el.style.left=(ex+s.clientX-ox)+'px';this.el.style.top=(ey+s.clientY-oy)+'px';};
+    const en=()=>d=false;
     document.addEventListener('touchmove',mv,{passive:true});document.addEventListener('mousemove',mv);
-    const en=()=>d=false;document.addEventListener('touchend',en);document.addEventListener('mouseup',en);
+    document.addEventListener('touchend',en);document.addEventListener('mouseup',en);
+    // メモリリーク防止: close時に解放
+    this._cleanups.push(()=>{
+      document.removeEventListener('touchmove',mv);
+      document.removeEventListener('mousemove',mv);
+      document.removeEventListener('touchend',en);
+      document.removeEventListener('mouseup',en);
+    });
   }
   /* ★ リサイズ時にinnerScaleを連動 */
   _bindResize(h){
@@ -693,15 +710,27 @@ class SubWin{
       this.innerScale=Math.max(0.2,Math.min(8,initSc*k));
       this._pdfCache=null;
       clearTimeout(this._resizeTm);this._resizeTm=setTimeout(()=>this.render(),60);};
+    const en=()=>d=false;
     document.addEventListener('touchmove',mv,{passive:true});document.addEventListener('mousemove',mv);
-    const en=()=>d=false;document.addEventListener('touchend',en);document.addEventListener('mouseup',en);
+    document.addEventListener('touchend',en);document.addEventListener('mouseup',en);
+    this._cleanups.push(()=>{
+      document.removeEventListener('touchmove',mv);
+      document.removeEventListener('mousemove',mv);
+      document.removeEventListener('touchend',en);
+      document.removeEventListener('mouseup',en);
+    });
   }
   update(strokes,pn){
-    this.strokes=strokes;
+    this.strokes=strokes;this._annDirty=true; // ストローク変化
     if(pn!==undefined&&pn!==this.pageNum){this.pageNum=pn;this._pdfCache=null;}
     this.render();
   }
-  close(){document.body.removeChild(this.el);const i=subWindows.indexOf(this);if(i>=0)subWindows.splice(i,1);if(typeof A!=='undefined')A.redrawSelOv?.();}
+  close(){
+    this._cleanups.forEach(fn=>fn());this._cleanups=[];
+    document.body.removeChild(this.el);
+    const i=subWindows.indexOf(this);if(i>=0)subWindows.splice(i,1);
+    if(typeof A!=='undefined')A.redrawSelOv?.();
+  }
 }
 
 /* ============================================================
@@ -719,6 +748,7 @@ const A=(()=>{
   let pdfDoc=null,origBuf=null,fileName='';
   let currentPage=1,totalPages=0,scale=1;
   let strokes={};
+  const _pgCache=new Map(); // PDF.js ページオブジェクトキャッシュ
   const maxScale=8; // ★ 最大800%
   // ★ cssExtraZoom対応
   let renderScale=1, cssExtraZoom=1;
@@ -1021,7 +1051,9 @@ const A=(()=>{
   /* ★ renderPage: renderScale + cssExtraZoom で800%対応 */
   async function renderPage(num){
     if(!pdfDoc)return;const ver=++rv;
-    const page=await pdfDoc.getPage(num);
+    // キャッシュからページ取得 (再取得のオーバーヘッドを削減)
+    let page=_pgCache.get(num);
+    if(!page){page=await pdfDoc.getPage(num);_pgCache.set(num,page);}
     const vp1=page.getViewport({scale:1});
     const maxDim=Math.max(vp1.width,vp1.height);
     // ★ キャンバスサイズ上限 → cssExtraZoomで残りを補完
@@ -1057,7 +1089,7 @@ const A=(()=>{
       document.getElementById('fnlbl').textContent=fileName;
       pdfDoc=await pdfjsLib.getDocument({data:origBuf.slice(0)}).promise;
       totalPages=pdfDoc.numPages;document.getElementById('tpn').textContent=totalPages;
-      currentPage=1;panX=16;panY=16;scale=1;renderScale=1;cssExtraZoom=1;
+      currentPage=1;panX=16;panY=16;scale=1;renderScale=1;cssExtraZoom=1;_pgCache.clear();
       subWindows.slice().forEach(sw=>sw.close());
       document.getElementById('dz').style.display='none';cw.style.display='block';
       const saved=await IDB.get('f:'+safeKey(file.name));
