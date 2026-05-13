@@ -2,79 +2,85 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>鉄骨図面ビューア</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>M_Viewer V2.01</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-/* ★ 工場で見やすい明るいUI */
-:root{
-  --bg:#1e2228;--pan:#262c34;--pan2:#2e363f;--brd:#4a5a6a;
-  --acc:#f07800;--tx:#ffffff;--tx2:#c8d8e4;--red:#c02020;
-}
+:root{--bg:#1e2228;--pan:#262c34;--pan2:#2e363f;--brd:#4a5a6a;
+  --acc:#f07800;--tx:#ffffff;--tx2:#c8d8e4;--red:#c02020;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overflow:hidden;}
 body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,sans-serif;
   display:flex;flex-direction:column;height:100dvh;user-select:none;-webkit-user-select:none;}
 
-/* ===== HEADER ===== */
+/* ===== HEADER (0.8x height) ===== */
 #hdr{flex-shrink:0;background:var(--pan);border-bottom:2px solid var(--acc);}
-.hr{height:46px;display:flex;align-items:center;gap:4px;padding:0 8px;
+/* 行高 37px (=46×0.8) */
+.hr{height:37px;display:flex;align-items:center;gap:3px;padding:0 6px;
   overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .hr:first-child{border-bottom:1px solid var(--brd);}
 .hr::-webkit-scrollbar{display:none;}
-.logo{font-size:14px;font-weight:800;color:var(--acc);padding-right:8px;
+.logo{font-size:12px;font-weight:800;color:var(--acc);padding-right:6px;
   border-right:2px solid var(--brd);white-space:nowrap;flex-shrink:0;}
-.vs{width:2px;height:28px;background:var(--brd);flex-shrink:0;margin:0 4px;}
-/* ★ ボタン: 明るく・大きく */
-.btn{height:38px;padding:0 12px;border:2px solid var(--brd);background:var(--pan2);
-  color:var(--tx);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;
-  white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:4px;
+.vs{width:2px;height:22px;background:var(--brd);flex-shrink:0;margin:0 3px;}
+/* ボタン高 30px (=38×0.8) */
+.btn{height:30px;padding:0 8px;border:1.5px solid var(--brd);background:var(--pan2);
+  color:var(--tx);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:3px;
   -webkit-user-select:none;transition:background .1s;}
 .btn:active{background:var(--brd);}
 .btn.on{background:var(--acc);border-color:var(--acc);color:#fff;}
 .btn.rd{background:var(--red);border-color:var(--red);color:#fff;}
-.pgni{width:38px;text-align:center;background:var(--pan2);border:2px solid var(--brd);
-  color:var(--tx);border-radius:6px;font-size:13px;padding:4px 0;flex-shrink:0;}
+/* ページ入力 */
+.pgni{width:32px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);
+  color:var(--tx);border-radius:5px;font-size:12px;padding:2px 0;flex-shrink:0;}
 .pgni:focus{outline:none;border-color:var(--acc);}
-.pgtot{font-size:12px;color:var(--tx2);white-space:nowrap;flex-shrink:0;}
-.zlbl{font-size:13px;font-weight:700;color:var(--acc);min-width:42px;text-align:center;flex-shrink:0;}
-/* ★ ファイル名: 白文字で見やすく */
-#fnlbl{font-size:12px;color:#ffffff;font-weight:600;max-width:160px;
+.pgtot{font-size:11px;color:var(--tx2);white-space:nowrap;flex-shrink:0;}
+/* ズーム% のみ (ボタンなし) */
+.zlbl{font-size:12px;font-weight:700;color:var(--acc);min-width:38px;text-align:center;flex-shrink:0;}
+/* ファイル名: 白 */
+#fnlbl{font-size:11px;color:#fff;font-weight:600;max-width:160px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;}
-.csw{width:28px;height:28px;border-radius:50%;border:3px solid transparent;
+/* カラースウォッチ */
+.csw{width:24px;height:24px;border-radius:50%;border:3px solid transparent;
   cursor:pointer;flex-shrink:0;transition:transform .1s;}
 .csw.on{border-color:#fff;transform:scale(1.25);}
-.szlbl{font-size:12px;color:var(--tx2);flex-shrink:0;}
-.sz-val{font-size:14px;font-weight:700;color:var(--acc);min-width:26px;text-align:center;
-  flex-shrink:0;cursor:pointer;padding:3px 8px;border:2px solid var(--brd);
-  border-radius:6px;background:var(--pan2);}
+/* 太さ */
+.szlbl{font-size:11px;color:var(--tx2);flex-shrink:0;}
+.sz-val{font-size:13px;font-weight:700;color:var(--acc);min-width:22px;text-align:center;
+  flex-shrink:0;cursor:pointer;padding:2px 6px;border:1.5px solid var(--brd);
+  border-radius:5px;background:var(--pan2);}
+/* ピッカー */
 .pkw{position:relative;flex-shrink:0;}
-.pkp{position:fixed;background:var(--pan);border:2px solid var(--brd);border-radius:10px;
-  padding:6px;z-index:300;box-shadow:0 4px 24px #0008;display:none;flex-direction:column;gap:4px;min-width:130px;}
+.pkp{position:fixed;background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;
+  padding:5px;z-index:300;box-shadow:0 4px 20px #0008;display:none;flex-direction:column;gap:3px;min-width:120px;}
 .pkp.on{display:flex;}
-.pkp button{height:42px;padding:0 14px;background:var(--pan2);border:2px solid var(--brd);
-  color:var(--tx);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;text-align:left;}
+.pkp button{height:38px;padding:0 12px;background:var(--pan2);border:1.5px solid var(--brd);
+  color:var(--tx);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;text-align:left;}
 .pkp button:active,.pkp button.on{background:var(--acc);border-color:var(--acc);color:#fff;}
+/* spacer */
+.sp{flex:1;}
 
 /* ===== 太さパネル ===== */
-#szp{display:none;position:fixed;z-index:350;background:var(--pan);border:2px solid var(--brd);
-  border-radius:12px;padding:14px 16px;box-shadow:0 4px 24px #0008;width:260px;}
+#szp{display:none;position:fixed;z-index:350;background:var(--pan);border:1.5px solid var(--brd);
+  border-radius:11px;padding:12px 14px;box-shadow:0 4px 20px #0008;width:250px;}
 #szp.on{display:block;}
-#szp-title{font-size:13px;color:var(--tx2);font-weight:700;margin-bottom:10px;display:block;}
-.szp-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+#szp-title{font-size:12px;color:var(--tx2);font-weight:700;margin-bottom:9px;display:block;}
+.szp-row{display:flex;align-items:center;gap:7px;margin-bottom:9px;}
 #sz-rng{-webkit-appearance:none;flex:1;height:8px;background:var(--brd);border-radius:4px;cursor:pointer;}
-#sz-rng::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid #fff;}
-#sz-n{width:46px;text-align:center;background:var(--pan2);border:2px solid var(--brd);
-  color:var(--tx);border-radius:6px;font-size:14px;font-weight:700;padding:5px;}
+#sz-rng::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;
+  background:var(--acc);cursor:pointer;border:2px solid #fff;}
+#sz-n{width:42px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);
+  color:var(--tx);border-radius:5px;font-size:13px;font-weight:700;padding:4px;}
 #sz-n:focus{outline:none;border-color:var(--acc);}
-#szp-prev{height:44px;background:var(--pan2);border-radius:8px;margin-bottom:10px;
+#szp-prev{height:42px;background:var(--pan2);border-radius:7px;margin-bottom:9px;
   display:flex;align-items:center;justify-content:center;}
-.szp-btns{display:flex;gap:8px;}
-.szp-ok{flex:1;height:40px;background:var(--acc);color:#fff;border:none;
-  border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
-.szp-cancel{height:40px;padding:0 14px;background:var(--pan2);color:var(--tx2);
-  border:2px solid var(--brd);border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+.szp-btns{display:flex;gap:7px;}
+.szp-ok{flex:1;height:38px;background:var(--acc);color:#fff;border:none;
+  border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;}
+.szp-cancel{height:38px;padding:0 12px;background:var(--pan2);color:var(--tx2);
+  border:1.5px solid var(--brd);border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;}
 
 /* ===== CANVAS ===== */
 #ca{flex:1;overflow:hidden;position:relative;min-height:0;touch-action:none;background:#444;}
@@ -83,80 +89,82 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 #drawcvs,#selcvs{position:absolute;top:0;left:0;}
 #selcvs{pointer-events:none;}
 #dz{position:absolute;inset:0;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:16px;z-index:10;background:var(--bg);}
-.dzi{font-size:52px;opacity:.4;}
-.dzm{font-size:17px;color:var(--tx);font-weight:700;}
-.dzs{font-size:12px;color:var(--tx2);text-align:center;padding:0 20px;line-height:1.7;}
-.dzb{background:var(--acc);color:#fff;border:none;padding:14px 32px;border-radius:12px;
-  font-size:16px;font-weight:700;cursor:pointer;}
+  align-items:center;justify-content:center;gap:14px;z-index:10;background:var(--bg);}
+.dzi{font-size:48px;opacity:.4;}.dzm{font-size:16px;color:var(--tx);font-weight:700;}
+.dzs{font-size:11px;color:var(--tx2);text-align:center;padding:0 18px;line-height:1.8;}
+.dzb{background:var(--acc);color:#fff;border:none;padding:13px 28px;border-radius:11px;
+  font-size:15px;font-weight:700;cursor:pointer;}
 #selbtn{display:none;position:fixed;z-index:150;background:var(--red);color:#fff;
-  border:none;border-radius:9px;padding:9px 16px;font-size:14px;font-weight:700;cursor:pointer;
-  box-shadow:0 2px 12px #0006;}
+  border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;
+  box-shadow:0 2px 10px #0005;}
 
 /* ===== サブウインドウ ===== */
-.swn{position:fixed;z-index:200;background:var(--pan);border:3px solid var(--acc);
-  border-radius:12px;box-shadow:0 8px 32px #000c;display:flex;flex-direction:column;
-  min-width:180px;min-height:180px;overflow:hidden;}
-.swn-tb{height:34px;background:var(--pan2);display:flex;align-items:center;
-  justify-content:space-between;padding:0 10px;cursor:grab;flex-shrink:0;border-bottom:2px solid var(--brd);}
-.swn-tb span{font-size:12px;font-weight:800;color:var(--acc);}
-.swn-close{background:transparent;border:none;color:var(--tx2);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:5px;}
+.swn{position:fixed;z-index:200;background:var(--pan);border:2.5px solid var(--acc);
+  border-radius:11px;box-shadow:0 6px 28px #000b;display:flex;flex-direction:column;
+  min-width:170px;min-height:170px;overflow:hidden;}
+.swn-tb{height:30px;background:var(--pan2);display:flex;align-items:center;
+  justify-content:space-between;padding:0 8px;cursor:grab;flex-shrink:0;border-bottom:1.5px solid var(--brd);}
+.swn-tb span{font-size:11px;font-weight:800;color:var(--acc);}
+.swn-close{background:transparent;border:none;color:var(--tx2);font-size:16px;cursor:pointer;padding:2px 5px;border-radius:4px;}
 .swn-body{flex:1;overflow:hidden;position:relative;background:#fff;}
 .swn-cvs{position:absolute;top:0;left:0;transform-origin:0 0;}
-.swn-zl{position:absolute;bottom:4px;left:6px;font-size:11px;color:var(--acc);
+.swn-zl{position:absolute;bottom:3px;left:5px;font-size:10px;color:var(--acc);
   pointer-events:none;font-weight:800;text-shadow:0 0 4px #000,0 0 4px #000;}
-.swn-rz{position:absolute;bottom:0;right:0;width:24px;height:24px;cursor:se-resize;
-  background:linear-gradient(135deg,transparent 50%,var(--acc) 50%);border-radius:0 0 9px 0;}
+.swn-rz{position:absolute;bottom:0;right:0;width:22px;height:22px;cursor:se-resize;
+  background:linear-gradient(135deg,transparent 50%,var(--acc) 50%);border-radius:0 0 8px 0;}
 
 /* ===== 計算機 ===== */
 #calc{display:none;position:fixed;z-index:400;background:var(--pan);
-  border:2px solid var(--brd);border-radius:14px;width:300px;
-  box-shadow:0 8px 40px #000a;bottom:20px;right:16px;}
+  border:1.5px solid var(--brd);border-radius:13px;width:290px;
+  box-shadow:0 8px 36px #000a;bottom:20px;right:16px;}
 #calc.on{display:block;}
-#ctb{padding:8px 14px 5px;display:flex;align-items:center;justify-content:space-between;
+#ctb{padding:6px 12px 4px;display:flex;align-items:center;justify-content:space-between;
   cursor:grab;border-bottom:1px solid var(--brd);}
-#ctb span{font-size:14px;font-weight:700;color:var(--tx2);}
-#cclose{background:var(--pan2);border:2px solid var(--brd);color:var(--tx);font-size:13px;
-  cursor:pointer;padding:4px 12px;border-radius:6px;font-weight:700;}
+#ctb span{font-size:13px;font-weight:700;color:var(--tx2);}
+#cclose{background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);font-size:12px;
+  cursor:pointer;padding:3px 10px;border-radius:5px;font-weight:700;}
 #cclose:active{background:var(--acc);color:#fff;}
-#chist{max-height:72px;overflow-y:auto;padding:2px 12px;border-bottom:1px solid var(--brd);}
-.chi{font-size:12px;color:var(--tx2);text-align:right;padding:2px 0;}
-#cdsp{padding:6px 14px;text-align:right;border-bottom:1px solid var(--brd);}
-#cexpr{font-size:12px;color:var(--tx2);min-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#cval{font-size:28px;font-weight:700;color:var(--tx);}
-#cdecrow{display:flex;align-items:center;gap:6px;padding:4px 12px;border-bottom:1px solid var(--brd);}
-#cdecrow label{font-size:12px;color:var(--tx2);}
-#cdec{width:38px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);
-  color:var(--tx);border-radius:5px;font-size:12px;padding:3px;}
-#cbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:10px;}
-.cb{height:52px;border-radius:10px;font-size:23px;font-weight:700;cursor:pointer;
+#chist{max-height:66px;overflow-y:auto;padding:2px 10px;border-bottom:1px solid var(--brd);}
+.chi{font-size:11px;color:var(--tx2);text-align:right;padding:2px 0;}
+#cdsp{padding:5px 12px;text-align:right;border-bottom:1px solid var(--brd);}
+#cexpr{font-size:11px;color:var(--tx2);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#cval{font-size:26px;font-weight:700;color:var(--tx);}
+#cdecrow{display:flex;align-items:center;gap:5px;padding:3px 10px;border-bottom:1px solid var(--brd);}
+#cdecrow label{font-size:11px;color:var(--tx2);}
+#cdec{width:34px;text-align:center;background:var(--pan2);border:1px solid var(--brd);
+  color:var(--tx);border-radius:4px;font-size:12px;padding:2px;}
+#cbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px;}
+.cb{height:50px;border-radius:9px;font-size:22px;font-weight:700;cursor:pointer;
   -webkit-user-select:none;transition:opacity .1s;border:2px solid;}
 .cb:active{opacity:.6;}
 .cbn{background:var(--pan2);color:var(--tx);border-color:#4a5a6a;}
 .cbo{background:#243040;color:#ffa040;border-color:#3a5070;}
 .cbeq{background:var(--acc);color:#fff;border-color:#c06000;}
-.cbf{background:#1e2530;color:var(--tx2);font-size:18px;border-color:#3a4a58;}
-.cbw{grid-column:span 2;}
-.cbrs{grid-row:span 2;}
-/* テキスト */
-#txov{display:none;position:fixed;inset:0;z-index:500;background:#0009;align-items:center;justify-content:center;}
+.cbf{background:#1e2530;color:var(--tx2);font-size:16px;border-color:#3a4a58;}
+.cbw{grid-column:span 2;}.cbrs{grid-row:span 2;}
+/* テキスト入力 */
+#txov{display:none;position:fixed;inset:0;z-index:500;background:#0009;
+  align-items:center;justify-content:center;}
 #txov.on{display:flex;}
-#txpop{background:var(--pan);border:2px solid var(--brd);border-radius:14px;padding:18px;width:310px;display:flex;flex-direction:column;gap:10px;}
-#txpop h3{font-size:14px;color:var(--tx2);}
-#txfld{background:var(--bg);border:2px solid var(--brd);border-radius:8px;color:var(--tx);
-  font-size:16px;padding:10px;resize:vertical;min-height:65px;font-family:inherit;
+#txpop{background:var(--pan);border:1.5px solid var(--brd);border-radius:13px;
+  padding:16px;width:300px;display:flex;flex-direction:column;gap:9px;}
+#txpop h3{font-size:13px;color:var(--tx2);}
+#txfld{background:var(--bg);border:1.5px solid var(--brd);border-radius:7px;color:var(--tx);
+  font-size:16px;padding:9px;resize:vertical;min-height:60px;font-family:inherit;
   user-select:text;-webkit-user-select:text;}
 #txfld:focus{outline:none;border-color:var(--acc);}
-.txbtns{display:flex;gap:8px;justify-content:flex-end;}
-.txb{padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:700;}
+.txbtns{display:flex;gap:7px;justify-content:flex-end;}
+.txb{padding:9px 16px;border-radius:7px;border:none;cursor:pointer;font-size:14px;font-weight:700;}
 /* ローディング/トースト */
-#loading{display:none;position:fixed;inset:0;z-index:600;background:#000a;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+#loading{display:none;position:fixed;inset:0;z-index:600;background:#000a;
+  align-items:center;justify-content:center;flex-direction:column;gap:12px;}
 #loading.on{display:flex;}
-.spin{width:36px;height:36px;border:3px solid var(--brd);border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite;}
+.spin{width:34px;height:34px;border:3px solid var(--brd);border-top-color:var(--acc);
+  border-radius:50%;animation:sp .7s linear infinite;}
 @keyframes sp{to{transform:rotate(360deg);}}
-#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
-  background:var(--pan);border:2px solid var(--brd);border-radius:10px;
-  padding:9px 18px;font-size:14px;color:var(--tx);opacity:0;pointer-events:none;
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;
+  padding:8px 16px;font-size:13px;color:var(--tx);opacity:0;pointer-events:none;
   transition:opacity .3s;z-index:999;white-space:nowrap;}
 #toast.on{opacity:1;}
 @media print{#hdr,#calc,#selbtn,.swn,#szp{display:none!important;}
@@ -165,36 +173,31 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 </style>
 </head>
 <body>
-
-<!-- HEADER 行1 -->
 <div id="hdr">
+<!-- 行1: ロゴ/開く/ファイル名 | Undo/Save/スクショ/印刷/計算 | Close(右端) -->
 <div class="hr">
-  <span class="logo">⚙鉄骨</span>
+  <span class="logo">M_Viewer <span style="font-size:10px">V2.01</span></span>
   <input type="file" id="fi" accept="application/pdf" style="display:none">
   <button class="btn" onclick="openFile()">📂 開く</button>
   <span id="fnlbl">ファイル未選択</span>
   <div class="vs"></div>
+  <button class="btn" onclick="A.undo()">↩ 戻す</button>
+  <button class="btn on" onclick="savePDF()">💾 保存</button>
+  <button class="btn" onclick="screenshot()">📸 スクショ</button>
+  <button class="btn" onclick="printPage()">🖨 印刷</button>
+  <button class="btn" id="calcbtn" onclick="toggleCalc()">🧮 計算</button>
+  <div class="sp"></div>
+  <button class="btn rd" onclick="A.closeFile()">✕ 閉じる</button>
+</div>
+<!-- 行2: ページナビ/ズーム% | [space] | ツール/色/太さ -->
+<div class="hr">
   <button class="btn" onclick="A.pg(-1)">◀</button>
   <input id="pgn" class="pgni" type="number" min="1" value="1" onchange="A.pg(+this.value,true)">
   <span class="pgtot">/<span id="tpn">0</span></span>
   <button class="btn" onclick="A.pg(1)">▶</button>
-  <div class="vs"></div>
-  <button class="btn" onclick="A.zoomBy(0.77)">－</button>
   <span id="zlbl" class="zlbl">--</span>
-  <button class="btn" onclick="A.zoomBy(1.3)">＋</button>
   <button class="btn" onclick="A.fit()">全体</button>
-  <div class="vs"></div>
-  <button class="btn" onclick="A.undo()">↩ 戻す</button>
-  <button class="btn rd" onclick="A.clear()">消去</button>
-  <button class="btn rd" onclick="A.closeFile()">✕ 閉じる</button>
-  <div class="vs"></div>
-  <button class="btn on" onclick="savePDF()">💾 保存</button>
-  <button class="btn" onclick="screenshot()">📸 共有</button>
-  <button class="btn" onclick="printPage()">🖨 印刷</button>
-  <button class="btn" id="calcbtn" onclick="toggleCalc()">🧮 計算</button>
-</div>
-<!-- HEADER 行2 -->
-<div class="hr">
+  <div style="width:30px;flex-shrink:0"></div><!-- ~1ボタン分スペース -->
   <button class="btn on" id="t-pen"    onclick="setTool('pen')">✏️ ペン</button>
   <button class="btn"    id="t-hl"     onclick="setTool('hl')">蛍光ペン</button>
   <div class="pkw">
@@ -211,16 +214,16 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   <div class="pkw">
     <button class="btn" id="t-select" onclick="togglePk('selpop',event)">選択▾</button>
     <div class="pkp" id="selpop">
-      <button id="sel-rect"  class="on" onclick="setSelMode('rect')">□ 矩形</button>
+      <button id="sel-rect" class="on" onclick="setSelMode('rect')">□ 矩形</button>
       <button id="sel-lasso"           onclick="setSelMode('lasso')">〇 なげなわ</button>
     </div>
   </div>
   <button class="btn" id="t-sub" onclick="setTool('sub')">サブ窓</button>
   <div class="vs"></div>
-  <div class="csw on"  style="background:#1a1a1a;border:2px solid #888" data-c="#1a1a1a" onclick="setColor(this)"></div>
-  <div class="csw" style="background:#cc2020" data-c="#cc2020" onclick="setColor(this)"></div>
-  <div class="csw" style="background:#1a55cc" data-c="#1a55cc" onclick="setColor(this)"></div>
-  <div class="csw" style="background:#108030" data-c="#108030" onclick="setColor(this)"></div>
+  <div class="csw on" id="sw0" style="background:#cc2020" data-c="#cc2020" onclick="setColor(this)"></div>
+  <div class="csw"    id="sw1" style="background:#1a1a1a;border:2px solid #888" data-c="#1a1a1a" onclick="setColor(this)"></div>
+  <div class="csw"    id="sw2" style="background:#1a55cc" data-c="#1a55cc" onclick="setColor(this)"></div>
+  <div class="csw"    id="sw3" style="background:#108030" data-c="#108030" onclick="setColor(this)"></div>
   <div class="vs"></div>
   <span class="szlbl">太さ</span>
   <span id="sz-v" class="sz-val" onclick="toggleSzP(event)">3</span>
@@ -234,7 +237,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <input type="range" id="sz-rng" min="1" max="40" value="3" oninput="onSzChange(this.value)">
     <input type="number" id="sz-n" min="1" max="40" value="3" onchange="onSzChange(this.value)">
   </div>
-  <div id="szp-prev"><canvas id="szp-cvs" width="220" height="42"></canvas></div>
+  <div id="szp-prev"><canvas id="szp-cvs" width="210" height="40"></canvas></div>
   <div class="szp-btns">
     <button class="szp-cancel" onclick="document.getElementById('szp').classList.remove('on')">キャンセル</button>
     <button class="szp-ok" onclick="applySz()">✓ 決定</button>
@@ -250,12 +253,11 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">PDFを開いてください</div>
-    <div class="dzs">
-      📂 タップして選択 / ドラッグ＆ドロップ<br>
-      ✏️ ペン・蛍光ペン: Apple Pencil使用<br>
-      👉 その他ツール・スクロール: 指でも操作可
-    </div>
+    <div class="dzm">M_Viewer V2.01</div>
+    <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>
+      ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
+      👉 その他ツール・スクロール: 指でも操作可<br>
+      🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" onclick="openFile()">📂 PDFを開く</button>
   </div>
 </div>
@@ -266,7 +268,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   <div id="ctb"><span>🧮 計算機</span><button id="cclose" onclick="toggleCalc()">✕ 閉じる</button></div>
   <div id="chist"></div>
   <div id="cdsp"><div id="cexpr"></div><div id="cval">0</div></div>
-  <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="1">桁</div>
+  <!-- ★ 計算機デフォルト0桁(四捨五入) -->
+  <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="0">桁</div>
   <div id="cbtns">
     <button class="cb cbf" onclick="cFn('C')">C</button>
     <button class="cb cbf" onclick="cSqrt()">√</button>
@@ -309,45 +312,71 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 <div id="toast"></div>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 /* ============================================================
-   ★ DPR=1 で統一 (クラッシュ防止・太さ固定)
-   Canvas ピクセル = CSS ピクセル = 画面サイズ確定
-   最大キャンバス 3800px でメモリ制限
+   ★ 設計方針
+   - renderScale: キャンバス実レンダリングスケール (MAX_CANVAS/pageSize でキャップ)
+   - cssExtraZoom: scale/renderScale → CSS scale() で追加拡大 (800% 対応)
+   - lineWidth = s.size / cssExtraZoom → 常に s.size CSS ピクセルで固定
    ============================================================ */
-const MAX_CANVAS = 3800; // ★ 上限: GPU テクスチャ 4096px 以内に収める
+const MAX_CANVAS = 3600; // GPU上限4096px以内 (A0対応)
 
-/* ============================================================
-   グローバル
-   ============================================================ */
+/* グローバル */
 let currentTool='pen', prevTool='pen', currentShape='arrow', selMode='rect';
-let strokeColor='#1a1a1a';
-const toolSizes={pen:3,hl:12,eraser:20,text:3,arrow:2,rect:2,circle:2,line:2};
+// ★ デフォルト色: ペン=赤, HL=黄色
+let strokeColor='#cc2020';
+// ★ ツール別太さ (HL/ペンデフォルト3)
+const toolSizes={pen:3,hl:3,eraser:20,text:3,arrow:2,rect:2,circle:2,line:2};
 let strokeSize=3;
-let txX=0, txY=0;
+let txX=0,txY=0;
 const subWindows=[];
 let _fileHandle=null;
+let swZIndex=200; // サブ窓前面表示用
+
+/* ★ コンテキスト別カラーパレット */
+const PEN_COLORS=[
+  {id:'sw0',c:'#cc2020',bg:'#cc2020'},
+  {id:'sw1',c:'#1a1a1a',bg:'#1a1a1a',border:'#888'},
+  {id:'sw2',c:'#1a55cc',bg:'#1a55cc'},
+  {id:'sw3',c:'#108030',bg:'#108030'},
+];
+const HL_COLORS=[
+  {id:'sw0',c:'#ffd700',bg:'#ffd700'},
+  {id:'sw1',c:'#50c040',bg:'#50c040'},
+  {id:'sw2',c:'#ff69b4',bg:'#ff69b4'},
+  {id:'sw3',c:'#40d4e8',bg:'#40d4e8'},
+];
+let penColor='#cc2020', hlColor='#ffd700';
+
+function updateSwatches(mode){
+  const palette=mode==='hl'?HL_COLORS:PEN_COLORS;
+  const active=mode==='hl'?hlColor:penColor;
+  palette.forEach(p=>{
+    const el=document.getElementById(p.id);if(!el)return;
+    el.dataset.c=p.c;
+    el.style.background=p.bg;
+    el.style.borderColor=p.c===active?'#fff':'transparent';
+    if(p.border)el.style.border=`2px solid ${p.border}`;
+    el.classList.toggle('on',p.c===active);
+  });
+  strokeColor=active;
+}
 
 /* ============================================================
    IDB
    ============================================================ */
 const IDB={
   _db:null,
-  async open(){
-    if(this._db)return this._db;
-    return this._db=await new Promise((res,rej)=>{
-      const r=indexedDB.open('TekkoV10',1);
-      r.onupgradeneeded=e=>e.target.result.createObjectStore('d');
-      r.onsuccess=e=>res(e.target.result); r.onerror=e=>rej(e.target.error);
-    });
-  },
+  async open(){if(this._db)return this._db;return this._db=await new Promise((res,rej)=>{
+    const r=indexedDB.open('TekkoV11',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('d');
+    r.onsuccess=e=>res(e.target.result);r.onerror=e=>rej(e.target.error);});},
   async get(k){try{const db=await this.open();return await new Promise(r=>{
     const q=db.transaction('d','readonly').objectStore('d').get(k);
-    q.onsuccess=e=>r(e.target.result??null); q.onerror=()=>r(null);});}catch{return null;}},
+    q.onsuccess=e=>r(e.target.result??null);q.onerror=()=>r(null);});}catch{return null;}},
   async set(k,v){try{const db=await this.open();await new Promise((res,rej)=>{
     const q=db.transaction('d','readwrite').objectStore('d').put(v,k);
-    q.onsuccess=res; q.onerror=rej;});}catch(e){console.warn('IDB:',e);}}
+    q.onsuccess=res;q.onerror=rej;});}catch(e){console.warn('IDB:',e);}}
 };
 function safeKey(s){return s.replace(/[^a-zA-Z0-9._-]/g,'_').substring(0,100);}
 let autoSvTm;
@@ -356,63 +385,51 @@ function schedSave(){
   autoSvTm=setTimeout(async()=>{
     if(!A.pdfDoc||!A.origBuf)return;
     const d={buf:A.origBuf.slice(0),file:A.fileName,
-      strokes:JSON.parse(JSON.stringify(A.strokes)),
-      page:A.currentPage,scale:A.scale,ts:Date.now()};
-    await IDB.set('last',d);
-    await IDB.set('f:'+safeKey(A.fileName),d);
+      strokes:JSON.parse(JSON.stringify(A.strokes)),page:A.currentPage,scale:A.scale,ts:Date.now()};
+    await IDB.set('last',d);await IDB.set('f:'+safeKey(A.fileName),d);
   },1200);
 }
 
 /* ============================================================
-   描画ユーティリティ (DPR=1: sc=scale, lineWidth=s.size CSS px固定)
+   描画ユーティリティ (invEZ = 1/cssExtraZoom でlineWidth補正)
    ============================================================ */
-function drawOne(s,ctx,sc){
+function drawOne(s,ctx,sc,invEZ=1){
   ctx.save();
-  // ★ lineWidth = s.size (CSS pixel = canvas pixel, DPR=1 なので常に一定)
-  const lw=s.size;
+  const lw=s.size*invEZ; // = s.size/cssExtraZoom → CSS px固定
   if(s.type==='eraser'){
     ctx.globalCompositeOperation='destination-out';
-    ctx.lineWidth=lw*4; ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.beginPath();
-    s.points.forEach((p,i)=>i?ctx.lineTo(p[0]*sc,p[1]*sc):ctx.moveTo(p[0]*sc,p[1]*sc));
-    ctx.stroke();
+    ctx.lineWidth=lw*4;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();s.points.forEach((p,i)=>i?ctx.lineTo(p[0]*sc,p[1]*sc):ctx.moveTo(p[0]*sc,p[1]*sc));ctx.stroke();
   }else if(['pen','hl'].includes(s.type)){
     ctx.globalCompositeOperation='source-over';
-    ctx.globalAlpha=s.type==='hl'?0.38:1;
-    ctx.strokeStyle=s.color;
-    ctx.lineWidth=s.type==='hl'?Math.max(lw*4,14):lw;
-    ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.beginPath();
-    s.points.forEach((p,i)=>i?ctx.lineTo(p[0]*sc,p[1]*sc):ctx.moveTo(p[0]*sc,p[1]*sc));
-    ctx.stroke();
+    ctx.globalAlpha=s.type==='hl'?0.38:1;ctx.strokeStyle=s.color;
+    ctx.lineWidth=s.type==='hl'?Math.max(lw*4,14*invEZ):lw;
+    ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();s.points.forEach((p,i)=>i?ctx.lineTo(p[0]*sc,p[1]*sc):ctx.moveTo(p[0]*sc,p[1]*sc));ctx.stroke();
   }else if(s.type==='text'){
     ctx.fillStyle=s.color;
     ctx.font=`bold ${Math.round(s.size*6)}px 'Helvetica Neue',Arial,sans-serif`;
     s.text.split('\n').forEach((l,i)=>ctx.fillText(l,s.x*sc,s.y*sc+i*s.size*7));
   }else{
-    ctx.strokeStyle=s.color; ctx.lineWidth=lw; ctx.lineCap='round';
+    ctx.strokeStyle=s.color;ctx.lineWidth=lw;ctx.lineCap='round';
     const[x1,y1,x2,y2]=[s.x1*sc,s.y1*sc,s.x2*sc,s.y2*sc];
     if(s.type==='rect')ctx.strokeRect(x1,y1,x2-x1,y2-y1);
-    else if(s.type==='circle'){
-      const rx=(x2-x1)/2,ry=(y2-y1)/2;
-      ctx.beginPath();ctx.ellipse(x1+rx,y1+ry,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2);ctx.stroke();
-    }else if(s.type==='line'){
-      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-    }else if(s.type==='arrow'){
+    else if(s.type==='circle'){const rx=(x2-x1)/2,ry=(y2-y1)/2;
+      ctx.beginPath();ctx.ellipse(x1+rx,y1+ry,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2);ctx.stroke();}
+    else if(s.type==='line'){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
+    else if(s.type==='arrow'){
       const hl=Math.max(lw*4,12),ang=Math.atan2(y2-y1,x2-x1);
       ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(ang-Math.PI/6),y2-hl*Math.sin(ang-Math.PI/6));
+      ctx.beginPath();ctx.moveTo(x2,y2);
+      ctx.lineTo(x2-hl*Math.cos(ang-Math.PI/6),y2-hl*Math.sin(ang-Math.PI/6));
       ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(ang+Math.PI/6),y2-hl*Math.sin(ang+Math.PI/6));
-      ctx.stroke();
-    }
+      ctx.stroke();}
   }
   ctx.restore();
 }
 function strokeBBox(s){
   if(!s||s.type==='eraser')return null;
-  if(s.points){const xs=s.points.map(p=>p[0]),ys=s.points.map(p=>p[1]);
-    return{x1:Math.min(...xs),y1:Math.min(...ys),x2:Math.max(...xs),y2:Math.max(...ys)};}
+  if(s.points){const xs=s.points.map(p=>p[0]),ys=s.points.map(p=>p[1]);return{x1:Math.min(...xs),y1:Math.min(...ys),x2:Math.max(...xs),y2:Math.max(...ys)};}
   if(s.type==='text')return{x1:s.x-2,y1:s.y-s.size*8,x2:s.x+s.size*4*(s.text?.length||1),y2:s.y+4};
   return{x1:Math.min(s.x1,s.x2),y1:Math.min(s.y1,s.y2),x2:Math.max(s.x1,s.x2),y2:Math.max(s.y1,s.y2)};
 }
@@ -420,8 +437,7 @@ function ptInPoly(px,py,poly){
   let inside=false;
   for(let i=0,j=poly.length-1;i<poly.length;j=i++){
     const[xi,yi]=poly[i],[xj,yj]=poly[j];
-    if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;
-  }
+    if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;}
   return inside;
 }
 
@@ -430,31 +446,32 @@ function ptInPoly(px,py,poly){
    ============================================================ */
 class SubWin{
   constructor(pdfDoc,strokes,pageNum,region,screenX,screenY,initScale){
-    this.pdfDoc=pdfDoc; this.strokes=strokes; this.pageNum=pageNum;
-    // ★ メインウインドウの倍率でサブ窓を作成
-    this.innerScale=initScale||1;
-    this.offX=region.x1; this.offY=region.y1;
-    const rW=region.x2-region.x1, rH=region.y2-region.y1;
+    this.pdfDoc=pdfDoc;this.strokes=strokes;this.pageNum=pageNum;
+    this.innerScale=Math.max(0.2,Math.min(8,initScale||1));
+    this.offX=region.x1;this.offY=region.y1;
+    const rW=region.x2-region.x1,rH=region.y2-region.y1;
     this.winW=Math.max(180,Math.round(rW*this.innerScale)+4);
-    this.winH=Math.max(160,Math.round(rH*this.innerScale)+34);
+    this.winH=Math.max(160,Math.round(rH*this.innerScale)+30);
     this.sx=Math.max(4,Math.min(window.innerWidth-this.winW-10,screenX));
     this.sy=Math.max(4,Math.min(window.innerHeight-this.winH-10,screenY));
-    this.pinch=null; this.panSt=null;
-    this.curStroke=null; this.isDrawing=false; this.lastX=0; this.lastY=0;
-    this._rv=0; this._pdfCache=null; this._pdfCacheScale=0; this._pdfCachePage=0;
-    this._build(); this.render();
+    this.pinch=null;this.panSt=null;
+    this.curStroke=null;this.isDrawing=false;this.lastX=0;this.lastY=0;
+    this._rv=0;this._pdfCache=null;this._pdfCacheSc=0;this._pdfCachePg=0;
+    this._build();this.render();
   }
   _build(){
-    const el=document.createElement('div'); el.className='swn';
-    el.style.cssText=`left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;`;
+    const el=document.createElement('div');el.className='swn';
+    el.style.cssText=`left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${++swZIndex};`;
     const n=subWindows.length+1;
     el.innerHTML=`<div class="swn-tb"><span>🔍 サブ窓${n}</span><button class="swn-close">✕</button></div>
       <div class="swn-body"><canvas class="swn-cvs"></canvas><span class="swn-zl"></span></div>
       <div class="swn-rz"></div>`;
-    this.el=el; this.body=el.querySelector('.swn-body');
-    this.cvs=el.querySelector('.swn-cvs'); this.ctx=this.cvs.getContext('2d');
+    this.el=el;this.body=el.querySelector('.swn-body');
+    this.cvs=el.querySelector('.swn-cvs');this.ctx=this.cvs.getContext('2d');
     this.zlEl=el.querySelector('.swn-zl');
     el.querySelector('.swn-close').addEventListener('pointerdown',e=>{e.stopPropagation();this.close();});
+    // ★ タッチで前面表示
+    el.addEventListener('pointerdown',()=>{el.style.zIndex=++swZIndex;},{capture:true,passive:true});
     this._bindDrag(el.querySelector('.swn-tb'));
     this._bindResize(el.querySelector('.swn-rz'));
     this._bindInput();
@@ -463,11 +480,12 @@ class SubWin{
   _br(){return this.body.getBoundingClientRect();}
   _pos(t){const r=this._br();return{x:(t.clientX-r.left)/this.innerScale+this.offX,y:(t.clientY-r.top)/this.innerScale+this.offY};}
   _updateXf(){
-    // ★ CSS transform でパン (再描画なし、ちらつきなし)
     this.cvs.style.transform=`translate(${-this.offX*this.innerScale}px,${-this.offY*this.innerScale}px)`;
+    // メインウインドウのサブ窓オーバーレイを更新
+    if(typeof A!=='undefined')A.redrawSelOv?.();
   }
 
-  /* PDF キャッシュ付きレンダリング (PDF層+アノテーション層の2層合成) */
+  /* ★ 2層合成レンダリング (消しゴム黒線防止) */
   async render(){
     if(!this.pdfDoc)return;
     const ver=++this._rv;
@@ -475,33 +493,24 @@ class SubWin{
     const page=await this.pdfDoc.getPage(this.pageNum);
     const vp=page.getViewport({scale:sc});
 
-    // PDF層: キャッシュ使用 (スケール・ページが同じならPDFを再描画しない)
     let pdfOff;
-    if(this._pdfCache&&this._pdfCacheScale===sc&&this._pdfCachePage===this.pageNum){
+    if(this._pdfCache&&this._pdfCacheSc===sc&&this._pdfCachePg===this.pageNum){
       pdfOff=this._pdfCache;
     }else{
-      pdfOff=document.createElement('canvas');
-      pdfOff.width=vp.width; pdfOff.height=vp.height;
+      pdfOff=document.createElement('canvas');pdfOff.width=vp.width;pdfOff.height=vp.height;
       const pctx=pdfOff.getContext('2d');
-      pctx.fillStyle='#ffffff'; pctx.fillRect(0,0,vp.width,vp.height);
+      pctx.fillStyle='#ffffff';pctx.fillRect(0,0,vp.width,vp.height);
       await page.render({canvasContext:pctx,viewport:vp}).promise;
-      this._pdfCache=pdfOff; this._pdfCacheScale=sc; this._pdfCachePage=this.pageNum;
+      this._pdfCache=pdfOff;this._pdfCacheSc=sc;this._pdfCachePg=this.pageNum;
     }
-
-    // アノテーション層 (2層合成で消しゴムが黒くならない)
-    const annOff=document.createElement('canvas');
-    annOff.width=vp.width; annOff.height=vp.height;
+    const annOff=document.createElement('canvas');annOff.width=vp.width;annOff.height=vp.height;
     const actx=annOff.getContext('2d');
     (this.strokes[this.pageNum]||[]).forEach(s=>drawOne(s,actx,sc));
-
     if(ver!==this._rv)return;
-
-    const bh=this.body.clientHeight||this.winH-34;
-    this.cvs.width=vp.width; this.cvs.height=vp.height;
-    this.cvs.style.width=vp.width+'px'; this.cvs.style.height=vp.height+'px';
+    this.cvs.width=vp.width;this.cvs.height=vp.height;
+    this.cvs.style.width=vp.width+'px';this.cvs.style.height=vp.height+'px';
     this.ctx.clearRect(0,0,vp.width,vp.height);
-    this.ctx.drawImage(pdfOff,0,0);
-    this.ctx.drawImage(annOff,0,0);
+    this.ctx.drawImage(pdfOff,0,0);this.ctx.drawImage(annOff,0,0);
     this._updateXf();
     this.zlEl.textContent=Math.round(sc*100)+'%';
   }
@@ -513,7 +522,6 @@ class SubWin{
       e.preventDefault();e.stopPropagation();
       if(e.touches.length>=2){this.panSt=null;this._stPinch(e.touches);return;}
       const t=e.touches[0];
-      // ペン・蛍光ペン: スタイラスのみ
       const needPen=['pen','hl'].includes(currentTool==='shape'?currentShape:currentTool);
       if(needPen&&!isPen(t)){this._stPan(t);return;}
       if(['sub','select'].includes(currentTool)){this._stPan(t);return;}
@@ -537,38 +545,49 @@ class SubWin{
       const br=this._br();const bx=e.clientX-br.left,by=e.clientY-br.top;
       const pdfX=bx/this.innerScale+this.offX,pdfY=by/this.innerScale+this.offY;
       const newSc=Math.max(0.2,Math.min(8,this.innerScale*r));
-      this.offX=pdfX-bx/newSc; this.offY=pdfY-by/newSc; this.innerScale=newSc;
-      this.render();
+      this.offX=pdfX-bx/newSc;this.offY=pdfY-by/newSc;this.innerScale=newSc;
+      this._pdfCache=null;this.render();
     },{passive:false});
   }
 
-  /* ★ピンチ: 中心固定 + スロットルレンダリング (位置ずれなし) */
+  /* ★ ピンチ: CSSプレビューで位置ずれなし */
   _dd(t){const dx=t[1].clientX-t[0].clientX,dy=t[1].clientY-t[0].clientY;return Math.sqrt(dx*dx+dy*dy);}
   _dm(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
   _stPinch(t){
     const m=this._dm(t),br=this._br();
     const bx=m.x-br.left,by=m.y-br.top;
-    this.pinch={d0:this._dd(t),s0:this.innerScale,target:this.innerScale,
+    this.pinch={d0:this._dd(t),s0:this.innerScale,
       pdfX:bx/this.innerScale+this.offX,pdfY:by/this.innerScale+this.offY};
   }
   _mvPinch(t){
     const p=this.pinch,r=this._dd(t)/p.d0;
     const m=this._dm(t),br=this._br();
-    const M1x=m.x-br.left,M1y=m.y-br.top;
+    p.lastM1x=m.x-br.left;p.lastM1y=m.y-br.top;
     p.target=Math.max(0.2,Math.min(8,p.s0*r));
-    // ★ ピンチ中心のPDF点が M1 に来るよう offX/offY 更新
-    this.offX=p.pdfX-M1x/p.target;
-    this.offY=p.pdfY-M1y/p.target;
-    this.innerScale=p.target;
+    // ★ 正確なCSS変換式: ピンチ中心点が M1 に来る (位置ずれなし)
+    // translate(M1x - pdfX*target, M1y - pdfY*target) scale(r) で
+    // canvas点(pdfX*s0, pdfY*s0)がスクリーン位置M1xに対応する
+    const tx=p.lastM1x-p.pdfX*p.target;
+    const ty=p.lastM1y-p.pdfY*p.target;
+    // ★ クランプ後スケールを使用 (最大800%でブレなし)
+    const cssR=p.target/p.s0;
+    this.cvs.style.transformOrigin='0 0';
+    this.cvs.style.transform=`translate(${tx}px,${ty}px) scale(${cssR})`;
     this.zlEl.textContent=Math.round(p.target*100)+'%';
-    // ★ CSS transform のみ更新 (スケール変化は再描画)
-    this._pdfCache=null; // キャッシュ無効化
-    clearTimeout(this._rt);
-    this._rt=setTimeout(()=>this.render(),60);
   }
-  _enPinch(){if(!this.pinch)return;this.pinch=null;this.render();}
+  _enPinch(){
+    if(!this.pinch)return;const p=this.pinch;
+    this.innerScale=p.target;
+    if(p.lastM1x!==undefined){
+      this.offX=p.pdfX-p.lastM1x/p.target;
+      this.offY=p.pdfY-p.lastM1y/p.target;
+    }
+    this.pinch=null;
+    this.cvs.style.transform=''; // CSSプレビューをクリア
+    this._pdfCache=null;this.render();
+  }
 
-  /* パン (CSS transformのみ - 再描画なし・ちらつきなし) */
+  /* パン (CSS transformのみ - 再描画なし) */
   _stPan(t){this.panSt={x0:t.clientX,y0:t.clientY,ox0:this.offX,oy0:this.offY};}
   _mvPan(t){
     if(!this.panSt)return;
@@ -584,32 +603,24 @@ class SubWin{
       document.getElementById('txov').classList.add('on');return;}
     this.isDrawing=true;this.lastX=p.x;this.lastY=p.y;
     const tool=currentTool==='shape'?currentShape:currentTool;
-    if(['pen','hl','eraser'].includes(tool)){
+    if(['pen','hl','eraser'].includes(tool))
       this.curStroke={type:tool,points:[[p.x,p.y]],color:strokeColor,size:strokeSize};
-    }else{
-      this.curStroke={type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:strokeColor,size:strokeSize};
-    }
+    else this.curStroke={type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:strokeColor,size:strokeSize};
   }
   _mvDraw(t){
     if(!this.curStroke)return;
     const p=this._pos(t);const s=this.curStroke;const sc=this.innerScale;
     if(['pen','hl'].includes(s.type)){
       s.points.push([p.x,p.y]);
-      this.ctx.save();
-      this.ctx.globalCompositeOperation='source-over';
-      this.ctx.globalAlpha=s.type==='hl'?0.38:1;
-      this.ctx.strokeStyle=s.color;
+      this.ctx.save();this.ctx.globalCompositeOperation='source-over';
+      this.ctx.globalAlpha=s.type==='hl'?0.38:1;this.ctx.strokeStyle=s.color;
       this.ctx.lineWidth=s.type==='hl'?Math.max(s.size*4,14):s.size;
       this.ctx.lineCap='round';this.ctx.lineJoin='round';
-      // ★ 正しいキャンバス座標: pdfX * sc (offX引き算は不要)
-      this.ctx.beginPath();
-      this.ctx.moveTo(this.lastX*sc,this.lastY*sc);
-      this.ctx.lineTo(p.x*sc,p.y*sc);
-      this.ctx.stroke();this.ctx.restore();
+      this.ctx.beginPath();this.ctx.moveTo(this.lastX*sc,this.lastY*sc);
+      this.ctx.lineTo(p.x*sc,p.y*sc);this.ctx.stroke();this.ctx.restore();
       this.lastX=p.x;this.lastY=p.y;
     }else if(s.type==='eraser'){
       s.points.push([p.x,p.y]);this.lastX=p.x;this.lastY=p.y;
-      // 消しゴムはライブ描画しない(enDrawで全再描画)
     }else{s.x2=p.x;s.y2=p.y;clearTimeout(this._dt);this._dt=setTimeout(()=>this.render(),30);}
   }
   _enDraw(){
@@ -618,8 +629,7 @@ class SubWin{
     if(!this.strokes[this.pageNum])this.strokes[this.pageNum]=[];
     const s=this.curStroke;
     this.strokes[this.pageNum].push({...s,points:s.points?[...s.points]:undefined});
-    this.curStroke=null;
-    this.render();A.redraw();schedSave();
+    this.curStroke=null;this.render();A.redraw();schedSave();
   }
   _bindDrag(h){
     let d=false,ox=0,oy=0,ex=0,ey=0;
@@ -632,19 +642,30 @@ class SubWin{
     document.addEventListener('touchmove',mv,{passive:true});document.addEventListener('mousemove',mv);
     const en=()=>d=false;document.addEventListener('touchend',en);document.addEventListener('mouseup',en);
   }
+  /* ★ リサイズ時にinnerScaleを連動 */
   _bindResize(h){
-    let d=false,ox=0,oy=0,w0=0,h0=0;
+    let d=false,ox=0,oy=0,w0=0,h0=0,initSc=1;
     const st=e=>{d=true;const s=e.touches?e.touches[0]:e;ox=s.clientX;oy=s.clientY;
-      w0=this.winW;h0=this.winH;e.stopPropagation();e.preventDefault();};
+      w0=this.winW;h0=this.winH;initSc=this.innerScale;e.stopPropagation();e.preventDefault();};
     h.addEventListener('touchstart',st,{passive:false});h.addEventListener('mousedown',st);
     const mv=e=>{if(!d)return;const s=e.touches?e.touches[0]:e;
-      this.winW=Math.max(180,w0+s.clientX-ox);this.winH=Math.max(160,h0+s.clientY-oy);
-      this.el.style.width=this.winW+'px';this.el.style.height=this.winH+'px';this.render();};
+      const newW=Math.max(180,w0+s.clientX-ox);
+      const newH=Math.max(160,h0+s.clientY-oy);
+      const k=Math.max(0.1,(newW-4)/Math.max(1,w0-4));
+      this.winW=newW;this.winH=newH;
+      this.el.style.width=newW+'px';this.el.style.height=newH+'px';
+      this.innerScale=Math.max(0.2,Math.min(8,initSc*k));
+      this._pdfCache=null;
+      clearTimeout(this._resizeTm);this._resizeTm=setTimeout(()=>this.render(),60);};
     document.addEventListener('touchmove',mv,{passive:true});document.addEventListener('mousemove',mv);
     const en=()=>d=false;document.addEventListener('touchend',en);document.addEventListener('mouseup',en);
   }
-  update(strokes,pn){this.strokes=strokes;if(pn!==undefined&&pn!==this.pageNum){this.pageNum=pn;this._pdfCache=null;}this.render();}
-  close(){document.body.removeChild(this.el);const i=subWindows.indexOf(this);if(i>=0)subWindows.splice(i,1);}
+  update(strokes,pn){
+    this.strokes=strokes;
+    if(pn!==undefined&&pn!==this.pageNum){this.pageNum=pn;this._pdfCache=null;}
+    this.render();
+  }
+  close(){document.body.removeChild(this.el);const i=subWindows.indexOf(this);if(i>=0)subWindows.splice(i,1);if(typeof A!=='undefined')A.redrawSelOv?.();}
 }
 
 /* ============================================================
@@ -661,28 +682,38 @@ const A=(()=>{
   const sctx=sc2.getContext('2d');
   let pdfDoc=null,origBuf=null,fileName='';
   let currentPage=1,totalPages=0,scale=1;
-  let strokes={},maxScale=6;
+  let strokes={};
+  const maxScale=8; // ★ 最大800%
+  // ★ cssExtraZoom対応
+  let renderScale=1, cssExtraZoom=1;
   let curStroke=null,isDrawing=false,lastX=0,lastY=0;
   let pinch=null,panSt=null;
   let selectedIdx=[],selPath=[];
   let subRect=null;
   let rv=0;
   let panX=16,panY=16;
-  let velHist=[];
-  let rafId=null;
+  let velHist=[],rafId=null;
 
-  function updateXf(){cw.style.transformOrigin='0 0';cw.style.transform=`translate(${panX}px,${panY}px)`;}
+  // ★ CSSトランスフォーム (cssExtraZoom対応)
+  function updateXf(){
+    cw.style.transformOrigin='0 0';
+    if(Math.abs(cssExtraZoom-1)>0.0005)
+      cw.style.transform=`translate(${panX}px,${panY}px) scale(${cssExtraZoom})`;
+    else
+      cw.style.transform=`translate(${panX}px,${panY}px)`;
+  }
+  // ★ clampPan: cssExtraZoomで視覚サイズを計算
+  function visualW(){return pc.width*cssExtraZoom;}
+  function visualH(){return pc.height*cssExtraZoom;}
   function clampPan(){
-    const aW=ca.clientWidth||1,aH=ca.clientHeight||1;
-    const cW=pc.offsetWidth||1,cH=pc.offsetHeight||1;
-    const m=60;
-    panX=Math.max(-(cW-m),Math.min(aW-m,panX));
-    panY=Math.max(-(cH-m),Math.min(aH-m,panY));
+    const aW=ca.clientWidth||1,aH=ca.clientHeight||1,m=60;
+    panX=Math.max(-(visualW()-m),Math.min(aW-m,panX));
+    panY=Math.max(-(visualH()-m),Math.min(aH-m,panY));
   }
   function centerCanvas(){
     const aW=ca.clientWidth||1,aH=ca.clientHeight||1;
-    panX=Math.max(16,(aW-pc.offsetWidth)/2);
-    panY=Math.max(16,(aH-pc.offsetHeight)/2);
+    panX=Math.max(16,(aW-visualW())/2);
+    panY=Math.max(16,(aH-visualH())/2);
     updateXf();
   }
   function cancelInertia(){cancelAnimationFrame(rafId);rafId=null;}
@@ -694,10 +725,9 @@ const A=(()=>{
   function onCanvas(src){
     const r=ca.getBoundingClientRect();
     const rx=src.clientX-r.left-panX,ry=src.clientY-r.top-panY;
-    return rx>=-20&&rx<=pc.offsetWidth+20&&ry>=-20&&ry<=pc.offsetHeight+20;
+    return rx>=-20&&rx<=visualW()+20&&ry>=-20&&ry<=visualH()+20;
   }
 
-  /* タッチ */
   ca.addEventListener('touchstart',onTS,{passive:false});
   ca.addEventListener('touchmove',onTM,{passive:false});
   ca.addEventListener('touchend',onTE,{passive:true});
@@ -715,14 +745,12 @@ const A=(()=>{
     clampPan();renderPage(currentPage);
   },{passive:false});
 
-  let swipeSt=null;
   function onTS(e){
     if(!pdfDoc)return;e.preventDefault();cancelInertia();
     if(e.touches.length>=2){isDrawing=false;curStroke=null;panSt=null;stPinch(e.touches);return;}
     const t=e.touches[0];
-    swipeSt={x:t.clientX,y:t.clientY,tm:Date.now()};
+    // ★ スワイプページめくりを無効化
     if(!onCanvas(t)){stPan(t);return;}
-    // ★ ペン・蛍光ペン: スタイラスのみ。それ以外はパン
     const needPen=['pen','hl'].includes(currentTool);
     if(needPen&&t.touchType!=='stylus'){stPan(t);return;}
     sd(e);
@@ -737,23 +765,17 @@ const A=(()=>{
   function onTE(e){
     if(pinch&&e.touches.length<2){enPinch();return;}
     if(panSt){enPan(e.changedTouches[0]);return;}
-    if(isDrawing){ed(e);swipeSt=null;return;}
-    if(swipeSt){
-      const t=e.changedTouches[0];
-      const dx=t.clientX-swipeSt.x,dy=t.clientY-swipeSt.y,dt=Date.now()-swipeSt.tm;
-      if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.5&&dt<500)pg(dx<0?1:-1);
-      swipeSt=null;
-    }
+    if(isDrawing){ed(e);return;}
+    // ★ スワイプページめくり無効化 (コード削除)
   }
 
-  /* ★ ピンチ (CSSプレビュー、中心固定) */
+  /* ★ ピンチ: CSSプレビュー + cssExtraZoom対応 */
   function pDist(t){const dx=t[1].clientX-t[0].clientX,dy=t[1].clientY-t[0].clientY;return Math.sqrt(dx*dx+dy*dy);}
   function pMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
   function stPinch(t){
     const m=pMid(t),cr=ca.getBoundingClientRect();
     const bx=m.x-cr.left,by=m.y-cr.top;
-    pinch={d0:pDist(t),s0:scale,target:scale,
-      pdfX:(bx-panX)/scale,pdfY:(by-panY)/scale,bx,by};
+    pinch={d0:pDist(t),s0:scale,target:scale,pdfX:(bx-panX)/scale,pdfY:(by-panY)/scale};
   }
   function mvPinch(t){
     const p=pinch,r=pDist(t)/p.d0;
@@ -761,21 +783,22 @@ const A=(()=>{
     const M1x=m.x-cr.left,M1y=m.y-cr.top;
     p.target=Math.max(0.2,Math.min(maxScale,p.s0*r));
     panX=M1x-p.pdfX*p.target;panY=M1y-p.pdfY*p.target;
+    // ★ CSSプレビュー: canvas は renderScale, 視覚スケール = p.target/renderScale
+    const previewEZ=p.target/renderScale;
     cw.style.transformOrigin='0 0';
-    cw.style.transform=`translate(${panX}px,${panY}px) scale(${r})`;
+    cw.style.transform=`translate(${panX}px,${panY}px) scale(${previewEZ})`;
     document.getElementById('zlbl').textContent=Math.round(p.target*100)+'%';
   }
   function enPinch(){
     if(!pinch)return;const p=pinch;pinch=null;scale=p.target;
-    renderPage(currentPage); // renderPage内でclampPan+updateXfが正確な状態にする
+    renderPage(currentPage);
   }
 
   /* パン+慣性 */
   function stPan(t){panSt={x0:t.clientX,y0:t.clientY,px0:panX,py0:panY};velHist=[];}
   function mvPan(t){
     if(!panSt)return;
-    velHist.push({x:t.clientX,y:t.clientY,tm:Date.now()});
-    if(velHist.length>6)velHist.shift();
+    velHist.push({x:t.clientX,y:t.clientY,tm:Date.now()});if(velHist.length>6)velHist.shift();
     panX=panSt.px0+(t.clientX-panSt.x0);panY=panSt.py0+(t.clientY-panSt.y0);
     clampPan();updateXf();
   }
@@ -786,8 +809,7 @@ const A=(()=>{
       const dt=Math.max(1,n.tm-f.tm);
       let vx=(n.x-f.x)/dt*14,vy=(n.y-f.y)/dt*14;
       const step=()=>{if(Math.abs(vx)<0.4&&Math.abs(vy)<0.4)return;
-        panX+=vx;panY+=vy;clampPan();updateXf();vx*=0.9;vy*=0.9;
-        rafId=requestAnimationFrame(step);};
+        panX+=vx;panY+=vy;clampPan();updateXf();vx*=0.9;vy*=0.9;rafId=requestAnimationFrame(step);};
       rafId=requestAnimationFrame(step);
     }
   }
@@ -803,19 +825,16 @@ const A=(()=>{
           isDrawing=true;lastX=p.x;lastY=p.y;return;}else clearSel();}
       selPath=[{x:p.x,y:p.y}];isDrawing=true;return;
     }
-    if(currentTool==='sub'){
-      subRect={x1:p.x,y1:p.y,x2:p.x,y2:p.y};isDrawing=true;return;
-    }
+    if(currentTool==='sub'){subRect={x1:p.x,y1:p.y,x2:p.x,y2:p.y};isDrawing=true;return;}
     isDrawing=true;lastX=p.x;lastY=p.y;
     const tool=currentTool==='shape'?currentShape:currentTool;
-    if(['pen','hl','eraser'].includes(tool)){
+    if(['pen','hl','eraser'].includes(tool))
       curStroke={type:tool,points:[[p.x,p.y]],color:strokeColor,size:strokeSize};
-    }else{
-      curStroke={type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:strokeColor,size:strokeSize};
-    }
+    else curStroke={type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:strokeColor,size:strokeSize};
   }
   function md(e){
-    const t=e.touches?e.touches[0]:e;const p=getPos(t);const sc=scale;
+    const t=e.touches?e.touches[0]:e;const p=getPos(t);
+    const sc=renderScale;const invEZ=1/cssExtraZoom;
     if(currentTool==='select'){
       if(selectedIdx.length>0&&!selPath.length){moveSel(p.x-lastX,p.y-lastY);lastX=p.x;lastY=p.y;redraw();drawSelOv();return;}
       selPath.push({x:p.x,y:p.y});drawSelPrev();return;
@@ -823,7 +842,7 @@ const A=(()=>{
     if(currentTool==='sub'&&subRect){
       subRect.x2=p.x;subRect.y2=p.y;
       sctx.clearRect(0,0,sc2.width,sc2.height);sctx.save();
-      sctx.strokeStyle=var_acc();sctx.lineWidth=2;sctx.setLineDash([8,4]);
+      sctx.strokeStyle='#f07800';sctx.lineWidth=2*invEZ;sctx.setLineDash([8*invEZ,4*invEZ]);
       sctx.strokeRect(subRect.x1*sc,subRect.y1*sc,(subRect.x2-subRect.x1)*sc,(subRect.y2-subRect.y1)*sc);
       sctx.fillStyle='rgba(240,120,0,.08)';
       sctx.fillRect(subRect.x1*sc,subRect.y1*sc,(subRect.x2-subRect.x1)*sc,(subRect.y2-subRect.y1)*sc);
@@ -833,13 +852,23 @@ const A=(()=>{
     if(['pen','hl','eraser'].includes(s.type)){
       s.points.push([p.x,p.y]);
       dctx.save();
-      if(s.type==='eraser'){dctx.globalCompositeOperation='destination-out';dctx.lineWidth=s.size*4;dctx.lineCap='round';dctx.lineJoin='round';}
-      else{dctx.globalCompositeOperation='source-over';dctx.globalAlpha=s.type==='hl'?0.38:1;
-        dctx.strokeStyle=s.color;dctx.lineWidth=s.type==='hl'?Math.max(s.size*4,14):s.size;
-        dctx.lineCap='round';dctx.lineJoin='round';}
+      if(s.type==='eraser'){
+        dctx.globalCompositeOperation='destination-out';
+        dctx.lineWidth=s.size*4*invEZ;dctx.lineCap='round';dctx.lineJoin='round';
+        // ★ 消しゴムインジケーター (selcvs に円を描画)
+        sctx.clearRect(0,0,sc2.width,sc2.height);
+        drawSubOverlays();
+        sctx.save();sctx.strokeStyle='#888';sctx.lineWidth=Math.max(1,1.5*invEZ);sctx.setLineDash([4*invEZ,2*invEZ]);
+        sctx.beginPath();sctx.arc(p.x*sc,p.y*sc,s.size*2*invEZ,0,Math.PI*2);sctx.stroke();sctx.restore();
+      }else{
+        dctx.globalCompositeOperation='source-over';dctx.globalAlpha=s.type==='hl'?0.38:1;
+        dctx.strokeStyle=s.color;
+        dctx.lineWidth=s.type==='hl'?Math.max(s.size*4*invEZ,14*invEZ):s.size*invEZ;
+        dctx.lineCap='round';dctx.lineJoin='round';
+      }
       dctx.beginPath();dctx.moveTo(lastX*sc,lastY*sc);dctx.lineTo(p.x*sc,p.y*sc);dctx.stroke();
       dctx.restore();lastX=p.x;lastY=p.y;
-    }else{s.x2=p.x;s.y2=p.y;redraw();drawOne(s,dctx,sc);}
+    }else{s.x2=p.x;s.y2=p.y;redraw();drawOne(s,dctx,sc,invEZ);}
   }
   function ed(e){
     isDrawing=false;
@@ -855,13 +884,13 @@ const A=(()=>{
         else{
           const cr=ca.getBoundingClientRect();
           const sx=cr.left+panX+r.x1*scale,sy=cr.top+panY+r.y1*scale;
-          // ★ メインウインドウの倍率でサブ窓を作成
           subWindows.push(new SubWin(pdfDoc,strokes,currentPage,r,sx,sy,scale));
         }
       }
       subRect=null;sctx.clearRect(0,0,sc2.width,sc2.height);
-      setTool(prevTool);return; // ★ サブ窓作成後は前ツールに戻る
+      setTool(prevTool);return;
     }
+    if(currentTool==='eraser'){drawSelOv();} // 消しゴムインジケーター消去
     if(!curStroke)return;
     if(!strokes[currentPage])strokes[currentPage]=[];
     const s=curStroke;
@@ -870,39 +899,34 @@ const A=(()=>{
     subWindows.forEach(sw=>sw.update(strokes,currentPage));schedSave();
   }
 
-  function var_acc(){return getComputedStyle(document.documentElement).getPropertyValue('--acc').trim()||'#f07800';}
-
   /* 選択 */
   function finishSel(){
     const arr=strokes[currentPage]||[];
     if(selMode==='rect'&&selPath.length>=2){
       const xs=selPath.map(p=>p.x),ys=selPath.map(p=>p.y);
       const rx1=Math.min(...xs),ry1=Math.min(...ys),rx2=Math.max(...xs),ry2=Math.max(...ys);
-      selectedIdx=arr.reduce((a,s,i)=>{const bb=strokeBBox(s);if(!bb)return a;
-        if(!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2))a.push(i);return a;},[]);
+      selectedIdx=arr.reduce((a,s,i)=>{const bb=strokeBBox(s);if(!bb)return a;if(!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2))a.push(i);return a;},[]);
     }else if(selMode==='lasso'&&selPath.length>=3){
       const poly=selPath.map(p=>[p.x,p.y]);
-      selectedIdx=arr.reduce((a,s,i)=>{const bb=strokeBBox(s);if(!bb)return a;
-        if(ptInPoly((bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2,poly))a.push(i);return a;},[]);
+      selectedIdx=arr.reduce((a,s,i)=>{const bb=strokeBBox(s);if(!bb)return a;if(ptInPoly((bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2,poly))a.push(i);return a;},[]);
     }
     selPath=[];sctx.clearRect(0,0,sc2.width,sc2.height);
     drawSelOv();document.getElementById('selbtn').style.display=selectedIdx.length?'block':'none';
   }
   function drawSelPrev(){
-    sctx.clearRect(0,0,sc2.width,sc2.height);if(!selPath.length)return;
-    sctx.save();sctx.strokeStyle='#4488ff';sctx.lineWidth=2;
-    sctx.setLineDash(selMode==='rect'?[6,4]:[]);
+    sctx.clearRect(0,0,sc2.width,sc2.height);drawSubOverlays();if(!selPath.length)return;
+    const sc=renderScale,invEZ=1/cssExtraZoom;
+    sctx.save();sctx.strokeStyle='#4488ff';sctx.lineWidth=2*invEZ;
+    sctx.setLineDash(selMode==='rect'?[6*invEZ,4*invEZ]:[]);
     if(selMode==='rect'){const p0=selPath[0],p1=selPath[selPath.length-1];
-      sctx.strokeRect(Math.min(p0.x,p1.x)*scale,Math.min(p0.y,p1.y)*scale,
-        Math.abs(p1.x-p0.x)*scale,Math.abs(p1.y-p0.y)*scale);
-    }else{sctx.beginPath();selPath.forEach((p,i)=>i?sctx.lineTo(p.x*scale,p.y*scale):sctx.moveTo(p.x*scale,p.y*scale));sctx.stroke();}
+      sctx.strokeRect(Math.min(p0.x,p1.x)*sc,Math.min(p0.y,p1.y)*sc,Math.abs(p1.x-p0.x)*sc,Math.abs(p1.y-p0.y)*sc);
+    }else{sctx.beginPath();selPath.forEach((p,i)=>i?sctx.lineTo(p.x*sc,p.y*sc):sctx.moveTo(p.x*sc,p.y*sc));sctx.stroke();}
     sctx.restore();
   }
   function selBBox(){
     const arr=strokes[currentPage]||[];const bbs=selectedIdx.map(i=>strokeBBox(arr[i])).filter(Boolean);
     if(!bbs.length)return null;
-    return{x1:Math.min(...bbs.map(b=>b.x1)),y1:Math.min(...bbs.map(b=>b.y1)),
-           x2:Math.max(...bbs.map(b=>b.x2)),y2:Math.max(...bbs.map(b=>b.y2))};
+    return{x1:Math.min(...bbs.map(b=>b.x1)),y1:Math.min(...bbs.map(b=>b.y1)),x2:Math.max(...bbs.map(b=>b.x2)),y2:Math.max(...bbs.map(b=>b.y2))};
   }
   function moveSel(dx,dy){
     const arr=strokes[currentPage]||[];
@@ -911,34 +935,55 @@ const A=(()=>{
       if(s.x1!==undefined){s.x1+=dx;s.y1+=dy;s.x2+=dx;s.y2+=dy;}
       if(s.type==='text'){s.x+=dx;s.y+=dy;}});
   }
-  function clearSel(){selectedIdx=[];selPath=[];sctx.clearRect(0,0,sc2.width,sc2.height);
-    document.getElementById('selbtn').style.display='none';}
+  function clearSel(){selectedIdx=[];selPath=[];sctx.clearRect(0,0,sc2.width,sc2.height);drawSubOverlays();document.getElementById('selbtn').style.display='none';}
   function drawSelOv(){
-    sctx.clearRect(0,0,sc2.width,sc2.height);if(!selectedIdx.length)return;
-    const arr=strokes[currentPage]||[];
-    sctx.save();sctx.strokeStyle='#4488ff';sctx.lineWidth=2;sctx.setLineDash([6,3]);
+    sctx.clearRect(0,0,sc2.width,sc2.height);
+    drawSubOverlays(); // ★ サブ窓領域オーバーレイを常に描画
+    if(!selectedIdx.length)return;
+    const arr=strokes[currentPage]||[];const sc=renderScale,invEZ=1/cssExtraZoom;
+    sctx.save();sctx.strokeStyle='#4488ff';sctx.lineWidth=2*invEZ;sctx.setLineDash([6*invEZ,3*invEZ]);
     selectedIdx.forEach(i=>{const bb=strokeBBox(arr[i]);if(!bb)return;
-      sctx.strokeRect(bb.x1*scale-4,bb.y1*scale-4,(bb.x2-bb.x1)*scale+8,(bb.y2-bb.y1)*scale+8);});
+      sctx.strokeRect(bb.x1*sc-4*invEZ,bb.y1*sc-4*invEZ,(bb.x2-bb.x1)*sc+8*invEZ,(bb.y2-bb.y1)*sc+8*invEZ);});
     sctx.restore();
     const bb=selBBox();if(bb){const wr=cw.getBoundingClientRect();const btn=document.getElementById('selbtn');
       btn.style.left=Math.max(0,wr.left+bb.x1*scale-4)+'px';
       btn.style.top=Math.max(0,wr.top+bb.y2*scale+6)+'px';}
   }
 
-  function redraw(){
-    dctx.clearRect(0,0,dc.width,dc.height);
-    (strokes[currentPage]||[]).forEach(s=>drawOne(s,dctx,scale));
+  /* ★ サブ窓領域をメインキャンバス上にオーバーレイ */
+  function drawSubOverlays(){
+    if(!pdfDoc||!subWindows.length)return;
+    const sc=renderScale,invEZ=1/cssExtraZoom;
+    const bColors=['rgba(240,120,0,0.10)','rgba(0,160,255,0.10)','rgba(0,200,80,0.10)','rgba(255,80,160,0.10)','rgba(200,200,0,0.10)'];
+    const lColors=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
+    subWindows.forEach((sw,idx)=>{
+      const br=sw.body.getBoundingClientRect();
+      if(!br.width||!br.height)return;
+      const rX1=sw.offX*sc, rY1=sw.offY*sc;
+      const rW=(br.width/sw.innerScale)*sc, rH=(br.height/sw.innerScale)*sc;
+      sctx.save();
+      sctx.fillStyle=bColors[idx%bColors.length];sctx.fillRect(rX1,rY1,rW,rH);
+      sctx.strokeStyle=lColors[idx%lColors.length];sctx.lineWidth=2*invEZ;sctx.setLineDash([8*invEZ,4*invEZ]);
+      sctx.strokeRect(rX1,rY1,rW,rH);sctx.restore();
+    });
   }
 
-  /* ★ renderPage: フラッシュなし、最大キャンバスサイズ制限 */
+  function redraw(){
+    dctx.clearRect(0,0,dc.width,dc.height);
+    (strokes[currentPage]||[]).forEach(s=>drawOne(s,dctx,renderScale,1/cssExtraZoom));
+    drawSelOv();
+  }
+
+  /* ★ renderPage: renderScale + cssExtraZoom で800%対応 */
   async function renderPage(num){
     if(!pdfDoc)return;const ver=++rv;
     const page=await pdfDoc.getPage(num);
     const vp1=page.getViewport({scale:1});
     const maxDim=Math.max(vp1.width,vp1.height);
-    // ★ 最大キャンバスサイズを超えないようにスケールを制限
-    const safeScale=Math.min(scale,MAX_CANVAS/maxDim);
-    const vp=page.getViewport({scale:safeScale});
+    // ★ キャンバスサイズ上限 → cssExtraZoomで残りを補完
+    renderScale=Math.min(scale,MAX_CANVAS/maxDim);
+    cssExtraZoom=scale/renderScale;
+    const vp=page.getViewport({scale:renderScale});
     const off=document.createElement('canvas');off.width=vp.width;off.height=vp.height;
     const octx=off.getContext('2d');
     octx.fillStyle='#ffffff';octx.fillRect(0,0,vp.width,vp.height);
@@ -946,12 +991,9 @@ const A=(()=>{
     if(ver!==rv)return;
     [pc,dc,sc2].forEach(c=>{c.width=vp.width;c.height=vp.height;});
     pctx.drawImage(off,0,0);redraw();clearSel();
-    // ★ CSSトランスフォームを正確にリセット (scale(r)プレビューを解除)
-    cw.style.transformOrigin='0 0';
-    cw.style.transform=''; // 一旦リセット
-    requestAnimationFrame(()=>{
-      clampPan();updateXf(); // 次フレームで正確な位置に設定
-    });
+    clampPan();
+    // ★ フレームで正確なトランスフォームを設定 (ちらつき防止)
+    requestAnimationFrame(()=>{clampPan();updateXf();});
     document.getElementById('pgn').value=num;
     document.getElementById('zlbl').textContent=Math.round(scale*100)+'%';
   }
@@ -963,13 +1005,9 @@ const A=(()=>{
       document.getElementById('fnlbl').textContent=fileName;
       pdfDoc=await pdfjsLib.getDocument({data:origBuf.slice(0)}).promise;
       totalPages=pdfDoc.numPages;document.getElementById('tpn').textContent=totalPages;
-      // ★ ページサイズに基づく最大スケール計算
-      const pg1=await pdfDoc.getPage(1);const vp1=pg1.getViewport({scale:1});
-      maxScale=Math.min(6,Math.floor(MAX_CANVAS/Math.max(vp1.width,vp1.height)*10)/10);
-      currentPage=1;panX=16;panY=16;
+      currentPage=1;panX=16;panY=16;scale=1;renderScale=1;cssExtraZoom=1;
       subWindows.slice().forEach(sw=>sw.close());
       document.getElementById('dz').style.display='none';cw.style.display='block';
-      // ★ ファイル名別保存データを復元
       const saved=await IDB.get('f:'+safeKey(file.name));
       strokes=saved?.strokes||{};
       await renderPage(1);await fit();
@@ -980,8 +1018,8 @@ const A=(()=>{
 
   async function pg(d,abs=false){
     if(!pdfDoc)return;const n=abs?Math.max(1,Math.min(totalPages,d)):currentPage+d;
-    if(n<1||n>totalPages)return;
-    currentPage=n;await renderPage(n);subWindows.forEach(sw=>sw.update(strokes,n));schedSave();
+    if(n<1||n>totalPages)return;currentPage=n;await renderPage(n);
+    subWindows.forEach(sw=>sw.update(strokes,n));schedSave();
   }
   async function zoomBy(r){scale=Math.max(0.2,Math.min(maxScale,scale*r));if(pdfDoc)await renderPage(currentPage);}
   async function fit(){
@@ -1005,7 +1043,7 @@ const A=(()=>{
     document.getElementById('dz').style.display='';
     document.getElementById('fnlbl').textContent='ファイル未選択';
     document.getElementById('tpn').textContent='0';document.getElementById('zlbl').textContent='--';
-    subWindows.slice().forEach(sw=>sw.close());_fileHandle=null;
+    subWindows.slice().forEach(sw=>sw.close());_fileHandle=null;renderScale=1;cssExtraZoom=1;
   }
 
   document.getElementById('fi').addEventListener('change',async e=>{
@@ -1015,26 +1053,27 @@ const A=(()=>{
   ca.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)loadPDF(f);});
 
   return{pg,zoomBy,fit,undo,clear,deleteSelected,closeFile,redraw,loadPDF,
+    drawSubOverlays,redrawSelOv:drawSelOv,
     get pdfDoc(){return pdfDoc;},get origBuf(){return origBuf;},get fileName(){return fileName;},
     get strokes(){return strokes;},get currentPage(){return currentPage;},
     get totalPages(){return totalPages;},get scale(){return scale;},
+    get renderScale(){return renderScale;},get cssExtraZoom(){return cssExtraZoom;},
+    get panX(){return panX;},get panY(){return panY;},
+    get pc(){return pc;},get dc(){return dc;},
     async restore(saved){
       origBuf=saved.buf;fileName=saved.file;
       document.getElementById('fnlbl').textContent=fileName;
       pdfDoc=await pdfjsLib.getDocument({data:saved.buf.slice(0)}).promise;
       totalPages=pdfDoc.numPages;document.getElementById('tpn').textContent=totalPages;
-      const pg1=await pdfDoc.getPage(1);const vp1=pg1.getViewport({scale:1});
-      maxScale=Math.min(6,Math.floor(MAX_CANVAS/Math.max(vp1.width,vp1.height)*10)/10);
-      strokes=saved.strokes||{};currentPage=saved.page||1;scale=saved.scale||1;panX=16;panY=16;
+      strokes=saved.strokes||{};currentPage=saved.page||1;scale=saved.scale||1;
+      panX=16;panY=16;renderScale=1;cssExtraZoom=1;
       document.getElementById('dz').style.display='none';cw.style.display='block';
       await renderPage(currentPage);centerCanvas();
     }
   };
 })();
 
-/* ============================================================
-   起動時復元
-   ============================================================ */
+/* 起動時復元 */
 (async()=>{
   const saved=await IDB.get('last');if(!saved?.buf)return;
   showLoading(true);
@@ -1060,12 +1099,17 @@ function setTool(t){
   document.querySelectorAll('[id^="t-"]').forEach(b=>b.classList.remove('on'));
   document.getElementById('t-'+t)?.classList.add('on');closeAllPk();
   if(t==='sub')return;
+  // ★ HL/ペンでスウォッチ切り替え
+  updateSwatches(t==='hl'?'hl':'pen');
   const key=t==='shape'?currentShape:t;
   strokeSize=toolSizes[key]||3;
   document.getElementById('sz-v').textContent=strokeSize;
 }
-function setColor(el){document.querySelectorAll('.csw').forEach(s=>s.classList.remove('on'));
-  el.classList.add('on');strokeColor=el.dataset.c;}
+function setColor(el){
+  document.querySelectorAll('.csw').forEach(s=>s.classList.remove('on'));
+  el.classList.add('on');strokeColor=el.dataset.c;
+  if(currentTool==='hl')hlColor=strokeColor;else penColor=strokeColor;
+}
 function togglePk(id,e){
   const pk=document.getElementById(id);const was=pk.classList.contains('on');
   closeAllPk();if(!was){const b=e.currentTarget.getBoundingClientRect();
@@ -1095,13 +1139,12 @@ document.addEventListener('click',e=>{
     document.getElementById('szp').classList.remove('on');
 });
 
-/* 太さパネル */
 let szTmp=3;
 function toggleSzP(e){
   const p=document.getElementById('szp');
   if(p.classList.contains('on')){p.classList.remove('on');return;}
   const b=e.currentTarget.getBoundingClientRect();
-  p.style.top=(b.bottom+6)+'px';p.style.left=Math.max(4,b.left-80)+'px';
+  p.style.top=(b.bottom+5)+'px';p.style.left=Math.max(4,b.left-80)+'px';
   const key=currentTool==='shape'?currentShape:currentTool;
   const titles={pen:'ペンの太さ',hl:'蛍光ペンの太さ',eraser:'消しゴムの太さ',
     text:'文字の大きさ',arrow:'矢印の太さ',rect:'四角の太さ',circle:'円の太さ',line:'直線の太さ'};
@@ -1118,19 +1161,16 @@ function onSzChange(v){
   drawSzPrev(szTmp);
 }
 function applySz(){
-  strokeSize=szTmp;
-  const key=currentTool==='shape'?currentShape:currentTool;
-  toolSizes[key]=strokeSize;
-  document.getElementById('sz-v').textContent=strokeSize;
-  document.getElementById('szp').classList.remove('on');
-  showToast('太さ '+strokeSize+' に設定しました');
+  strokeSize=szTmp;const key=currentTool==='shape'?currentShape:currentTool;
+  toolSizes[key]=strokeSize;document.getElementById('sz-v').textContent=strokeSize;
+  document.getElementById('szp').classList.remove('on');showToast('太さ '+strokeSize+' に設定');
 }
 function drawSzPrev(sz){
   const c=document.getElementById('szp-cvs');const ctx=c.getContext('2d');
   ctx.clearRect(0,0,c.width,c.height);
-  ctx.strokeStyle=strokeColor||'#1a1a1a';
+  ctx.strokeStyle=strokeColor||'#cc2020';
   ctx.lineWidth=Math.min(sz,c.height*0.85);ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(16,c.height/2);ctx.lineTo(c.width-16,c.height/2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(14,c.height/2);ctx.lineTo(c.width-14,c.height/2);ctx.stroke();
 }
 
 /* テキスト */
@@ -1147,11 +1187,11 @@ document.getElementById('txfld').addEventListener('keydown',e=>{
 });
 
 /* ============================================================
-   保存
+   保存 (★ RS=3 高解像度)
    ============================================================ */
-async function generateBlob(){
-  if(!window.jspdf)throw new Error('jsPDFが読み込まれていません');
-  const{jsPDF}=window.jspdf;const RS=2;
+/* PDF生成共通関数 */
+async function generatePDFBlob(){
+  const{jsPDF}=window.jspdf;const RS=3;
   const pg1=await A.pdfDoc.getPage(1);const vp1=pg1.getViewport({scale:1});
   const doc=new jsPDF({unit:'pt',format:[vp1.width,vp1.height],orientation:vp1.width>vp1.height?'l':'p'});
   for(let i=1;i<=A.totalPages;i++){
@@ -1159,14 +1199,12 @@ async function generateBlob(){
       doc.addPage([vpi.width,vpi.height],vpi.width>vpi.height?'l':'p');}
     const page=await A.pdfDoc.getPage(i);const vp=page.getViewport({scale:RS});
     const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
-    const ctx=c.getContext('2d');
-    ctx.fillStyle='#fff';ctx.fillRect(0,0,vp.width,vp.height);
+    const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,vp.width,vp.height);
     await page.render({canvasContext:ctx,viewport:vp}).promise;
-    // 2層合成
     const ann=document.createElement('canvas');ann.width=vp.width;ann.height=vp.height;
     (A.strokes[i]||[]).forEach(s=>drawOne(s,ann.getContext('2d'),RS));
     ctx.drawImage(ann,0,0);
-    doc.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,vp.width/RS,vp.height/RS);
+    doc.addImage(c.toDataURL('image/jpeg',0.94),'JPEG',0,0,vp.width/RS,vp.height/RS);
   }
   return doc.output('blob');
 }
@@ -1174,7 +1212,7 @@ async function savePDF(){
   if(!A.pdfDoc){showToast('PDFが開かれていません');return;}
   showLoading(true);
   try{
-    const blob=await generateBlob();const fname=A.fileName||'drawing.pdf';
+    const blob=await generatePDFBlob();const fname=A.fileName||'drawing.pdf';
     if(_fileHandle){
       try{const w=await _fileHandle.createWritable();await w.write(blob);await w.close();
         showToast('💾 上書き保存しました');showLoading(false);return;}
@@ -1189,41 +1227,39 @@ async function savePDF(){
     }
     const url=URL.createObjectURL(blob);const a=document.createElement('a');
     a.download=fname;a.href=url;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
-    showToast('💾 ダウンロードしました: '+fname);
+    showToast('💾 ダウンロード: '+fname);
   }catch(e){showToast('保存失敗: '+e.message);console.error(e);}
   showLoading(false);
 }
 function printPage(){if(!A.pdfDoc){showToast('PDFが開かれていません');return;}window.print();}
 
-/* スクリーンショット */
+/* ★ スクショ: 書き込み済みPDFを生成してWeb Share API/ダウンロードで出力 */
 async function screenshot(){
   if(!A.pdfDoc){showToast('PDFが開かれていません');return;}
+  showLoading(true);
   try{
-    const pc=document.getElementById('pdfcvs');
-    const dc=document.getElementById('drawcvs');
-    const m=document.createElement('canvas');
-    m.width=pc.width;m.height=pc.height;
-    const ctx=m.getContext('2d');
-    ctx.drawImage(pc,0,0);ctx.drawImage(dc,0,0);
-    const blob=await new Promise(r=>m.toBlob(r,'image/png'));
-    if(!blob){showToast('スクリーンショット失敗');return;}
-    const file=new File([blob],'tekko_'+Date.now()+'.png',{type:'image/png'});
-    if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({title:'鉄骨図面 '+A.fileName,files:[file]});
-    }else{
-      const url=URL.createObjectURL(blob);const a=document.createElement('a');
-      a.href=url;a.download=file.name;a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),30000);
-      showToast('📸 スクリーンショット保存');
+    const blob=await generatePDFBlob();
+    const fname=(A.fileName||'drawing').replace(/\.pdf$/i,'')+'_share.pdf';
+    const file=new File([blob],fname,{type:'application/pdf'});
+    if(navigator.share&&navigator.canShare?.({files:[file]})){
+      try{await navigator.share({title:'M_Viewer '+A.fileName,files:[file]});
+        showLoading(false);return;}
+      catch(e){if(e.name==='AbortError'){showLoading(false);return;}}
     }
-  }catch(e){if(e.name!=='AbortError'){showToast('共有失敗: '+e.message);console.error(e);}}
+    // フォールバック: ダウンロード
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    a.download=fname;a.href=url;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    showToast('📸 PDF保存: '+fname);
+  }catch(e){showToast('スクショ失敗: '+e.message);console.error(e);}
+  showLoading(false);
 }
 
 /* ============================================================
    計算機
    ============================================================ */
 let ce='',cop='',cv='',cjeq=false;const chist=[];
-function cDec(){return parseInt(document.getElementById('cdec').value)??1;}
+function cDec(){return parseInt(document.getElementById('cdec').value)??0;}
 function cDsp(){document.getElementById('cexpr').textContent=ce;document.getElementById('cval').textContent=cv||'0';}
 function cNum(n){if(cjeq){cv='';ce='';cjeq=false;}if(n==='.'&&cv.includes('.'))return;cv+=n;cDsp();}
 function cOp(op){cjeq=false;if(cv!==''&&cop!==''){
@@ -1263,9 +1299,6 @@ function toggleCalc(){const el=document.getElementById('calc');el.classList.togg
   document.addEventListener('touchend',en);document.addEventListener('mouseup',en);
 })();
 
-/* ============================================================
-   HELPERS
-   ============================================================ */
 let toastT;
 function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2800);}
 function showLoading(v){document.getElementById('loading').classList.toggle('on',v);}
