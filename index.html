@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V2.06</title>
+<title>M_Viewer V2.05</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <style>
 :root{--bg:#1e2228;--pan:#262c34;--pan2:#2e363f;--brd:#4a5a6a;
   --acc:#f07800;--tx:#ffffff;--tx2:#c8d8e4;--red:#c02020;}
@@ -177,7 +176,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 <div id="hdr">
 <!-- 行1: ロゴ/開く/ファイル名 | Undo/Save/スクショ/印刷/計算 | Close(右端) -->
 <div class="hr">
-  <span class="logo">M_Viewer <span style="font-size:10px">V2.06</span></span>
+  <span class="logo">M_Viewer <span style="font-size:10px">V2.05</span></span>
   <input type="file" id="fi" accept="application/pdf" style="display:none">
   <button class="btn" onclick="openFile()">📂 開く</button>
   <span id="fnlbl">ファイル未選択</span>
@@ -1272,45 +1271,10 @@ document.getElementById('txfld').addEventListener('keydown',e=>{
 });
 
 /* ============================================================
-   保存: pdf-lib で PDF標準注釈として書き出し
-   ・消しゴムなし → Ink/Square/Circle/Line/FreeText 等の標準注釈
-   ・消しゴムあり → JPEG ラスタライズで代替 (消去を正確に反映)
+   保存 (★ RS=3 高解像度)
    ============================================================ */
-
-/* 色変換ユーティリティ */
-function hexToRgbArr(hex){
-  if(!hex||hex.length<7)return[0,0,0];
-  return[parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255];
-}
-
-/* PDF標準注釈として書き出す共通関数 */
+/* PDF生成共通関数 */
 async function generatePDFBlob(){
-  const PL=window.PDFLib;
-  if(!PL){
-    // pdf-lib 未ロード時はjsPDFにフォールバック
-    showToast('⚠ pdf-lib 未ロード。通常保存で代替します');
-    return _generatePDFBlobFallback();
-  }
-  const{PDFDocument,PDFName,PDFArray,PDFString}=PL;
-  const srcDoc=await PDFDocument.load(A.origBuf.slice(0));
-  for(let i=0;i<A.totalPages;i++){
-    const pn=i+1;const ss=A.strokes[pn]||[];if(!ss.length)continue;
-    const page=srcDoc.getPage(i);const{width,height}=page.getSize();
-    const flip=y=>height-y; // PDF.js(Y↓) → pdf-lib(Y↑) 座標変換
-    if(ss.some(s=>s.type==='eraser')){
-      // 消しゴムあり: ラスタライズ
-      await _pdfRasterPage(srcDoc,page,pn,ss,width,height);
-    }else{
-      // 消しゴムなし: 標準注釈
-      await _pdfAnnotPage(srcDoc,page,ss,flip,PDFName,PDFArray,PDFString);
-    }
-  }
-  const bytes=await srcDoc.save();
-  return new Blob([bytes],{type:'application/pdf'});
-}
-
-/* フォールバック: jsPDF によるラスタライズ */
-async function _generatePDFBlobFallback(){
   const{jsPDF}=window.jspdf;const RS=4;
   const pg1=await A.pdfDoc.getPage(1);const vp1=pg1.getViewport({scale:1});
   const doc=new jsPDF({unit:'pt',format:[vp1.width,vp1.height],orientation:vp1.width>vp1.height?'l':'p'});
@@ -1327,98 +1291,6 @@ async function _generatePDFBlobFallback(){
     doc.addImage(c.toDataURL('image/jpeg',0.94),'JPEG',0,0,vp.width/RS,vp.height/RS);
   }
   return doc.output('blob');
-}
-
-/* 消しゴムあり: ページをJPEGラスタライズして画像として埋め込む */
-async function _pdfRasterPage(srcDoc,page,pageNum,strokes,pw,ph){
-  const RS=3;
-  const jsPage=await A.pdfDoc.getPage(pageNum);
-  const vp=jsPage.getViewport({scale:RS});
-  const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
-  const ctx=c.getContext('2d');
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,vp.width,vp.height);
-  await jsPage.render({canvasContext:ctx,viewport:vp}).promise;
-  const ann=document.createElement('canvas');ann.width=vp.width;ann.height=vp.height;
-  strokes.forEach(s=>drawOne(s,ann.getContext('2d'),RS));
-  ctx.drawImage(ann,0,0);
-  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.94));
-  const imgBytes=new Uint8Array(await blob.arrayBuffer());
-  const img=await srcDoc.embedJpg(imgBytes);
-  // 白地で既存コンテンツを覆い、画像を全面に配置
-  page.drawRectangle({x:0,y:0,width:pw,height:ph,color:window.PDFLib.rgb(1,1,1),borderWidth:0});
-  page.drawImage(img,{x:0,y:0,width:pw,height:ph});
-}
-
-/* 消しゴムなし: PDF標準注釈として追加 */
-async function _pdfAnnotPage(srcDoc,page,strokes,flip,PDFName,PDFArray,PDFString){
-  // Annots 配列を取得または新規作成
-  let annots=page.node.get(PDFName.of('Annots'));
-  if(!annots){
-    annots=srcDoc.context.obj([]);
-    page.node.set(PDFName.of('Annots'),annots);
-  }else if(!(annots instanceof PDFArray)){
-    const resolved=srcDoc.context.lookup(annots);
-    annots=(resolved instanceof PDFArray)?resolved:srcDoc.context.obj([]);
-    if(!(annots instanceof PDFArray))page.node.set(PDFName.of('Annots'),annots);
-  }
-  for(const s of strokes){
-    const d=_annotDict(s,flip,PDFName,PDFString,srcDoc);
-    if(d)annots.push(srcDoc.context.register(srcDoc.context.obj(d)));
-  }
-}
-
-/* 注釈辞書を生成 */
-function _annotDict(s,flip,PDFName,PDFString,srcDoc){
-  const c=hexToRgbArr(s.color);
-  const mk=(subtype,extra)=>({Type:PDFName.of('Annot'),Subtype:PDFName.of(subtype),F:4,...extra});
-
-  if(s.type==='pen'||s.type==='hl'){
-    const pts=s.points;if(!pts||pts.length<2)return null;
-    const lw=s.type==='hl'?Math.max(s.size*4,14):s.size;
-    const coords=pts.flatMap(p=>[+p[0].toFixed(2),+flip(p[1]).toFixed(2)]);
-    const xs=pts.map(p=>p[0]),ys=pts.map(p=>flip(p[1]));
-    const pd=lw+2;
-    return mk('Ink',{
-      InkList:[coords],
-      Rect:[+(Math.min(...xs)-pd).toFixed(2),+(Math.min(...ys)-pd).toFixed(2),
-            +(Math.max(...xs)+pd).toFixed(2),+(Math.max(...ys)+pd).toFixed(2)],
-      C:c,CA:s.type==='hl'?0.38:1,
-      BS:srcDoc.context.obj({W:lw}),
-    });
-  }
-  if(s.type==='rect'||s.type==='circle'){
-    const x1=Math.min(s.x1,s.x2),x2=Math.max(s.x1,s.x2);
-    const y1=Math.min(flip(s.y1),flip(s.y2)),y2=Math.max(flip(s.y1),flip(s.y2));
-    return mk(s.type==='rect'?'Square':'Circle',{
-      Rect:[x1-s.size,y1-s.size,x2+s.size,y2+s.size],
-      C:c,BS:srcDoc.context.obj({W:s.size}),
-    });
-  }
-  if(s.type==='line'||s.type==='arrow'){
-    const[y1,y2]=[flip(s.y1),flip(s.y2)];
-    const pd=s.size+20;
-    const d=mk('Line',{
-      L:[+s.x1.toFixed(2),+y1.toFixed(2),+s.x2.toFixed(2),+y2.toFixed(2)],
-      Rect:[Math.min(s.x1,s.x2)-pd,Math.min(y1,y2)-pd,Math.max(s.x1,s.x2)+pd,Math.max(y1,y2)+pd],
-      C:c,BS:srcDoc.context.obj({W:s.size}),
-    });
-    if(s.type==='arrow')d.LE=[PDFName.of('None'),PDFName.of('OpenArrow')];
-    return d;
-  }
-  if(s.type==='text'){
-    const fs=Math.round(s.size*6);
-    const fy=flip(s.y);
-    const lines=(s.text||''). split('\n');
-    const tw=Math.max(...lines.map(l=>l.length))*fs*0.6+12;
-    const th=lines.length*fs*1.4;
-    const rgb3=c.map(v=>v.toFixed(3)).join(' ');
-    return mk('FreeText',{
-      Rect:[+s.x.toFixed(2),+(fy-th).toFixed(2),+(s.x+tw).toFixed(2),+(fy+fs*0.3).toFixed(2)],
-      Contents:PDFString.of(s.text||''),
-      DA:PDFString.of(`${rgb3} rg /Helvetica ${fs} Tf`),
-    });
-  }
-  return null;
 }
 async function savePDF(){
   if(!A.pdfDoc){showToast('PDFが開かれていません');return;}
