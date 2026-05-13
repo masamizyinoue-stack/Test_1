@@ -269,7 +269,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   <div id="chist"></div>
   <div id="cdsp"><div id="cexpr"></div><div id="cval">0</div></div>
   <!-- ★ 計算機デフォルト0桁(四捨五入) -->
-  <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="0">桁</div>
+  <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="1">桁</div>
   <div id="cbtns">
     <button class="cb cbf" onclick="cFn('C')">C</button>
     <button class="cb cbf" onclick="cSqrt()">√</button>
@@ -457,11 +457,16 @@ class SubWin{
     this.pinch=null;this.panSt=null;
     this.curStroke=null;this.isDrawing=false;this.lastX=0;this.lastY=0;
     this._rv=0;this._pdfCache=null;this._pdfCacheSc=0;this._pdfCachePg=0;
+    // ★ サブ窓固有カラー (枠色=メインオーバーレイ色と一致)
+    const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
+    const SW_FILLS=['rgba(240,120,0,0.12)','rgba(0,160,255,0.12)','rgba(0,200,80,0.12)','rgba(255,80,160,0.12)','rgba(200,200,0,0.12)'];
+    this.swColor=SW_COLORS[subWindows.length%5];
+    this.swFill=SW_FILLS[subWindows.length%5];
     this._build();this.render();
   }
   _build(){
     const el=document.createElement('div');el.className='swn';
-    el.style.cssText=`left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${++swZIndex};`;
+    el.style.cssText=`left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${++swZIndex};border-color:${this.swColor};`;
     const n=subWindows.length+1;
     el.innerHTML=`<div class="swn-tb"><span>🔍 サブ窓${n}</span><button class="swn-close">✕</button></div>
       <div class="swn-body"><canvas class="swn-cvs"></canvas><span class="swn-zl"></span></div>
@@ -954,16 +959,15 @@ const A=(()=>{
   function drawSubOverlays(){
     if(!pdfDoc||!subWindows.length)return;
     const sc=renderScale,invEZ=1/cssExtraZoom;
-    const bColors=['rgba(240,120,0,0.10)','rgba(0,160,255,0.10)','rgba(0,200,80,0.10)','rgba(255,80,160,0.10)','rgba(200,200,0,0.10)'];
-    const lColors=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
-    subWindows.forEach((sw,idx)=>{
+    subWindows.forEach(sw=>{
       const br=sw.body.getBoundingClientRect();
       if(!br.width||!br.height)return;
       const rX1=sw.offX*sc, rY1=sw.offY*sc;
       const rW=(br.width/sw.innerScale)*sc, rH=(br.height/sw.innerScale)*sc;
+      // ★ サブ窓枠色と同色でオーバーレイ
       sctx.save();
-      sctx.fillStyle=bColors[idx%bColors.length];sctx.fillRect(rX1,rY1,rW,rH);
-      sctx.strokeStyle=lColors[idx%lColors.length];sctx.lineWidth=2*invEZ;sctx.setLineDash([8*invEZ,4*invEZ]);
+      sctx.fillStyle=sw.swFill||'rgba(240,120,0,0.12)';sctx.fillRect(rX1,rY1,rW,rH);
+      sctx.strokeStyle=sw.swColor||'#f07800';sctx.lineWidth=2*invEZ;sctx.setLineDash([8*invEZ,4*invEZ]);
       sctx.strokeRect(rX1,rY1,rW,rH);sctx.restore();
     });
   }
@@ -1191,7 +1195,7 @@ document.getElementById('txfld').addEventListener('keydown',e=>{
    ============================================================ */
 /* PDF生成共通関数 */
 async function generatePDFBlob(){
-  const{jsPDF}=window.jspdf;const RS=3;
+  const{jsPDF}=window.jspdf;const RS=4;
   const pg1=await A.pdfDoc.getPage(1);const vp1=pg1.getViewport({scale:1});
   const doc=new jsPDF({unit:'pt',format:[vp1.width,vp1.height],orientation:vp1.width>vp1.height?'l':'p'});
   for(let i=1;i<=A.totalPages;i++){
@@ -1233,26 +1237,57 @@ async function savePDF(){
 }
 function printPage(){if(!A.pdfDoc){showToast('PDFが開かれていません');return;}window.print();}
 
-/* ★ スクショ: 書き込み済みPDFを生成してWeb Share API/ダウンロードで出力 */
+/* ★ スクショ: 画面表示範囲(メイン+サブ窓)をPNGで共有 */
 async function screenshot(){
   if(!A.pdfDoc){showToast('PDFが開かれていません');return;}
-  showLoading(true);
   try{
-    const blob=await generatePDFBlob();
-    const fname=(A.fileName||'drawing').replace(/\.pdf$/i,'')+'_share.pdf';
-    const file=new File([blob],fname,{type:'application/pdf'});
-    if(navigator.share&&navigator.canShare?.({files:[file]})){
-      try{await navigator.share({title:'M_Viewer '+A.fileName,files:[file]});
-        showLoading(false);return;}
-      catch(e){if(e.name==='AbortError'){showLoading(false);return;}}
+    const ca=document.getElementById('ca');
+    const caRect=ca.getBoundingClientRect();
+    const m=document.createElement('canvas');
+    m.width=Math.round(caRect.width);m.height=Math.round(caRect.height);
+    const ctx=m.getContext('2d');
+    ctx.fillStyle='#444';ctx.fillRect(0,0,m.width,m.height);
+    // メインキャンバス可視範囲
+    const pc=A.pc,dc=A.dc,panX=A.panX,panY=A.panY,ez=A.cssExtraZoom;
+    const vW=pc.width*ez,vH=pc.height*ez;
+    const dstX=Math.max(0,panX),dstY=Math.max(0,panY);
+    const srcX=Math.max(0,-panX)/ez,srcY=Math.max(0,-panY)/ez;
+    const visW=Math.min(m.width-dstX,vW-Math.max(0,-panX));
+    const visH=Math.min(m.height-dstY,vH-Math.max(0,-panY));
+    if(visW>0&&visH>0){
+      const sW=visW/ez,sH=visH/ez;
+      ctx.drawImage(pc,srcX,srcY,sW,sH,dstX,dstY,visW,visH);
+      ctx.drawImage(dc,srcX,srcY,sW,sH,dstX,dstY,visW,visH);
     }
-    // フォールバック: ダウンロード
+    // サブウインドウ
+    subWindows.forEach(sw=>{
+      const swRect=sw.el.getBoundingClientRect();
+      const bRect=sw.body.getBoundingClientRect();
+      const bx=bRect.left-caRect.left,by=bRect.top-caRect.top;
+      const bw=bRect.width,bh=bRect.height;
+      if(bx<m.width&&by<m.height&&bx+bw>0&&by+bh>0){
+        ctx.save();
+        ctx.rect(Math.max(0,bx),Math.max(0,by),Math.min(bw,m.width-bx),Math.min(bh,m.height-by));
+        ctx.clip();
+        ctx.drawImage(sw.cvs,sw.offX*sw.innerScale,sw.offY*sw.innerScale,bw,bh,bx,by,bw,bh);
+        ctx.restore();
+        const sx=swRect.left-caRect.left,sy=swRect.top-caRect.top;
+        ctx.save();ctx.strokeStyle=sw.swColor||'#f07800';ctx.lineWidth=2.5;
+        ctx.strokeRect(sx,sy,swRect.width,swRect.height);ctx.restore();
+      }
+    });
+    const blob=await new Promise(r=>m.toBlob(r,'image/png'));
+    if(!blob){showToast('スクショ失敗');return;}
+    const fname='M_Viewer_'+Date.now()+'.png';
+    const file=new File([blob],fname,{type:'image/png'});
+    if(navigator.share&&navigator.canShare?.({files:[file]})){
+      try{await navigator.share({title:'M_Viewer '+A.fileName,files:[file]});return;}
+      catch(e){if(e.name==='AbortError')return;}
+    }
     const url=URL.createObjectURL(blob);const a=document.createElement('a');
-    a.download=fname;a.href=url;a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-    showToast('📸 PDF保存: '+fname);
-  }catch(e){showToast('スクショ失敗: '+e.message);console.error(e);}
-  showLoading(false);
+    a.href=url;a.download=fname;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);showToast('📸 スクショ保存');
+  }catch(e){if(e.name!=='AbortError'){showToast('スクショ失敗');console.error(e);}}
 }
 
 /* ============================================================
