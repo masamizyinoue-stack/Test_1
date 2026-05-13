@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V3.01</title>
+<title>M_Viewer V2.04</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -176,7 +176,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 <div id="hdr">
 <!-- 行1: ロゴ/開く/ファイル名 | Undo/Save/スクショ/印刷/計算 | Close(右端) -->
 <div class="hr">
-  <span class="logo">M_Viewer <span style="font-size:10px">V3.01</span></span>
+  <span class="logo">M_Viewer <span style="font-size:10px">V2.04</span></span>
   <input type="file" id="fi" accept="application/pdf" style="display:none">
   <button class="btn" onclick="openFile()">📂 開く</button>
   <span id="fnlbl">ファイル未選択</span>
@@ -253,7 +253,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V3.01</div>
+    <div class="dzm">M_Viewer V2.01</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
       👉 その他ツール・スクロール: 指でも操作可<br>
@@ -405,7 +405,17 @@ function drawOne(s,ctx,sc,invEZ=1){
     ctx.globalAlpha=s.type==='hl'?0.38:1;ctx.strokeStyle=s.color;
     ctx.lineWidth=s.type==='hl'?Math.max(lw*4,14*invEZ):lw;
     ctx.lineCap='round';ctx.lineJoin='round';
-    ctx.beginPath();s.points.forEach((p,i)=>i?ctx.lineTo(p[0]*sc,p[1]*sc):ctx.moveTo(p[0]*sc,p[1]*sc));ctx.stroke();
+    // ★ midpoint Bezier で滑らかな曲線
+    ctx.beginPath();
+    {const pts=s.points;if(pts&&pts.length){
+      ctx.moveTo(pts[0][0]*sc,pts[0][1]*sc);
+      for(let i=1;i<pts.length-1;i++){
+        const mx=(pts[i][0]+pts[i+1][0])/2*sc,my=(pts[i][1]+pts[i+1][1])/2*sc;
+        ctx.quadraticCurveTo(pts[i][0]*sc,pts[i][1]*sc,mx,my);
+      }
+      if(pts.length>1)ctx.lineTo(pts[pts.length-1][0]*sc,pts[pts.length-1][1]*sc);
+    }}
+    ctx.stroke();
   }else if(s.type==='text'){
     ctx.fillStyle=s.color;
     ctx.font=`bold ${Math.round(s.size*6)}px 'Helvetica Neue',Arial,sans-serif`;
@@ -457,7 +467,6 @@ class SubWin{
     this.pinch=null;this.panSt=null;
     this.curStroke=null;this.isDrawing=false;this.lastX=0;this.lastY=0;
     this._rv=0;this._pdfCache=null;this._pdfCacheSc=0;this._pdfCachePg=0;
-    this.renderScale=1;this.cssExtraZoom=1;
     // ★ サブ窓固有カラー (枠色=メインオーバーレイ色と一致)
     const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
     const SW_FILLS=['rgba(240,120,0,0.12)','rgba(0,160,255,0.12)','rgba(0,200,80,0.12)','rgba(255,80,160,0.12)','rgba(200,200,0,0.12)'];
@@ -470,10 +479,11 @@ class SubWin{
     el.style.cssText=`left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${++swZIndex};border-color:${this.swColor};`;
     const n=subWindows.length+1;
     el.innerHTML=`<div class="swn-tb"><span>🔍 サブ窓${n}</span><button class="swn-close">✕</button></div>
-      <div class="swn-body"><canvas class="swn-cvs"></canvas><span class="swn-zl"></span></div>
+      <div class="swn-body"><canvas class="swn-cvs"></canvas><canvas class="swn-sel" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas><span class="swn-zl"></span></div>
       <div class="swn-rz"></div>`;
     this.el=el;this.body=el.querySelector('.swn-body');
     this.cvs=el.querySelector('.swn-cvs');this.ctx=this.cvs.getContext('2d');
+    this.sel=el.querySelector('.swn-sel');this.selCtx=this.sel.getContext('2d');
     this.zlEl=el.querySelector('.swn-zl');
     el.querySelector('.swn-close').addEventListener('pointerdown',e=>{e.stopPropagation();this.close();});
     // ★ タッチで前面表示
@@ -486,13 +496,7 @@ class SubWin{
   _br(){return this.body.getBoundingClientRect();}
   _pos(t){const r=this._br();return{x:(t.clientX-r.left)/this.innerScale+this.offX,y:(t.clientY-r.top)/this.innerScale+this.offY};}
   _updateXf(){
-    const tx=-this.offX*this.renderScale;
-    const ty=-this.offY*this.renderScale;
-    this.cvs.style.transformOrigin='0 0';
-    if(Math.abs(this.cssExtraZoom-1)>0.0005)
-      this.cvs.style.transform=`translate(${tx}px,${ty}px) scale(${this.cssExtraZoom})`;
-    else
-      this.cvs.style.transform=`translate(${tx}px,${ty}px)`;
+    this.cvs.style.transform=`translate(${-this.offX*this.innerScale}px,${-this.offY*this.innerScale}px)`;
     // メインウインドウのサブ窓オーバーレイを更新
     if(typeof A!=='undefined')A.redrawSelOv?.();
   }
@@ -501,14 +505,10 @@ class SubWin{
   async render(){
     if(!this.pdfDoc)return;
     const ver=++this._rv;
+    const sc=this.innerScale;
     const page=await this.pdfDoc.getPage(this.pageNum);
-    const vp1=page.getViewport({scale:1});
-    const maxDim=Math.max(vp1.width,vp1.height);
-    // ★ renderScale/cssExtraZoom (メインウインドウと同じGPU上限対応)
-    this.renderScale=Math.min(this.innerScale,MAX_CANVAS/maxDim);
-    this.cssExtraZoom=this.innerScale/this.renderScale;
-    const sc=this.renderScale;
     const vp=page.getViewport({scale:sc});
+
     let pdfOff;
     if(this._pdfCache&&this._pdfCacheSc===sc&&this._pdfCachePg===this.pageNum){
       pdfOff=this._pdfCache;
@@ -521,14 +521,14 @@ class SubWin{
     }
     const annOff=document.createElement('canvas');annOff.width=vp.width;annOff.height=vp.height;
     const actx=annOff.getContext('2d');
-    (this.strokes[this.pageNum]||[]).forEach(s=>drawOne(s,actx,sc,1/this.cssExtraZoom));
+    (this.strokes[this.pageNum]||[]).forEach(s=>drawOne(s,actx,sc));
     if(ver!==this._rv)return;
     this.cvs.width=vp.width;this.cvs.height=vp.height;
     this.cvs.style.width=vp.width+'px';this.cvs.style.height=vp.height+'px';
     this.ctx.clearRect(0,0,vp.width,vp.height);
     this.ctx.drawImage(pdfOff,0,0);this.ctx.drawImage(annOff,0,0);
     this._updateXf();
-    this.zlEl.textContent=Math.round(this.innerScale*100)+'%';
+    this.zlEl.textContent=Math.round(sc*100)+'%';
   }
 
   _bindInput(){
@@ -564,20 +564,6 @@ class SubWin{
       this.offX=pdfX-bx/newSc;this.offY=pdfY-by/newSc;this.innerScale=newSc;
       this._pdfCache=null;this.render();
     },{passive:false});
-    // ★ マウス操作 (メインウインドウと同等)
-    cv.addEventListener('mousedown',e=>{
-      if(e.button!==0)return;e.preventDefault();
-      if(['sub','select'].includes(currentTool)){this._stPan(e);return;}
-      this._stDraw(e);
-    });
-    cv.addEventListener('mousemove',e=>{
-      if(this.panSt){this._mvPan(e);return;}
-      if(this.isDrawing)this._mvDraw(e);
-    });
-    cv.addEventListener('mouseup',()=>{
-      if(this.panSt){this.panSt=null;return;}
-      if(this.isDrawing)this._enDraw();
-    });
   }
 
   /* ★ ピンチ: CSSプレビューで位置ずれなし */
@@ -600,7 +586,7 @@ class SubWin{
     const tx=p.lastM1x-p.pdfX*p.target;
     const ty=p.lastM1y-p.pdfY*p.target;
     // ★ クランプ後スケールを使用 (最大800%でブレなし)
-    const cssR=p.target/this.renderScale;
+    const cssR=p.target/p.s0;
     this.cvs.style.transformOrigin='0 0';
     this.cvs.style.transform=`translate(${tx}px,${ty}px) scale(${cssR})`;
     this.zlEl.textContent=Math.round(p.target*100)+'%';
@@ -639,19 +625,36 @@ class SubWin{
   }
   _mvDraw(t){
     if(!this.curStroke)return;
-    const p=this._pos(t);const s=this.curStroke;
-    const sc=this.renderScale;const invEZ=1/this.cssExtraZoom;
+    const p=this._pos(t);const s=this.curStroke;const sc=this.innerScale;
     if(['pen','hl'].includes(s.type)){
       s.points.push([p.x,p.y]);
       this.ctx.save();this.ctx.globalCompositeOperation='source-over';
       this.ctx.globalAlpha=s.type==='hl'?0.38:1;this.ctx.strokeStyle=s.color;
-      this.ctx.lineWidth=s.type==='hl'?Math.max(s.size*4*invEZ,14*invEZ):s.size*invEZ;
+      this.ctx.lineWidth=s.type==='hl'?Math.max(s.size*4,14):s.size;
       this.ctx.lineCap='round';this.ctx.lineJoin='round';
-      this.ctx.beginPath();this.ctx.moveTo(this.lastX*sc,this.lastY*sc);
-      this.ctx.lineTo(p.x*sc,p.y*sc);this.ctx.stroke();this.ctx.restore();
-      this.lastX=p.x;this.lastY=p.y;
+      // ★ 滑らかBezier (3点以上でmidpoint bezier)
+      this.ctx.beginPath();
+      if(s.points.length>=3){
+        const pts=s.points;
+        const pp=pts[pts.length-3],cp=pts[pts.length-2];
+        const pmx=(pp[0]+cp[0])/2*sc,pmy=(pp[1]+cp[1])/2*sc;
+        const cmx=(cp[0]+p.x)/2*sc,cmy=(cp[1]+p.y)/2*sc;
+        this.ctx.moveTo(pmx,pmy);this.ctx.quadraticCurveTo(cp[0]*sc,cp[1]*sc,cmx,cmy);
+      }else{this.ctx.moveTo(this.lastX*sc,this.lastY*sc);this.ctx.lineTo(p.x*sc,p.y*sc);}
+      this.ctx.stroke();this.ctx.restore();this.lastX=p.x;this.lastY=p.y;
     }else if(s.type==='eraser'){
       s.points.push([p.x,p.y]);this.lastX=p.x;this.lastY=p.y;
+      // ★ 消しゴムインジケーター (selキャンバスに円を表示)
+      if(this.sel){
+        const br=this._br();
+        if(this.sel.width!==Math.round(br.width)||this.sel.height!==Math.round(br.height)){
+          this.sel.width=Math.round(br.width);this.sel.height=Math.round(br.height);
+        }else{this.selCtx.clearRect(0,0,this.sel.width,this.sel.height);}
+        const bx=(p.x-this.offX)*this.innerScale,by=(p.y-this.offY)*this.innerScale;
+        this.selCtx.save();this.selCtx.strokeStyle='#888';this.selCtx.lineWidth=1.5;
+        this.selCtx.setLineDash([4,2]);this.selCtx.beginPath();
+        this.selCtx.arc(bx,by,s.size*2,0,Math.PI*2);this.selCtx.stroke();this.selCtx.restore();
+      }
     }else{s.x2=p.x;s.y2=p.y;clearTimeout(this._dt);this._dt=setTimeout(()=>this.render(),30);}
   }
   _enDraw(){
@@ -660,7 +663,9 @@ class SubWin{
     if(!this.strokes[this.pageNum])this.strokes[this.pageNum]=[];
     const s=this.curStroke;
     this.strokes[this.pageNum].push({...s,points:s.points?[...s.points]:undefined});
-    this.curStroke=null;this.render();A.redraw();schedSave();
+    this.curStroke=null;
+    if(this.sel)this.selCtx.clearRect(0,0,this.sel.width,this.sel.height);
+    this.render();A.redraw();schedSave();
   }
   _bindDrag(h){
     let d=false,ox=0,oy=0,ex=0,ey=0;
@@ -734,8 +739,9 @@ const A=(()=>{
       cw.style.transform=`translate(${panX}px,${panY}px)`;
   }
   // ★ clampPan: cssExtraZoomで視覚サイズを計算
-  function visualW(){return pc.width*cssExtraZoom;}
-  function visualH(){return pc.height*cssExtraZoom;}
+  // ★ CSS表示サイズ基準 (DPR対応でpc.widthはCSS幅と異なる場合がある)
+  function visualW(){return (parseFloat(pc.style.width)||pc.width)*cssExtraZoom;}
+  function visualH(){return (parseFloat(pc.style.height)||pc.height)*cssExtraZoom;}
   function clampPan(){
     const aW=ca.clientWidth||1,aH=ca.clientHeight||1,m=60;
     panX=Math.max(-(visualW()-m),Math.min(aW-m,panX));
@@ -897,8 +903,16 @@ const A=(()=>{
         dctx.lineWidth=s.type==='hl'?Math.max(s.size*4*invEZ,14*invEZ):s.size*invEZ;
         dctx.lineCap='round';dctx.lineJoin='round';
       }
-      dctx.beginPath();dctx.moveTo(lastX*sc,lastY*sc);dctx.lineTo(p.x*sc,p.y*sc);dctx.stroke();
-      dctx.restore();lastX=p.x;lastY=p.y;
+      // ★ ライブ描画: midpoint Bezierで滑らか
+      dctx.beginPath();
+      if(s.points&&s.points.length>=3&&['pen','hl'].includes(s.type)){
+        const pts=s.points;
+        const pp=pts[pts.length-3],cp=pts[pts.length-2];
+        const pmx=(pp[0]+cp[0])/2*sc,pmy=(pp[1]+cp[1])/2*sc;
+        const cmx=(cp[0]+p.x)/2*sc,cmy=(cp[1]+p.y)/2*sc;
+        dctx.moveTo(pmx,pmy);dctx.quadraticCurveTo(cp[0]*sc,cp[1]*sc,cmx,cmy);
+      }else{dctx.moveTo(lastX*sc,lastY*sc);dctx.lineTo(p.x*sc,p.y*sc);}
+      dctx.stroke();dctx.restore();lastX=p.x;lastY=p.y;
     }else{s.x2=p.x;s.y2=p.y;redraw();drawOne(s,dctx,sc,invEZ);}
   }
   function ed(e){
@@ -1014,12 +1028,20 @@ const A=(()=>{
     renderScale=Math.min(scale,MAX_CANVAS/maxDim);
     cssExtraZoom=scale/renderScale;
     const vp=page.getViewport({scale:renderScale});
-    const off=document.createElement('canvas');off.width=vp.width;off.height=vp.height;
+    // ★ PDF高解像度レンダリング (Retinaディスプレイ対応)
+    const _pdfDPR=Math.min(window.devicePixelRatio||1,2);
+    const _pdfRS=Math.min(renderScale*_pdfDPR,(4096-4)/maxDim); // GPU上限内で2x品質
+    const hiVP=page.getViewport({scale:_pdfRS});
+    const off=document.createElement('canvas');off.width=hiVP.width;off.height=hiVP.height;
     const octx=off.getContext('2d');
-    octx.fillStyle='#ffffff';octx.fillRect(0,0,vp.width,vp.height);
-    await page.render({canvasContext:octx,viewport:vp}).promise;
+    octx.fillStyle='#ffffff';octx.fillRect(0,0,hiVP.width,hiVP.height);
+    await page.render({canvasContext:octx,viewport:hiVP}).promise;
     if(ver!==rv)return;
-    [pc,dc,sc2].forEach(c=>{c.width=vp.width;c.height=vp.height;});
+    // pc: 高解像度canvas, CSS幅は通常スケールに設定
+    pc.width=hiVP.width;pc.height=hiVP.height;
+    pc.style.width=vp.width+'px';pc.style.height=vp.height+'px';
+    // dc/sc2: 座標変換用に通常スケール
+    [dc,sc2].forEach(c=>{c.width=vp.width;c.height=vp.height;});
     pctx.drawImage(off,0,0);redraw();clearSel();
     clampPan();
     // ★ フレームで正確なトランスフォームを設定 (ちらつき防止)
@@ -1275,15 +1297,20 @@ async function screenshot(){
     ctx.fillStyle='#444';ctx.fillRect(0,0,m.width,m.height);
     // メインキャンバス可視範囲
     const pc=A.pc,dc=A.dc,panX=A.panX,panY=A.panY,ez=A.cssExtraZoom;
-    const vW=pc.width*ez,vH=pc.height*ez;
+    // ★ pcはDPR高解像度のためCSS幅から表示サイズを計算
+    const pcCssW=parseFloat(pc.style.width)||pc.width;
+    const pcCssH=parseFloat(pc.style.height)||pc.height;
+    const pdfDpr=pc.width/pcCssW; // DPR倍率 (通常1または2)
+    const vW=pcCssW*ez,vH=pcCssH*ez;
     const dstX=Math.max(0,panX),dstY=Math.max(0,panY);
-    const srcX=Math.max(0,-panX)/ez,srcY=Math.max(0,-panY)/ez;
+    const srcXcss=Math.max(0,-panX)/ez,srcYcss=Math.max(0,-panY)/ez;
     const visW=Math.min(m.width-dstX,vW-Math.max(0,-panX));
     const visH=Math.min(m.height-dstY,vH-Math.max(0,-panY));
     if(visW>0&&visH>0){
       const sW=visW/ez,sH=visH/ez;
-      ctx.drawImage(pc,srcX,srcY,sW,sH,dstX,dstY,visW,visH);
-      ctx.drawImage(dc,srcX,srcY,sW,sH,dstX,dstY,visW,visH);
+      // pcはDPRスケール, dcはCSS 1:1スケール
+      ctx.drawImage(pc,srcXcss*pdfDpr,srcYcss*pdfDpr,sW*pdfDpr,sH*pdfDpr,dstX,dstY,visW,visH);
+      ctx.drawImage(dc,srcXcss,srcYcss,sW,sH,dstX,dstY,visW,visH);
     }
     // サブウインドウ
     subWindows.forEach(sw=>{
