@@ -322,25 +322,6 @@ body {
 }
 #toast.on { opacity: 1; }
 
-/* ===== 移動モード ===== */
-/* body.view-mode : ヘッダー非表示・描画無効 */
-body.view-mode #hdr,
-body.view-mode #tabbar { display: none; }
-body.view-mode #szp,
-body.view-mode .pkp    { display: none !important; }
-
-/* モード表示バッジ */
-#view-badge {
-  display: none; position: fixed; top: 10px; left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0,0,0,.62); color: #fff; border-radius: 18px;
-  padding: 5px 16px; font-size: 12px; font-weight: 700;
-  pointer-events: none; z-index: 599; white-space: nowrap;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 2px 10px #0005;
-}
-body.view-mode #view-badge { display: block; }
-
 /* ===== 印刷 ===== */
 @media print {
   #hdr, #tabbar, #calc, #selbtn, .swn, #szp { display: none !important; }
@@ -445,7 +426,6 @@ body.view-mode #view-badge { display: block; }
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
 </div>
-<div id="view-badge">🔍 移動モード　タップで戻る</div>
 <button id="selbtn">🗑 削除</button>
 
 <!-- 計算機 -->
@@ -559,9 +539,6 @@ const betsuWindows = []; // 別窓インスタンス管理
 let   bwZIndex    = 220; // 別窓 z-index (SubWin より前面)
 let   _fileHandle = null;
 
-/* 移動モード管理 */
-let viewMode = false; // false=コマンドモード / true=移動モード(閲覧専用)
-let _tapSt   = null; // タップ開始記録 { x, y, ms } — モード切替検出用
 
 /* ツール別太さ (実行中に変更される) */
 const toolSizes = { ...TOOL_DEFAULT_SIZES };
@@ -1497,21 +1474,6 @@ class BetsuWin {
   }
 }
 
-/**
- * 移動モード ↔ コマンドモード トグル
- * - 移動モード : ヘッダー非表示・描画ブロック・パン/ピンチのみ
- * - コマンドモード : 通常操作に戻る
- */
-function _toggleViewMode() {
-  viewMode = !viewMode;
-  document.body.classList.toggle('view-mode', viewMode);
-  if (!viewMode) {
-    // コマンドモード復帰時: 開いているピッカー等を閉じる
-    closeAllPickers();
-    document.getElementById('szp').classList.remove('on');
-  }
-}
-
 /** 別窓を開く (最大 BW_MAX_WIN 個まで) */
 function openBetsuWin() {
   if (betsuWindows.length >= BW_MAX_WIN) {
@@ -1608,26 +1570,13 @@ const App = (() => {
   function onTouchStart(e) {
     if (!pdfDoc) return; e.preventDefault(); cancelInertia();
     if (e.touches.length >= 2) {
-      _tapSt = null; // マルチタッチ → タップ候補キャンセル
       isDrawing = false; curStroke = null; panSt = null;
       startPinch(e.touches); return;
     }
-    const t      = e.touches[0];
-    const isSty  = t.touchType === 'stylus'; // Apple Pencil 判定
-
-    // タップ候補を記録 (指のみ / Apple Pencil は対象外)
-    _tapSt = isSty ? null : { x: t.clientX, y: t.clientY, ms: Date.now() };
-
-    // 移動モード: 指→パンのみ / Apple Pencil→無視
-    if (viewMode) {
-      if (!isSty) startPan(t);
-      return;
-    }
-
-    // コマンドモード (既存ロジック)
+    const t = e.touches[0];
     if (!isOnCanvas(t)) { startPan(t); return; }
     const needPen = ['pen','hl'].includes(currentTool);
-    if (needPen && !isSty) { startPan(t); return; }
+    if (needPen && t.touchType !== 'stylus') { startPan(t); return; }
     startDraw(e);
   }
   function onTouchMove(e) {
@@ -1638,25 +1587,7 @@ const App = (() => {
     if (isDrawing)   moveDraw(e);
   }
   function onTouchEnd(e) {
-    if (pinch && e.touches.length < 2) { _tapSt = null; endPinch(); return; }
-
-    // ── タップ検出: 指・短時間・微小移動 → モード切替 ──────────────
-    if (_tapSt && e.changedTouches.length === 1) {
-      const ct = e.changedTouches[0];
-      if (ct.touchType !== 'stylus') { // Apple Pencil は除外
-        const moved = Math.hypot(ct.clientX - _tapSt.x, ct.clientY - _tapSt.y);
-        const dt    = Date.now() - _tapSt.ms;
-        if (dt < 220 && moved < 14) {
-          // 途中で開始したパン/描画をキャンセルして切替
-          panSt = null; curStroke = null; isDrawing = false;
-          _tapSt = null;
-          _toggleViewMode(); return;
-        }
-      }
-      _tapSt = null;
-    }
-    // ───────────────────────────────────────────────────────────────
-
+    if (pinch && e.touches.length < 2) { endPinch(); return; }
     if (panSt)     { endPan(e.changedTouches[0]); return; }
     if (isDrawing)   endDraw(e);
   }
