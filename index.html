@@ -342,13 +342,6 @@ body {
 }
 #toast.on { opacity: 1; }
 
-/* ===== 印刷 ===== */
-@media print {
-  #hdr, #tabbar, #calc, #selbtn, .swn, #szp { display: none !important; }
-  body { background: #fff !important; }
-  #ca { overflow: visible !important; position: static !important; }
-  #cw { position: static !important; transform: none !important; }
-}
 </style>
 </head>
 <body>
@@ -363,7 +356,6 @@ body {
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
     <button class="btn on" id="btn-save">📤 PDF出力</button>
-    <button class="btn" id="btn-print">🖨 印刷</button>
     <button class="btn" id="calcbtn">🧮 計算</button>
     <div class="sp"></div>
     <button class="btn rd" id="btn-close">✕ 閉じる</button>
@@ -2644,11 +2636,6 @@ async function _executeSave(rangeStr) {
   showLoading(false);
 }
 
-function printPage() {
-  if (!App.pdfDoc) { showToast('PDFが開かれていません'); return; }
-  window.print();
-}
-
 /* ============================================================
    計算機
    ============================================================ */
@@ -2846,7 +2833,6 @@ function showLoading(visible) {
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
   document.getElementById('btn-undo') .addEventListener('click', () => App.undo());
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
-  document.getElementById('btn-print').addEventListener('click', () => printPage());
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
   document.getElementById('btn-close').addEventListener('click', () => {
     if (!App.pdfDoc) return;
@@ -2924,6 +2910,11 @@ function showLoading(visible) {
     if (btn.dataset.cnum !== undefined) calcNum(btn.dataset.cnum);
     else if (btn.dataset.cop  !== undefined) calcOp(btn.dataset.cop);
     else if (btn.dataset.cfn  !== undefined) calcFn(btn.dataset.cfn);
+  });
+
+  /* --- Ctrl+P 印刷ショートカット無効化 --- */
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); }
   });
 
   /* --- グローバルクリック: ピッカー & 太さパネルを閉じる --- */
