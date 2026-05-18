@@ -231,6 +231,38 @@ body {
 .bw-rz-nw { top: 32px; left: 0; cursor: nw-resize;
   background: linear-gradient(315deg, transparent 50%, #00c8ff 50%); border-radius: 8px 0 0 0; }
 
+/* ===== タブバー ===== */
+#tabbar {
+  flex-shrink: 0; display: flex; align-items: stretch; min-height: 30px;
+  background: var(--pan2); border-bottom: 1.5px solid var(--brd);
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+#tabbar::-webkit-scrollbar { display: none; }
+.shtab {
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 6px 0 10px; min-width: 72px; max-width: 152px;
+  background: var(--pan2); color: var(--tx2); border-right: 1px solid var(--brd);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+  user-select: none; -webkit-user-select: none; transition: background .1s;
+}
+.shtab:hover { background: var(--brd); color: var(--tx); }
+.shtab.active {
+  background: var(--bg); color: var(--tx);
+  box-shadow: inset 0 -2px 0 var(--acc);
+}
+.shtab-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.shtab-x {
+  flex-shrink: 0; background: none; border: none; color: var(--tx2);
+  cursor: pointer; font-size: 12px; padding: 1px 3px; border-radius: 3px; line-height: 1;
+}
+.shtab-x:hover { background: var(--red); color: #fff; }
+.shtab-add {
+  padding: 0 13px; background: none; border: none; color: var(--tx2);
+  font-size: 20px; cursor: pointer; flex-shrink: 0; align-self: center;
+}
+.shtab-add:hover { color: var(--acc); }
+
 /* ===== 計算機 ===== */
 #calc {
   display: none; position: fixed; z-index: 400; background: var(--pan);
@@ -292,7 +324,7 @@ body {
 
 /* ===== 印刷 ===== */
 @media print {
-  #hdr, #calc, #selbtn, .swn, #szp { display: none !important; }
+  #hdr, #tabbar, #calc, #selbtn, .swn, #szp { display: none !important; }
   body { background: #fff !important; }
   #ca { overflow: visible !important; position: static !important; }
   #cw { position: static !important; transform: none !important; }
@@ -357,6 +389,9 @@ body {
     <span id="sz-v" class="sz-val">3</span>
   </div>
 </div>
+
+<!-- タブバー (シート切替) -->
+<div id="tabbar"></div>
 
 <!-- 太さパネル -->
 <div id="szp">
@@ -1908,6 +1943,7 @@ const App = (() => {
       await renderPage(1); await fit();
       if (saved?.strokes && Object.keys(saved.strokes).length > 0)
         showToast('📝 書き込みデータを復元しました');
+      _postLoadFn?.(); // シートタブへ同期 (シートマネージャーが登録)
     } catch(e) { showToast('読み込みに失敗しました'); console.error(e); }
     showLoading(false);
   }
@@ -1979,9 +2015,46 @@ const App = (() => {
     await renderPage(curPage); centerCanvas();
   }
 
+  /* ---- タブ連携: 状態保存・復元 ---- */
+  let _postLoadFn = null; // ファイル読み込み後フック (シートマネージャーが設定)
+
+  /** 現在のApp状態スナップショットを返す (参照渡し・コピーなし) */
+  function saveState() {
+    return { pdfDoc, origBuf, fileName, curPage, totalPages,
+             scale, renderScale, cssExtraZoom, panX, panY, strokes };
+  }
+
+  /** シート切替時にApp状態を一括復元してページ再描画 */
+  async function loadState(sh) {
+    pdfDoc       = sh.pdfDoc;       origBuf    = sh.origBuf;
+    fileName     = sh.fileName || ''; curPage  = sh.curPage || 1;
+    totalPages   = sh.totalPages || 0; scale   = sh.scale  || 1;
+    renderScale  = sh.renderScale  || 1; cssExtraZoom = sh.cssExtraZoom || 1;
+    panX         = sh.panX ?? 16;   panY       = sh.panY ?? 16;
+    strokes      = sh.strokes || {}; pageCache.clear();
+    selectedIdx  = []; selPath = [];
+
+    document.getElementById('fnlbl').textContent = fileName || 'ファイル未選択';
+    document.getElementById('tpn').textContent   = totalPages || '0';
+    document.getElementById('pgn').value         = curPage;
+
+    if (pdfDoc) {
+      document.getElementById('dz').style.display = 'none';
+      cwEl.style.display = 'block';
+      await renderPage(curPage);
+    } else {
+      document.getElementById('dz').style.display = '';
+      cwEl.style.display = 'none';
+      document.getElementById('zlbl').textContent = '--';
+      [pdfCvs, annCvs, ovlCvs].forEach(c => { c.width = 1; c.height = 1; });
+    }
+  }
+
   return {
     gotoPage, fit, undo, clear, deleteSelected, closeFile, redraw, loadPDF,
     drawSubOverlays, redrawSelOv: drawSelOv,
+    saveState, loadState,
+    setPostLoad(fn) { _postLoadFn = fn; }, // シートマネージャーから呼ぶ
     get pdfDoc()      { return pdfDoc;      },
     get origBuf()     { return origBuf;     },
     get fileName()    { return fileName;    },
@@ -1997,10 +2070,166 @@ const App = (() => {
 (async () => {
   const saved = await IDB.get('last'); if (!saved?.buf) return;
   showLoading(true);
-  try { await App.restore(saved); showToast('前回の状態を復元しました'); }
+  try {
+    await App.restore(saved);
+    if (typeof _sheetSync === 'function') _sheetSync(); // タブへ反映
+    showToast('前回の状態を復元しました');
+  }
   catch(e) { console.error('Restore:', e); }
   showLoading(false);
 })();
+
+/* ============================================================
+   シートマネージャー (タブ管理)
+   各シートは pdfDoc・strokes・ズーム・ページ・サブ窓状態を独立保持。
+   タブ切替時のみ App 状態を保存/復元することで最小限の変更に抑える。
+   メモリ: 非アクティブ pdfDoc は参照保持のみ (pageCache は切替時クリア)
+   ============================================================ */
+const MAX_SHEETS = 8;   // タブ最大数
+let _sheets   = [];     // シート状態配列
+let _sheetIdx = 0;      // アクティブインデックス
+let _sheetSeq = 0;      // ID カウンタ
+
+/** 空シートオブジェクトを生成 */
+function _emptySheet() {
+  return { id: ++_sheetSeq, pdfDoc: null, origBuf: null, fileName: '(新規)',
+           curPage: 1, totalPages: 0, scale: 1, renderScale: 1, cssExtraZoom: 1,
+           panX: 16, panY: 16, strokes: {}, subWinStates: [], fh: null };
+}
+_sheets.push(_emptySheet()); // 初期シート
+
+/** サブ窓状態を保存して DOM を閉じる */
+function _freezeSubWins() {
+  const st = subWindows.map(sw => ({
+    pageNum: sw.pageNum, offX: sw.offX, offY: sw.offY,
+    innerScale: sw.innerScale,
+    winW: sw.el.clientWidth  || sw.winW,
+    winH: sw.el.clientHeight || sw.winH,
+    left: sw.el.style.left, top: sw.el.style.top,
+    rW: (sw.cvs.width  || 400) / sw.innerScale,
+    rH: (sw.cvs.height || 300) / sw.innerScale
+  }));
+  subWindows.slice().forEach(sw => sw.close());
+  return st;
+}
+
+/** 保存済みサブ窓状態から DOM を再構築 */
+function _thawSubWins(states, doc, strks) {
+  if (!states || !doc) return;
+  states.forEach(s => {
+    if (subWindows.length >= MAX_SUBWIN) return;
+    const region = { x1: s.offX, y1: s.offY,
+                     x2: s.offX + (s.rW || 200), y2: s.offY + (s.rH || 200) };
+    const sx = parseFloat(s.left) || 80, sy = parseFloat(s.top) || 80;
+    const sw = new SubWin(doc, strks, s.pageNum, region, sx, sy, s.innerScale);
+    if (s.winW && s.winH) {
+      sw.winW = s.winW; sw.winH = s.winH;
+      sw.el.style.width = s.winW + 'px'; sw.el.style.height = s.winH + 'px';
+    }
+    subWindows.push(sw);
+  });
+}
+
+/** 現在の App 状態を現在シートへ同期 (_postLoadFn 経由でも呼ばれる) */
+function _sheetSync() {
+  if (!_sheets[_sheetIdx]) return;
+  Object.assign(_sheets[_sheetIdx], App.saveState(), { fh: _fileHandle });
+  _renderTabBar();
+}
+
+/** タブバー DOM を再描画 */
+function _renderTabBar() {
+  const bar = document.getElementById('tabbar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  _sheets.forEach((sh, i) => {
+    const div = document.createElement('div');
+    div.className = 'shtab' + (i === _sheetIdx ? ' active' : '');
+    const raw = sh.fileName === '(新規)' ? '(新規)' : sh.fileName.replace(/\.pdf$/i, '');
+    const label = raw.length > 16 ? raw.slice(0, 15) + '…' : raw;
+    div.innerHTML = `<span class="shtab-nm" title="${sh.fileName}">📄 ${label}</span>`
+                  + `<button class="shtab-x" title="閉じる">✕</button>`;
+    div.addEventListener('click', e => {
+      if (!e.target.classList.contains('shtab-x')) switchToSheet(i);
+    });
+    div.querySelector('.shtab-x').addEventListener('click', e => {
+      e.stopPropagation(); closeSheetAt(i);
+    });
+    bar.appendChild(div);
+  });
+  const add = document.createElement('button');
+  add.className = 'shtab-add'; add.title = 'PDFを追加 (新タブ)'; add.textContent = '＋';
+  add.addEventListener('click', () => addSheet());
+  bar.appendChild(add);
+}
+
+/** タブ切替 */
+async function switchToSheet(idx) {
+  if (idx === _sheetIdx || idx < 0 || idx >= _sheets.length) { _renderTabBar(); return; }
+  showLoading(true);
+  // 現在シートを保存
+  _sheets[_sheetIdx].subWinStates = _freezeSubWins();
+  Object.assign(_sheets[_sheetIdx], App.saveState(), { fh: _fileHandle });
+  // 新シートへ切替
+  _sheetIdx = idx;
+  const sh = _sheets[_sheetIdx];
+  _fileHandle = sh.fh || null;
+  await App.loadState(sh);
+  _thawSubWins(sh.subWinStates, sh.pdfDoc, App.strokes);
+  _renderTabBar();
+  showLoading(false);
+}
+
+/** 新タブを追加してファイル選択を促す */
+async function addSheet() {
+  if (_sheets.length >= MAX_SHEETS) { showToast(`タブは最大${MAX_SHEETS}つです`); return; }
+  // 現在シートを保存
+  _sheets[_sheetIdx].subWinStates = _freezeSubWins();
+  Object.assign(_sheets[_sheetIdx], App.saveState(), { fh: _fileHandle });
+  // 現サブ窓を再展開 (addSheet はタブ切替しないので現状維持)
+  _thawSubWins(_sheets[_sheetIdx].subWinStates, _sheets[_sheetIdx].pdfDoc, App.strokes);
+  // 新シート
+  const sh = _emptySheet();
+  _sheets.push(sh);
+  _sheetIdx = _sheets.length - 1;
+  _fileHandle = null;
+  await App.loadState(sh);
+  _renderTabBar();
+  openFile(); // ファイル選択 → loadPDF → _postLoadFn → _sheetSync で同期
+}
+
+/** タブを閉じる */
+async function closeSheetAt(idx) {
+  showLoading(true);
+  if (idx === _sheetIdx) _sheets[_sheetIdx].subWinStates = _freezeSubWins();
+  // pdfDoc 破棄 (メモリ解放)
+  if (_sheets[idx].pdfDoc) {
+    try { _sheets[idx].pdfDoc.destroy(); } catch(_) {}
+    _sheets[idx].pdfDoc = null;
+  }
+  if (_sheets.length === 1) {
+    // 最後の1枚は空にして維持
+    _sheets[0] = _emptySheet();
+    _sheetIdx  = 0; _fileHandle = null;
+    subWindows.slice().forEach(sw => sw.close());
+    await App.loadState(_sheets[0]);
+  } else {
+    _sheets.splice(idx, 1);
+    _sheetIdx = Math.min(idx, _sheets.length - 1);
+    const sh  = _sheets[_sheetIdx];
+    _fileHandle = sh.fh || null;
+    subWindows.slice().forEach(sw => sw.close());
+    await App.loadState(sh);
+    _thawSubWins(sh.subWinStates, sh.pdfDoc, App.strokes);
+  }
+  _renderTabBar();
+  showLoading(false);
+}
+
+// ファイル読み込み完了 → シートへ自動同期
+App.setPostLoad(() => _sheetSync());
+// 初期タブバー描画
+_renderTabBar();
 
 /* ============================================================
    ファイルを開く
@@ -2470,7 +2699,10 @@ function showLoading(visible) {
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
   document.getElementById('btn-print').addEventListener('click', () => printPage());
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
-  document.getElementById('btn-close').addEventListener('click', () => App.closeFile());
+  document.getElementById('btn-close').addEventListener('click', () => {
+    if (!App.pdfDoc) return;
+    if (confirm('このタブを閉じますか？（保存済みデータは残ります）')) closeSheetAt(_sheetIdx);
+  });
   document.getElementById('cclose')   .addEventListener('click', () => toggleCalc());
 
   /* --- ヘッダー行2: ページナビ --- */
