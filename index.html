@@ -258,7 +258,6 @@ body {
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
     <button class="btn on" id="btn-save">💾 保存</button>
-    <button class="btn" id="btn-shot">📸 スクショ</button>
     <button class="btn" id="btn-print">🖨 印刷</button>
     <button class="btn" id="calcbtn">🧮 計算</button>
     <div class="sp"></div>
@@ -1579,12 +1578,6 @@ const App = (() => {
     get currentPage() { return curPage;     },
     get totalPages()  { return totalPages;  },
     get scale()       { return scale;       },
-    get renderScale() { return renderScale; },
-    get cssExtraZoom(){ return cssExtraZoom;},
-    get panX()        { return panX;        },
-    get panY()        { return panY;        },
-    get pc()          { return pdfCvs;      },
-    get dc()          { return annCvs;      },
     restore
   };
 })();
@@ -1868,67 +1861,6 @@ function printPage() {
 }
 
 /* ============================================================
-   スクリーンショット
-   ============================================================ */
-async function screenshot() {
-  if (!App.pdfDoc) { showToast('PDFが開かれていません'); return; }
-  try {
-    const caEl   = document.getElementById('ca');
-    const caRect = caEl.getBoundingClientRect();
-    const m      = document.createElement('canvas');
-    m.width  = Math.round(caRect.width);
-    m.height = Math.round(caRect.height);
-    const ctx = m.getContext('2d');
-    ctx.fillStyle = '#444'; ctx.fillRect(0, 0, m.width, m.height);
-
-    const pc     = App.pc, dc = App.dc;
-    const panX   = App.panX, panY = App.panY, ez = App.cssExtraZoom;
-    const pcCssW = parseFloat(pc.style.width)  || pc.width;
-    const pcCssH = parseFloat(pc.style.height) || pc.height;
-    const pdfDpr = pc.width / pcCssW;
-    const vW = pcCssW * ez, vH = pcCssH * ez;
-    const dstX   = Math.max(0, panX), dstY = Math.max(0, panY);
-    const srcXcss = Math.max(0, -panX) / ez;
-    const srcYcss = Math.max(0, -panY) / ez;
-    const visW   = Math.min(m.width  - dstX, vW - Math.max(0, -panX));
-    const visH   = Math.min(m.height - dstY, vH - Math.max(0, -panY));
-    if (visW > 0 && visH > 0) {
-      const sW = visW / ez, sH = visH / ez;
-      ctx.drawImage(pc, srcXcss*pdfDpr, srcYcss*pdfDpr, sW*pdfDpr, sH*pdfDpr, dstX, dstY, visW, visH);
-      ctx.drawImage(dc, srcXcss,        srcYcss,        sW,        sH,        dstX, dstY, visW, visH);
-    }
-    subWindows.forEach(sw => {
-      const swRect = sw.el.getBoundingClientRect();
-      const bRect  = sw.body.getBoundingClientRect();
-      const bx = bRect.left - caRect.left, by = bRect.top - caRect.top;
-      const bw = bRect.width, bh = bRect.height;
-      if (bx < m.width && by < m.height && bx+bw > 0 && by+bh > 0) {
-        ctx.save();
-        ctx.rect(Math.max(0,bx), Math.max(0,by), Math.min(bw,m.width-bx), Math.min(bh,m.height-by));
-        ctx.clip();
-        ctx.drawImage(sw.cvs, sw.offX*sw.innerScale, sw.offY*sw.innerScale, bw, bh, bx, by, bw, bh);
-        ctx.restore();
-        const sx = swRect.left - caRect.left, sy = swRect.top - caRect.top;
-        ctx.save(); ctx.strokeStyle = sw.swColor || '#f07800'; ctx.lineWidth = 2.5;
-        ctx.strokeRect(sx, sy, swRect.width, swRect.height); ctx.restore();
-      }
-    });
-    const blob = await new Promise(r => m.toBlob(r, 'image/png'));
-    if (!blob) { showToast('スクショ失敗'); return; }
-    const fname = 'M_Viewer_' + Date.now() + '.png';
-    const file  = new File([blob], fname, { type: 'image/png' });
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ title: 'M_Viewer ' + App.fileName, files: [file] }); return; }
-      catch(e) { if (e.name === 'AbortError') return; }
-    }
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a'); a.href = url; a.download = fname; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-    showToast('📸 スクショ保存');
-  } catch(e) { if (e.name !== 'AbortError') { showToast('スクショ失敗'); console.error(e); } }
-}
-
-/* ============================================================
    計算機
    ============================================================ */
 let calcExpr = '', calcOper = '', calcVal = '', calcJustEq = false;
@@ -2043,7 +1975,6 @@ function showLoading(visible) {
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
   document.getElementById('btn-undo') .addEventListener('click', () => App.undo());
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
-  document.getElementById('btn-shot') .addEventListener('click', () => screenshot());
   document.getElementById('btn-print').addEventListener('click', () => printPage());
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
   document.getElementById('btn-close').addEventListener('click', () => App.closeFile());
