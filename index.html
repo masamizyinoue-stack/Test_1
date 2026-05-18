@@ -1828,6 +1828,23 @@ const App = (() => {
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
     }
+    // ② 消しゴム: pen型ストロークのみ実データ削除。hl/text/図形/矢印は消えない
+    if (curStroke?.type === 'eraser') {
+      const er = curStroke;
+      const r  = (er.size || 20) * 2 / 3 + 0.5; // ヒット半径 (PDF座標単位)
+      strokes[curPage] = (strokes[curPage] || []).filter(s => {
+        if (s.type !== 'pen' || !s.points?.length) return true; // pen以外は保護
+        const hitR = r + (s.size || 3) / 6;
+        return !er.points?.some(ep =>
+          s.points.some(pp => Math.hypot(ep[0]-pp[0], ep[1]-pp[1]) < hitR)
+        );
+      });
+      curStroke = null;
+      ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+      redraw(); drawSelOv();
+      subWindows.forEach(sw => sw.update(strokes, curPage));
+      schedSave(); return;
+    }
     if (currentTool === 'eraser') drawSelOv();
     if (!curStroke) return;
     if (!strokes[curPage]) strokes[curPage] = [];
@@ -2595,7 +2612,8 @@ async function _executeSave(rangeStr) {
     const pages = _parsePageRange(rangeStr, App.totalPages);
     if (!pages.length) { showToast('有効なページがありません'); showLoading(false); return; }
     const isAll = pages.length === App.totalPages;
-    const blob  = isAll ? await generatePDFBlob() : await _generateSubsetPDF(pages);
+    // 全ページ・部分ページとも _generateSubsetPDF で統一（コードパスを単一化して安定化）
+    const blob  = await _generateSubsetPDF(pages);
     if (!blob) { showLoading(false); return; }
     const suffix = isAll ? '' : '_p' + rangeStr.replace(/\s/g, '');
     const fname  = (App.fileName || 'drawing.pdf').replace(/\.pdf$/i, '') + suffix + '.pdf';
