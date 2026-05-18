@@ -178,6 +178,59 @@ body {
   background: linear-gradient(135deg, transparent 50%, var(--acc) 50%); border-radius: 0 0 8px 0;
 }
 
+/* ===== 別窓 ===== */
+.bw {
+  position: fixed; z-index: 220; background: var(--pan);
+  border: 2.5px solid #00c8ff; border-radius: 11px;
+  box-shadow: 0 6px 28px #000b; display: flex; flex-direction: column;
+  min-width: 300px; min-height: 220px; overflow: hidden;
+}
+.bw-tb {
+  height: 32px; background: var(--pan2); display: flex; align-items: center;
+  gap: 4px; padding: 0 6px; cursor: grab; flex-shrink: 0;
+  border-bottom: 1.5px solid var(--brd);
+}
+.bw-tb span.bw-lbl { font-size: 11px; font-weight: 800; color: #00c8ff; flex-shrink: 0; }
+.bw-fn {
+  font-size: 10px; color: var(--tx2); max-width: 130px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1;
+}
+.bw-navbtn {
+  height: 22px; padding: 0 5px; border: 1.5px solid var(--brd); background: var(--pan2);
+  color: var(--tx); border-radius: 4px; font-size: 11px; cursor: pointer; flex-shrink: 0;
+}
+.bw-navbtn:active { background: var(--brd); }
+.bw-pn { font-size: 10px; color: var(--tx2); flex-shrink: 0; white-space: nowrap; }
+.bw-zl { font-size: 10px; color: #00c8ff; flex-shrink: 0; white-space: nowrap; }
+.bw-openbtn {
+  height: 22px; padding: 0 6px; border: 1.5px solid var(--brd); background: var(--pan2);
+  color: var(--tx); border-radius: 4px; font-size: 11px; cursor: pointer; flex-shrink: 0;
+}
+.bw-openbtn:active { background: var(--acc); border-color: var(--acc); color: #fff; }
+.bw-close {
+  background: transparent; border: none; color: var(--tx2); font-size: 15px;
+  cursor: pointer; padding: 2px 4px; border-radius: 4px; flex-shrink: 0; margin-left: 2px;
+}
+.bw-close:active { color: var(--tx); }
+.bw-area {
+  flex: 1; overflow: hidden; position: relative; background: #555; touch-action: none;
+}
+.bw-cw { position: absolute; top: 0; left: 0; transform-origin: 0 0; background: #fff; }
+.bw-cvs { display: block; }
+.bw-dz {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--tx2); cursor: pointer; background: var(--bg);
+  flex-direction: column; gap: 8px;
+}
+/* リサイズハンドル (右下・左下・左上) */
+.bw-rz { position: absolute; width: 22px; height: 22px; z-index: 5; }
+.bw-rz-se { bottom: 0; right: 0; cursor: se-resize;
+  background: linear-gradient(135deg, transparent 50%, #00c8ff 50%); border-radius: 0 0 8px 0; }
+.bw-rz-sw { bottom: 0; left: 0; cursor: sw-resize;
+  background: linear-gradient(225deg, transparent 50%, #00c8ff 50%); border-radius: 0 0 0 8px; }
+.bw-rz-nw { top: 32px; left: 0; cursor: nw-resize;
+  background: linear-gradient(315deg, transparent 50%, #00c8ff 50%); border-radius: 8px 0 0 0; }
+
 /* ===== 計算機 ===== */
 #calc {
   display: none; position: fixed; z-index: 400; background: var(--pan);
@@ -293,6 +346,7 @@ body {
       </div>
     </div>
     <button class="btn" id="t-sub">サブ窓</button>
+    <button class="btn" id="t-betsu">別窓</button>
     <div class="vs"></div>
     <div class="csw on" id="sw0" style="background:#cc2020" data-c="#cc2020"></div>
     <div class="csw"    id="sw1" style="background:#1a1a1a;border:2px solid #888" data-c="#1a1a1a"></div>
@@ -444,8 +498,10 @@ let penColor     = '#cc2020';
 let hlColor      = '#ffd700';
 let txX = 0, txY = 0;
 
-const subWindows = [];
-let   swZIndex   = 200;
+const subWindows  = [];
+let   swZIndex    = 200;
+const betsuWindows = []; // 別窓インスタンス管理
+let   bwZIndex    = 220; // 別窓 z-index (SubWin より前面)
 let   _fileHandle = null;
 
 /* ツール別太さ (実行中に変更される) */
@@ -1030,6 +1086,361 @@ class SubWin {
     if (i >= 0) subWindows.splice(i, 1);
     App.redrawSelOv?.();
   }
+}
+
+/* ============================================================
+   別窓 (BetsuWin) — メインPDFとは独立した PDF ビューア
+   ・独自 pdfDoc / ページ状態 / ズームを保持
+   ・SubWin・メインApp の状態と完全独立
+   ・軽量化: ページキャッシュ 1枚・renderScale 上限 2048px
+   ============================================================ */
+const BW_MAX_CANVAS = 2048; // 別窓 GPU 上限 (iPadメモリ考慮)
+const BW_MAX_WIN    = 3;    // 最大別窓数
+
+class BetsuWin {
+  constructor(x, y, w, h) {
+    this.pdfDoc       = null;
+    this.fileName     = '';
+    this.curPage      = 1;
+    this.totalPages   = 0;
+    this.scale        = 1;
+    this.renderScale  = 1;
+    this.cssEZ        = 1;
+    this.panX         = 8;
+    this.panY         = 8;
+    this.renderVer    = 0;
+    this._pageObj     = null; // 1ページキャッシュ
+    this._cachedPgNum = 0;
+
+    this.winW   = w || 500;
+    this.winH   = h || 380;
+    this.sx     = x || 90;
+    this.sy     = y || 90;
+    this.pinch  = null;
+    this.panSt  = null;
+    this._cleanups = [];
+
+    this._build();
+  }
+
+  /* ---- DOM構築 ---- */
+  _build() {
+    const el = document.createElement('div');
+    el.className = 'bw';
+    el.style.cssText =
+      `left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${++bwZIndex}`;
+
+    el.innerHTML = `
+      <div class="bw-tb">
+        <span class="bw-lbl">📄 別窓</span>
+        <span class="bw-fn"></span>
+        <button class="bw-navbtn bw-prev">◀</button>
+        <span class="bw-pn">-/-</span>
+        <button class="bw-navbtn bw-next">▶</button>
+        <span class="bw-zl"></span>
+        <div style="flex:1"></div>
+        <button class="bw-openbtn">📂 開く</button>
+        <button class="bw-close">✕</button>
+      </div>
+      <div class="bw-area">
+        <div class="bw-cw"><canvas class="bw-cvs"></canvas></div>
+        <div class="bw-dz">📄 別窓<br><small>「📂 開く」でPDFを読み込む</small></div>
+      </div>
+      <div class="bw-rz bw-rz-se"></div>
+      <div class="bw-rz bw-rz-sw"></div>
+      <div class="bw-rz bw-rz-nw"></div>`;
+
+    this.el     = el;
+    this.tb     = el.querySelector('.bw-tb');
+    this.fnEl   = el.querySelector('.bw-fn');
+    this.pnEl   = el.querySelector('.bw-pn');
+    this.zlEl   = el.querySelector('.bw-zl');
+    this.area   = el.querySelector('.bw-area');
+    this.cw     = el.querySelector('.bw-cw');
+    this.cvs    = el.querySelector('.bw-cvs');
+    this.ctx    = this.cvs.getContext('2d');
+    this.dz     = el.querySelector('.bw-dz');
+
+    el.querySelector('.bw-close')  .addEventListener('pointerdown', e => { e.stopPropagation(); this.close(); });
+    el.querySelector('.bw-openbtn').addEventListener('click', () => this._openFilePicker());
+    el.querySelector('.bw-prev')   .addEventListener('click', () => this._gotoPage(-1));
+    el.querySelector('.bw-next')   .addEventListener('click', () => this._gotoPage(+1));
+    this.dz                        .addEventListener('click', () => this._openFilePicker());
+
+    // 前面表示
+    el.addEventListener('pointerdown', () => { el.style.zIndex = ++bwZIndex; }, { capture: true, passive: true });
+
+    this._bindDrag(this.tb);
+    this._bindResize(el.querySelector('.bw-rz-se'), 'se');
+    this._bindResize(el.querySelector('.bw-rz-sw'), 'sw');
+    this._bindResize(el.querySelector('.bw-rz-nw'), 'nw');
+    this._bindAreaInput();
+
+    document.body.appendChild(el);
+  }
+
+  /* ---- ファイル選択 ---- */
+  _openFilePicker() {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/pdf';
+    inp.onchange = async e => { const f = e.target.files[0]; if (f) await this.loadPDF(f); };
+    inp.click();
+  }
+
+  /* ---- PDF 読み込み ---- */
+  async loadPDF(file) {
+    try {
+      const buf = await file.arrayBuffer();
+      // 既存 pdfDoc を破棄してメモリ解放
+      if (this.pdfDoc) { try { this.pdfDoc.destroy(); } catch(_) {} }
+      this.pdfDoc       = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+      this.fileName     = file.name;
+      this.totalPages   = this.pdfDoc.numPages;
+      this.curPage      = 1;
+      this._pageObj     = null;
+      this._cachedPgNum = 0;
+      this.fnEl.textContent = file.name.length > 22 ? '…' + file.name.slice(-20) : file.name;
+      this.dz.style.display = 'none';
+      await this._fitPage();
+      await this.renderPage(1);
+    } catch(e) { console.error(e); showToast('別窓: 読み込み失敗'); }
+  }
+
+  /* ---- フィット ---- */
+  async _fitPage() {
+    const page = await this._getPage(this.curPage);
+    const vp1  = page.getViewport({ scale: 1 });
+    const aW   = this.area.clientWidth  - 16;
+    const aH   = this.area.clientHeight - 16;
+    this.scale = Math.max(0.1, Math.min(aW / vp1.width, aH / vp1.height));
+    this.panX  = 8; this.panY = 8;
+  }
+
+  /* ---- ページオブジェクト取得 (1枚キャッシュ) ---- */
+  async _getPage(num) {
+    if (this._cachedPgNum === num && this._pageObj) return this._pageObj;
+    this._pageObj     = await this.pdfDoc.getPage(num);
+    this._cachedPgNum = num;
+    return this._pageObj;
+  }
+
+  /* ---- ページ描画 ---- */
+  async renderPage(num) {
+    if (!this.pdfDoc) return;
+    const ver  = ++this.renderVer;
+    const page = await this._getPage(num);
+    const vp1  = page.getViewport({ scale: 1 });
+    const maxD = Math.max(vp1.width, vp1.height);
+
+    this.renderScale = Math.min(this.scale, BW_MAX_CANVAS / maxD);
+    this.cssEZ       = this.scale / this.renderScale;
+
+    const vp    = page.getViewport({ scale: this.renderScale });
+    const dpr   = Math.min(window.devicePixelRatio || 1, 2);
+    const hiRS  = Math.min(this.renderScale * dpr, (BW_MAX_CANVAS - 4) / maxD);
+    const hiVP  = page.getViewport({ scale: hiRS });
+
+    // オフスクリーン描画
+    const off    = document.createElement('canvas');
+    off.width    = hiVP.width; off.height = hiVP.height;
+    const offCtx = off.getContext('2d');
+    offCtx.fillStyle = '#fff'; offCtx.fillRect(0, 0, off.width, off.height);
+    await page.render({ canvasContext: offCtx, viewport: hiVP }).promise;
+
+    if (ver !== this.renderVer) return; // キャンセル判定
+
+    this.cvs.width  = hiVP.width;  this.cvs.height = hiVP.height;
+    this.cvs.style.width  = vp.width  + 'px';
+    this.cvs.style.height = vp.height + 'px';
+    this.ctx.drawImage(off, 0, 0);
+
+    this._clampPan();
+    this._updateTransform();
+    this._updateNav();
+  }
+
+  _updateTransform() {
+    this.cw.style.transformOrigin = '0 0';
+    this.cw.style.transform = Math.abs(this.cssEZ - 1) > 0.0005
+      ? `translate(${this.panX}px,${this.panY}px) scale(${this.cssEZ})`
+      : `translate(${this.panX}px,${this.panY}px)`;
+  }
+
+  _updateNav() {
+    this.pnEl.textContent = this.totalPages ? `${this.curPage}/${this.totalPages}` : '-/-';
+    this.zlEl.textContent = this.pdfDoc ? Math.round(this.scale * 100) + '%' : '';
+  }
+
+  _visualW() { return (parseFloat(this.cvs.style.width)  || this.cvs.width)  * this.cssEZ; }
+  _visualH() { return (parseFloat(this.cvs.style.height) || this.cvs.height) * this.cssEZ; }
+
+  _clampPan() {
+    const mg = 40, aW = this.area.clientWidth || 1, aH = this.area.clientHeight || 1;
+    this.panX = Math.max(-(this._visualW() - mg), Math.min(aW - mg, this.panX));
+    this.panY = Math.max(-(this._visualH() - mg), Math.min(aH - mg, this.panY));
+  }
+
+  async _gotoPage(d) {
+    if (!this.pdfDoc) return;
+    const n = this.curPage + d;
+    if (n < 1 || n > this.totalPages) return;
+    this.curPage = n; await this.renderPage(n);
+  }
+
+  /* ---- タッチ / ホイール入力 ---- */
+  _bindAreaInput() {
+    const area = this.area;
+
+    area.addEventListener('touchstart', e => {
+      if (!this.pdfDoc) return; e.preventDefault();
+      if (e.touches.length >= 2) { this.panSt = null; this._startPinch(e.touches); return; }
+      this._startPan(e.touches[0]);
+    }, { passive: false });
+
+    area.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (e.touches.length >= 2 && this.pinch) { this._movePinch(e.touches); return; }
+      if (this.panSt) this._movePan(e.touches[0]);
+    }, { passive: false });
+
+    area.addEventListener('touchend', e => {
+      if (this.pinch && e.touches.length < 2) { this._endPinch(); return; }
+      if (this.panSt) this.panSt = null;
+    });
+
+    area.addEventListener('wheel', e => {
+      if (!this.pdfDoc) return; e.preventDefault();
+      const r  = e.deltaY < 0 ? 1.15 : 0.87;
+      const ar = this.area.getBoundingClientRect();
+      const vx = e.clientX - ar.left, vy = e.clientY - ar.top;
+      const pX = (vx - this.panX) / this.scale, pY = (vy - this.panY) / this.scale;
+      this.scale = Math.max(0.1, Math.min(8, this.scale * r));
+      this.panX  = vx - pX * this.scale; this.panY = vy - pY * this.scale;
+      this._clampPan(); this.renderPage(this.curPage);
+    }, { passive: false });
+  }
+
+  /* ---- ピンチ (軽量CSSプレビュー → endで再描画) ---- */
+  _pd(t) { const dx=t[1].clientX-t[0].clientX,dy=t[1].clientY-t[0].clientY; return Math.sqrt(dx*dx+dy*dy); }
+  _pm(t) { return { x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2 }; }
+
+  _startPinch(t) {
+    const m = this._pm(t), ar = this.area.getBoundingClientRect();
+    const bx = m.x - ar.left, by = m.y - ar.top;
+    this.pinch = { d0: this._pd(t), s0: this.scale, target: this.scale,
+                   pdfX: (bx - this.panX) / this.scale, pdfY: (by - this.panY) / this.scale };
+  }
+  _movePinch(t) {
+    const p = this.pinch, r = this._pd(t) / p.d0;
+    const m = this._pm(t), ar = this.area.getBoundingClientRect();
+    const mx = m.x - ar.left, my = m.y - ar.top;
+    p.target = Math.max(0.1, Math.min(8, p.s0 * r));
+    p.lastMx = mx; p.lastMy = my;
+    this.panX = mx - p.pdfX * p.target; this.panY = my - p.pdfY * p.target;
+    // 軽量プレビュー (CSS scale のみ)
+    const ez = p.target / this.renderScale;
+    this.cw.style.transform = `translate(${this.panX}px,${this.panY}px) scale(${ez})`;
+    this.zlEl.textContent = Math.round(p.target * 100) + '%';
+  }
+  _endPinch() {
+    if (!this.pinch) return;
+    this.scale = this.pinch.target; this.pinch = null;
+    this.renderPage(this.curPage);
+  }
+
+  /* ---- パン ---- */
+  _startPan(t) { this.panSt = { x0: t.clientX, y0: t.clientY, px0: this.panX, py0: this.panY }; }
+  _movePan(t) {
+    if (!this.panSt) return;
+    this.panX = this.panSt.px0 + (t.clientX - this.panSt.x0);
+    this.panY = this.panSt.py0 + (t.clientY - this.panSt.y0);
+    this._clampPan(); this._updateTransform();
+  }
+
+  /* ---- ドラッグ移動 ---- */
+  _bindDrag(handle) {
+    let d = false, ox=0, oy=0, ex=0, ey=0;
+    const onS = e => {
+      if (e.target.closest('.bw-close,.bw-openbtn,.bw-prev,.bw-next')) return;
+      d = true; const s = e.touches ? e.touches[0] : e;
+      ox = s.clientX; oy = s.clientY;
+      const r = this.el.getBoundingClientRect(); ex = r.left; ey = r.top; e.preventDefault();
+    };
+    const onM = e => {
+      if (!d) return; const s = e.touches ? e.touches[0] : e;
+      this.el.style.left = (ex + s.clientX - ox) + 'px';
+      this.el.style.top  = (ey + s.clientY - oy) + 'px';
+    };
+    const onE = () => { d = false; };
+    handle.addEventListener('touchstart', onS, { passive: false });
+    handle.addEventListener('mousedown', onS);
+    document.addEventListener('touchmove', onM, { passive: true });
+    document.addEventListener('mousemove', onM);
+    document.addEventListener('touchend', onE);
+    document.addEventListener('mouseup', onE);
+    this._cleanups.push(() => {
+      document.removeEventListener('touchmove', onM);
+      document.removeEventListener('mousemove', onM);
+      document.removeEventListener('touchend', onE);
+      document.removeEventListener('mouseup', onE);
+    });
+  }
+
+  /* ---- リサイズ (右下 se / 左下 sw / 左上 nw) ---- */
+  _bindResize(handle, corner) {
+    let d=false, ox=0, oy=0, w0=0, h0=0, lx0=0, ly0=0;
+    const onS = e => {
+      d = true; const s = e.touches ? e.touches[0] : e;
+      ox = s.clientX; oy = s.clientY;
+      const r = this.el.getBoundingClientRect();
+      w0=r.width; h0=r.height; lx0=r.left; ly0=r.top;
+      e.stopPropagation(); e.preventDefault();
+    };
+    const onM = e => {
+      if (!d) return; const s = e.touches ? e.touches[0] : e;
+      const dx = s.clientX - ox, dy = s.clientY - oy;
+      let nW=w0, nH=h0, nL=lx0, nT=ly0;
+      if      (corner === 'se') { nW = Math.max(300, w0+dx); nH = Math.max(220, h0+dy); }
+      else if (corner === 'sw') { nW = Math.max(300, w0-dx); nH = Math.max(220, h0+dy); nL = lx0+w0-nW; }
+      else if (corner === 'nw') { nW = Math.max(300, w0-dx); nH = Math.max(220, h0-dy); nL = lx0+w0-nW; nT = ly0+h0-nH; }
+      this.el.style.width  = nW + 'px'; this.el.style.height = nH + 'px';
+      this.el.style.left   = nL + 'px'; this.el.style.top    = nT + 'px';
+      this.winW = nW; this.winH = nH;
+      clearTimeout(this._rzTimer);
+      this._rzTimer = setTimeout(() => this.renderPage(this.curPage), 80);
+    };
+    const onE = () => { d = false; };
+    handle.addEventListener('touchstart', onS, { passive: false });
+    handle.addEventListener('mousedown', onS);
+    document.addEventListener('touchmove', onM, { passive: true });
+    document.addEventListener('mousemove', onM);
+    document.addEventListener('touchend', onE);
+    document.addEventListener('mouseup', onE);
+    this._cleanups.push(() => {
+      document.removeEventListener('touchmove', onM);
+      document.removeEventListener('mousemove', onM);
+      document.removeEventListener('touchend', onE);
+      document.removeEventListener('mouseup', onE);
+    });
+  }
+
+  /* ---- クローズ (メモリ解放) ---- */
+  close() {
+    this._cleanups.forEach(fn => fn()); this._cleanups = [];
+    if (this.pdfDoc) { try { this.pdfDoc.destroy(); } catch(_) {} this.pdfDoc = null; }
+    document.body.removeChild(this.el);
+    const i = betsuWindows.indexOf(this); if (i >= 0) betsuWindows.splice(i, 1);
+  }
+}
+
+/** 別窓を開く (最大 BW_MAX_WIN 個まで) */
+function openBetsuWin() {
+  if (betsuWindows.length >= BW_MAX_WIN) {
+    showToast(`別窓は最大${BW_MAX_WIN}つです`); return;
+  }
+  const offset = betsuWindows.length * 28;
+  const bw = new BetsuWin(80 + offset, 80 + offset, 520, 400);
+  betsuWindows.push(bw);
 }
 
 /* ============================================================
@@ -2072,6 +2483,7 @@ function showLoading(visible) {
   /* --- ツールボタン --- */
   ['pen','hl','text','eraser','sub'].forEach(id =>
     document.getElementById('t-' + id).addEventListener('click', () => setTool(id)));
+  document.getElementById('t-betsu').addEventListener('click', () => openBetsuWin());
 
   document.getElementById('t-shape').addEventListener('click', e =>
     togglePicker('shapepop', e.currentTarget));
