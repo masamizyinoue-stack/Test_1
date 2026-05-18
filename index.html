@@ -639,6 +639,12 @@ function ptInPoly(px, py, poly) {
 
 /* ============================================================
    ページ回転補正 (PDF保存用)
+   [FIX-ROTATE] 旧コードは反射行列で誤り → 正しい回転行列に修正
+   pdf.js は rotation 分だけ CCW 回転して表示するため、
+   保存時は逆方向(CW)に回転して元のネイティブ座標系へ戻す。
+     rot=90  : src(ph*rs × pw*rs) → 90°CW  → dest(pw*rs × ph*rs)
+     rot=180 : src(pw*rs × ph*rs) → 180°   → dest(pw*rs × ph*rs)
+     rot=270 : src(ph*rs × pw*rs) → 90°CCW → dest(pw*rs × ph*rs)
    ============================================================ */
 function rotateCanvas(src, jsPage, pw, ph, rs) {
   const rot = jsPage.rotate || 0;
@@ -646,9 +652,9 @@ function rotateCanvas(src, jsPage, pw, ph, rs) {
   const dc = document.createElement('canvas');
   dc.width = Math.round(pw * rs); dc.height = Math.round(ph * rs);
   const ctx = dc.getContext('2d');
-  if      (rot === 90)  ctx.transform(0,  1,  1,  0, 0,       0);
-  else if (rot === 180) ctx.transform(-1, 0,  0,  1, pw*rs,   0);
-  else if (rot === 270) ctx.transform(0, -1, -1,  0, pw*rs, ph*rs);
+  if      (rot === 90)  { ctx.translate(pw*rs, 0);      ctx.rotate( Math.PI / 2);  } // 90°CW
+  else if (rot === 180) { ctx.translate(pw*rs, ph*rs);  ctx.rotate( Math.PI);      } // 180°
+  else if (rot === 270) { ctx.translate(0,     ph*rs);  ctx.rotate(-Math.PI / 2);  } // 90°CCW
   ctx.drawImage(src, 0, 0);
   return dc;
 }
