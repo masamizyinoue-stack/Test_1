@@ -1151,9 +1151,12 @@ class SubWin {
    別窓 (BetsuWin) — メインPDFとは独立した PDF ビューア
    ・独自 pdfDoc / ページ状態 / ズームを保持
    ・SubWin・メインApp の状態と完全独立
-   ・軽量化: ページキャッシュ 1枚・renderScale 上限 2048px
+   ・ページキャッシュ 1枚
+   ・BW_MAX_CANVAS : renderScale 論理上限 (cssEZ 発生を抑えるため 3200)
+   ・BW_HI_CANVAS  : 実レンダリング上限 (Retina/高DPI 対応、メイン画面と統一)
    ============================================================ */
-const BW_MAX_CANVAS = 2048; // 別窓 GPU 上限 (iPadメモリ考慮)
+const BW_MAX_CANVAS = 3200; // 別窓 renderScale 上限 (旧: 2048 → 高解像度化)
+const BW_HI_CANVAS  = 4096; // 別窓 実レンダリング上限 (Retina/高DPI用、メイン画面と統一)
 const BW_MAX_WIN    = 3;    // 最大別窓数
 
 class BetsuWin {
@@ -1291,12 +1294,14 @@ class BetsuWin {
     const vp1  = page.getViewport({ scale: 1 });
     const maxD = Math.max(vp1.width, vp1.height);
 
+    // renderScale: BW_MAX_CANVAS を上限に cssEZ 発生を最小化
     this.renderScale = Math.min(this.scale, BW_MAX_CANVAS / maxD);
     this.cssEZ       = this.scale / this.renderScale;
 
     const vp    = page.getViewport({ scale: this.renderScale });
     const dpr   = Math.min(window.devicePixelRatio || 1, 2);
-    const hiRS  = Math.min(this.renderScale * dpr, (BW_MAX_CANVAS - 4) / maxD);
+    // hiRS: BW_HI_CANVAS を上限に実レンダリング解像度を確保 (Retina対応)
+    const hiRS  = Math.min(this.renderScale * dpr, (BW_HI_CANVAS - 4) / maxD);
     const hiVP  = page.getViewport({ scale: hiRS });
 
     // オフスクリーン描画
