@@ -177,6 +177,26 @@ body {
   position: absolute; bottom: 0; right: 0; width: 22px; height: 22px; cursor: se-resize;
   background: linear-gradient(135deg, transparent 50%, var(--acc) 50%); border-radius: 0 0 8px 0;
 }
+/* ① SubWin 追加リサイズハンドル (左下・左上) */
+.swn-rz-sw {
+  position: absolute; bottom: 0; left: 0; width: 22px; height: 22px; cursor: sw-resize;
+  background: linear-gradient(225deg, transparent 50%, var(--acc) 50%); border-radius: 0 0 0 8px;
+}
+.swn-rz-nw {
+  position: absolute; top: 30px; left: 0; width: 22px; height: 22px; cursor: nw-resize;
+  background: linear-gradient(315deg, transparent 50%, var(--acc) 50%); border-radius: 8px 0 0 0;
+}
+
+/* ③ PDF出力ページ指定オーバーレイ */
+#pgrov { display: none; position: fixed; inset: 0; z-index: 500; background: #0009; align-items: center; justify-content: center; }
+#pgrov.on { display: flex; }
+#pgrpop { background: var(--pan); border: 1.5px solid var(--brd); border-radius: 13px; padding: 16px; width: 300px; display: flex; flex-direction: column; gap: 9px; }
+#pgrpop h3 { font-size: 13px; color: var(--tx2); }
+#pgrfld { background: var(--bg); border: 1.5px solid var(--brd); border-radius: 7px; color: var(--tx); font-size: 15px; padding: 8px; font-family: inherit; user-select: text; -webkit-user-select: text; }
+#pgrfld:focus { outline: none; border-color: var(--acc); }
+.pgr-qrow { display: flex; gap: 6px; }
+.pgr-q { flex: 1; height: 32px; border-radius: 6px; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx2); font-size: 11px; cursor: pointer; font-weight: 600; }
+.pgr-q:active { background: var(--brd); }
 
 /* ===== 別窓 ===== */
 .bw {
@@ -342,7 +362,7 @@ body {
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
-    <button class="btn on" id="btn-save">💾 保存</button>
+    <button class="btn on" id="btn-save">📤 PDF出力</button>
     <button class="btn" id="btn-print">🖨 印刷</button>
     <button class="btn" id="calcbtn">🧮 計算</button>
     <div class="sp"></div>
@@ -457,6 +477,22 @@ body {
     <button class="cb cbeq cbrs" data-cfn="=">=</button>
     <button class="cb cbn cbw"   data-cnum="0">0</button>
     <button class="cb cbn"       data-cnum=".">.</button>
+  </div>
+</div>
+
+<!-- ③ PDF出力ページ指定オーバーレイ -->
+<div id="pgrov">
+  <div id="pgrpop">
+    <h3>📤 PDF出力 — ページ指定</h3>
+    <div class="pgr-qrow">
+      <button class="pgr-q" id="pgr-cur">現在のページ</button>
+      <button class="pgr-q" id="pgr-all">全ページ</button>
+    </div>
+    <input id="pgrfld" type="text" placeholder="例: 1, 1-5, 1,3,5-8">
+    <div class="txbtns">
+      <button class="txb" id="pgrCancel" style="background:var(--pan2);color:var(--tx2)">キャンセル</button>
+      <button class="txb" id="pgrConfirm" style="background:var(--acc);color:#fff">📤 出力</button>
+    </div>
   </div>
 </div>
 
@@ -702,6 +738,27 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
 }
 
 /**
+ * ② アノテーション描画（消しゴムはペンのみ対象に適用）
+ * 消しゴムあり: ペン+消しゴムを一時canvasで処理し、HL/図形等は影響を受けない
+ * 消しゴムなし: 通常通り全ストロークを描画（一時canvas不要）
+ */
+function _drawAnnotations(ctx, strks, sc) {
+  if (!strks || !strks.length) return;
+  if (strks.some(s => s.type === 'eraser')) {
+    // ペン+消しゴムを一時canvasに描いてから本canvasへ合成
+    const tmp  = document.createElement('canvas');
+    tmp.width  = ctx.canvas.width; tmp.height = ctx.canvas.height;
+    const tctx = tmp.getContext('2d');
+    strks.forEach(s => { if (s.type === 'pen' || s.type === 'eraser') drawStroke(s, tctx, sc); });
+    ctx.drawImage(tmp, 0, 0);
+    // HL・図形・文字・矢印は消しゴムの影響なしに上に描画
+    strks.forEach(s => { if (s.type !== 'pen' && s.type !== 'eraser') drawStroke(s, ctx, sc); });
+  } else {
+    strks.forEach(s => drawStroke(s, ctx, sc));
+  }
+}
+
+/**
  * ストロークのバウンディングボックスを返す
  */
 function strokeBBox(s) {
@@ -802,7 +859,9 @@ class SubWin {
         <canvas class="swn-sel" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas>
         <span class="swn-zl"></span>
       </div>
-      <div class="swn-rz"></div>`;
+      <div class="swn-rz"></div>
+      <div class="swn-rz-sw"></div>
+      <div class="swn-rz-nw"></div>`;
 
     this.el      = el;
     this.body    = el.querySelector('.swn-body');
@@ -819,7 +878,9 @@ class SubWin {
       { capture: true, passive: true });
 
     this._bindDrag  (el.querySelector('.swn-tb'));
-    this._bindResize(el.querySelector('.swn-rz'));
+    this._bindResize(el.querySelector('.swn-rz'),    'se'); // 右下（既存）
+    this._bindResize(el.querySelector('.swn-rz-sw'), 'sw'); // 左下（追加）
+    this._bindResize(el.querySelector('.swn-rz-nw'), 'nw'); // 左上（追加）
     this._bindInput();
 
     document.body.appendChild(el);
@@ -863,7 +924,7 @@ class SubWin {
       this._annCvs.width = vp.width; this._annCvs.height = vp.height;
       const actx = this._annCvs.getContext('2d');
       actx.clearRect(0, 0, vp.width, vp.height);
-      (this.strokes[this.pageNum] || []).forEach(s => drawStroke(s, actx, sc));
+      _drawAnnotations(actx, this.strokes[this.pageNum] || [], sc); // ② ペンのみ消しゴム対象
       this._annDirty = false;
     }
 
@@ -1069,24 +1130,32 @@ class SubWin {
   }
 
   /* リサイズ */
-  _bindResize(handle) {
-    let dragging = false, ox = 0, oy = 0, w0 = 0, h0 = 0, initSc = 1;
+  _bindResize(handle, corner = 'se') {
+    let dragging = false, ox = 0, oy = 0, w0 = 0, h0 = 0, lx0 = 0, ty0 = 0, initSc = 1;
     const onStart = e => {
       dragging = true;
       const s = e.touches ? e.touches[0] : e;
       ox = s.clientX; oy = s.clientY;
-      w0 = this.winW; h0 = this.winH; initSc = this.innerScale;
+      const r = this.el.getBoundingClientRect();
+      w0 = r.width; h0 = r.height; lx0 = r.left; ty0 = r.top;
+      initSc = this.innerScale;
       e.stopPropagation(); e.preventDefault();
     };
     const onMove = e => {
       if (!dragging) return;
       const s = e.touches ? e.touches[0] : e;
-      const newW = Math.max(180, w0 + s.clientX - ox);
-      const newH = Math.max(160, h0 + s.clientY - oy);
-      const k = Math.max(0.1, (newW - 4) / Math.max(1, w0 - 4));
-      this.winW = newW; this.winH = newH;
-      this.el.style.width  = newW + 'px';
-      this.el.style.height = newH + 'px';
+      const dx = s.clientX - ox, dy = s.clientY - oy;
+      let nW = w0, nH = h0;
+      if      (corner === 'se') { nW = Math.max(180, w0 + dx); nH = Math.max(160, h0 + dy); }
+      else if (corner === 'sw') { nW = Math.max(180, w0 - dx); nH = Math.max(160, h0 + dy);
+        this.el.style.left = (lx0 + w0 - nW) + 'px'; }
+      else if (corner === 'nw') { nW = Math.max(180, w0 - dx); nH = Math.max(160, h0 - dy);
+        this.el.style.left = (lx0 + w0 - nW) + 'px';
+        this.el.style.top  = (ty0 + h0 - nH) + 'px'; }
+      const k = Math.max(0.1, (nW - 4) / Math.max(1, w0 - 4));
+      this.winW = nW; this.winH = nH;
+      this.el.style.width  = nW + 'px';
+      this.el.style.height = nH + 'px';
       this.innerScale = Math.max(0.2, Math.min(8, initSc * k));
       this._pdfCache = null;
       clearTimeout(this._resizeTimer);
@@ -1885,7 +1954,7 @@ const App = (() => {
 
   function redraw() {
     annCtx.clearRect(0, 0, annCvs.width, annCvs.height);
-    (strokes[curPage] || []).forEach(s => drawStroke(s, annCtx, renderScale)); // [FIX-ZOOM-SIZE] invEZ不要
+    _drawAnnotations(annCtx, strokes[curPage] || [], renderScale); // ② ペンのみ消しゴム対象
     drawSelOv();
   }
 
@@ -2418,7 +2487,7 @@ async function _pdfRasterPage(srcDoc, page, pageNum, strks, pw, ph) {
   await jsPage.render({ canvasContext: ctx, viewport: vp }).promise;
   const ann    = document.createElement('canvas');
   ann.width = vp.width; ann.height = vp.height;
-  strks.forEach(s => drawStroke(s, ann.getContext('2d'), SAVE_RS, SAVE_RS));
+  _drawAnnotations(ann.getContext('2d'), strks, SAVE_RS); // ② ペンのみ消しゴム対象
   ctx.drawImage(ann, 0, 0);
   const embed  = rotateCanvas(c, jsPage, pw, ph, SAVE_RS);
   const blob   = await new Promise(r => embed.toBlob(r, 'image/jpeg', 0.94));
@@ -2470,17 +2539,71 @@ async function _generatePDFBlobFallback() {
   return doc.output('blob');
 }
 
-async function savePDF() {
+/** ③ PDF出力ボタン → ページ指定ダイアログを表示 */
+function savePDF() {
   if (!App.pdfDoc) { showToast('PDFが開かれていません'); return; }
+  document.getElementById('pgrov').classList.add('on');
+  document.getElementById('pgrfld').value       = '';
+  document.getElementById('pgrfld').placeholder = `全ページ / 例: 1, 1-${App.totalPages}, 1,3`;
+}
+
+/** ③ ページ範囲文字列をページ番号配列に変換
+ *  対応形式: "" / "全ページ" / "1" / "1-5" / "1,3,5" / "1-3,8,10-12"
+ */
+function _parsePageRange(input, total) {
+  const s = (input || '').trim();
+  if (!s || s === '全ページ') return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set();
+  s.split(',').forEach(part => {
+    const t = part.trim();
+    if (/^\d+$/.test(t)) {
+      pages.add(parseInt(t));
+    } else if (/^(\d+)-(\d+)$/.test(t)) {
+      const [, a, b] = t.match(/^(\d+)-(\d+)$/);
+      for (let i = parseInt(a); i <= parseInt(b); i++) pages.add(i);
+    }
+  });
+  return [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+}
+
+/** ③ 指定ページのみ出力する PDF を生成 */
+async function _generateSubsetPDF(pageNums) {
+  const PL = window.PDFLib;
+  if (!PL) { showToast('⚠ pdf-lib 未ロード'); return null; }
+  const srcDoc = await PL.PDFDocument.load(App.origBuf.slice(0));
+  for (const pn of pageNums) {
+    const ss = App.strokes[pn] || [];
+    if (!ss.length) continue;
+    const page = srcDoc.getPage(pn - 1);
+    const { width, height } = page.getSize();
+    await (ss.some(s => s.type === 'eraser')
+      ? _pdfRasterPage(srcDoc, page, pn, ss, width, height)
+      : _pdfOverlayPage(srcDoc, page, pn, ss, width, height));
+  }
+  const newDoc = await PL.PDFDocument.create();
+  const copied = await newDoc.copyPages(srcDoc, pageNums.map(n => n - 1));
+  copied.forEach(p => newDoc.addPage(p));
+  return new Blob([await newDoc.save()], { type: 'application/pdf' });
+}
+
+/** ③ 実際のPDF出力処理（ダイアログ確定後に呼ぶ） */
+async function _executeSave(rangeStr) {
+  document.getElementById('pgrov').classList.remove('on');
+  if (!App.pdfDoc) return;
   showLoading(true);
   try {
-    const blob  = await generatePDFBlob();
-    const fname = App.fileName || 'drawing.pdf';
-    if (_fileHandle) {
+    const pages = _parsePageRange(rangeStr, App.totalPages);
+    if (!pages.length) { showToast('有効なページがありません'); showLoading(false); return; }
+    const isAll = pages.length === App.totalPages;
+    const blob  = isAll ? await generatePDFBlob() : await _generateSubsetPDF(pages);
+    if (!blob) { showLoading(false); return; }
+    const suffix = isAll ? '' : '_p' + rangeStr.replace(/\s/g, '');
+    const fname  = (App.fileName || 'drawing.pdf').replace(/\.pdf$/i, '') + suffix + '.pdf';
+    if (_fileHandle && isAll) {
       try {
         const w = await _fileHandle.createWritable();
         await w.write(blob); await w.close();
-        showToast('💾 上書き保存しました'); showLoading(false); return;
+        showToast('📤 PDF出力しました'); showLoading(false); return;
       } catch(e) { console.warn('write:', e); }
     }
     if (window.showSaveFilePicker) {
@@ -2489,17 +2612,17 @@ async function savePDF() {
           suggestedName: fname,
           types: [{ description:'PDF', accept:{'application/pdf':['.pdf']} }]
         });
-        _fileHandle = fh;
+        if (isAll) _fileHandle = fh;
         const w = await fh.createWritable(); await w.write(blob); await w.close();
-        showToast('💾 保存しました'); showLoading(false); return;
+        showToast('📤 PDF出力しました'); showLoading(false); return;
       } catch(e) { if (e.name === 'AbortError') { showLoading(false); return; } }
     }
     const url = URL.createObjectURL(blob);
     const a   = document.createElement('a');
     a.download = fname; a.href = url; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-    showToast('💾 ダウンロード: ' + fname);
-  } catch(e) { showToast('保存失敗: ' + e.message); console.error(e); }
+    showToast('📤 PDF出力: ' + fname);
+  } catch(e) { showToast('出力失敗: ' + e.message); console.error(e); }
   showLoading(false);
 }
 
@@ -2746,6 +2869,24 @@ function showLoading(visible) {
   document.getElementById('szp-ok')    .addEventListener('click', () => applySz());
   document.getElementById('szp-cancel').addEventListener('click', () =>
     document.getElementById('szp').classList.remove('on'));
+
+  /* --- ③ PDF出力ページ指定 --- */
+  document.getElementById('pgr-cur').addEventListener('click', () => {
+    document.getElementById('pgrfld').value = String(App.currentPage);
+  });
+  document.getElementById('pgr-all').addEventListener('click', () => {
+    document.getElementById('pgrfld').value = '';
+  });
+  document.getElementById('pgrConfirm').addEventListener('click', () => {
+    _executeSave(document.getElementById('pgrfld').value);
+  });
+  document.getElementById('pgrCancel').addEventListener('click', () => {
+    document.getElementById('pgrov').classList.remove('on');
+  });
+  document.getElementById('pgrfld').addEventListener('keydown', e => {
+    if (e.key === 'Enter')  _executeSave(document.getElementById('pgrfld').value);
+    if (e.key === 'Escape') document.getElementById('pgrov').classList.remove('on');
+  });
 
   /* --- テキスト入力 --- */
   document.getElementById('txConfirm').addEventListener('click', () => confirmTx());
