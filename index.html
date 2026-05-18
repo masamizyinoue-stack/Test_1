@@ -751,6 +751,34 @@ function _drawAnnotations(ctx, strks, sc) {
 }
 
 /**
+ * 消しゴム円内のポイントだけ除去し、残存部分を別ストロークとして返す（部分消去）
+ * stroke全体削除ではなく「カーソル範囲内のポイントのみ」を消すことで当たり判定を正確化
+ * @param {object}   penStroke - ペンストローク {points:[[x,y],...], size, ...}
+ * @param {number[][]} erPts   - 消しゴム経路の座標列 (PDF座標)
+ * @param {number}   hitR      - ヒット半径 (PDF座標単位)
+ * @returns {object[]}         - 残存セグメント配列（0個以上）
+ */
+function _applyEraser(penStroke, erPts, hitR) {
+  // 各ペンポイントが消しゴム円内か判定（1点でも近いなら消去）
+  const kept = penStroke.points.map(pp =>
+    erPts.every(ep => Math.hypot(ep[0] - pp[0], ep[1] - pp[1]) >= hitR) ? pp : null
+  );
+  // 連続する保持ポイントをセグメントに分割（消去ポイントで切断）
+  const result = [];
+  let seg = [];
+  for (const p of kept) {
+    if (p !== null) {
+      seg.push(p);
+    } else {
+      if (seg.length >= 2) result.push({ ...penStroke, points: [...seg] });
+      seg = [];
+    }
+  }
+  if (seg.length >= 2) result.push({ ...penStroke, points: [...seg] });
+  return result;
+}
+
+/**
  * ストロークのバウンディングボックスを返す
  */
 function strokeBBox(s) {
@@ -1820,17 +1848,22 @@ const App = (() => {
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
     }
-    // ② 消しゴム: pen型ストロークのみ実データ削除。hl/text/図形/矢印は消えない
+    // ② 消しゴム: pen型のみ「ポイント単位」で部分消去（ストローク全体削除ではない）
     if (curStroke?.type === 'eraser') {
-      const er = curStroke;
-      const r  = (er.size || 20) * 2 / 3 + 0.5; // ヒット半径 (PDF座標単位)
-      strokes[curPage] = (strokes[curPage] || []).filter(s => {
-        if (s.type !== 'pen' || !s.points?.length) return true; // pen以外は保護
-        const hitR = r + (s.size || 3) / 6;
-        return !er.points?.some(ep =>
-          s.points.some(pp => Math.hypot(ep[0]-pp[0], ep[1]-pp[1]) < hitR)
-        );
-      });
+      const er  = curStroke;
+      const r   = (er.size || 20) * 2 / 3; // 消しゴム基本半径 (PDF座標単位)
+      const erPts = er.points || [];
+      const newStrokes = [];
+      for (const s of (strokes[curPage] || [])) {
+        if (s.type !== 'pen' || !s.points?.length) {
+          newStrokes.push(s); // pen以外はそのまま保持（hl/text/図形/矢印を保護）
+          continue;
+        }
+        const hitR = r + (s.size || 3) / 6; // ペン半幅を加算して視覚的な当たりに合わせる
+        const segs = _applyEraser(s, erPts, hitR); // ポイント単位で消去 → 残存セグメント取得
+        newStrokes.push(...segs); // 残存部分のみ追加（消えた部分は含まれない）
+      }
+      strokes[curPage] = newStrokes;
       curStroke = null;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       redraw(); drawSelOv();
@@ -2483,7 +2516,8 @@ async function _pdfOverlayPage(srcDoc, page, pageNum, strks, pw, ph) {
   const embed  = rotateCanvas(cvs, jsPage, pw, ph, SAVE_RS);
   const blob   = await new Promise(r => embed.toBlob(r, 'image/png'));
   const img    = await srcDoc.embedPng(new Uint8Array(await blob.arrayBuffer()));
-  page.drawImage(img, { x: 0, y: 0, width: pw, height: ph });
+  // pdf-lib はページ左下を(0,0)とする座標系。画像はページ全体を覆うよう配置
+  page.drawImage(img, { x: 0, y: 0, width: pw, height: ph, opacity: 1 });
 }
 
 async function _pdfRasterPage(srcDoc, page, pageNum, strks, pw, ph) {
@@ -2501,9 +2535,10 @@ async function _pdfRasterPage(srcDoc, page, pageNum, strks, pw, ph) {
   const embed  = rotateCanvas(c, jsPage, pw, ph, SAVE_RS);
   const blob   = await new Promise(r => embed.toBlob(r, 'image/jpeg', 0.94));
   const img    = await srcDoc.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+  // 白背景で既存コンテンツを塗りつぶし、ラスタ画像（PDF+注釈）で全面置換
   page.drawRectangle({ x:0, y:0, width:pw, height:ph,
     color: window.PDFLib.rgb(1,1,1), borderWidth: 0 });
-  page.drawImage(img, { x: 0, y: 0, width: pw, height: ph });
+  page.drawImage(img, { x: 0, y: 0, width: pw, height: ph, opacity: 1 });
 }
 
 async function generatePDFBlob() {
@@ -2590,8 +2625,17 @@ async function _generateSubsetPDF(pageNums) {
       : _pdfOverlayPage(srcDoc, page, pn, ss, width, height));
   }
   const newDoc = await PL.PDFDocument.create();
-  const copied = await newDoc.copyPages(srcDoc, pageNums.map(n => n - 1));
-  copied.forEach(p => newDoc.addPage(p));
+  const indices = pageNums.map(n => n - 1);
+  const copied  = await newDoc.copyPages(srcDoc, indices);
+  copied.forEach((p, i) => {
+    newDoc.addPage(p);
+    // copyPages が Rotate メタデータを保持しない場合に備えて明示的に再設定
+    try {
+      const srcPage = srcDoc.getPage(indices[i]);
+      const rotAngle = srcPage.getRotation()?.angle ?? 0;
+      if (rotAngle) p.setRotation(PL.degrees(rotAngle));
+    } catch(_) {}
+  });
   return new Blob([await newDoc.save()], { type: 'application/pdf' });
 }
 
