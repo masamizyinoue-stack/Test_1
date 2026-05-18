@@ -536,7 +536,7 @@ const HL_COLORS = [
 
 /* ツール別デフォルト太さ */
 const TOOL_DEFAULT_SIZES = {
-  pen:3, hl:3, eraser:20, text:3,
+  pen:1, hl:1, eraser:7, text:3,    // [THIN] pen/hl: 3→1, eraser: 20→7 (約1/3細さ)
   arrow:2, rect:2, circle:2, line:2
 };
 
@@ -678,7 +678,7 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha   = s.type === 'hl' ? 0.38 : 1;
     ctx.strokeStyle   = s.color;
-    ctx.lineWidth     = s.type === 'hl' ? Math.max(lw * 4, 14 * sc) : lw; // [FIX-ZOOM-SIZE] HL最小幅もscベース
+    ctx.lineWidth     = s.type === 'hl' ? Math.max(lw * 4, 5 * sc) : lw; // [FIX-ZOOM-SIZE] HL最小幅 14→5 [THIN]
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     const pts = s.points;
     if (pts && pts.length) {
@@ -1017,7 +1017,7 @@ class SubWin {
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.globalAlpha  = s.type === 'hl' ? 0.38 : 1;
       this.ctx.strokeStyle  = s.color;
-      this.ctx.lineWidth    = s.type === 'hl' ? Math.max(s.size*4, 14) * sc : s.size * sc; // [FIX-ZOOM-SIZE]
+      this.ctx.lineWidth    = s.type === 'hl' ? Math.max(s.size*4, 5) * sc : s.size * sc; // [FIX-ZOOM-SIZE][THIN] HL最小 14→5
       this.ctx.lineCap = 'round'; this.ctx.lineJoin = 'round';
       this.ctx.beginPath();
       drawLiveBezierSegment(this.ctx, s.points, [p.x, p.y], sc);
@@ -1779,7 +1779,7 @@ const App = (() => {
       annCtx.globalCompositeOperation = 'source-over';
       annCtx.globalAlpha = s.type === 'hl' ? 0.38 : 1;
       annCtx.strokeStyle = s.color;
-      annCtx.lineWidth   = s.type === 'hl' ? Math.max(s.size*4, 14) * sc : s.size * sc; // [FIX-ZOOM-SIZE]
+      annCtx.lineWidth   = s.type === 'hl' ? Math.max(s.size*4, 5) * sc : s.size * sc; // [FIX-ZOOM-SIZE][THIN] HL最小 14→5
       annCtx.lineCap = 'round'; annCtx.lineJoin = 'round';
       annCtx.beginPath();
       drawLiveBezierSegment(annCtx, s.points, [p.x, p.y], sc);
