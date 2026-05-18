@@ -1757,7 +1757,7 @@ const App = (() => {
       }
       subRect = null;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
-      setTool(prevTool); return;
+      setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
     }
     if (currentTool === 'eraser') drawSelOv();
     if (!curStroke) return;
