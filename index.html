@@ -2228,6 +2228,8 @@ async function closeSheetAt(idx) {
     await App.loadState(sh);
     _thawSubWins(sh.subWinStates, sh.pdfDoc, App.strokes);
   }
+  // PDF未選択状態になったら起動時復元キーをクリア（手動で閉じたデータを復元しない）
+  if (!App.pdfDoc) await IDB.set('last', null);
   _renderTabBar();
   showLoading(false);
 }
