@@ -1866,61 +1866,143 @@ function printPage() {
 let calcExpr = '', calcOper = '', calcVal = '', calcJustEq = false;
 const calcHistory = [];
 
-function calcDecPlaces() { return parseInt(document.getElementById('cdec').value) ?? 0; }
-function calcDisplay() {
-  document.getElementById('cexpr').textContent = calcExpr;
-  document.getElementById('cval').textContent  = calcVal || '0';
+function calcDecPlaces() { return Math.max(0, parseInt(document.getElementById('cdec').value) || 0); }
+
+/* --- [FIX-CALC] 安全性・精度強化ユーティリティ --- */
+
+/** 全角数字・記号→半角変換 */
+function _calcNorm(s) {
+  return String(s)
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[．]/g, '.').trim();
 }
 
-/** 演算実行 */
+/** 安全な数値変換: 無効値・空文字は null を返す (|| 0 による誤魔化しを排除) */
+function _safeNum(s) {
+  const norm = _calcNorm(String(s));
+  if (norm === '') return null;          // [FIX-CALC] 空文字→null (Numberは0を返すため明示ガード)
+  const n = Number(norm);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 浮動小数点ノイズ除去 + 表示桁丸め (toPrecision(14) で mm単位精度を確保) */
+function _calcFmt(n, places) {
+  const cleaned = parseFloat(n.toPrecision(14));
+  return String(+cleaned.toFixed(places));
+}
+
+/** エラー状態か判定 */
+function _isErr(v) { return v === 'エラー' || v === '÷0エラー'; }
+
+/** 演算実行: ゼロ除算は null を返す (旧: 0 返却バグを修正) */
 function _calcCompute(a, op, b) {
   if (op === '+') return a + b;
   if (op === '-') return a - b;
   if (op === '*') return a * b;
-  if (op === '/') return b ? a / b : 0;
+  if (op === '/') return b === 0 ? null : a / b; // [FIX-CALC] ゼロ除算→null
   return a;
 }
 
+/** 履歴DOM更新 */
+function _calcUpdateHist() {
+  document.getElementById('chist').innerHTML =
+    calcHistory.map(h => `<div class="chi">${h}</div>`).join('');
+}
+
+/** calcExpr の先頭数値部分を取得 (末尾の演算子記号を除去) */
+function _calcGetA() { return _safeNum(calcExpr.replace(/[÷×＋−]$/, '').trim()); }
+
+/** エラー設定 (メッセージ + 状態リセット) */
+function _calcSetError(msg) {
+  calcHistory.unshift(msg);
+  if (calcHistory.length > 20) calcHistory.pop();
+  _calcUpdateHist();
+  calcExpr = ''; calcVal = 'エラー'; calcOper = ''; calcJustEq = true;
+}
+
+/* --- 表示更新 --- */
+function calcDisplay() {
+  document.getElementById('cexpr').textContent = calcExpr;
+  const el = document.getElementById('cval');
+  el.textContent = calcVal || '0';
+  el.style.color = _isErr(calcVal) ? '#ff6060' : ''; // [FIX-CALC] エラー時に赤表示
+}
+
+/* --- 数値ボタン --- */
 function calcNum(n) {
+  if (_isErr(calcVal)) return;                         // [FIX-CALC] エラー中は入力ブロック
   if (calcJustEq) { calcVal = ''; calcExpr = ''; calcJustEq = false; }
+  n = _calcNorm(n);                                    // [FIX-CALC] 全角正規化
   if (n === '.' && calcVal.includes('.')) return;
+  if (n === '.' && calcVal === '') calcVal = '0';      // 先頭ドット補完
   calcVal += n; calcDisplay();
 }
+
+/* --- 演算子ボタン --- */
 function calcOp(op) {
+  if (_isErr(calcVal)) return;                         // [FIX-CALC] エラー中はブロック
   calcJustEq = false;
   if (calcVal !== '' && calcOper !== '') {
-    const a = parseFloat(calcExpr.split(/[÷×＋−]/)[0]) || 0;
-    const b = parseFloat(calcVal) || 0;
-    calcVal = String(+_calcCompute(a, calcOper, b).toFixed(calcDecPlaces()));
+    const a = _calcGetA(), b = _safeNum(calcVal);      // [FIX-CALC] 安全パース
+    if (a === null || b === null) { _calcSetError('入力エラー'); calcDisplay(); return; }
+    const r = _calcCompute(a, calcOper, b);
+    if (r === null) { _calcSetError(calcExpr + calcVal + ' = ÷0エラー'); calcDisplay(); return; }
+    calcVal = _calcFmt(r, calcDecPlaces());             // [FIX-CALC] 高精度フォーマット
   }
   const OP_SYMBOLS = { '+': '＋', '-': '−', '*': '×', '/': '÷' };
   calcExpr = (calcVal || '0') + OP_SYMBOLS[op];
   calcOper = op; calcVal = ''; calcDisplay();
 }
+
+/* --- イコール --- */
 function calcEq() {
-  if (!calcOper || calcVal === '') return;
-  const a  = parseFloat(calcExpr.split(/[÷×＋−]/)[0]) || 0;
-  const b  = parseFloat(calcVal) || 0;
-  const rs = String(+_calcCompute(a, calcOper, b).toFixed(calcDecPlaces()));
+  if (!calcOper || calcVal === '' || _isErr(calcVal)) return;
+  const a = _calcGetA(), b = _safeNum(calcVal);        // [FIX-CALC] 安全パース
+  if (a === null || b === null) { _calcSetError('入力エラー'); calcDisplay(); return; }
+  const r = _calcCompute(a, calcOper, b);
+  if (r === null) {                                    // [FIX-CALC] ゼロ除算→エラー表示
+    _calcSetError(calcExpr + calcVal + ' = ÷0エラー');
+    calcDisplay(); return;
+  }
+  const rs = _calcFmt(r, calcDecPlaces());             // [FIX-CALC] 高精度フォーマット
   calcHistory.unshift(calcExpr + calcVal + ' = ' + rs);
   if (calcHistory.length > 20) calcHistory.pop();
-  document.getElementById('chist').innerHTML =
-    calcHistory.map(h => `<div class="chi">${h}</div>`).join('');
+  _calcUpdateHist();
   calcExpr = calcExpr + calcVal + '='; calcVal = rs;
   calcOper = ''; calcJustEq = true; calcDisplay();
 }
+
+/* --- 特殊ボタン --- */
 function calcFn(f) {
-  if      (f === 'C')    { calcExpr = ''; calcVal = ''; calcOper = ''; calcJustEq = false; }
-  else if (f === '±')   { if (calcVal) calcVal = String(-parseFloat(calcVal)); }
-  else if (f === '%')    { if (calcVal) calcVal = String(parseFloat(calcVal) / 100); }
-  else if (f === '⌫')   { calcVal = calcVal.length > 1 ? calcVal.slice(0, -1) : ''; }
-  else if (f === 'sqrt') { if (!calcVal) return; const v = parseFloat(calcVal); calcVal = v < 0 ? 'エラー' : String(+Math.sqrt(v).toFixed(calcDecPlaces())); }
-  else if (f === 'sq')   { if (!calcVal) return; calcVal = String(+(parseFloat(calcVal)**2).toFixed(calcDecPlaces())); }
-  else if (f === '=')    { calcEq(); return; }
+  if (f === 'C') {
+    calcExpr = ''; calcVal = ''; calcOper = ''; calcJustEq = false;
+  } else if (f === '±') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = String(-n);
+  } else if (f === '%') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = String(parseFloat((n / 100).toPrecision(14))); // [FIX-CALC] 精度保持
+  } else if (f === '⌫') {
+    if (_isErr(calcVal)) { calcVal = ''; }              // [FIX-CALC] エラー→クリア
+    else calcVal = calcVal.length > 1 ? calcVal.slice(0, -1) : '';
+  } else if (f === 'sqrt') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = n < 0 ? 'エラー' : _calcFmt(Math.sqrt(n), calcDecPlaces());
+  } else if (f === 'sq') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = _calcFmt(n * n, calcDecPlaces());
+  } else if (f === '=') {
+    calcEq(); return;
+  }
   calcDisplay();
 }
+
 function toggleCalc() {
-  const el  = document.getElementById('calc');
+  const el = document.getElementById('calc');
   el.classList.toggle('on');
   document.getElementById('calcbtn').classList.toggle('on', el.classList.contains('on'));
 }
