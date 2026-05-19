@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.05</title>
+<title>M_Viewer V0.06</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -332,7 +332,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.05</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.06</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <button class="btn" id="btn-open">📂 開く</button>
     <span id="fnlbl">ファイル未選択</span>
@@ -412,7 +412,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.05</div>
+    <div class="dzm">M_Viewer V0.06</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -1530,13 +1530,18 @@ class SplitViewer {
       this.strokes[this.curPage] = (this.strokes[this.curPage]||[]).flatMap(st=>_applyEraserAll(st,erPts,r));
       this.curStroke = null;
       this.ovlCtx.clearRect(0,0,this.ovlCvs.width,this.ovlCvs.height);
-      this.redraw(); return;
+      this.redraw();
+      // 左右同一PDF の場合、左パネルも再描画
+      if (this._sharedWithMain) App.redraw();
+      return;
     }
     if (!this.strokes[this.curPage]) this.strokes[this.curPage]=[];
     this.strokes[this.curPage].push({...s, points:s.points?[...s.points]:undefined});
     this.curStroke = null;
     this.ovlCtx.clearRect(0,0,this.ovlCvs.width,this.ovlCvs.height);
     this.redraw(); this._schedSave();
+    // 左右同一PDF の場合、左パネルも再描画
+    if (this._sharedWithMain) App.redraw();
   }
 
   redraw() {
@@ -1601,8 +1606,17 @@ class SplitViewer {
       this.curPage=1; this.scale=1; this.pageCache.clear(); this._offscr=null;
       this.fnEl.textContent=file.name.length>20?'…'+file.name.slice(-18):file.name;
       document.getElementById('sv-dz').style.display='none';
-      const saved=await IDB.get('sv:'+safeKey(file.name));
-      this.strokes=_pruneEraserStrokes(saved?.strokes||{});
+      // 同じPDFが左パネルで開かれている場合 → strokes を共有（書き込みを双方向同期）
+      if (App.pdfDoc && App.fileName === file.name) {
+        this.strokes = App.strokes; // 左右で同一オブジェクト参照を共有
+        this._sharedWithMain = true;
+      } else {
+        // 左パネルの保存データも参照（sv: がなければ f: を使用）
+        const saved = await IDB.get('sv:'+safeKey(file.name));
+        const mainSaved = await IDB.get('f:'+safeKey(file.name));
+        this.strokes = _pruneEraserStrokes(saved?.strokes || mainSaved?.strokes || {});
+        this._sharedWithMain = false;
+      }
       await this._fit();
       if (saved?.strokes&&Object.keys(saved.strokes).length>0)
         showToast('📝 右パネル: 書き込みデータを復元しました');
@@ -2130,9 +2144,11 @@ const App = (() => {
   function redraw() {
     if (!window.DBG?.flags?.redraw) return; // ② DBG.off('redraw') で停止可
     annCtx.clearRect(0, 0, annCvs.width, annCvs.height);
-    if (window.DBG?.flags?.annotationDraw) // ⑦ DBG.off('annotationDraw') で停止可
+    if (window.DBG?.flags?.annotationDraw)
       _drawAnnotations(annCtx, strokes[curPage] || [], renderScale);
-    if (window.DBG?.flags?.overlay) drawSelOv(); // ⑧ DBG.off('overlay') で停止可
+    if (window.DBG?.flags?.overlay) drawSelOv();
+    // 右パネルが同一PDFを表示中なら右パネルも再描画（書き込み同期）
+    if (_svInst?._sharedWithMain) _svInst.redraw();
   }
 
   /* ---- レンダリング ---- */
