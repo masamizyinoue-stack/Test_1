@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.13</title>
+<title>M_Viewer V0.12</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -333,7 +333,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.13</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.12</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -412,7 +412,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.13</div>
+    <div class="dzm">M_Viewer V0.12</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -549,7 +549,6 @@ let hlColor      = '#ffd700';
 let txX = 0, txY = 0;
 
 const subWindows  = [];
-let _activeSelSubWin = null; // サブ窓選択コンテキスト (null=メイン)
 let   swZIndex    = 200;
 let   _fileHandle = null;
 
@@ -1158,18 +1157,12 @@ class SubWin {
       document.getElementById('txov').classList.add('on');
       return;
     }
-    // select ツール: メインウインドウと同等の選択処理
+    // select ツール: 矩形選択開始
     if (currentTool === 'select') {
-      if (this.selectedIdx.length > 0) {
-        const bb = this._swSelBBox();
-        if (bb && p.x >= bb.x1-10 && p.x <= bb.x2+10 && p.y >= bb.y1-10 && p.y <= bb.y2+10) {
-          this.isDrawing = true; this.lastX = p.x; this.lastY = p.y; return; // 移動モード
-        } else {
-          this._swClearSel();
-        }
-      }
       this.selPath = [{ x: p.x, y: p.y }];
-      this.isDrawing = true; return;
+      this.selectedIdx = [];
+      this.isDrawing = true;
+      return;
     }
     this.isDrawing = true; this.lastX = p.x; this.lastY = p.y;
     const tool = currentTool === 'shape' ? currentShape : currentTool;
@@ -1178,18 +1171,24 @@ class SubWin {
       : { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: strokeColor, size: strokeSize };
   }
   _moveDraw(t) {
-    // select ツール: プレビューまたは移動
+    // select ツール: 矩形プレビュー描画
     if (currentTool === 'select' && this.isDrawing) {
       const p = this._toDocPos(t);
-      if (this.selectedIdx.length > 0 && !this.selPath.length) {
-        // 選択済み → 移動モード
-        this._swMoveSel(p.x - this.lastX, p.y - this.lastY);
-        this.lastX = p.x; this.lastY = p.y;
-        this.render(); this._swDrawSelOv(); return;
-      }
-      // 矩形プレビュー
       this.selPath.push({ x: p.x, y: p.y });
-      this._swDrawSelPreview(); return;
+      const br = this._bodyRect();
+      this.selCvs.width = Math.round(br.width); this.selCvs.height = Math.round(br.height);
+      this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+      this.selCtx.save();
+      this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
+      this.selCtx.setLineDash([6, 4]);
+      const p0 = this.selPath[0], p1 = this.selPath[this.selPath.length-1];
+      const sc = this.innerScale;
+      this.selCtx.strokeRect(
+        (p0.x - this.offX)*sc, (p0.y - this.offY)*sc,
+        (p1.x - p0.x)*sc,     (p1.y - p0.y)*sc
+      );
+      this.selCtx.restore();
+      return;
     }
     if (!this.curStroke) return;
     const p = this._toDocPos(t);
@@ -1234,14 +1233,28 @@ class SubWin {
     }
   }
   _endDraw() {
-    // select ツール: メインウインドウと同等の選択処理
+    // select ツール: 矩形内ストロークを選択・削除
     if (currentTool === 'select' && this.isDrawing) {
       this.isDrawing = false;
-      if (this.selectedIdx.length > 0 && !this.selPath.length) {
-        // 移動完了 → 再描画して保存
-        this.render(); this._swDrawSelOv(); schedSave(); return;
+      if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+      if (this.selPath.length >= 2) {
+        const xs = this.selPath.map(p => p.x), ys = this.selPath.map(p => p.y);
+        const rx1=Math.min(...xs), ry1=Math.min(...ys), rx2=Math.max(...xs), ry2=Math.max(...ys);
+        const arr = this.strokes[this.pageNum] || [];
+        const hits = arr.reduce((a, s, i) => {
+          const bb = strokeBBox(s); if (!bb) return a;
+          if (!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2)) a.push(i);
+          return a;
+        }, []);
+        if (hits.length > 0) {
+          this.strokes[this.pageNum] = arr.filter((_,i) => !hits.includes(i));
+          this._annDirty = true;
+          this.render(); App.redraw(); schedSave();
+          showToast(`サブ窓: ${hits.length}件削除`);
+        }
       }
-      this._swFinishSel(); return;
+      this.selPath = []; this.selectedIdx = [];
+      return;
     }
     if (!this.isDrawing || !this.curStroke) { this.isDrawing = false; return; }
     this.isDrawing = false;
@@ -1705,109 +1718,6 @@ class SplitViewer {
     if (!arr||!arr.length){showToast('操作がありません（右パネル）');return;}
     arr.pop(); this.redraw(); this._schedSave();
   }
-
-  /* ---- SubWin 選択ヘルパー（メインウインドウと同等） ---- */
-  _swFinishSel() {
-    const arr = this.strokes[this.pageNum] || [];
-    if (selMode === 'rect' && this.selPath.length >= 2) {
-      const xs = this.selPath.map(p => p.x), ys = this.selPath.map(p => p.y);
-      const rx1=Math.min(...xs), ry1=Math.min(...ys), rx2=Math.max(...xs), ry2=Math.max(...ys);
-      this.selectedIdx = arr.reduce((a, s, i) => {
-        const bb = strokeBBox(s); if (!bb) return a;
-        if (!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2)) a.push(i);
-        return a;
-      }, []);
-    }
-    this.selPath = [];
-    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
-    this._swDrawSelOv();
-    if (this.selectedIdx.length > 0) {
-      _activeSelSubWin = this;
-      document.getElementById('selbtn').style.display = 'block';
-      this._swPositionSelBtn();
-    }
-  }
-  _swDrawSelPreview() {
-    if (!this.selPath.length) return;
-    const br = this._bodyRect();
-    this.selCvs.width  = Math.round(br.width);
-    this.selCvs.height = Math.round(br.height);
-    this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
-    this.selCtx.save();
-    this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
-    this.selCtx.setLineDash([6, 4]);
-    const sc = this.innerScale;
-    const p0 = this.selPath[0], p1 = this.selPath[this.selPath.length-1];
-    this.selCtx.strokeRect(
-      (Math.min(p0.x,p1.x) - this.offX)*sc, (Math.min(p0.y,p1.y) - this.offY)*sc,
-      Math.abs(p1.x-p0.x)*sc, Math.abs(p1.y-p0.y)*sc
-    );
-    this.selCtx.restore();
-  }
-  _swDrawSelOv() {
-    const br = this._bodyRect();
-    this.selCvs.width  = Math.round(br.width);
-    this.selCvs.height = Math.round(br.height);
-    this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
-    if (!this.selectedIdx.length) return;
-    const arr = this.strokes[this.pageNum] || [];
-    const sc  = this.innerScale;
-    this.selCtx.save();
-    this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
-    this.selCtx.setLineDash([6, 3]);
-    this.selectedIdx.forEach(i => {
-      const bb = strokeBBox(arr[i]); if (!bb) return;
-      this.selCtx.strokeRect(
-        (bb.x1 - this.offX)*sc - 4, (bb.y1 - this.offY)*sc - 4,
-        (bb.x2-bb.x1)*sc + 8,       (bb.y2-bb.y1)*sc + 8
-      );
-    });
-    this.selCtx.restore();
-    this._swPositionSelBtn();
-  }
-  _swSelBBox() {
-    const arr = this.strokes[this.pageNum] || [];
-    const bbs = this.selectedIdx.map(i => strokeBBox(arr[i])).filter(Boolean);
-    if (!bbs.length) return null;
-    return {
-      x1: Math.min(...bbs.map(b => b.x1)), y1: Math.min(...bbs.map(b => b.y1)),
-      x2: Math.max(...bbs.map(b => b.x2)), y2: Math.max(...bbs.map(b => b.y2))
-    };
-  }
-  _swMoveSel(dx, dy) {
-    const arr = this.strokes[this.pageNum] || [];
-    this.selectedIdx.forEach(i => {
-      const s = arr[i]; if (!s) return;
-      if (s.points) s.points = s.points.map(p => [p[0]+dx, p[1]+dy]);
-      if (s.x1 !== undefined) { s.x1+=dx; s.y1+=dy; s.x2+=dx; s.y2+=dy; }
-      if (s.type === 'text') { s.x+=dx; s.y+=dy; }
-    });
-  }
-  _swClearSel() {
-    this.selectedIdx = []; this.selPath = [];
-    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
-    document.getElementById('selbtn').style.display = 'none';
-    if (_activeSelSubWin === this) _activeSelSubWin = null;
-  }
-  _swPositionSelBtn() {
-    const bb = this._swSelBBox(); if (!bb) return;
-    const br = this._bodyRect();
-    const sc = this.innerScale;
-    const btn = document.getElementById('selbtn');
-    btn.style.left = Math.max(0, br.left + (bb.x1 - this.offX)*sc - 4) + 'px';
-    btn.style.top  = Math.max(0, br.top  + (bb.y2 - this.offY)*sc + 6) + 'px';
-  }
-  _deleteSelected() {
-    if (!this.selectedIdx.length) return;
-    this.strokes[this.pageNum] = (this.strokes[this.pageNum] || [])
-      .filter((_, i) => !this.selectedIdx.includes(i));
-    this.selectedIdx = []; this._annDirty = true;
-    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
-    document.getElementById('selbtn').style.display = 'none';
-    if (_activeSelSubWin === this) _activeSelSubWin = null;
-    this.render(); App.redraw(); schedSave();
-  }
-
   _schedSave() {
     clearTimeout(this._saveTimer);
     this._saveTimer=setTimeout(async()=>{
@@ -3212,69 +3122,4 @@ function showLoading(visible) {
   document.getElementById('loading').classList.toggle('on', visible);
 }
 
-/* ============================================================
-   イベントバインド (DOMContentLoaded後に実行)
-   ============================================================ */
-(function bindEvents() {
-  /* --- ヘッダー行1 --- */
-  document.getElementById('dz-open')  .addEventListener('click', () => openFile());
-  document.getElementById('btn-undo') .addEventListener('click', () => App.undo());
-  document.getElementById('btn-save') .addEventListener('click', () => savePDF());
-  document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
-  document.getElementById('btn-close').addEventListener('click', () => {
-    if (!App.pdfDoc) return;
-    if (confirm('このタブを閉じますか？（保存済みデータは残ります）')) closeSheetAt(_sheetIdx);
-  });
-  document.getElementById('cclose')   .addEventListener('click', () => toggleCalc());
-
-  /* --- ヘッダー行2: ページナビ --- */
-  document.getElementById('btn-prev').addEventListener('click', () => App.gotoPage(-1));
-  document.getElementById('btn-next').addEventListener('click', () => App.gotoPage(+1));
-  document.getElementById('btn-fit') .addEventListener('click', () => App.fit());
-  document.getElementById('pgn').addEventListener('change', e =>
-    App.gotoPage(+e.target.value, true));
-
-  /* --- 入力欄フォーカス時に全選択（iPad 含むタッチ端末対応） --- */
-  ['pgn', 'sz-n', 'pgrfld'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const selectAll = () => { el.select?.(); el.setSelectionRange?.(0, 99999); };
-    el.addEventListener('focus', selectAll);
-    el.addEventListener('click', selectAll); // iPad Safari: click でも発火
-  });
-
-  /* --- ツールボタン --- */
-  ['pen','hl','text','eraser','sub'].forEach(id =>
-    document.getElementById('t-' + id).addEventListener('click', () => setTool(id)));
-  document.getElementById('t-split').addEventListener('click', () => toggleSplitView());
-
-  document.getElementById('t-shape').addEventListener('click', e =>
-    togglePicker('shapepop', e.currentTarget));
-  document.querySelectorAll('#shapepop [data-shape]').forEach(btn =>
-    btn.addEventListener('click', () => pickShape(btn.dataset.shape)));
-
-  document.getElementById('t-select').addEventListener('click', e =>
-    togglePicker('selpop', e.currentTarget));
-  document.querySelectorAll('#selpop [data-selmode]').forEach(btn =>
-    btn.addEventListener('click', () => setSelMode(btn.dataset.selmode)));
-
-  /* --- カラースウォッチ --- */
-  document.querySelectorAll('.csw').forEach(el =>
-    el.addEventListener('click', () => setColor(el)));
-
-  /* --- 太さ --- */
-  document.getElementById('sz-v').addEventListener(  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); }
-  });
-
-  /* --- グローバルクリック: ピッカー & 太さパネルを閉じる --- */
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.pkw'))
-      closeAllPickers();
-    if (!e.target.closest('#szp') && !e.target.closest('.sz-val'))
-      document.getElementById('szp').classList.remove('on');
-  });
-})();
-</script>
-</body>
-</html>
+/* ========
