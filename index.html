@@ -2435,7 +2435,6 @@ function pickShape(shapeName) {
   document.querySelectorAll('#shapepop button').forEach(b => b.classList.remove('on'));
   document.querySelector(`#shapepop [data-shape="${shapeName}"]`)?.classList.add('on');
   closeAllPickers();
-  updateSwatches('pen'); // 図形は常にペン色を使用（蛍光ペン色の影響を排除）
   strokeSize = toolSizes[shapeName] || 2;
   document.getElementById('sz-v').textContent = strokeSize;
 }
@@ -2934,4 +2933,5 @@ function showLoading(visible) {
 
   /* --- 太さ --- */
   document.getElementById('sz-v').addEventListener('click', e => toggleSzPanel(e.currentTarget));
-  document.getElementById('sz-rng'
+  document.getElementById('sz-rng').addEventListener('input',  e => onSzChange(e.target.value));
+  document.getElementById('sz-n')  .ad
