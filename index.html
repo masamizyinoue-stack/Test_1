@@ -751,34 +751,6 @@ function _drawAnnotations(ctx, strks, sc) {
 }
 
 /**
- * 消しゴム円内のポイントだけ除去し、残存部分を別ストロークとして返す（部分消去）
- * stroke全体削除ではなく「カーソル範囲内のポイントのみ」を消すことで当たり判定を正確化
- * @param {object}   penStroke - ペンストローク {points:[[x,y],...], size, ...}
- * @param {number[][]} erPts   - 消しゴム経路の座標列 (PDF座標)
- * @param {number}   hitR      - ヒット半径 (PDF座標単位)
- * @returns {object[]}         - 残存セグメント配列（0個以上）
- */
-function _applyEraser(penStroke, erPts, hitR) {
-  // 各ペンポイントが消しゴム円内か判定（1点でも近いなら消去）
-  const kept = penStroke.points.map(pp =>
-    erPts.every(ep => Math.hypot(ep[0] - pp[0], ep[1] - pp[1]) >= hitR) ? pp : null
-  );
-  // 連続する保持ポイントをセグメントに分割（消去ポイントで切断）
-  const result = [];
-  let seg = [];
-  for (const p of kept) {
-    if (p !== null) {
-      seg.push(p);
-    } else {
-      if (seg.length >= 2) result.push({ ...penStroke, points: [...seg] });
-      seg = [];
-    }
-  }
-  if (seg.length >= 2) result.push({ ...penStroke, points: [...seg] });
-  return result;
-}
-
-/**
  * ストロークのバウンディングボックスを返す
  */
 function strokeBBox(s) {
@@ -1848,22 +1820,17 @@ const App = (() => {
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
     }
-    // ② 消しゴム: pen型のみ「ポイント単位」で部分消去（ストローク全体削除ではない）
+    // ② 消しゴム: pen型ストロークのみ実データ削除。hl/text/図形/矢印は消えない
     if (curStroke?.type === 'eraser') {
-      const er  = curStroke;
-      const r   = (er.size || 20) * 2 / 3; // 消しゴム基本半径 (PDF座標単位)
-      const erPts = er.points || [];
-      const newStrokes = [];
-      for (const s of (strokes[curPage] || [])) {
-        if (s.type !== 'pen' || !s.points?.length) {
-          newStrokes.push(s); // pen以外はそのまま保持（hl/text/図形/矢印を保護）
-          continue;
-        }
-        const hitR = r + (s.size || 3) / 6; // ペン半幅を加算して視覚的な当たりに合わせる
-        const segs = _applyEraser(s, erPts, hitR); // ポイント単位で消去 → 残存セグメント取得
-        newStrokes.push(...segs); // 残存部分のみ追加（消えた部分は含まれない）
-      }
-      strokes[curPage] = newStrokes;
+      const er = curStroke;
+      const r  = (er.size || 20) * 2 / 3 + 0.5; // ヒット半径 (PDF座標単位)
+      strokes[curPage] = (strokes[curPage] || []).filter(s => {
+        if (s.type !== 'pen' || !s.points?.length) return true; // pen以外は保護
+        const hitR = r + (s.size || 3) / 6;
+        return !er.points?.some(ep =>
+          s.points.some(pp => Math.hypot(ep[0]-pp[0], ep[1]-pp[1]) < hitR)
+        );
+      });
       curStroke = null;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       redraw(); drawSelOv();
@@ -2932,4 +2899,43 @@ function showLoading(visible) {
     document.getElementById('pgrov').classList.remove('on');
   });
   document.getElementById('pgrfld').addEventListener('keydown', e => {
-    if (e.key === 'Enter')  _executeSave(document.getElementB
+    if (e.key === 'Enter')  _executeSave(document.getElementById('pgrfld').value);
+    if (e.key === 'Escape') document.getElementById('pgrov').classList.remove('on');
+  });
+
+  /* --- テキスト入力 --- */
+  document.getElementById('txConfirm').addEventListener('click', () => confirmTx());
+  document.getElementById('txCancel') .addEventListener('click', () => cancelTx());
+  document.getElementById('txfld').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) confirmTx();
+    if (e.key === 'Escape') cancelTx();
+  });
+
+  /* --- 選択削除 --- */
+  document.getElementById('selbtn').addEventListener('click', () => App.deleteSelected());
+
+  /* --- 計算機ボタン (data属性でディスパッチ) --- */
+  document.getElementById('cbtns').addEventListener('click', e => {
+    const btn = e.target.closest('[data-cnum],[data-cop],[data-cfn]');
+    if (!btn) return;
+    if (btn.dataset.cnum !== undefined) calcNum(btn.dataset.cnum);
+    else if (btn.dataset.cop  !== undefined) calcOp(btn.dataset.cop);
+    else if (btn.dataset.cfn  !== undefined) calcFn(btn.dataset.cfn);
+  });
+
+  /* --- Ctrl+P 印刷ショートカット無効化 --- */
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); }
+  });
+
+  /* --- グローバルクリック: ピッカー & 太さパネルを閉じる --- */
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.pkw'))
+      closeAllPickers();
+    if (!e.target.closest('#szp') && !e.target.closest('.sz-val'))
+      document.getElementById('szp').classList.remove('on');
+  });
+})();
+</script>
+</body>
+</html>
