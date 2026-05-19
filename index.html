@@ -612,16 +612,33 @@ function safeKey(s) {
 }
 
 let _autoSaveTimer;
+/** IDB 保存・復元時に eraser ストロークを除去（蓄積による freeze 防止） */
+function _pruneEraserStrokes(strks) {
+  const result = {};
+  for (const [pg, arr] of Object.entries(strks || {})) {
+    const filtered = (arr || []).filter(s => s.type !== 'eraser');
+    if (filtered.length) result[pg] = filtered;
+  }
+  return result;
+}
+
 function schedSave() {
   clearTimeout(_autoSaveTimer);
   _autoSaveTimer = setTimeout(async () => {
     if (!App.pdfDoc || !App.origBuf) return;
+    // eraser ストロークを保存しない（IDB 蓄積 → 復元後の freeze 防止）
+    const rawStrokes = App.strokes;
+    const cleanStrokes = {};
+    for (const [pg, arr] of Object.entries(rawStrokes || {})) {
+      const filtered = (arr || []).filter(s => s.type !== 'eraser');
+      if (filtered.length) cleanStrokes[pg] = filtered;
+    }
     const data = {
       buf:     App.origBuf.slice(0),
       file:    App.fileName,
       strokes: (typeof structuredClone === 'function'
-                  ? structuredClone(App.strokes)
-                  : JSON.parse(JSON.stringify(App.strokes))),
+                  ? structuredClone(cleanStrokes)
+                  : JSON.parse(JSON.stringify(cleanStrokes))),
       page:    App.currentPage,
       scale:   App.scale,
       ts:      Date.now()
@@ -731,31 +748,12 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
 
 /**
  * ② アノテーション描画
- *    eraser あり: pen+eraser のみ temp canvas で compositing（HL/図形は直接描画）
- *    → temp canvas はペンストロークのみ → 常に高速
- *    _annCompCvs にキャッシュして毎回のメモリ確保を防止（iPad freeze 対策）
+ *    eraser ストロークは endDraw 時に即時削除するため配列に残らない
+ *    → 常に単純描画パス（temp canvas 生成ゼロ・compositing なし）
  */
-let _annCompCvs = null; // 合成用一時canvas キャッシュ
-
 function _drawAnnotations(ctx, strks, sc) {
   if (!strks || !strks.length) return;
-  if (strks.some(s => s.type === 'eraser')) {
-    const w = ctx.canvas.width, h = ctx.canvas.height;
-    // サイズ変更時のみ再生成（clearRect で再利用して毎フレームの大型確保を回避）
-    if (!_annCompCvs || _annCompCvs.width !== w || _annCompCvs.height !== h) {
-      _annCompCvs = document.createElement('canvas');
-      _annCompCvs.width = w; _annCompCvs.height = h;
-    }
-    const tctx = _annCompCvs.getContext('2d');
-    tctx.clearRect(0, 0, w, h);
-    // pen+eraser のみ temp canvas（少量→高速）
-    strks.forEach(s => { if (s.type === 'pen' || s.type === 'eraser') drawStroke(s, tctx, sc); });
-    ctx.drawImage(_annCompCvs, 0, 0);
-    // HL・図形・文字は直接描画（compositing の影響なし・元のパスへ戻す）
-    strks.forEach(s => { if (s.type !== 'pen' && s.type !== 'eraser') drawStroke(s, ctx, sc); });
-  } else {
-    strks.forEach(s => drawStroke(s, ctx, sc));
-  }
+  strks.forEach(s => drawStroke(s, ctx, sc));
 }
 
 /**
@@ -1171,12 +1169,10 @@ class SubWin {
     if (!this.strokes[this.pageNum]) this.strokes[this.pageNum] = [];
     const s = this.curStroke;
     if (s.type === 'eraser') {
-      // HL・図形を削除 → eraser ストロークを保存（pen compositing 用）
+      // 全タイプを即時削除・eraser を配列に保存しない
       const r = (s.size || 20) * 2 / 3, erPts = s.points || [];
-      this.strokes[this.pageNum] = (this.strokes[this.pageNum] || []).flatMap(st =>
-        st.type === 'pen' ? [st] : _applyEraserAll(st, erPts, r)
-      );
-      this.strokes[this.pageNum].push({ ...s, points: s.points ? [...s.points] : undefined });
+      this.strokes[this.pageNum] = (this.strokes[this.pageNum] || [])
+        .flatMap(st => _applyEraserAll(st, erPts, r));
     } else {
       this.strokes[this.pageNum].push({ ...s, points: s.points ? [...s.points] : undefined });
     }
@@ -1929,20 +1925,16 @@ const App = (() => {
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
     }
-    // ② 消しゴム:
-    //    step1: HL・図形を _applyEraserAll で即時削除（一回だけ・redraw コストなし）
-    //    step2: eraser ストロークを配列に保存（pen の compositing 用）
-    //    → temp canvas は pen のみ → compositing が常に高速
+    // ② 消しゴム: 全タイプを即時削除（eraser を配列に保存しない）
+    //    → _drawAnnotations が常に単純パス → temp canvas 生成ゼロ → freeze しない
+    //    pen/hl → _applyEraser で部分削除
+    //    shapes → _applyEraserAll で全体削除
+    //    text   → 保護
     if (curStroke?.type === 'eraser') {
       const er = curStroke;
       const r  = (er.size || 20) * 2 / 3;
       const erPts = er.points || [];
-      // HL・図形のみ削除（pen は compositing で処理、text は保護）
-      strokes[curPage] = (strokes[curPage] || []).flatMap(s =>
-        s.type === 'pen' ? [s] : _applyEraserAll(s, erPts, r)
-      );
-      // eraser ストロークを保存（pen への compositing 処理用）
-      strokes[curPage].push({ ...er, points: er.points ? [...er.points] : undefined });
+      strokes[curPage] = (strokes[curPage] || []).flatMap(s => _applyEraserAll(s, erPts, r));
       curStroke = null;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       redraw(); drawSelOv();
@@ -2138,7 +2130,7 @@ const App = (() => {
       cwEl.style.display = 'block';
 
       const saved = await IDB.get('f:' + safeKey(file.name));
-      strokes = saved?.strokes || {};
+      strokes = _pruneEraserStrokes(saved?.strokes || {});
       await renderPage(1); await fit();
       if (saved?.strokes && Object.keys(saved.strokes).length > 0)
         showToast('📝 書き込みデータを復元しました');
@@ -2206,7 +2198,7 @@ const App = (() => {
     pdfDoc     = await pdfjsLib.getDocument({ data: saved.buf.slice(0) }).promise;
     totalPages = pdfDoc.numPages;
     document.getElementById('tpn').textContent = totalPages;
-    strokes    = saved.strokes || {};
+    strokes    = _pruneEraserStrokes(saved.strokes || {});
     curPage    = saved.page || 1; scale = saved.scale || 1;
     panX = 16; panY = 16; renderScale = 1; cssExtraZoom = 1;
     document.getElementById('dz').style.display = 'none';
