@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.10</title>
+<title>M_Viewer V0.11</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -131,7 +131,7 @@ body {
 .szp-cancel { height: 38px; padding: 0 12px; background: var(--pan2); color: var(--tx2); border: 1.5px solid var(--brd); border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
 
 /* ===== キャンバス領域 ===== */
-#ca { flex: 1; overflow: hidden; position: relative; min-height: 0; touch-action: none; background: #444; }
+#ca { flex: 1; overflow: hidden; position: relative; min-height: 0; touch-action: none; background: #444; overscroll-behavior: none; }
 #cw { position: absolute; top: 0; left: 0; transform-origin: 0 0; background: #fff; }
 #pdfCvs { display: block; }
 #annCvs, #ovlCvs { position: absolute; top: 0; left: 0; }
@@ -333,7 +333,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.10</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.11</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -412,7 +412,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.10</div>
+    <div class="dzm">M_Viewer V0.11</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -636,6 +636,19 @@ window.DBG = (() => {
 })();
 
 /** IDB 保存・復元時に eraser ストロークを除去（蓄積による freeze 防止） */
+/**
+ * Palm Rejection: タッチ接触面が手のひらサイズか判定
+ * Apple Pencil (touchType==='stylus') は必ず false を返す
+ * radiusX/Y が大きい = 手のひら or 太い指の腹 → 描画・パン操作を無視
+ */
+function _isPalmContact(t) {
+  if (!t) return false;
+  if (t.touchType === 'stylus') return false; // Apple Pencil は除外
+  const rx = t.radiusX || 0, ry = t.radiusY || 0;
+  if (!rx && !ry) return false; // 情報なし → 判定不可（通す）
+  return rx > 25 || ry > 25;   // 接触半径 25px 超 → 手のひら判定
+}
+
 function _pruneEraserStrokes(strks) {
   const result = {};
   for (const [pg, arr] of Object.entries(strks || {})) {
@@ -1045,8 +1058,13 @@ class SubWin {
 
     cv.addEventListener('touchstart', e => {
       e.preventDefault(); e.stopPropagation();
-      if (e.touches.length >= 2) { this.panSt = null; this._startPinch(e.touches); return; }
+      if (e.touches.length >= 2) {
+        const hasStylus = Array.from(e.touches).some(t => isStylus(t));
+        if (hasStylus || this.isDrawing) return;
+        this.panSt = null; this._startPinch(e.touches); return;
+      }
       const t = e.touches[0];
+      if (_isPalmContact(t)) return; // Palm Rejection
       const needPen = ['pen','hl'].includes(currentTool === 'shape' ? currentShape : currentTool);
       if ((needPen && !isStylus(t)) || ['sub','select'].includes(currentTool)) {
         this._startPan(t); return;
@@ -1372,11 +1390,14 @@ class SplitViewer {
     ca.addEventListener('touchstart', e => {
       if (!this.pdfDoc) return; e.preventDefault();
       if (e.touches.length >= 2) {
+        const hasStylus = Array.from(e.touches).some(t => t.touchType === 'stylus');
+        if (hasStylus || this.isDrawing) return;
         this.curStroke = null; this.isDrawing = false; this.panSt = null;
         this._startPinch(e.touches); return;
       }
       const t = e.touches[0];
       const isSty = t.touchType === 'stylus';
+      if (_isPalmContact(t)) return; // Palm Rejection
       this._cancelInertia();
       if (!isSty) { this._startPan(t); return; }
       this._startDraw(e);
@@ -1806,10 +1827,15 @@ const App = (() => {
   function onTouchStart(e) {
     if (!pdfDoc) return; e.preventDefault(); cancelInertia();
     if (e.touches.length >= 2) {
+      // Apple Pencil 描画中に手のひらが追加されても pinch に移行しない
+      const hasStylus = Array.from(e.touches).some(t => t.touchType === 'stylus');
+      if (hasStylus || isDrawing) return; // 描画継続を優先
       isDrawing = false; curStroke = null; panSt = null;
       startPinch(e.touches); return;
     }
     const t = e.touches[0];
+    // Palm Rejection: 手のひら接触は無視
+    if (_isPalmContact(t)) return;
     if (!isOnCanvas(t)) { startPan(t); return; }
     const needPen = ['pen','hl'].includes(currentTool);
     if (needPen && t.touchType !== 'stylus') { startPan(t); return; }
