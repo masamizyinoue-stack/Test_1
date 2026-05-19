@@ -1869,22 +1869,13 @@ const App = (() => {
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
     }
-    // ② 消しゴム: pen型のみ「ポイント単位」で部分消去（ストローク全体削除ではない）
+    // ② 消しゴム: SubWin と同じ compositing 方式に統一（ピクセル精度・カーソルと完全一致）
+    //    eraser ストロークを保存 → redraw() で _drawAnnotations が destination-out 合成
+    //    → canvas compostingのためポイント距離判定のズレなし / Undo も pop で復元可
     if (curStroke?.type === 'eraser') {
-      const er  = curStroke;
-      const r   = (er.size || 20) * 2 / 3; // 消しゴム基本半径 (PDF座標単位)
-      const erPts = er.points || [];
-      const newStrokes = [];
-      for (const s of (strokes[curPage] || [])) {
-        if (s.type !== 'pen' || !s.points?.length) {
-          newStrokes.push(s); // pen以外はそのまま保持（hl/text/図形/矢印を保護）
-          continue;
-        }
-        const hitR = r; // 視覚カーソル半径と完全一致（pen.size/6の超過分を廃止）
-        const segs = _applyEraser(s, erPts, hitR); // 線分ベース判定で消去 → 残存セグメント取得
-        newStrokes.push(...segs); // 残存部分のみ追加（消えた部分は含まれない）
-      }
-      strokes[curPage] = newStrokes;
+      if (!strokes[curPage]) strokes[curPage] = [];
+      const s = curStroke;
+      strokes[curPage].push({ ...s, points: s.points ? [...s.points] : undefined });
       curStroke = null;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       redraw(); drawSelOv();
@@ -2421,9 +2412,10 @@ function setTool(t) {
 }
 
 function setColor(el) {
-  document.querySelectorAll('.csw').forEach(s => s.classList.remove('on'));
-  el.classList.add('on'); strokeColor = el.dataset.c;
+  strokeColor = el.dataset.c;
   if (currentTool === 'hl') hlColor = strokeColor; else penColor = strokeColor;
+  // updateSwatches 経由で再描画 → インラインstyle.borderColor と .on クラスを正しく同期
+  updateSwatches(currentTool === 'hl' ? 'hl' : 'pen');
 }
 
 function pickShape(shapeName) {
@@ -2435,6 +2427,7 @@ function pickShape(shapeName) {
   document.querySelectorAll('#shapepop button').forEach(b => b.classList.remove('on'));
   document.querySelector(`#shapepop [data-shape="${shapeName}"]`)?.classList.add('on');
   closeAllPickers();
+  updateSwatches('pen'); // 図形は常にペン色を使用（蛍光ペン色の影響を排除）
   strokeSize = toolSizes[shapeName] || 2;
   document.getElementById('sz-v').textContent = strokeSize;
 }
