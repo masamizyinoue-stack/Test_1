@@ -612,6 +612,30 @@ function safeKey(s) {
 }
 
 let _autoSaveTimer;
+/* ============================================================
+   デバッグ計測 (freeze 原因特定用)
+   ブラウザ開発者ツール Console で count / log を確認してください。
+   ============================================================ */
+const _DBG = {
+  _rafCount: 0, _rafTimer: null,
+  startRafMonitor() {
+    // RAF が毎秒何件動いているか計測（正常=0、異常=多数）
+    this._rafTimer = setInterval(() => {
+      if (this._rafCount > 0) {
+        console.warn(`[DBG] RAF/sec = ${this._rafCount}  ← 0 以外は RAF 蓄積の疑い`);
+        this._rafCount = 0;
+      }
+    }, 1000);
+  },
+  countRaf() { this._rafCount++; },
+  // strokes 配列サイズを記録（肥大化チェック）
+  logStrokes(strokes, page) {
+    const total = Object.values(strokes||{}).reduce((s,a)=>s+(a?.length||0),0);
+    if (total > 200) console.warn(`[DBG] strokes total = ${total}  ← 多いほど redraw() が重い`);
+  }
+};
+_DBG.startRafMonitor();
+
 /** IDB 保存・復元時に eraser ストロークを除去（蓄積による freeze 防止） */
 function _pruneEraserStrokes(strks) {
   const result = {};
@@ -1261,6 +1285,7 @@ class SubWin {
   }
 
   update(strokes, pageNum) {
+    console.count('[DBG] sw.update');
     this.strokes = strokes; this._annDirty = true;
     if (pageNum !== undefined && pageNum !== this.pageNum) {
       this.pageNum = pageNum; this._pdfCache = null;
@@ -1712,6 +1737,7 @@ const App = (() => {
   caEl.addEventListener('mousemove',  e => { if (isDrawing) moveDraw(e); else if (panSt) movePan(e); });
   caEl.addEventListener('mouseup',    e => { if (isDrawing) endDraw(e); else if (panSt) endPan(e); });
   caEl.addEventListener('wheel', e => {
+    console.count('[DBG] wheel');
     if (!pdfDoc) return; e.preventDefault();
     const r    = e.deltaY < 0 ? 1.15 : 0.87;
     const cr   = caEl.getBoundingClientRect();
@@ -1798,6 +1824,7 @@ const App = (() => {
       const dt = Math.max(1, n.tm - f.tm);
       let vx = (n.x - f.x) / dt * 14, vy = (n.y - f.y) / dt * 14;
       const step = () => {
+        _DBG.countRaf(); // RAF 増殖チェック
         if (Math.abs(vx) < 0.4 && Math.abs(vy) < 0.4) return;
         panX += vx; panY += vy; clampPan(); updateTransform();
         vx *= 0.9; vy *= 0.9; rafId = requestAnimationFrame(step);
@@ -2066,13 +2093,16 @@ const App = (() => {
   }
 
   function redraw() {
+    console.count('[DBG] redraw');
+    _DBG.logStrokes(strokes, curPage); // strokes 肥大化チェック
     annCtx.clearRect(0, 0, annCvs.width, annCvs.height);
-    _drawAnnotations(annCtx, strokes[curPage] || [], renderScale); // ② 消しゴムは text 以外すべて対象
+    _drawAnnotations(annCtx, strokes[curPage] || [], renderScale);
     drawSelOv();
   }
 
   /* ---- レンダリング ---- */
   async function renderPage(num) {
+    console.count('[DBG] renderPage');
     if (!pdfDoc) return;
     const ver = ++renderVer;
 
