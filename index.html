@@ -549,6 +549,7 @@ let hlColor      = '#ffd700';
 let txX = 0, txY = 0;
 
 const subWindows  = [];
+let _activeSelSubWin = null; // サブ窓選択コンテキスト (null=メイン)
 let   swZIndex    = 200;
 let   _fileHandle = null;
 
@@ -1157,11 +1158,18 @@ class SubWin {
       document.getElementById('txov').classList.add('on');
       return;
     }
-    // select ツール: 矩形選択開始
+    // select ツール: メインウインドウと同等の選択処理
     if (currentTool === 'select') {
-      this.selPath = [{ x: p.x, y: p.y }];
-      this.selectedIdx = [];
-      this.isDrawing = true;
+      if (this.selectedIdx.length > 0) {
+        // 既存選択のBB内をタップ → 移動モード
+        const bb = this._swSelBBox();
+        if (bb && p.x >= bb.x1-10 && p.x <= bb.x2+10 && p.y >= bb.y1-10 && p.y <= bb.y2+10) {
+          this.isDrawing = true; this.lastX = p.x; this.lastY = p.y; return;
+        } else {
+          this._swClearSel();
+        }
+      }
+      this.selPath = [{ x: p.x, y: p.y }]; this.isDrawing = true;
       return;
     }
     this.isDrawing = true; this.lastX = p.x; this.lastY = p.y;
@@ -3210,8 +3218,14 @@ function showLoading(visible) {
     if (e.key === 'Escape') cancelTx();
   });
 
-  /* --- 選択削除 --- */
-  document.getElementById('selbtn').addEventListener('click', () => App.deleteSelected());
+  /* --- 選択削除（メイン or サブ窓コンテキスト対応） --- */
+  document.getElementById('selbtn').addEventListener('click', () => {
+    if (_activeSelSubWin) {
+      _activeSelSubWin._deleteSelected();
+    } else {
+      App.deleteSelected();
+    }
+  });
 
   /* --- 計算機ボタン (data属性でディスパッチ) --- */
   document.getElementById('cbtns').addEventListener('click', e => {
