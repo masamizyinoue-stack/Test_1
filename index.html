@@ -730,21 +730,22 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
 }
 
 /**
- * ② アノテーション描画（消しゴムはペンのみ対象に適用）
+ * ② アノテーション描画（消しゴムは text 以外すべて対象: pen/hl/line/rect/circle/arrow）
  * 消しゴムあり: ペン+消しゴムを一時canvasで処理し、HL/図形等は影響を受けない
  * 消しゴムなし: 通常通り全ストロークを描画（一時canvas不要）
  */
 function _drawAnnotations(ctx, strks, sc) {
   if (!strks || !strks.length) return;
   if (strks.some(s => s.type === 'eraser')) {
-    // ペン+消しゴムを一時canvasに描いてから本canvasへ合成
+    // テキスト以外（ペン・HL・図形・矢印・消しゴム）を一時canvasに描いてから合成
+    // → 消しゴムの destination-out が text 以外すべてに作用する
     const tmp  = document.createElement('canvas');
     tmp.width  = ctx.canvas.width; tmp.height = ctx.canvas.height;
     const tctx = tmp.getContext('2d');
-    strks.forEach(s => { if (s.type === 'pen' || s.type === 'eraser') drawStroke(s, tctx, sc); });
+    strks.forEach(s => { if (s.type !== 'text') drawStroke(s, tctx, sc); }); // text以外=消去対象
     ctx.drawImage(tmp, 0, 0);
-    // HL・図形・文字・矢印は消しゴムの影響なしに上に描画
-    strks.forEach(s => { if (s.type !== 'pen' && s.type !== 'eraser') drawStroke(s, ctx, sc); });
+    // テキストのみ消しゴムの影響なしに最前面へ描画
+    strks.forEach(s => { if (s.type === 'text') drawStroke(s, ctx, sc); });
   } else {
     strks.forEach(s => drawStroke(s, ctx, sc));
   }
@@ -965,7 +966,7 @@ class SubWin {
       this._annCvs.width = vp.width; this._annCvs.height = vp.height;
       const actx = this._annCvs.getContext('2d');
       actx.clearRect(0, 0, vp.width, vp.height);
-      _drawAnnotations(actx, this.strokes[this.pageNum] || [], sc); // ② ペンのみ消しゴム対象
+      _drawAnnotations(actx, this.strokes[this.pageNum] || [], sc); // ② 消しゴムは text 以外すべて対象
       this._annDirty = false;
     }
 
@@ -2008,7 +2009,7 @@ const App = (() => {
 
   function redraw() {
     annCtx.clearRect(0, 0, annCvs.width, annCvs.height);
-    _drawAnnotations(annCtx, strokes[curPage] || [], renderScale); // ② ペンのみ消しゴム対象
+    _drawAnnotations(annCtx, strokes[curPage] || [], renderScale); // ② 消しゴムは text 以外すべて対象
     drawSelOv();
   }
 
@@ -2544,7 +2545,7 @@ async function _pdfRasterPage(srcDoc, page, pageNum, strks, pw, ph) {
   await jsPage.render({ canvasContext: ctx, viewport: vp }).promise;
   const ann    = document.createElement('canvas');
   ann.width = vp.width; ann.height = vp.height;
-  _drawAnnotations(ann.getContext('2d'), strks, SAVE_RS); // ② ペンのみ消しゴム対象
+  _drawAnnotations(ann.getContext('2d'), strks, SAVE_RS); // ② 消しゴムは text 以外すべて対象
   ctx.drawImage(ann, 0, 0);
   const embed  = rotateCanvas(c, jsPage, pw, ph, SAVE_RS);
   const blob   = await new Promise(r => embed.toBlob(r, 'image/jpeg', 0.94));
@@ -2929,60 +2930,4 @@ function showLoading(visible) {
   document.getElementById('sz-rng').addEventListener('input',  e => onSzChange(e.target.value));
   document.getElementById('sz-n')  .addEventListener('change', e => onSzChange(e.target.value));
   document.getElementById('szp-ok')    .addEventListener('click', () => applySz());
-  document.getElementById('szp-cancel').addEventListener('click', () =>
-    document.getElementById('szp').classList.remove('on'));
-
-  /* --- ③ PDF出力ページ指定 --- */
-  document.getElementById('pgr-cur').addEventListener('click', () => {
-    document.getElementById('pgrfld').value = String(App.currentPage);
-  });
-  document.getElementById('pgr-all').addEventListener('click', () => {
-    document.getElementById('pgrfld').value = '';
-  });
-  document.getElementById('pgrConfirm').addEventListener('click', () => {
-    _executeSave(document.getElementById('pgrfld').value);
-  });
-  document.getElementById('pgrCancel').addEventListener('click', () => {
-    document.getElementById('pgrov').classList.remove('on');
-  });
-  document.getElementById('pgrfld').addEventListener('keydown', e => {
-    if (e.key === 'Enter')  _executeSave(document.getElementById('pgrfld').value);
-    if (e.key === 'Escape') document.getElementById('pgrov').classList.remove('on');
-  });
-
-  /* --- テキスト入力 --- */
-  document.getElementById('txConfirm').addEventListener('click', () => confirmTx());
-  document.getElementById('txCancel') .addEventListener('click', () => cancelTx());
-  document.getElementById('txfld').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.ctrlKey) confirmTx();
-    if (e.key === 'Escape') cancelTx();
-  });
-
-  /* --- 選択削除 --- */
-  document.getElementById('selbtn').addEventListener('click', () => App.deleteSelected());
-
-  /* --- 計算機ボタン (data属性でディスパッチ) --- */
-  document.getElementById('cbtns').addEventListener('click', e => {
-    const btn = e.target.closest('[data-cnum],[data-cop],[data-cfn]');
-    if (!btn) return;
-    if (btn.dataset.cnum !== undefined) calcNum(btn.dataset.cnum);
-    else if (btn.dataset.cop  !== undefined) calcOp(btn.dataset.cop);
-    else if (btn.dataset.cfn  !== undefined) calcFn(btn.dataset.cfn);
-  });
-
-  /* --- Ctrl+P 印刷ショートカット無効化 --- */
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); }
-  });
-
-  /* --- グローバルクリック: ピッカー & 太さパネルを閉じる --- */
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.pkw'))
-      closeAllPickers();
-    if (!e.target.closest('#szp') && !e.target.closest('.sz-val'))
-      document.getElementById('szp').classList.remove('on');
-  });
-})();
-</script>
-</body>
-</html>
+ 
