@@ -731,19 +731,25 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
 
 /**
  * ② アノテーション描画（消しゴムは text 以外すべて対象: pen/hl/line/rect/circle/arrow）
- * 消しゴムあり: ペン+消しゴムを一時canvasで処理し、HL/図形等は影響を受けない
+ * 消しゴムあり: 合成用一時canvasに描いて destination-out で消去 → textは別レイヤー
  * 消しゴムなし: 通常通り全ストロークを描画（一時canvas不要）
+ * パフォーマンス: _annCompCvs にキャッシュして毎回の大型canvas生成を防止（iPad freeze 対策）
  */
+let _annCompCvs = null; // 合成用一時canvas（サイズ変更時のみ再生成・毎フレーム生成を避ける）
+
 function _drawAnnotations(ctx, strks, sc) {
   if (!strks || !strks.length) return;
   if (strks.some(s => s.type === 'eraser')) {
-    // テキスト以外（ペン・HL・図形・矢印・消しゴム）を一時canvasに描いてから合成
-    // → 消しゴムの destination-out が text 以外すべてに作用する
-    const tmp  = document.createElement('canvas');
-    tmp.width  = ctx.canvas.width; tmp.height = ctx.canvas.height;
-    const tctx = tmp.getContext('2d');
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    // サイズが変わった時のみ再生成（同サイズなら clearRect で再利用してメモリ確保を省く）
+    if (!_annCompCvs || _annCompCvs.width !== w || _annCompCvs.height !== h) {
+      _annCompCvs = document.createElement('canvas');
+      _annCompCvs.width = w; _annCompCvs.height = h;
+    }
+    const tctx = _annCompCvs.getContext('2d');
+    tctx.clearRect(0, 0, w, h);
     strks.forEach(s => { if (s.type !== 'text') drawStroke(s, tctx, sc); }); // text以外=消去対象
-    ctx.drawImage(tmp, 0, 0);
+    ctx.drawImage(_annCompCvs, 0, 0);
     // テキストのみ消しゴムの影響なしに最前面へ描画
     strks.forEach(s => { if (s.type === 'text') drawStroke(s, ctx, sc); });
   } else {
