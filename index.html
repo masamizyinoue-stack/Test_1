@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.04</title>
+<title>M_Viewer V0.05</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -225,6 +225,8 @@ body {
 .sv-zl  { font-size: 10px; color: var(--acc); white-space: nowrap; flex-shrink: 0; }
 .sv-openbtn { height: 21px; padding: 0 7px; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx); border-radius: 4px; font-size: 11px; cursor: pointer; flex-shrink: 0; }
 .sv-openbtn:active { background: var(--acc); color: #fff; }
+.sv-closebtn { height: 21px; padding: 0 7px; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx2); border-radius: 4px; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+.sv-closebtn:active { background: var(--red); color: #fff; }
 .sv-ca  { flex: 1; overflow: hidden; position: relative; background: #555; touch-action: none; }
 #sv-cw  { position: absolute; top: 0; left: 0; transform-origin: 0 0; background: #fff; }
 #sv-pdf { display: block; }
@@ -330,7 +332,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.04</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.05</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <button class="btn" id="btn-open">📂 開く</button>
     <span id="fnlbl">ファイル未選択</span>
@@ -410,7 +412,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.04</div>
+    <div class="dzm">M_Viewer V0.05</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -1331,6 +1333,7 @@ class SplitViewer {
         <div style="flex:1"></div>
         <button class="sv-nbtn" id="sv-fit">全体</button>
         <button class="sv-openbtn" id="sv-open">📂 開く</button>
+        <button class="sv-closebtn" id="sv-close" title="PDFを閉じる">✕</button>
       </div>
       <div class="sv-ca" id="sv-ca">
         <div id="sv-cw">
@@ -1355,11 +1358,12 @@ class SplitViewer {
     this.fnEl  = c.querySelector('.sv-fn');
     this.pnEl  = document.getElementById('sv-pn');
     this.zlEl  = document.getElementById('sv-zl');
-    document.getElementById('sv-open').addEventListener('click', () => this._openFile());
-    document.getElementById('sv-prev').addEventListener('click', () => this._gotoPage(-1));
-    document.getElementById('sv-next').addEventListener('click', () => this._gotoPage(+1));
-    document.getElementById('sv-fit') .addEventListener('click', () => this._fit());
-    document.getElementById('sv-dz')  .addEventListener('click', () => this._openFile());
+    document.getElementById('sv-open') .addEventListener('click', () => this._openFile());
+    document.getElementById('sv-close').addEventListener('click', () => this.closePDF());
+    document.getElementById('sv-prev') .addEventListener('click', () => this._gotoPage(-1));
+    document.getElementById('sv-next') .addEventListener('click', () => this._gotoPage(+1));
+    document.getElementById('sv-fit')  .addEventListener('click', () => this._fit());
+    document.getElementById('sv-dz')   .addEventListener('click', () => this._openFile());
     this._bindInput();
   }
 
@@ -1604,6 +1608,19 @@ class SplitViewer {
         showToast('📝 右パネル: 書き込みデータを復元しました');
     } catch(e){console.error('[SplitViewer] loadPDF:',e);showToast('右パネル: 読み込み失敗');}
   }
+  /** 右パネルの PDF を閉じて初期状態に戻す */
+  closePDF() {
+    if (this.pdfDoc) { try { this.pdfDoc.destroy(); } catch(_) {} this.pdfDoc = null; }
+    this.origBuf = null; this.fileName = ''; this.strokes = {}; this.totalPages = 0;
+    this.curPage = 1; this.scale = 1; this.pageCache.clear(); this._offscr = null;
+    clearTimeout(this._saveTimer);
+    // キャンバスをクリア
+    [this.pdfCvs, this.annCvs, this.ovlCvs].forEach(c => { c.width = 1; c.height = 1; });
+    this.fnEl.textContent = '（右パネル）';
+    this.pnEl.textContent = '-/-'; this.zlEl.textContent = '';
+    document.getElementById('sv-dz').style.display = '';
+  }
+
   _openFile() {
     const inp=document.createElement('input');
     inp.type='file'; inp.accept='application/pdf';
