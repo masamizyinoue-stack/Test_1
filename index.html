@@ -2421,10 +2421,9 @@ function setTool(t) {
 }
 
 function setColor(el) {
-  strokeColor = el.dataset.c;
+  document.querySelectorAll('.csw').forEach(s => s.classList.remove('on'));
+  el.classList.add('on'); strokeColor = el.dataset.c;
   if (currentTool === 'hl') hlColor = strokeColor; else penColor = strokeColor;
-  // updateSwatches 経由で再描画 → インラインstyle.borderColor と .on クラスを正しく同期
-  updateSwatches(currentTool === 'hl' ? 'hl' : 'pen');
 }
 
 function pickShape(shapeName) {
@@ -2934,4 +2933,5 @@ function showLoading(visible) {
     el.addEventListener('click', () => setColor(el)));
 
   /* --- 太さ --- */
-  document.getElementById('sz-v').addEventListener('click', e => 
+  document.getElementById('sz-v').addEventListener('click', e => toggleSzPanel(e.currentTarget));
+  document.getElementById('sz-rng'
