@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.07</title>
+<title>M_Viewer V0.10</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -263,6 +263,7 @@ body {
 .shtab-add {
   padding: 0 13px; background: none; border: none; color: var(--tx2);
   font-size: 20px; cursor: pointer; flex-shrink: 0; align-self: center;
+  margin-left: auto; /* 常に右端へ固定（✕ボタンとの誤操作防止） */
 }
 .shtab-add:hover { color: var(--acc); }
 
@@ -332,9 +333,8 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.07</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.10</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
-    <button class="btn" id="btn-open">📂 開く</button>
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
@@ -412,7 +412,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.07</div>
+    <div class="dzm">M_Viewer V0.10</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -1332,7 +1332,7 @@ class SplitViewer {
         <span class="sv-zl" id="sv-zl"></span>
         <div style="flex:1"></div>
         <button class="sv-nbtn" id="sv-fit">全体</button>
-        <button class="sv-openbtn" id="sv-open">📂 開く</button>
+        <button class="sv-openbtn" id="sv-open">📂 PDF追加</button>
         <button class="sv-closebtn" id="sv-close" title="PDFを閉じる">✕</button>
       </div>
       <div class="sv-ca" id="sv-ca">
@@ -1344,7 +1344,7 @@ class SplitViewer {
         <div class="sv-dz" id="sv-dz">
           <div style="font-size:40px;opacity:.4">📄</div>
           <div style="font-size:13px;font-weight:700;color:var(--tx)">右パネル</div>
-          <div style="font-size:11px;color:var(--tx2);margin-top:4px">「📂 開く」でPDFを読み込む</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:4px">「📂 PDF追加」でPDFを読み込む</div>
         </div>
       </div>`;
     this.caEl  = document.getElementById('sv-ca');
@@ -3050,7 +3050,6 @@ function showLoading(visible) {
    ============================================================ */
 (function bindEvents() {
   /* --- ヘッダー行1 --- */
-  document.getElementById('btn-open') .addEventListener('click', () => openFile());
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
   document.getElementById('btn-undo') .addEventListener('click', () => App.undo());
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
