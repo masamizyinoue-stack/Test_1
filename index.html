@@ -755,32 +755,14 @@ function _drawAnnotations(ctx, strks, sc) {
  * stroke全体削除ではなく「カーソル範囲内のポイントのみ」を消すことで当たり判定を正確化
  * @param {object}   penStroke - ペンストローク {points:[[x,y],...], size, ...}
  * @param {number[][]} erPts   - 消しゴム経路の座標列 (PDF座標)
- * @param {number}   hitR      - ヒット半径 (PDF座標単位) ← 視覚カーソル半径と完全一致させること
+ * @param {number}   hitR      - ヒット半径 (PDF座標単位)
  * @returns {object[]}         - 残存セグメント配列（0個以上）
  */
-
-/** ペン点pから消しゴム線分a→bへの最短距離 (PDF座標) */
-function _distPtSeg(px, py, ax, ay, bx, by) {
-  const dx = bx-ax, dy = by-ay, len2 = dx*dx+dy*dy;
-  if (len2 === 0) return Math.hypot(px-ax, py-ay);
-  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/len2));
-  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
-}
-
 function _applyEraser(penStroke, erPts, hitR) {
-  // 各ペンポイントと消しゴム【線分】の最短距離で判定（点列のみより高精度）
-  const kept = penStroke.points.map(pp => {
-    const px = pp[0], py = pp[1];
-    if (erPts.length === 0) return pp;
-    // 1点目: 点との距離
-    if (Math.hypot(px-erPts[0][0], py-erPts[0][1]) < hitR) return null;
-    // 2点目以降: 各線分との最短距離
-    for (let i = 1; i < erPts.length; i++) {
-      if (_distPtSeg(px, py, erPts[i-1][0], erPts[i-1][1], erPts[i][0], erPts[i][1]) < hitR)
-        return null;
-    }
-    return pp;
-  });
+  // 各ペンポイントが消しゴム円内か判定（1点でも近いなら消去）
+  const kept = penStroke.points.map(pp =>
+    erPts.every(ep => Math.hypot(ep[0] - pp[0], ep[1] - pp[1]) >= hitR) ? pp : null
+  );
   // 連続する保持ポイントをセグメントに分割（消去ポイントで切断）
   const result = [];
   let seg = [];
@@ -1877,8 +1859,8 @@ const App = (() => {
           newStrokes.push(s); // pen以外はそのまま保持（hl/text/図形/矢印を保護）
           continue;
         }
-        const hitR = r; // 視覚カーソル半径と完全一致（pen.size/6の超過分を廃止）
-        const segs = _applyEraser(s, erPts, hitR); // 線分ベース判定で消去 → 残存セグメント取得
+        const hitR = r + (s.size || 3) / 6; // ペン半幅を加算して視覚的な当たりに合わせる
+        const segs = _applyEraser(s, erPts, hitR); // ポイント単位で消去 → 残存セグメント取得
         newStrokes.push(...segs); // 残存部分のみ追加（消えた部分は含まれない）
       }
       strokes[curPage] = newStrokes;
@@ -2934,4 +2916,20 @@ function showLoading(visible) {
   document.getElementById('sz-n')  .addEventListener('change', e => onSzChange(e.target.value));
   document.getElementById('szp-ok')    .addEventListener('click', () => applySz());
   document.getElementById('szp-cancel').addEventListener('click', () =>
-    document.getElementById('szp').classList
+    document.getElementById('szp').classList.remove('on'));
+
+  /* --- ③ PDF出力ページ指定 --- */
+  document.getElementById('pgr-cur').addEventListener('click', () => {
+    document.getElementById('pgrfld').value = String(App.currentPage);
+  });
+  document.getElementById('pgr-all').addEventListener('click', () => {
+    document.getElementById('pgrfld').value = '';
+  });
+  document.getElementById('pgrConfirm').addEventListener('click', () => {
+    _executeSave(document.getElementById('pgrfld').value);
+  });
+  document.getElementById('pgrCancel').addEventListener('click', () => {
+    document.getElementById('pgrov').classList.remove('on');
+  });
+  document.getElementById('pgrfld').addEventListener('keydown', e => {
+    if (e.key === 'Enter')  _executeSave(document.getElementB
