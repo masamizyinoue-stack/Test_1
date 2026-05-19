@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.01</title>
+<title>M_Viewer V0.02</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -349,7 +349,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.01</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.02</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <button class="btn" id="btn-open">📂 開く</button>
     <span id="fnlbl">ファイル未選択</span>
@@ -428,7 +428,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.01</div>
+    <div class="dzm">M_Viewer V0.02</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -515,7 +515,7 @@ const MAX_CANVAS  = 3600;  // GPU上限(A0対応)
 const MAX_SCALE   = 8;     // 最大800%
 const SAVE_DELAY  = 1200;  // 自動保存ディレイ(ms)
 const SAVE_RS     = 3;     // PDF保存時レンダリングスケール
-const PDF_MAX_DPR = 2;     // Retina対応最大DPR
+const PDF_MAX_DPR = 1.5;   // Retina対応最大DPR (iPad freeze 対策: 2→1.5)
 
 /* サブウィンドウ最大数 */
 const MAX_SUBWIN  = 5;
@@ -730,20 +730,28 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
 }
 
 /**
- * ② アノテーション描画（消しゴムはペンのみ対象に適用）
- * 消しゴムあり: ペン+消しゴムを一時canvasで処理し、HL/図形等は影響を受けない
- * 消しゴムなし: 通常通り全ストロークを描画（一時canvas不要）
+ * ② アノテーション描画
+ *    eraser あり: pen+eraser のみ temp canvas で compositing（HL/図形は直接描画）
+ *    → temp canvas はペンストロークのみ → 常に高速
+ *    _annCompCvs にキャッシュして毎回のメモリ確保を防止（iPad freeze 対策）
  */
+let _annCompCvs = null; // 合成用一時canvas キャッシュ
+
 function _drawAnnotations(ctx, strks, sc) {
   if (!strks || !strks.length) return;
   if (strks.some(s => s.type === 'eraser')) {
-    // ペン+消しゴムを一時canvasに描いてから本canvasへ合成
-    const tmp  = document.createElement('canvas');
-    tmp.width  = ctx.canvas.width; tmp.height = ctx.canvas.height;
-    const tctx = tmp.getContext('2d');
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    // サイズ変更時のみ再生成（clearRect で再利用して毎フレームの大型確保を回避）
+    if (!_annCompCvs || _annCompCvs.width !== w || _annCompCvs.height !== h) {
+      _annCompCvs = document.createElement('canvas');
+      _annCompCvs.width = w; _annCompCvs.height = h;
+    }
+    const tctx = _annCompCvs.getContext('2d');
+    tctx.clearRect(0, 0, w, h);
+    // pen+eraser のみ temp canvas（少量→高速）
     strks.forEach(s => { if (s.type === 'pen' || s.type === 'eraser') drawStroke(s, tctx, sc); });
-    ctx.drawImage(tmp, 0, 0);
-    // HL・図形・文字・矢印は消しゴムの影響なしに上に描画
+    ctx.drawImage(_annCompCvs, 0, 0);
+    // HL・図形・文字は直接描画（compositing の影響なし・元のパスへ戻す）
     strks.forEach(s => { if (s.type !== 'pen' && s.type !== 'eraser') drawStroke(s, ctx, sc); });
   } else {
     strks.forEach(s => drawStroke(s, ctx, sc));
@@ -751,18 +759,66 @@ function _drawAnnotations(ctx, strks, sc) {
 }
 
 /**
+ * 消しゴム処理 (全消去対象タイプ対応版)
+ *   pen/hl → _applyEraser で部分消去（ポイント削除）
+ *   line/rect/circle/arrow → バウンディングボックス接触で図形全体を削除
+ *   text → 削除しない
+ * eraser ストロークは配列に保存せず即時削除 → compositing 不要 → redraw() が軽量
+ */
+function _applyEraserAll(stroke, erPts, hitR) {
+  if (stroke.type === 'text') return [stroke]; // text は消去しない
+  // pen / hl : ポイント単位の部分消去
+  if ((stroke.type === 'pen' || stroke.type === 'hl') && stroke.points?.length) {
+    return _applyEraser(stroke, erPts, hitR);
+  }
+  // 図形 (line/rect/circle/arrow) : バウンディングボックス接触で全体削除
+  const bb = strokeBBox(stroke);
+  if (!bb) return [stroke];
+  // 消しゴム点列のいずれかが BB+hitR 内に入るか、BB中心への線分距離が範囲内なら削除
+  for (let i = 0; i < erPts.length; i++) {
+    const [ex, ey] = erPts[i];
+    if (ex >= bb.x1 - hitR && ex <= bb.x2 + hitR &&
+        ey >= bb.y1 - hitR && ey <= bb.y2 + hitR) return []; // 点がBBに接触
+    if (i > 0) {
+      const cx = (bb.x1 + bb.x2) / 2, cy = (bb.y1 + bb.y2) / 2;
+      const reach = hitR + Math.hypot(bb.x2 - bb.x1, bb.y2 - bb.y1) / 2;
+      if (_distPtSeg(cx, cy, erPts[i-1][0], erPts[i-1][1], ex, ey) < reach) return []; // 線分がBBに近い
+    }
+  }
+  return [stroke]; // 接触なし → 保持
+}
+
+/**
  * 消しゴム円内のポイントだけ除去し、残存部分を別ストロークとして返す（部分消去）
  * stroke全体削除ではなく「カーソル範囲内のポイントのみ」を消すことで当たり判定を正確化
  * @param {object}   penStroke - ペンストローク {points:[[x,y],...], size, ...}
  * @param {number[][]} erPts   - 消しゴム経路の座標列 (PDF座標)
- * @param {number}   hitR      - ヒット半径 (PDF座標単位)
+ * @param {number}   hitR      - ヒット半径 (PDF座標単位) ← 視覚カーソル半径と完全一致させること
  * @returns {object[]}         - 残存セグメント配列（0個以上）
  */
+
+/** ペン点pから消しゴム線分a→bへの最短距離 (PDF座標) */
+function _distPtSeg(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay, len2 = dx*dx+dy*dy;
+  if (len2 === 0) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/len2));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+
 function _applyEraser(penStroke, erPts, hitR) {
-  // 各ペンポイントが消しゴム円内か判定（1点でも近いなら消去）
-  const kept = penStroke.points.map(pp =>
-    erPts.every(ep => Math.hypot(ep[0] - pp[0], ep[1] - pp[1]) >= hitR) ? pp : null
-  );
+  // 各ペンポイントと消しゴム【線分】の最短距離で判定（点列のみより高精度）
+  const kept = penStroke.points.map(pp => {
+    const px = pp[0], py = pp[1];
+    if (erPts.length === 0) return pp;
+    // 1点目: 点との距離
+    if (Math.hypot(px-erPts[0][0], py-erPts[0][1]) < hitR) return null;
+    // 2点目以降: 各線分との最短距離
+    for (let i = 1; i < erPts.length; i++) {
+      if (_distPtSeg(px, py, erPts[i-1][0], erPts[i-1][1], erPts[i][0], erPts[i][1]) < hitR)
+        return null;
+    }
+    return pp;
+  });
   // 連続する保持ポイントをセグメントに分割（消去ポイントで切断）
   const result = [];
   let seg = [];
@@ -807,12 +863,15 @@ function ptInPoly(px, py, poly) {
 
 /* ============================================================
    ページ回転補正 (PDF保存用)
-   [FIX-ROTATE] 旧コードは反射行列で誤り → 正しい回転行列に修正
-   pdf.js は rotation 分だけ CCW 回転して表示するため、
-   保存時は逆方向(CW)に回転して元のネイティブ座標系へ戻す。
-     rot=90  : src(ph*rs × pw*rs) → 90°CW  → dest(pw*rs × ph*rs)
-     rot=180 : src(pw*rs × ph*rs) → 180°   → dest(pw*rs × ph*rs)
-     rot=270 : src(ph*rs × pw*rs) → 90°CCW → dest(pw*rs × ph*rs)
+   PDF Rotate=R は「表示時に R°CW 回転する」の意味。
+   pdf.js は Rotate 分を適用済みの display canvas を生成する。
+   保存時は display→native 変換を適用してネイティブ座標系に戻す。
+   数学的根拠 (canvas y-down, native WxH → display):
+     rot=90 : native(x,y)→display(ph-y, x)  逆変換: display(X,Y)→native(Y, ph-X)
+              → translate(0, ph*rs) + rotate(-π/2)
+     rot=180: native(x,y)→display(pw-x,ph-y) 逆変換: translate(pw,ph) + rotate(π)
+     rot=270: native(x,y)→display(y, pw-x)   逆変換: display(X,Y)→native(pw-Y, X)
+              → translate(pw*rs, 0) + rotate(+π/2)
    ============================================================ */
 function rotateCanvas(src, jsPage, pw, ph, rs) {
   const rot = jsPage.rotate || 0;
@@ -820,9 +879,9 @@ function rotateCanvas(src, jsPage, pw, ph, rs) {
   const dc = document.createElement('canvas');
   dc.width = Math.round(pw * rs); dc.height = Math.round(ph * rs);
   const ctx = dc.getContext('2d');
-  if      (rot === 90)  { ctx.translate(pw*rs, 0);      ctx.rotate( Math.PI / 2);  } // 90°CW
-  else if (rot === 180) { ctx.translate(pw*rs, ph*rs);  ctx.rotate( Math.PI);      } // 180°
-  else if (rot === 270) { ctx.translate(0,     ph*rs);  ctx.rotate(-Math.PI / 2);  } // 90°CCW
+  if      (rot === 90)  { ctx.translate(0,      ph*rs); ctx.rotate(-Math.PI / 2); } // 90°CCW (display→native)
+  else if (rot === 180) { ctx.translate(pw*rs, ph*rs);  ctx.rotate( Math.PI);     } // 180°   (unchanged)
+  else if (rot === 270) { ctx.translate(pw*rs, 0);      ctx.rotate( Math.PI / 2); } // 90°CW  (display→native)
   ctx.drawImage(src, 0, 0);
   return dc;
 }
@@ -944,7 +1003,7 @@ class SubWin {
       this._annCvs.width = vp.width; this._annCvs.height = vp.height;
       const actx = this._annCvs.getContext('2d');
       actx.clearRect(0, 0, vp.width, vp.height);
-      _drawAnnotations(actx, this.strokes[this.pageNum] || [], sc); // ② ペンのみ消しゴム対象
+      _drawAnnotations(actx, this.strokes[this.pageNum] || [], sc); // ② 消しゴムは text 以外すべて対象
       this._annDirty = false;
     }
 
@@ -1111,7 +1170,16 @@ class SubWin {
     this.isDrawing = false;
     if (!this.strokes[this.pageNum]) this.strokes[this.pageNum] = [];
     const s = this.curStroke;
-    this.strokes[this.pageNum].push({ ...s, points: s.points ? [...s.points] : undefined });
+    if (s.type === 'eraser') {
+      // HL・図形を削除 → eraser ストロークを保存（pen compositing 用）
+      const r = (s.size || 20) * 2 / 3, erPts = s.points || [];
+      this.strokes[this.pageNum] = (this.strokes[this.pageNum] || []).flatMap(st =>
+        st.type === 'pen' ? [st] : _applyEraserAll(st, erPts, r)
+      );
+      this.strokes[this.pageNum].push({ ...s, points: s.points ? [...s.points] : undefined });
+    } else {
+      this.strokes[this.pageNum].push({ ...s, points: s.points ? [...s.points] : undefined });
+    }
     this.curStroke = null; this._annDirty = true;
     if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
     this.render(); App.redraw(); schedSave();
@@ -1593,6 +1661,8 @@ const App = (() => {
   let strokes    = {};
   let renderScale = 1, cssExtraZoom = 1;
   let curStroke  = null, isDrawing = false, lastX = 0, lastY = 0;
+  let _wheelTimer = null;  // wheel連打 debounce 用
+  let _offscr     = null;  // offscreen canvas 再利用キャッシュ
   let pinch      = null, panSt    = null;
   let selectedIdx = [], selPath = [];
   let subRect    = null;
@@ -1653,7 +1723,14 @@ const App = (() => {
     const pdfX = (vx - panX) / scale, pdfY = (vy - panY) / scale;
     scale = Math.max(0.2, Math.min(MAX_SCALE, scale * r));
     panX  = vx - pdfX * scale; panY = vy - pdfY * scale;
-    clampPan(); renderPage(curPage);
+    clampPan();
+    // CSS プレビューで即時反映（renderPage は debounce して連打を防止）
+    const previewEZ = scale / renderScale;
+    cwEl.style.transformOrigin = '0 0';
+    cwEl.style.transform = `translate(${panX}px,${panY}px) scale(${previewEZ})`;
+    document.getElementById('zlbl').textContent = Math.round(scale * 100) + '%';
+    clearTimeout(_wheelTimer);
+    _wheelTimer = setTimeout(() => renderPage(curPage), 150);
   }, { passive: false });
 
   function onTouchStart(e) {
@@ -1818,7 +1895,11 @@ const App = (() => {
       ovlCtx.stroke(); ovlCtx.restore();
 
     } else {
-      s.x2 = p.x; s.y2 = p.y; redraw(); drawStroke(s, annCtx, sc); // [FIX-ZOOM-SIZE] invEZ不要
+      // 図形プレビューを ovlCvs へ描画（全注釈 redraw を回避 → touchmove 軽量化）
+      s.x2 = p.x; s.y2 = p.y;
+      ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+      drawSubOverlays();
+      drawStroke(s, ovlCtx, sc);
     }
   }
 
@@ -1848,22 +1929,20 @@ const App = (() => {
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
     }
-    // ② 消しゴム: pen型のみ「ポイント単位」で部分消去（ストローク全体削除ではない）
+    // ② 消しゴム:
+    //    step1: HL・図形を _applyEraserAll で即時削除（一回だけ・redraw コストなし）
+    //    step2: eraser ストロークを配列に保存（pen の compositing 用）
+    //    → temp canvas は pen のみ → compositing が常に高速
     if (curStroke?.type === 'eraser') {
-      const er  = curStroke;
-      const r   = (er.size || 20) * 2 / 3; // 消しゴム基本半径 (PDF座標単位)
+      const er = curStroke;
+      const r  = (er.size || 20) * 2 / 3;
       const erPts = er.points || [];
-      const newStrokes = [];
-      for (const s of (strokes[curPage] || [])) {
-        if (s.type !== 'pen' || !s.points?.length) {
-          newStrokes.push(s); // pen以外はそのまま保持（hl/text/図形/矢印を保護）
-          continue;
-        }
-        const hitR = r + (s.size || 3) / 6; // ペン半幅を加算して視覚的な当たりに合わせる
-        const segs = _applyEraser(s, erPts, hitR); // ポイント単位で消去 → 残存セグメント取得
-        newStrokes.push(...segs); // 残存部分のみ追加（消えた部分は含まれない）
-      }
-      strokes[curPage] = newStrokes;
+      // HL・図形のみ削除（pen は compositing で処理、text は保護）
+      strokes[curPage] = (strokes[curPage] || []).flatMap(s =>
+        s.type === 'pen' ? [s] : _applyEraserAll(s, erPts, r)
+      );
+      // eraser ストロークを保存（pen への compositing 処理用）
+      strokes[curPage].push({ ...er, points: er.points ? [...er.points] : undefined });
       curStroke = null;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       redraw(); drawSelOv();
@@ -1996,7 +2075,7 @@ const App = (() => {
 
   function redraw() {
     annCtx.clearRect(0, 0, annCvs.width, annCvs.height);
-    _drawAnnotations(annCtx, strokes[curPage] || [], renderScale); // ② ペンのみ消しゴム対象
+    _drawAnnotations(annCtx, strokes[curPage] || [], renderScale); // ② 消しゴムは text 以外すべて対象
     drawSelOv();
   }
 
@@ -2019,9 +2098,12 @@ const App = (() => {
     const hiRS   = Math.min(renderScale * dpr, (4096 - 4) / maxDim);
     const hiVP   = page.getViewport({ scale: hiRS });
 
-    const offscr = document.createElement('canvas');
-    offscr.width = hiVP.width; offscr.height = hiVP.height;
-    const offCtx = offscr.getContext('2d');
+    // offscreen canvas を再利用（サイズ変更時のみ再生成して毎回の大型確保を回避）
+    if (!_offscr || _offscr.width !== hiVP.width || _offscr.height !== hiVP.height) {
+      _offscr = document.createElement('canvas');
+      _offscr.width = hiVP.width; _offscr.height = hiVP.height;
+    }
+    const offCtx = _offscr.getContext('2d');
     offCtx.fillStyle = '#ffffff'; offCtx.fillRect(0, 0, hiVP.width, hiVP.height);
     await page.render({ canvasContext: offCtx, viewport: hiVP }).promise;
 
@@ -2031,7 +2113,7 @@ const App = (() => {
     pdfCvs.style.width  = vp.width  + 'px';
     pdfCvs.style.height = vp.height + 'px';
     [annCvs, ovlCvs].forEach(c => { c.width = vp.width; c.height = vp.height; });
-    pdfCtx.drawImage(offscr, 0, 0);
+    pdfCtx.drawImage(_offscr, 0, 0);
     redraw(); clearSel(); clampPan();
     requestAnimationFrame(() => { clampPan(); updateTransform(); });
 
@@ -2400,9 +2482,10 @@ function setTool(t) {
 }
 
 function setColor(el) {
-  document.querySelectorAll('.csw').forEach(s => s.classList.remove('on'));
-  el.classList.add('on'); strokeColor = el.dataset.c;
+  strokeColor = el.dataset.c;
   if (currentTool === 'hl') hlColor = strokeColor; else penColor = strokeColor;
+  // updateSwatches 経由で再描画 → インラインstyle.borderColor と .on クラスを正しく同期
+  updateSwatches(currentTool === 'hl' ? 'hl' : 'pen');
 }
 
 function pickShape(shapeName) {
@@ -2414,6 +2497,7 @@ function pickShape(shapeName) {
   document.querySelectorAll('#shapepop button').forEach(b => b.classList.remove('on'));
   document.querySelector(`#shapepop [data-shape="${shapeName}"]`)?.classList.add('on');
   closeAllPickers();
+  updateSwatches('pen'); // 図形は常にペン色を使用（蛍光ペン色の影響を排除）
   strokeSize = toolSizes[shapeName] || 2;
   document.getElementById('sz-v').textContent = strokeSize;
 }
@@ -2530,7 +2614,7 @@ async function _pdfRasterPage(srcDoc, page, pageNum, strks, pw, ph) {
   await jsPage.render({ canvasContext: ctx, viewport: vp }).promise;
   const ann    = document.createElement('canvas');
   ann.width = vp.width; ann.height = vp.height;
-  _drawAnnotations(ann.getContext('2d'), strks, SAVE_RS); // ② ペンのみ消しゴム対象
+  _drawAnnotations(ann.getContext('2d'), strks, SAVE_RS); // ② 消しゴムは text 以外すべて対象
   ctx.drawImage(ann, 0, 0);
   const embed  = rotateCanvas(c, jsPage, pw, ph, SAVE_RS);
   const blob   = await new Promise(r => embed.toBlob(r, 'image/jpeg', 0.94));
@@ -2915,21 +2999,4 @@ function showLoading(visible) {
   document.getElementById('sz-rng').addEventListener('input',  e => onSzChange(e.target.value));
   document.getElementById('sz-n')  .addEventListener('change', e => onSzChange(e.target.value));
   document.getElementById('szp-ok')    .addEventListener('click', () => applySz());
-  document.getElementById('szp-cancel').addEventListener('click', () =>
-    document.getElementById('szp').classList.remove('on'));
-
-  /* --- ③ PDF出力ページ指定 --- */
-  document.getElementById('pgr-cur').addEventListener('click', () => {
-    document.getElementById('pgrfld').value = String(App.currentPage);
-  });
-  document.getElementById('pgr-all').addEventListener('click', () => {
-    document.getElementById('pgrfld').value = '';
-  });
-  document.getElementById('pgrConfirm').addEventListener('click', () => {
-    _executeSave(document.getElementById('pgrfld').value);
-  });
-  document.getElementById('pgrCancel').addEventListener('click', () => {
-    document.getElementById('pgrov').classList.remove('on');
-  });
-  document.getElementById('pgrfld').addEventListener('keydown', e => {
-    if (e.key === 'Enter')  _executeSave(document.getElementB
+ 
