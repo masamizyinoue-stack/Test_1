@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.05</title>
+<title>M_Viewer V0.15</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -131,7 +131,7 @@ body {
 .szp-cancel { height: 38px; padding: 0 12px; background: var(--pan2); color: var(--tx2); border: 1.5px solid var(--brd); border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
 
 /* ===== キャンバス領域 ===== */
-#ca { flex: 1; overflow: hidden; position: relative; min-height: 0; touch-action: none; background: #444; }
+#ca { flex: 1; overflow: hidden; position: relative; min-height: 0; touch-action: none; background: #444; overscroll-behavior: none; }
 #cw { position: absolute; top: 0; left: 0; transform-origin: 0 0; background: #fff; }
 #pdfCvs { display: block; }
 #annCvs, #ovlCvs { position: absolute; top: 0; left: 0; }
@@ -263,6 +263,7 @@ body {
 .shtab-add {
   padding: 0 13px; background: none; border: none; color: var(--tx2);
   font-size: 20px; cursor: pointer; flex-shrink: 0; align-self: center;
+  margin-left: auto; /* 常に右端へ固定（✕ボタンとの誤操作防止） */
 }
 .shtab-add:hover { color: var(--acc); }
 
@@ -332,9 +333,8 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.05</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.15</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
-    <button class="btn" id="btn-open">📂 開く</button>
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
@@ -412,7 +412,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.05</div>
+    <div class="dzm">M_Viewer V0.15</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -549,6 +549,7 @@ let hlColor      = '#ffd700';
 let txX = 0, txY = 0;
 
 const subWindows  = [];
+let _activeSelSubWin = null; // サブ窓選択コンテキスト (null=メイン)
 let   swZIndex    = 200;
 let   _fileHandle = null;
 
@@ -636,6 +637,19 @@ window.DBG = (() => {
 })();
 
 /** IDB 保存・復元時に eraser ストロークを除去（蓄積による freeze 防止） */
+/**
+ * Palm Rejection: タッチ接触面が手のひらサイズか判定
+ * Apple Pencil (touchType==='stylus') は必ず false を返す
+ * radiusX/Y が大きい = 手のひら or 太い指の腹 → 描画・パン操作を無視
+ */
+function _isPalmContact(t) {
+  if (!t) return false;
+  if (t.touchType === 'stylus') return false; // Apple Pencil は除外
+  const rx = t.radiusX || 0, ry = t.radiusY || 0;
+  if (!rx && !ry) return false; // 情報なし → 判定不可（通す）
+  return rx > 25 || ry > 25;   // 接触半径 25px 超 → 手のひら判定
+}
+
 function _pruneEraserStrokes(strks) {
   const result = {};
   for (const [pg, arr] of Object.entries(strks || {})) {
@@ -929,6 +943,8 @@ class SubWin {
     this.pinch     = null; this.panSt    = null;
     this.curStroke = null; this.isDrawing = false;
     this.lastX = 0; this.lastY = 0;
+    this.selPath = []; this.selectedIdx = []; // 選択ツール用
+    this.swSelPath = []; this.swSelectedIdx = []; // 選択ツール用
 
     this._renderVer  = 0;
     this._pdfCache   = null; this._pdfCacheSc = 0; this._pdfCachePg = 0;
@@ -1045,10 +1061,16 @@ class SubWin {
 
     cv.addEventListener('touchstart', e => {
       e.preventDefault(); e.stopPropagation();
-      if (e.touches.length >= 2) { this.panSt = null; this._startPinch(e.touches); return; }
+      if (e.touches.length >= 2) {
+        const hasStylus = Array.from(e.touches).some(t => isStylus(t));
+        if (hasStylus || this.isDrawing) return;
+        this.panSt = null; this._startPinch(e.touches); return;
+      }
       const t = e.touches[0];
+      if (_isPalmContact(t)) return; // Palm Rejection
       const needPen = ['pen','hl'].includes(currentTool === 'shape' ? currentShape : currentTool);
-      if ((needPen && !isStylus(t)) || ['sub','select'].includes(currentTool)) {
+      // 'select' は _startDraw へ流す（サブ窓選択を有効化）
+      if ((needPen && !isStylus(t)) || currentTool === 'sub') {
         this._startPan(t); return;
       }
       this._startDraw(t);
@@ -1131,6 +1153,16 @@ class SubWin {
   /* 描画 */
   _startDraw(t) {
     const p = this._toDocPos(t);
+    if (currentTool === 'select') {
+      if (this.swSelectedIdx.length > 0) {
+        const bb = this._swSelBBox();
+        if (bb && p.x >= bb.x1-10 && p.x <= bb.x2+10 && p.y >= bb.y1-10 && p.y <= bb.y2+10) {
+          this.isDrawing = true; this.lastX = p.x; this.lastY = p.y; return;
+        }
+        this._swClearSel();
+      }
+      this.swSelPath = [{ x: p.x, y: p.y }]; this.isDrawing = true; return;
+    }
     if (currentTool === 'text') {
       txX = p.x; txY = p.y;
       document.getElementById('txfld').value = '';
@@ -1144,6 +1176,16 @@ class SubWin {
       : { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: strokeColor, size: strokeSize };
   }
   _moveDraw(t) {
+    if (currentTool === 'select' && this.isDrawing) {
+      const p = this._toDocPos(t);
+      if (this.swSelectedIdx.length > 0 && !this.swSelPath.length) {
+        this._swMoveSel(p.x - this.lastX, p.y - this.lastY);
+        this.lastX = p.x; this.lastY = p.y;
+        this.render(); this._swDrawSelOv(); return;
+      }
+      this.swSelPath.push({ x: p.x, y: p.y });
+      this._swDrawSelPreview(); return;
+    }
     if (!this.curStroke) return;
     const p = this._toDocPos(t);
     const s = this.curStroke;
@@ -1187,6 +1229,13 @@ class SubWin {
     }
   }
   _endDraw() {
+    if (currentTool === 'select' && this.isDrawing) {
+      this.isDrawing = false;
+      if (this.swSelectedIdx.length > 0 && !this.swSelPath.length) {
+        this.render(); this._swDrawSelOv(); schedSave(); return;
+      }
+      this._swFinishSel(); return;
+    }
     if (!this.isDrawing || !this.curStroke) { this.isDrawing = false; return; }
     this.isDrawing = false;
     if (!this.strokes[this.pageNum]) this.strokes[this.pageNum] = [];
@@ -1283,6 +1332,108 @@ class SubWin {
     });
   }
 
+  /* ---- 選択ツール（メインウインドウと同等） ---- */
+  _swFinishSel() {
+    const arr = this.strokes[this.pageNum] || [];
+    if (this.swSelPath.length >= 2) {
+      const xs = this.swSelPath.map(p => p.x), ys = this.swSelPath.map(p => p.y);
+      const rx1=Math.min(...xs), ry1=Math.min(...ys), rx2=Math.max(...xs), ry2=Math.max(...ys);
+      this.swSelectedIdx = arr.reduce((a, s, i) => {
+        const bb = strokeBBox(s); if (!bb) return a;
+        if (!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2)) a.push(i);
+        return a;
+      }, []);
+    }
+    this.swSelPath = [];
+    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    this._swDrawSelOv();
+    if (this.swSelectedIdx.length > 0) {
+      _activeSelSubWin = this;
+      document.getElementById('selbtn').style.display = 'block';
+      this._swPositionSelBtn();
+    }
+  }
+  _swDrawSelPreview() {
+    if (!this.swSelPath.length) return;
+    const br = this._bodyRect();
+    this.selCvs.width  = Math.round(br.width);
+    this.selCvs.height = Math.round(br.height);
+    this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    this.selCtx.save();
+    this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
+    this.selCtx.setLineDash([6, 4]);
+    const sc = this.innerScale;
+    const p0 = this.swSelPath[0], p1 = this.swSelPath[this.swSelPath.length-1];
+    this.selCtx.strokeRect(
+      (Math.min(p0.x,p1.x)-this.offX)*sc, (Math.min(p0.y,p1.y)-this.offY)*sc,
+      Math.abs(p1.x-p0.x)*sc, Math.abs(p1.y-p0.y)*sc
+    );
+    this.selCtx.restore();
+  }
+  _swDrawSelOv() {
+    const br = this._bodyRect();
+    this.selCvs.width  = Math.round(br.width);
+    this.selCvs.height = Math.round(br.height);
+    this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    if (!this.swSelectedIdx.length) return;
+    const arr = this.strokes[this.pageNum] || [];
+    const sc  = this.innerScale;
+    this.selCtx.save();
+    this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
+    this.selCtx.setLineDash([6, 3]);
+    this.swSelectedIdx.forEach(i => {
+      const bb = strokeBBox(arr[i]); if (!bb) return;
+      this.selCtx.strokeRect(
+        (bb.x1-this.offX)*sc-4, (bb.y1-this.offY)*sc-4,
+        (bb.x2-bb.x1)*sc+8,    (bb.y2-bb.y1)*sc+8
+      );
+    });
+    this.selCtx.restore();
+    this._swPositionSelBtn();
+  }
+  _swSelBBox() {
+    const arr = this.strokes[this.pageNum] || [];
+    const bbs = this.swSelectedIdx.map(i => strokeBBox(arr[i])).filter(Boolean);
+    if (!bbs.length) return null;
+    return {
+      x1: Math.min(...bbs.map(b => b.x1)), y1: Math.min(...bbs.map(b => b.y1)),
+      x2: Math.max(...bbs.map(b => b.x2)), y2: Math.max(...bbs.map(b => b.y2))
+    };
+  }
+  _swMoveSel(dx, dy) {
+    const arr = this.strokes[this.pageNum] || [];
+    this.swSelectedIdx.forEach(i => {
+      const s = arr[i]; if (!s) return;
+      if (s.points) s.points = s.points.map(p => [p[0]+dx, p[1]+dy]);
+      if (s.x1 !== undefined) { s.x1+=dx; s.y1+=dy; s.x2+=dx; s.y2+=dy; }
+      if (s.type === 'text') { s.x+=dx; s.y+=dy; }
+    });
+  }
+  _swClearSel() {
+    this.swSelectedIdx = []; this.swSelPath = [];
+    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    document.getElementById('selbtn').style.display = 'none';
+    if (_activeSelSubWin === this) _activeSelSubWin = null;
+  }
+  _swPositionSelBtn() {
+    const bb = this._swSelBBox(); if (!bb) return;
+    const br = this._bodyRect();
+    const sc = this.innerScale;
+    const btn = document.getElementById('selbtn');
+    btn.style.left = Math.max(0, br.left + (bb.x1-this.offX)*sc - 4) + 'px';
+    btn.style.top  = Math.max(0, br.top  + (bb.y2-this.offY)*sc + 6) + 'px';
+  }
+  _swDeleteSelected() {
+    if (!this.swSelectedIdx.length) return;
+    this.strokes[this.pageNum] = (this.strokes[this.pageNum]||[])
+      .filter((_, i) => !this.swSelectedIdx.includes(i));
+    this.swSelectedIdx = []; this._annDirty = true;
+    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    document.getElementById('selbtn').style.display = 'none';
+    if (_activeSelSubWin === this) _activeSelSubWin = null;
+    this.render(); App.redraw(); schedSave();
+  }
+
   update(strokes, pageNum) {
     if (!window.DBG?.flags?.subWindowUpdate) return; // ① DBG.off('subWindowUpdate') で停止可
     this.strokes = strokes; this._annDirty = true;
@@ -1332,7 +1483,7 @@ class SplitViewer {
         <span class="sv-zl" id="sv-zl"></span>
         <div style="flex:1"></div>
         <button class="sv-nbtn" id="sv-fit">全体</button>
-        <button class="sv-openbtn" id="sv-open">📂 開く</button>
+        <button class="sv-openbtn" id="sv-open">📂 PDF追加</button>
         <button class="sv-closebtn" id="sv-close" title="PDFを閉じる">✕</button>
       </div>
       <div class="sv-ca" id="sv-ca">
@@ -1344,7 +1495,7 @@ class SplitViewer {
         <div class="sv-dz" id="sv-dz">
           <div style="font-size:40px;opacity:.4">📄</div>
           <div style="font-size:13px;font-weight:700;color:var(--tx)">右パネル</div>
-          <div style="font-size:11px;color:var(--tx2);margin-top:4px">「📂 開く」でPDFを読み込む</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:4px">「📂 PDF追加」でPDFを読み込む</div>
         </div>
       </div>`;
     this.caEl  = document.getElementById('sv-ca');
@@ -1372,11 +1523,14 @@ class SplitViewer {
     ca.addEventListener('touchstart', e => {
       if (!this.pdfDoc) return; e.preventDefault();
       if (e.touches.length >= 2) {
+        const hasStylus = Array.from(e.touches).some(t => t.touchType === 'stylus');
+        if (hasStylus || this.isDrawing) return;
         this.curStroke = null; this.isDrawing = false; this.panSt = null;
         this._startPinch(e.touches); return;
       }
       const t = e.touches[0];
       const isSty = t.touchType === 'stylus';
+      if (_isPalmContact(t)) return; // Palm Rejection
       this._cancelInertia();
       if (!isSty) { this._startPan(t); return; }
       this._startDraw(e);
@@ -1530,13 +1684,18 @@ class SplitViewer {
       this.strokes[this.curPage] = (this.strokes[this.curPage]||[]).flatMap(st=>_applyEraserAll(st,erPts,r));
       this.curStroke = null;
       this.ovlCtx.clearRect(0,0,this.ovlCvs.width,this.ovlCvs.height);
-      this.redraw(); return;
+      this.redraw();
+      // 左右同一PDF の場合、左パネルも再描画
+      if (this._sharedWithMain) App.redraw();
+      return;
     }
     if (!this.strokes[this.curPage]) this.strokes[this.curPage]=[];
     this.strokes[this.curPage].push({...s, points:s.points?[...s.points]:undefined});
     this.curStroke = null;
     this.ovlCtx.clearRect(0,0,this.ovlCvs.width,this.ovlCvs.height);
     this.redraw(); this._schedSave();
+    // 左右同一PDF の場合、左パネルも再描画
+    if (this._sharedWithMain) App.redraw();
   }
 
   redraw() {
@@ -1601,8 +1760,17 @@ class SplitViewer {
       this.curPage=1; this.scale=1; this.pageCache.clear(); this._offscr=null;
       this.fnEl.textContent=file.name.length>20?'…'+file.name.slice(-18):file.name;
       document.getElementById('sv-dz').style.display='none';
-      const saved=await IDB.get('sv:'+safeKey(file.name));
-      this.strokes=_pruneEraserStrokes(saved?.strokes||{});
+      // 同じPDFが左パネルで開かれている場合 → strokes を共有（書き込みを双方向同期）
+      if (App.pdfDoc && App.fileName === file.name) {
+        this.strokes = App.strokes; // 左右で同一オブジェクト参照を共有
+        this._sharedWithMain = true;
+      } else {
+        // 左パネルの保存データも参照（sv: がなければ f: を使用）
+        const saved = await IDB.get('sv:'+safeKey(file.name));
+        const mainSaved = await IDB.get('f:'+safeKey(file.name));
+        this.strokes = _pruneEraserStrokes(saved?.strokes || mainSaved?.strokes || {});
+        this._sharedWithMain = false;
+      }
       await this._fit();
       if (saved?.strokes&&Object.keys(saved.strokes).length>0)
         showToast('📝 右パネル: 書き込みデータを復元しました');
@@ -1792,10 +1960,15 @@ const App = (() => {
   function onTouchStart(e) {
     if (!pdfDoc) return; e.preventDefault(); cancelInertia();
     if (e.touches.length >= 2) {
+      // Apple Pencil 描画中に手のひらが追加されても pinch に移行しない
+      const hasStylus = Array.from(e.touches).some(t => t.touchType === 'stylus');
+      if (hasStylus || isDrawing) return; // 描画継続を優先
       isDrawing = false; curStroke = null; panSt = null;
       startPinch(e.touches); return;
     }
     const t = e.touches[0];
+    // Palm Rejection: 手のひら接触は無視
+    if (_isPalmContact(t)) return;
     if (!isOnCanvas(t)) { startPan(t); return; }
     const needPen = ['pen','hl'].includes(currentTool);
     if (needPen && t.touchType !== 'stylus') { startPan(t); return; }
@@ -2130,9 +2303,11 @@ const App = (() => {
   function redraw() {
     if (!window.DBG?.flags?.redraw) return; // ② DBG.off('redraw') で停止可
     annCtx.clearRect(0, 0, annCvs.width, annCvs.height);
-    if (window.DBG?.flags?.annotationDraw) // ⑦ DBG.off('annotationDraw') で停止可
+    if (window.DBG?.flags?.annotationDraw)
       _drawAnnotations(annCtx, strokes[curPage] || [], renderScale);
-    if (window.DBG?.flags?.overlay) drawSelOv(); // ⑧ DBG.off('overlay') で停止可
+    if (window.DBG?.flags?.overlay) drawSelOv();
+    // 右パネルが同一PDFを表示中なら右パネルも再描画（書き込み同期）
+    if (_svInst?._sharedWithMain) _svInst.redraw();
   }
 
   /* ---- レンダリング ---- */
@@ -2546,6 +2721,8 @@ function updateSwatches(mode) {
 }
 
 function setTool(t) {
+  // ツール切替時にサブ窓の選択をクリア
+  subWindows.forEach(sw => { if (sw._swClearSel) sw._swClearSel(); });
   if (t !== 'sub') prevTool = currentTool;
   currentTool = t;
   document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
@@ -3034,7 +3211,7 @@ function showLoading(visible) {
    ============================================================ */
 (function bindEvents() {
   /* --- ヘッダー行1 --- */
-  document.getElementById('btn-open') .addEventListener('click', () => openFile());
+
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
   document.getElementById('btn-undo') .addEventListener('click', () => App.undo());
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
@@ -3055,7 +3232,7 @@ function showLoading(visible) {
   /* --- ツールボタン --- */
   ['pen','hl','text','eraser','sub'].forEach(id =>
     document.getElementById('t-' + id).addEventListener('click', () => setTool(id)));
-  document.getElementById('t-split').addEventListener('click', () => toggleSplitView());
+  document.getElementById('t-betsu').addEventListener('click', () => openBetsuWin());
 
   document.getElementById('t-shape').addEventListener('click', e =>
     togglePicker('shapepop', e.currentTarget));
@@ -3084,11 +3261,7 @@ function showLoading(visible) {
     document.getElementById('pgrfld').value = String(App.currentPage);
   });
   document.getElementById('pgr-all').addEventListener('click', () => {
-    const fld = document.getElementById('pgrfld');
-    const total = App.totalPages || 0;
-    // 総ページ数を "1-N" 形式で入力欄に表示（空だと変化なく分かりにくいため）
-    fld.value = total > 0 ? (total === 1 ? '1' : `1-${total}`) : '';
-    fld.dispatchEvent(new Event('input')); // 必要な場合の同期イベント発火
+    document.getElementById('pgrfld').value = '';
   });
   document.getElementById('pgrConfirm').addEventListener('click', () => {
     _executeSave(document.getElementById('pgrfld').value);
@@ -3109,4 +3282,34 @@ function showLoading(visible) {
     if (e.key === 'Escape') cancelTx();
   });
 
-  /* -
+  /* --- 選択削除 --- */
+  document.getElementById('selbtn').addEventListener('click', () => {
+    if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
+    else { App.deleteSelected(); }
+  });
+
+  /* --- 計算機ボタン (data属性でディスパッチ) --- */
+  document.getElementById('cbtns').addEventListener('click', e => {
+    const btn = e.target.closest('[data-cnum],[data-cop],[data-cfn]');
+    if (!btn) return;
+    if (btn.dataset.cnum !== undefined) calcNum(btn.dataset.cnum);
+    else if (btn.dataset.cop  !== undefined) calcOp(btn.dataset.cop);
+    else if (btn.dataset.cfn  !== undefined) calcFn(btn.dataset.cfn);
+  });
+
+  /* --- Ctrl+P 印刷ショートカット無効化 --- */
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); }
+  });
+
+  /* --- グローバルクリック: ピッカー & 太さパネルを閉じる --- */
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.pkw'))
+      closeAllPickers();
+    if (!e.target.closest('#szp') && !e.target.closest('.sz-val'))
+      document.getElementById('szp').classList.remove('on');
+  });
+})();
+</script>
+</body>
+</html>
