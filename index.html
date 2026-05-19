@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.01</title>
+<title>M_Viewer V0.02</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -349,7 +349,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.01</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.02</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <button class="btn" id="btn-open">📂 開く</button>
     <span id="fnlbl">ファイル未選択</span>
@@ -428,7 +428,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.01</div>
+    <div class="dzm">M_Viewer V0.02</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -825,12 +825,15 @@ function ptInPoly(px, py, poly) {
 
 /* ============================================================
    ページ回転補正 (PDF保存用)
-   [FIX-ROTATE] 旧コードは反射行列で誤り → 正しい回転行列に修正
-   pdf.js は rotation 分だけ CCW 回転して表示するため、
-   保存時は逆方向(CW)に回転して元のネイティブ座標系へ戻す。
-     rot=90  : src(ph*rs × pw*rs) → 90°CW  → dest(pw*rs × ph*rs)
-     rot=180 : src(pw*rs × ph*rs) → 180°   → dest(pw*rs × ph*rs)
-     rot=270 : src(ph*rs × pw*rs) → 90°CCW → dest(pw*rs × ph*rs)
+   PDF Rotate=R は「表示時に R°CW 回転する」の意味。
+   pdf.js は Rotate 分を適用済みの display canvas を生成する。
+   保存時は display→native 変換を適用してネイティブ座標系に戻す。
+   数学的根拠 (canvas y-down, native WxH → display):
+     rot=90 : native(x,y)→display(ph-y, x)  逆変換: display(X,Y)→native(Y, ph-X)
+              → translate(0, ph*rs) + rotate(-π/2)
+     rot=180: native(x,y)→display(pw-x,ph-y) 逆変換: translate(pw,ph) + rotate(π)
+     rot=270: native(x,y)→display(y, pw-x)   逆変換: display(X,Y)→native(pw-Y, X)
+              → translate(pw*rs, 0) + rotate(+π/2)
    ============================================================ */
 function rotateCanvas(src, jsPage, pw, ph, rs) {
   const rot = jsPage.rotate || 0;
@@ -838,9 +841,9 @@ function rotateCanvas(src, jsPage, pw, ph, rs) {
   const dc = document.createElement('canvas');
   dc.width = Math.round(pw * rs); dc.height = Math.round(ph * rs);
   const ctx = dc.getContext('2d');
-  if      (rot === 90)  { ctx.translate(pw*rs, 0);      ctx.rotate( Math.PI / 2);  } // 90°CW
-  else if (rot === 180) { ctx.translate(pw*rs, ph*rs);  ctx.rotate( Math.PI);      } // 180°
-  else if (rot === 270) { ctx.translate(0,     ph*rs);  ctx.rotate(-Math.PI / 2);  } // 90°CCW
+  if      (rot === 90)  { ctx.translate(0,      ph*rs); ctx.rotate(-Math.PI / 2); } // 90°CCW (display→native)
+  else if (rot === 180) { ctx.translate(pw*rs, ph*rs);  ctx.rotate( Math.PI);     } // 180°   (unchanged)
+  else if (rot === 270) { ctx.translate(pw*rs, 0);      ctx.rotate( Math.PI / 2); } // 90°CW  (display→native)
   ctx.drawImage(src, 0, 0);
   return dc;
 }
