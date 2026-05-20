@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.20</title>
+<title>M_Viewer V0.21</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -33,10 +33,12 @@ body {
 }
 
 /* ===== ヘッダー ===== */
-#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); }
+#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.21: スクロール防止 */
 .hr {
-  height: 40px; display: flex; align-items: center; gap: 5px; padding: 0 8px;
+  /* V0.21: 高さを0.95倍縮小 (40→38px), padding微調整 */
+  height: 38px; display: flex; align-items: center; gap: 5px; padding: 0 7px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
+  overflow-y: hidden; /* 縦スクロール防止 */
 }
 .hr:first-child { border-bottom: 1px solid var(--brd); }
 .hr::-webkit-scrollbar { display: none; }
@@ -45,12 +47,13 @@ body {
   font-size: 12px; font-weight: 800; color: var(--acc); padding-right: 6px;
   border-right: 2px solid var(--brd); white-space: nowrap; flex-shrink: 0;
 }
-.vs { width: 2px; height: 26px; background: var(--brd); flex-shrink: 0; margin: 0 4px; }
+.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.21: 0.95倍 */
 .sp { flex: 1; }
 
 /* ボタン共通 */
 .btn {
-  height: 34px; padding: 0 10px; border: 1.5px solid var(--brd); background: var(--pan2);
+  /* V0.21: 高さ0.95倍 (34→32px) */
+  height: 32px; padding: 0 9px; border: 1.5px solid var(--brd); background: var(--pan2);
   color: var(--tx); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
   white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;
   -webkit-user-select: none; transition: background .1s;
@@ -78,7 +81,8 @@ body {
 
 /* カラースウォッチ */
 .csw {
-  width: 28px; height: 28px; border-radius: 50%; border: 3px solid transparent;
+  /* V0.21: 0.95倍 (28→26px) */
+  width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent;
   cursor: pointer; flex-shrink: 0; transition: transform .1s;
 }
 .csw.on { border-color: #fff; transform: scale(1.25); }
@@ -328,56 +332,80 @@ body {
 #toast.on { opacity: 1; }
 
 
-/* ===== タッチデバイス最適化 (pointer: coarse) ===== */
+/* ===== タッチデバイス最適化 (pointer: coarse) V0.21調整版 ===== */
 @media (pointer: coarse) {
-  /* ツールバー行の高さ・余白を拡大 */
+  /* [V0.21] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
   .hr {
-    height: 48px;
-    gap: 7px;
-    padding: 0 10px;
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
+    height: 46px;
+    gap: 6px;
+    padding: 0 9px;
+    padding-left: max(9px, env(safe-area-inset-left));
+    padding-right: max(9px, env(safe-area-inset-right));
+    overflow-y: hidden; /* 縦スクロール防止 */
   }
-  /* ボタン全体を大型化 */
+  /* [V0.21] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
   .btn {
-    height: 40px;
-    padding: 0 13px;
-    font-size: 13px;
-    border-radius: 10px;
-    gap: 5px;
+    height: 38px;
+    padding: 0 11px;
+    font-size: 12px;
+    border-radius: 9px;
+    gap: 4px;
   }
-  /* カラースウォッチ拡大 */
+  /* [V0.21] カラースウォッチ: 34→32px */
   .csw {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-width: 3px;
   }
-  /* 区切り線を高く */
+  /* [V0.21] 区切り線: 30→28px */
   .vs {
-    height: 30px;
-    margin: 0 5px;
+    height: 28px;
+    margin: 0 4px;
   }
-  /* ページ番号入力拡大 */
+  /* [V0.21] ページ番号入力: 高さ34→32px */
   .pgni {
-    width: 40px;
-    font-size: 14px;
-    height: 34px;
-    padding: 4px 0;
+    width: 38px;
+    font-size: 13px;
+    height: 32px;
+    padding: 3px 0;
   }
-  /* ページ合計テキスト */
-  .pgtot { font-size: 13px; }
-  /* ズームラベル */
-  .zlbl { font-size: 14px; min-width: 44px; }
-  /* ファイル名ラベル */
-  #fnlbl { font-size: 12px; max-width: 200px; }
-  /* ドロップダウンピッカーボタン拡大 */
-  .pkp button { height: 44px; font-size: 13px; }
-  /* ロゴ余白 */
-  .logo { font-size: 13px; padding-right: 8px; }
-  /* ヘッダー下端にsafe-area対応 */
+  /* [V0.21] ページ合計・ズーム・ファイル名テキスト調整 */
+  .pgtot { font-size: 12px; }
+  .zlbl { font-size: 13px; min-width: 40px; }
+  #fnlbl { font-size: 12px; max-width: 180px; }
+  /* [V0.21] ドロップダウン: 44→42px */
+  .pkp button { height: 42px; font-size: 12px; }
+  /* [V0.21] ロゴ */
+  .logo { font-size: 12px; padding-right: 7px; }
+  /* [V0.21] safe-area: ヘッダー下端対応 */
   #hdr {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+}
+
+/* ===== iPad横向き専用: ヘッダー収縮・スクロール防止 ===== */
+@media (pointer: coarse) and (orientation: landscape) {
+  /* [V0.21] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
+  .hr {
+    height: 42px;
+    gap: 5px;
+    padding: 0 8px;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+  /* [V0.21] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
+  .btn {
+    height: 35px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+  /* [V0.21] 横向きスウォッチ */
+  .csw { width: 30px; height: 30px; }
+  /* [V0.21] 横向き区切り線 */
+  .vs { height: 26px; margin: 0 3px; }
+  /* [V0.21] 横向きページ入力 */
+  .pgni { height: 30px; font-size: 12px; }
 }
 
 </style>
@@ -387,7 +415,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.20</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.21</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -467,7 +495,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.20</div>
+    <div class="dzm">M_Viewer V0.21</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
