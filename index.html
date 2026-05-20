@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.19</title>
+<title>M_Viewer V0.20</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -35,7 +35,7 @@ body {
 /* ===== ヘッダー ===== */
 #hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); }
 .hr {
-  height: 37px; display: flex; align-items: center; gap: 3px; padding: 0 6px;
+  height: 40px; display: flex; align-items: center; gap: 5px; padding: 0 8px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
 .hr:first-child { border-bottom: 1px solid var(--brd); }
@@ -45,14 +45,14 @@ body {
   font-size: 12px; font-weight: 800; color: var(--acc); padding-right: 6px;
   border-right: 2px solid var(--brd); white-space: nowrap; flex-shrink: 0;
 }
-.vs { width: 2px; height: 22px; background: var(--brd); flex-shrink: 0; margin: 0 3px; }
+.vs { width: 2px; height: 26px; background: var(--brd); flex-shrink: 0; margin: 0 4px; }
 .sp { flex: 1; }
 
 /* ボタン共通 */
 .btn {
-  height: 30px; padding: 0 8px; border: 1.5px solid var(--brd); background: var(--pan2);
-  color: var(--tx); border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer;
-  white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 3px;
+  height: 34px; padding: 0 10px; border: 1.5px solid var(--brd); background: var(--pan2);
+  color: var(--tx); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;
   -webkit-user-select: none; transition: background .1s;
 }
 .btn:active  { background: var(--brd); }
@@ -78,7 +78,7 @@ body {
 
 /* カラースウォッチ */
 .csw {
-  width: 24px; height: 24px; border-radius: 50%; border: 3px solid transparent;
+  width: 28px; height: 28px; border-radius: 50%; border: 3px solid transparent;
   cursor: pointer; flex-shrink: 0; transition: transform .1s;
 }
 .csw.on { border-color: #fff; transform: scale(1.25); }
@@ -327,6 +327,59 @@ body {
 }
 #toast.on { opacity: 1; }
 
+
+/* ===== タッチデバイス最適化 (pointer: coarse) ===== */
+@media (pointer: coarse) {
+  /* ツールバー行の高さ・余白を拡大 */
+  .hr {
+    height: 48px;
+    gap: 7px;
+    padding: 0 10px;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+  /* ボタン全体を大型化 */
+  .btn {
+    height: 40px;
+    padding: 0 13px;
+    font-size: 13px;
+    border-radius: 10px;
+    gap: 5px;
+  }
+  /* カラースウォッチ拡大 */
+  .csw {
+    width: 34px;
+    height: 34px;
+    border-width: 3px;
+  }
+  /* 区切り線を高く */
+  .vs {
+    height: 30px;
+    margin: 0 5px;
+  }
+  /* ページ番号入力拡大 */
+  .pgni {
+    width: 40px;
+    font-size: 14px;
+    height: 34px;
+    padding: 4px 0;
+  }
+  /* ページ合計テキスト */
+  .pgtot { font-size: 13px; }
+  /* ズームラベル */
+  .zlbl { font-size: 14px; min-width: 44px; }
+  /* ファイル名ラベル */
+  #fnlbl { font-size: 12px; max-width: 200px; }
+  /* ドロップダウンピッカーボタン拡大 */
+  .pkp button { height: 44px; font-size: 13px; }
+  /* ロゴ余白 */
+  .logo { font-size: 13px; padding-right: 8px; }
+  /* ヘッダー下端にsafe-area対応 */
+  #hdr {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
 </style>
 </head>
 <body>
@@ -334,7 +387,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.19</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.20</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -414,7 +467,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.19</div>
+    <div class="dzm">M_Viewer V0.20</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
