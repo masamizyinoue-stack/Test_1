@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.16</title>
+<title>M_Viewer V0.18</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ===== CSS変数 ===== */
 :root {
@@ -333,12 +334,13 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.16</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.18</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
     <button class="btn on" id="btn-save">📤 PDF出力</button>
+    <button class="btn" id="btn-backup" title="注釈データをZIPでバックアップ">💾 バックアップ</button>
     <button class="btn" id="calcbtn">🧮 計算機</button>
     <div class="sp"></div>
     <button class="btn rd" id="btn-close">✕ 閉じる</button>
@@ -412,7 +414,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.16</div>
+    <div class="dzm">M_Viewer V0.18</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -2687,6 +2689,108 @@ _renderTabBar();
 /* ============================================================
    ファイルを開く
    ============================================================ */
+/* ============================================================
+   自動バックアップ書き出し機能
+   対象: 全シートの注釈・設定・プロジェクト状態 (PDFバイナリは除く)
+   形式: MVIEWER_BACKUP_YYYYMMDD_HHMM.zip (JSZip)
+   ============================================================ */
+const BACKUP_INTERVAL_MS = 5 * 60 * 1000; // 5分ごと自動バックアップ
+
+/** ZIPデータ構造を生成 */
+async function _buildBackupZip() {
+  const JSZip = window.JSZip;
+  if (!JSZip) { console.warn('[Backup] JSZip 未ロード'); return null; }
+  const zip = new JSZip();
+
+  // project.json: シート・バージョン・UI状態
+  const project = {
+    appVersion: document.title,
+    exportTime: new Date().toISOString(),
+    activeSheetIdx: _sheetIdx,
+    sheets: (_sheets||[]).map((sh,i) => ({
+      id: sh.id, fileName: sh.fileName||'',
+      curPage: sh.curPage||1, totalPages: sh.totalPages||0,
+      scale: sh.scale||1, panX: sh.panX||0, panY: sh.panY||0,
+      isActive: i === _sheetIdx
+    }))
+  };
+  zip.file('project.json', JSON.stringify(project, null, 2));
+
+  // annotations.json: 全ファイルの注釈 (IDB + インメモリマージ)
+  const annotations = {};
+  const seen = new Set();
+  for (const sh of (_sheets||[])) {
+    const fn = sh.fileName; if (!fn || seen.has(fn)) continue; seen.add(fn);
+    try {
+      const saved = await IDB.get('f:'+safeKey(fn));
+      const strks = saved?.strokes || sh.strokes || null;
+      if (strks && Object.keys(strks).length > 0)
+        annotations[fn] = { fileName:fn, strokes:_pruneEraserStrokes(strks), savedAt:Date.now() };
+    } catch(_) {}
+  }
+  if (App.pdfDoc && App.fileName) {
+    annotations[App.fileName] = {
+      fileName:App.fileName, strokes:_pruneEraserStrokes(App.strokes||{}), savedAt:Date.now()
+    };
+  }
+  zip.file('annotations.json', JSON.stringify(annotations, null, 2));
+
+  // settings.json: ツール・カラー設定
+  zip.file('settings.json', JSON.stringify({
+    toolSizes:{...toolSizes}, penColor, hlColor, selMode, currentTool
+  }, null, 2));
+
+  return zip;
+}
+
+/** 手動バックアップ: ZIPをダウンロード */
+async function downloadBackup() {
+  const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc||Object.keys(s.strokes||{}).length>0);
+  if (!hasData) { showToast('バックアップ対象データがありません'); return; }
+  showLoading(true);
+  try {
+    const zip = await _buildBackupZip();
+    if (!zip) { showLoading(false); return; }
+    const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{level:6} });
+    const now = new Date();
+    const p = n => String(n).padStart(2,'0');
+    const ts = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
+    const fname = `MVIEWER_BACKUP_${ts}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=fname; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+    showToast(`💾 バックアップ完了: ${fname}`);
+  } catch(e) { showToast('バックアップ失敗: '+e.message); console.error('[Backup]',e); }
+  showLoading(false);
+}
+
+/** 自動バックアップ: IDBに最新2世代を保存（サイレント） */
+async function _autoBackupToIDB() {
+  const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc);
+  if (!hasData) return;
+  try {
+    const zip = await _buildBackupZip();
+    if (!zip) return;
+    const buf = await zip.generateAsync({type:'arraybuffer',compression:'DEFLATE'});
+    const now = new Date();
+    const p = n => String(n).padStart(2,'0');
+    const ts = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
+    const prev = await IDB.get('backup:latest').catch(()=>null);
+    if (prev) await IDB.set('backup:prev', prev).catch(()=>{});
+    await IDB.set('backup:latest', {ts, buf});
+    console.log(`[Backup] 自動バックアップ完了 (${ts})`);
+  } catch(e) { console.warn('[Backup] 自動バックアップ失敗:', e); }
+}
+
+// 5分ごと自動バックアップ
+setInterval(_autoBackupToIDB, BACKUP_INTERVAL_MS);
+
+// ページ離脱前: 未保存データがある場合は警告
+window.addEventListener('beforeunload', e => {
+  const dirty = App.pdfDoc && Object.keys(App.strokes||{}).some(pg=>(App.strokes[pg]||[]).length>0);
+  if (dirty) { e.preventDefault(); e.returnValue=''; }
+});
+
 async function openFile() {
   if (window.showOpenFilePicker) {
     try {
@@ -3211,10 +3315,10 @@ function showLoading(visible) {
    ============================================================ */
 (function bindEvents() {
   /* --- ヘッダー行1 --- */
-
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
   document.getElementById('btn-undo') .addEventListener('click', () => App.undo());
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
+  document.getElementById('btn-backup').addEventListener('click', () => downloadBackup());
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
   document.getElementById('btn-close').addEventListener('click', () => {
     if (!App.pdfDoc) return;
@@ -3283,10 +3387,7 @@ function showLoading(visible) {
   });
 
   /* --- 選択削除 --- */
-  document.getElementById('selbtn').addEventListener('click', () => {
-    if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
-    else { App.deleteSelected(); }
-  });
+  document.getElementById('selbtn').addEventListener('click', () => App.deleteSelected());
 
   /* --- 計算機ボタン (data属性でディスパッチ) --- */
   document.getElementById('cbtns').addEventListener('click', e => {
