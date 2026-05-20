@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.21</title>
+<title>M_Viewer V0.23</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -33,9 +33,9 @@ body {
 }
 
 /* ===== ヘッダー ===== */
-#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.21: スクロール防止 */
+#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.23: スクロール防止 */
 .hr {
-  /* V0.21: 高さを0.95倍縮小 (40→38px), padding微調整 */
+  /* V0.23: 高さを0.95倍縮小 (40→38px), padding微調整 */
   height: 38px; display: flex; align-items: center; gap: 5px; padding: 0 7px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   overflow-y: hidden; /* 縦スクロール防止 */
@@ -47,12 +47,12 @@ body {
   font-size: 12px; font-weight: 800; color: var(--acc); padding-right: 6px;
   border-right: 2px solid var(--brd); white-space: nowrap; flex-shrink: 0;
 }
-.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.21: 0.95倍 */
+.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.23: 0.95倍 */
 .sp { flex: 1; }
 
 /* ボタン共通 */
 .btn {
-  /* V0.21: 高さ0.95倍 (34→32px) */
+  /* V0.23: 高さ0.95倍 (34→32px) */
   height: 32px; padding: 0 9px; border: 1.5px solid var(--brd); background: var(--pan2);
   color: var(--tx); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
   white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;
@@ -81,7 +81,7 @@ body {
 
 /* カラースウォッチ */
 .csw {
-  /* V0.21: 0.95倍 (28→26px) */
+  /* V0.23: 0.95倍 (28→26px) */
   width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent;
   cursor: pointer; flex-shrink: 0; transition: transform .1s;
 }
@@ -332,9 +332,9 @@ body {
 #toast.on { opacity: 1; }
 
 
-/* ===== タッチデバイス最適化 (pointer: coarse) V0.21調整版 ===== */
+/* ===== タッチデバイス最適化 (pointer: coarse) V0.23調整版 ===== */
 @media (pointer: coarse) {
-  /* [V0.21] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
+  /* [V0.23] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
   .hr {
     height: 46px;
     gap: 6px;
@@ -343,7 +343,7 @@ body {
     padding-right: max(9px, env(safe-area-inset-right));
     overflow-y: hidden; /* 縦スクロール防止 */
   }
-  /* [V0.21] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
+  /* [V0.23] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
   .btn {
     height: 38px;
     padding: 0 11px;
@@ -351,33 +351,33 @@ body {
     border-radius: 9px;
     gap: 4px;
   }
-  /* [V0.21] カラースウォッチ: 34→32px */
+  /* [V0.23] カラースウォッチ: 34→32px */
   .csw {
     width: 32px;
     height: 32px;
     border-width: 3px;
   }
-  /* [V0.21] 区切り線: 30→28px */
+  /* [V0.23] 区切り線: 30→28px */
   .vs {
     height: 28px;
     margin: 0 4px;
   }
-  /* [V0.21] ページ番号入力: 高さ34→32px */
+  /* [V0.23] ページ番号入力: 高さ34→32px */
   .pgni {
     width: 38px;
     font-size: 13px;
     height: 32px;
     padding: 3px 0;
   }
-  /* [V0.21] ページ合計・ズーム・ファイル名テキスト調整 */
+  /* [V0.23] ページ合計・ズーム・ファイル名テキスト調整 */
   .pgtot { font-size: 12px; }
   .zlbl { font-size: 13px; min-width: 40px; }
   #fnlbl { font-size: 12px; max-width: 180px; }
-  /* [V0.21] ドロップダウン: 44→42px */
+  /* [V0.23] ドロップダウン: 44→42px */
   .pkp button { height: 42px; font-size: 12px; }
-  /* [V0.21] ロゴ */
+  /* [V0.23] ロゴ */
   .logo { font-size: 12px; padding-right: 7px; }
-  /* [V0.21] safe-area: ヘッダー下端対応 */
+  /* [V0.23] safe-area: ヘッダー下端対応 */
   #hdr {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -385,7 +385,7 @@ body {
 
 /* ===== iPad横向き専用: ヘッダー収縮・スクロール防止 ===== */
 @media (pointer: coarse) and (orientation: landscape) {
-  /* [V0.21] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
+  /* [V0.23] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
   .hr {
     height: 42px;
     gap: 5px;
@@ -393,18 +393,18 @@ body {
     padding-left: max(8px, env(safe-area-inset-left));
     padding-right: max(8px, env(safe-area-inset-right));
   }
-  /* [V0.21] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
+  /* [V0.23] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
   .btn {
     height: 35px;
     padding: 0 10px;
     font-size: 12px;
     border-radius: 8px;
   }
-  /* [V0.21] 横向きスウォッチ */
+  /* [V0.23] 横向きスウォッチ */
   .csw { width: 30px; height: 30px; }
-  /* [V0.21] 横向き区切り線 */
+  /* [V0.23] 横向き区切り線 */
   .vs { height: 26px; margin: 0 3px; }
-  /* [V0.21] 横向きページ入力 */
+  /* [V0.23] 横向きページ入力 */
   .pgni { height: 30px; font-size: 12px; }
 }
 
@@ -415,7 +415,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.21</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.23</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -495,7 +495,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.21</div>
+    <div class="dzm">M_Viewer V0.23</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -630,6 +630,7 @@ let strokeSize   = 3;
 let penColor     = '#cc2020';
 let hlColor      = '#ffd700';
 let txX = 0, txY = 0;
+let _txTarget = 'main'; // [V0.23] テキスト入力対象パネル ('main'|'split')
 
 const subWindows  = [];
 let _activeSelSubWin = null; // サブ窓選択コンテキスト (null=メイン)
@@ -1552,6 +1553,8 @@ class SplitViewer {
     this.lastX = 0; this.lastY = 0;
     this.velHist = []; this._rafId = null;
     this._saveTimer = null; this._offscr = null; this._wheelTimer = null;
+    // [V0.23] 選択ツール用状態
+    this.svSelPath = []; this.svSelectedIdx = []; this._svLastFocused = false;
     this._build();
   }
 
@@ -1721,6 +1724,31 @@ class SplitViewer {
 
   _startDraw(e) {
     const p = this._getDocPos(e);
+    // [V0.23] text tool: メインと共通UIでテキスト入力
+    if (currentTool === 'text') {
+      txX = p.x; txY = p.y; _txTarget = 'split';
+      document.getElementById('txfld').value = '';
+      document.getElementById('txov').classList.add('on');
+      this._svLastFocused = true; return;
+    }
+    // [V0.23] select tool: ラッソ選択開始
+    if (currentTool === 'select') {
+      if (this.svSelectedIdx.length > 0) {
+        const bb = this._svSelBBox();
+        if (bb && p.x >= bb.x1-10 && p.x <= bb.x2+10 && p.y >= bb.y1-10 && p.y <= bb.y2+10) {
+          this.isDrawing = true; this.lastX = p.x; this.lastY = p.y;
+          this._svLastFocused = true; return;
+        }
+        this._svClearSel();
+      }
+      this.svSelPath = [{ x: p.x, y: p.y }]; this.isDrawing = true;
+      this._svLastFocused = true; return;
+    }
+    // [V0.23] sub tool: パンとして扱う（サブ窓作成はメインパネルのみ）
+    if (currentTool === 'sub') {
+      const t = e.touches ? e.touches[0] : e; this._startPan(t); return;
+    }
+    this._svLastFocused = true;
     this.isDrawing = true; this.lastX = p.x; this.lastY = p.y;
     const tool = currentTool === 'shape' ? currentShape : currentTool;
     this.curStroke = ['pen','hl','eraser'].includes(tool)
@@ -1728,6 +1756,17 @@ class SplitViewer {
       : { type:tool, x1:p.x, y1:p.y, x2:p.x, y2:p.y, color:strokeColor, size:strokeSize };
   }
   _moveDraw(e) {
+    // [V0.23] select tool: ラッソ範囲またはストローク移動
+    if (currentTool === 'select' && this.isDrawing) {
+      const p = this._getDocPos(e);
+      if (this.svSelectedIdx.length > 0 && !this.svSelPath.length) {
+        this._svMoveSel(p.x - this.lastX, p.y - this.lastY);
+        this.lastX = p.x; this.lastY = p.y;
+        this.redraw(); this._svDrawSelOv(); return;
+      }
+      this.svSelPath.push({ x: p.x, y: p.y });
+      this._svDrawSelPreview(); return;
+    }
     if (!this.curStroke) return;
     const p = this._getDocPos(e);
     const sc = this.renderScale, invEZ = 1 / this.cssEZ;
@@ -1759,6 +1798,14 @@ class SplitViewer {
     }
   }
   _endDraw(e) {
+    // [V0.23] select tool: 選択確定または移動完了
+    if (currentTool === 'select' && this.isDrawing) {
+      this.isDrawing = false;
+      if (this.svSelectedIdx.length > 0 && !this.svSelPath.length) {
+        this.redraw(); this._svDrawSelOv(); this._schedSave(); return;
+      }
+      this._svFinishSel(); return;
+    }
     this.isDrawing = false;
     if (!this.curStroke) return;
     const s = this.curStroke;
@@ -1877,6 +1924,94 @@ class SplitViewer {
     inp.type='file'; inp.accept='application/pdf';
     inp.onchange=async e=>{const f=e.target.files[0];if(f)await this.loadPDF(f);};
     inp.click();
+  }
+  // [V0.23] 選択ツール: 右パネル用選択メソッド群 (SubWin._sw* を右パネル向けに移植)
+  _svFinishSel() {
+    const arr = this.strokes[this.curPage] || [];
+    if (this.svSelPath.length >= 2) {
+      const xs = this.svSelPath.map(p => p.x), ys = this.svSelPath.map(p => p.y);
+      const rx1=Math.min(...xs), ry1=Math.min(...ys), rx2=Math.max(...xs), ry2=Math.max(...ys);
+      this.svSelectedIdx = arr.reduce((a, s, i) => {
+        const bb = strokeBBox(s); if (!bb) return a;
+        if (!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2)) a.push(i);
+        return a;
+      }, []);
+    }
+    this.svSelPath = [];
+    this.ovlCtx.clearRect(0, 0, this.ovlCvs.width, this.ovlCvs.height);
+    this._svDrawSelOv();
+    if (this.svSelectedIdx.length > 0) {
+      document.getElementById('selbtn').style.display = 'block';
+      this._svPositionSelBtn();
+    }
+  }
+  _svDrawSelPreview() {
+    if (!this.svSelPath.length) return;
+    const p0 = this.svSelPath[0], p1 = this.svSelPath[this.svSelPath.length-1];
+    const sc = this.renderScale;
+    this.ovlCtx.clearRect(0, 0, this.ovlCvs.width, this.ovlCvs.height);
+    this.ovlCtx.save();
+    this.ovlCtx.strokeStyle = '#4488ff'; this.ovlCtx.lineWidth = 2;
+    this.ovlCtx.setLineDash([6, 4]);
+    this.ovlCtx.strokeRect(
+      Math.min(p0.x,p1.x)*sc, Math.min(p0.y,p1.y)*sc,
+      Math.abs(p1.x-p0.x)*sc, Math.abs(p1.y-p0.y)*sc
+    );
+    this.ovlCtx.restore();
+  }
+  _svDrawSelOv() {
+    this.ovlCtx.clearRect(0, 0, this.ovlCvs.width, this.ovlCvs.height);
+    if (!this.svSelectedIdx.length) return;
+    const arr = this.strokes[this.curPage] || [];
+    const sc  = this.renderScale;
+    this.ovlCtx.save();
+    this.ovlCtx.strokeStyle = '#4488ff'; this.ovlCtx.lineWidth = 2;
+    this.ovlCtx.setLineDash([6, 3]);
+    this.svSelectedIdx.forEach(i => {
+      const bb = strokeBBox(arr[i]); if (!bb) return;
+      this.ovlCtx.strokeRect(bb.x1*sc-4, bb.y1*sc-4, (bb.x2-bb.x1)*sc+8, (bb.y2-bb.y1)*sc+8);
+    });
+    this.ovlCtx.restore();
+    this._svPositionSelBtn();
+  }
+  _svSelBBox() {
+    const arr = this.strokes[this.curPage] || [];
+    const bbs = this.svSelectedIdx.map(i => strokeBBox(arr[i])).filter(Boolean);
+    if (!bbs.length) return null;
+    return {
+      x1: Math.min(...bbs.map(b => b.x1)), y1: Math.min(...bbs.map(b => b.y1)),
+      x2: Math.max(...bbs.map(b => b.x2)), y2: Math.max(...bbs.map(b => b.y2))
+    };
+  }
+  _svMoveSel(dx, dy) {
+    const arr = this.strokes[this.curPage] || [];
+    this.svSelectedIdx.forEach(i => {
+      const s = arr[i]; if (!s) return;
+      if (s.points) s.points = s.points.map(p => [p[0]+dx, p[1]+dy]);
+      if (s.x1 !== undefined) { s.x1+=dx; s.y1+=dy; s.x2+=dx; s.y2+=dy; }
+      if (s.type === 'text') { s.x+=dx; s.y+=dy; }
+    });
+  }
+  _svClearSel() {
+    this.svSelectedIdx = []; this.svSelPath = [];
+    this.ovlCtx.clearRect(0, 0, this.ovlCvs.width, this.ovlCvs.height);
+    document.getElementById('selbtn').style.display = 'none';
+  }
+  _svPositionSelBtn() {
+    const bb = this._svSelBBox(); if (!bb) return;
+    const cr = this.caEl.getBoundingClientRect();
+    const btn = document.getElementById('selbtn');
+    btn.style.left = Math.max(0, cr.left + this.panX + bb.x1 * this.scale - 4) + 'px';
+    btn.style.top  = Math.max(0, cr.top  + this.panY + bb.y2 * this.scale + 6) + 'px';
+  }
+  _svDeleteSelected() {
+    if (!this.svSelectedIdx.length) return;
+    this.strokes[this.curPage] = (this.strokes[this.curPage]||[])
+      .filter((_, i) => !this.svSelectedIdx.includes(i));
+    this.svSelectedIdx = [];
+    this.ovlCtx.clearRect(0, 0, this.ovlCvs.width, this.ovlCvs.height);
+    document.getElementById('selbtn').style.display = 'none';
+    this.redraw(); this._schedSave();
   }
   undo() {
     const arr=this.strokes[this.curPage];
@@ -2128,9 +2263,11 @@ const App = (() => {
   function startDraw(e) {
     const t = e.touches ? e.touches[0] : e;
     const p = getDocPos(t);
+    // [V0.23] メイン描画開始時: 右パネルのフォーカスフラグをリセット
+    if (splitView) splitView._svLastFocused = false;
 
     if (currentTool === 'text') {
-      txX = p.x; txY = p.y;
+      txX = p.x; txY = p.y; _txTarget = 'main'; // [V0.23]
       document.getElementById('txfld').value = '';
       document.getElementById('txov').classList.add('on');
       return;
@@ -2775,7 +2912,7 @@ _renderTabBar();
    対象: 全シートの注釈・設定・プロジェクト状態 (PDFバイナリは除く)
    形式: MVIEWER_BACKUP_YYYYMMDD_HHMM.zip (JSZip)
    ============================================================ */
-const BACKUP_INTERVAL_MS = 5 * 60 * 1000; // 5分ごと自動バックアップ
+const BACKUP_INTERVAL_MS = 10 * 60 * 1000; // [V0.23] 10分ごと自動バックアップ (負荷軽減)
 
 /** ZIPデータ構造を生成 */
 async function _buildBackupZip() {
@@ -2845,58 +2982,37 @@ async function downloadBackup() {
   showLoading(false);
 }
 
-/** 自動バックアップ: IDBに最新2世代を保存（サイレント） */
+/** [V0.23] 自動バックアップ: IDBに最新2世代を保存（完全サイレント・非同期UI非妨害）
+ *  - ダウンロードダイアログ・ポップアップなし
+ *  - 圧縮レベル1(高速)でUIカクつき軽減
+ *  - await yield でUIスレッドを解放
+ */
 async function _autoBackupToIDB() {
   const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc);
   if (!hasData) return;
   try {
+    // UIスレッドを一度解放してからバックアップ開始
+    await new Promise(r => setTimeout(r, 0));
     const zip = await _buildBackupZip();
     if (!zip) return;
-    const buf = await zip.generateAsync({type:'arraybuffer',compression:'DEFLATE'});
+    // [V0.23] 圧縮レベル1(高速)→UIフリーズ軽減, 完全停止なし
+    const buf = await zip.generateAsync({type:'arraybuffer', compression:'DEFLATE', compressionOptions:{level:1}});
+    // UIスレッド再解放
+    await new Promise(r => setTimeout(r, 0));
     const now = new Date();
     const p = n => String(n).padStart(2,'0');
     const ts = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
     const prev = await IDB.get('backup:latest').catch(()=>null);
     if (prev) await IDB.set('backup:prev', prev).catch(()=>{});
     await IDB.set('backup:latest', {ts, buf});
+    // [V0.23] ログのみ。Toastは表示しない（操作妨害防止）
     console.log(`[Backup] 自動バックアップ完了 (${ts})`);
   } catch(e) { console.warn('[Backup] 自動バックアップ失敗:', e); }
 }
 
-// 自動バックアップ: IDB保存 + iPad/Safari Downloads フォルダへ自動ダウンロード
-// （タイマーからの blob download は Safari でも Downloads フォルダに保存される）
-let _lastAutoDownloadTs = 0; // 最後にダウンロードしたタイムスタンプ
-
-async function _autoBackupAndDownload() {
-  // IDB サイレント保存は常に実行
-  await _autoBackupToIDB();
-
-  // ダウンロード: データがある場合のみ、前回から10分以上経過していれば実行
-  const now = Date.now();
-  const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc);
-  if (!hasData || (now - _lastAutoDownloadTs) < 10 * 60 * 1000) return;
-
-  try {
-    const zip = await _buildBackupZip();
-    if (!zip) return;
-    const blob = await zip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
-    const d = new Date();
-    const p = n => String(n).padStart(2,'0');
-    const ts = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
-    const fname = `MVIEWER_BACKUP_${ts}.zip`;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fname;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    _lastAutoDownloadTs = now;
-    console.log('[Backup] 自動ダウンロード完了:', fname);
-  } catch(e) { console.warn('[Backup] 自動ダウンロード失敗:', e); }
-}
-
-setInterval(_autoBackupAndDownload, BACKUP_INTERVAL_MS);
+// [V0.23] 自動バックアップ: IDB保存のみ（ダウンロードダイアログ廃止）
+// ダウンロードが必要な場合はヘッダーの「バックアップ」ボタンを手動で押下
+setInterval(_autoBackupToIDB, BACKUP_INTERVAL_MS);
 
 // ページ離脱前: 未保存データがある場合は警告
 window.addEventListener('beforeunload', e => {
@@ -3047,15 +3163,27 @@ function cancelTx()  { document.getElementById('txov').classList.remove('on'); }
 function confirmTx() {
   const txt = document.getElementById('txfld').value.trim();
   if (txt) {
-    if (!App.strokes[App.currentPage]) App.strokes[App.currentPage] = [];
-    App.strokes[App.currentPage].push({
-      type: 'text', text: txt, x: txX, y: txY,
-      color: strokeColor, size: Math.max(strokeSize, 2)
-    });
-    App.redraw();
-    subWindows.forEach(sw => sw.update(App.strokes, App.currentPage));
-    schedSave();
+    // [V0.23] _txTarget で保存先パネルを振り分け
+    if (_txTarget === 'split' && splitView?.pdfDoc) {
+      const pg = splitView.curPage;
+      if (!splitView.strokes[pg]) splitView.strokes[pg] = [];
+      splitView.strokes[pg].push({
+        type: 'text', text: txt, x: txX, y: txY,
+        color: strokeColor, size: Math.max(strokeSize, 2)
+      });
+      splitView.redraw(); splitView._schedSave();
+    } else {
+      if (!App.strokes[App.currentPage]) App.strokes[App.currentPage] = [];
+      App.strokes[App.currentPage].push({
+        type: 'text', text: txt, x: txX, y: txY,
+        color: strokeColor, size: Math.max(strokeSize, 2)
+      });
+      App.redraw();
+      subWindows.forEach(sw => sw.update(App.strokes, App.currentPage));
+      schedSave();
+    }
   }
+  _txTarget = 'main'; // [V0.23] リセット
   cancelTx();
 }
 
@@ -3429,7 +3557,11 @@ function showLoading(visible) {
 (function bindEvents() {
   /* --- ヘッダー行1 --- */
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
-  document.getElementById('btn-undo') .addEventListener('click', () => App.undo());
+  // [V0.23] undo: 最後に描画したパネルに振り分け
+  document.getElementById('btn-undo').addEventListener('click', () => {
+    if (splitView?._svLastFocused) splitView.undo();
+    else App.undo();
+  });
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
   document.getElementById('btn-backup').addEventListener('click', () => downloadBackup());
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
@@ -3500,7 +3632,12 @@ function showLoading(visible) {
   });
 
   /* --- 選択削除 --- */
-  document.getElementById('selbtn').addEventListener('click', () => App.deleteSelected());
+  // [V0.23] 削除ボタン: SubWin → 右パネル → メインの順に確認
+  document.getElementById('selbtn').addEventListener('click', () => {
+    if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
+    else if (splitView?.svSelectedIdx?.length) { splitView._svDeleteSelected(); }
+    else { App.deleteSelected(); }
+  });
 
   /* --- 計算機ボタン (data属性でディスパッチ) --- */
   document.getElementById('cbtns').addEventListener('click', e => {
