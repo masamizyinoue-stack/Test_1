@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.18</title>
+<title>M_Viewer V0.19</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -334,7 +334,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.18</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.19</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -414,7 +414,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.18</div>
+    <div class="dzm">M_Viewer V0.19</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -2782,8 +2782,40 @@ async function _autoBackupToIDB() {
   } catch(e) { console.warn('[Backup] 自動バックアップ失敗:', e); }
 }
 
-// 5分ごと自動バックアップ
-setInterval(_autoBackupToIDB, BACKUP_INTERVAL_MS);
+// 自動バックアップ: IDB保存 + iPad/Safari Downloads フォルダへ自動ダウンロード
+// （タイマーからの blob download は Safari でも Downloads フォルダに保存される）
+let _lastAutoDownloadTs = 0; // 最後にダウンロードしたタイムスタンプ
+
+async function _autoBackupAndDownload() {
+  // IDB サイレント保存は常に実行
+  await _autoBackupToIDB();
+
+  // ダウンロード: データがある場合のみ、前回から10分以上経過していれば実行
+  const now = Date.now();
+  const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc);
+  if (!hasData || (now - _lastAutoDownloadTs) < 10 * 60 * 1000) return;
+
+  try {
+    const zip = await _buildBackupZip();
+    if (!zip) return;
+    const blob = await zip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
+    const d = new Date();
+    const p = n => String(n).padStart(2,'0');
+    const ts = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+    const fname = `MVIEWER_BACKUP_${ts}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    _lastAutoDownloadTs = now;
+    console.log('[Backup] 自動ダウンロード完了:', fname);
+  } catch(e) { console.warn('[Backup] 自動ダウンロード失敗:', e); }
+}
+
+setInterval(_autoBackupAndDownload, BACKUP_INTERVAL_MS);
 
 // ページ離脱前: 未保存データがある場合は警告
 window.addEventListener('beforeunload', e => {
