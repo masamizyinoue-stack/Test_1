@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.40</title>
+<title>M_Viewer V0.41</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -545,7 +545,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.40</div>
+    <div class="dzm">M_Viewer V0.41</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -806,6 +806,14 @@ const DocMgr = (() => {
       } catch(e) { console.warn('[DocMgr.updateStrokes]', e); }
     },
 
+    /** ファイル名でDocumentを検索（起動時復元のバイナリ補完用） */
+    async findByName(name) {
+      const list  = await _getList();
+      const entry = list.find(e => e.name === name);
+      if (!entry) return null;
+      return IDB.get('doc:' + entry.id);
+    },
+
     /** ドキュメント一覧（updatedAt降順） */
     async list() {
       const list = await _getList();
@@ -921,7 +929,7 @@ function schedSave() {
       if (filtered.length) cleanStrokes[pg] = filtered;
     }
     const data = {
-      buf:     App.origBuf.slice(0),
+      buf:     null,  // [V0.41] バイナリは doc:{id} のみ保存（重複排除）
       file:    App.fileName,
       strokes: (typeof structuredClone === 'function'
                   ? structuredClone(cleanStrokes)
@@ -967,7 +975,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && App.pdfDoc && App.origBuf) {
     const clean = _pruneEraserStrokes(App.strokes);
     const data  = {
-      buf:     App.origBuf.slice(0),
+      buf:     null,  // [V0.41] バイナリは doc:{id} のみ保存（重複排除）
       strokes: clean,
       file:    App.fileName,
       page:    App.currentPage,
@@ -2461,6 +2469,15 @@ const App = (() => {
       }
     }
   } catch(e) { console.error('[起動] IDB.get 失敗:', e); }
+  // [V0.41] buf がない（新方式）場合は DocMgr からバイナリを補完
+  if (!saved?.buf && saved?.file) {
+    try {
+      const doc = await DocMgr.findByName(saved.file);
+      if (doc?.originalPdfBytes) {
+        saved = { ...saved, buf: new Uint8Array(doc.originalPdfBytes) };
+      }
+    } catch(_) {}
+  }
   if (!saved?.buf) { clearTimeout(_safetyTimer); showHome(); return; }
 
   showLoading(true);
