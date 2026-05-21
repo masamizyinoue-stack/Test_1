@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.36</title>
+<title>M_Viewer V0.37</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -485,7 +485,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.36</div>
+    <div class="dzm">M_Viewer V0.37</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -3067,8 +3067,8 @@ async function _generateSubsetPDF(pageNums) {
     if (ss.some(s => s.type === 'eraser')) {
       await _pdfRasterPage(srcDoc, page, pn, ss, width, height);
     } else {
-      // [V0.35] 消しゴムなし → 正式PDF注釈を追加
-      await _addPdfAnnotations(srcDoc, page, pn, ss, width, height);
+      // [V0.37] PNG画像オーバーレイ（確実に他ビューワーで表示可能）
+      await _pdfOverlayPage(srcDoc, page, pn, ss, width, height);
     }
   }
   // [V0.35] 全ストロークを hidden JSON として Keywords に埋め込む
