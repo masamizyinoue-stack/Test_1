@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.37</title>
+<title>M_Viewer V0.40</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -153,6 +153,65 @@ body {
 .dzm { font-size: 16px; color: var(--tx); font-weight: 700; }
 .dzs { font-size: 11px; color: var(--tx2); text-align: center; padding: 0 18px; line-height: 1.8; }
 .dzb { background: var(--acc); color: #fff; border: none; padding: 13px 28px; border-radius: 11px; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+/* ===== [V0.40] ホーム画面 ===== */
+#home {
+  position: absolute; inset: 0; z-index: 10; background: var(--bg);
+  display: none; flex-direction: column; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.home-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 18px 12px; flex-shrink: 0;
+  border-bottom: 1px solid var(--brd);
+}
+.home-title { font-size: 18px; font-weight: 700; color: var(--tx); }
+.home-open-btn {
+  background: var(--acc); color: #fff; border: none; padding: 10px 22px;
+  border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+  touch-action: manipulation;
+}
+.home-open-btn:active { opacity: .8; }
+.home-section {
+  font-size: 11px; font-weight: 700; color: var(--tx2); padding: 14px 18px 6px;
+  flex-shrink: 0; text-transform: uppercase; letter-spacing: .05em;
+}
+#home-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px; padding: 6px 18px 20px; align-content: start;
+}
+.home-card {
+  background: var(--pan); border: 1.5px solid var(--brd); border-radius: 10px;
+  padding: 12px 10px 8px; cursor: pointer; position: relative;
+  display: flex; flex-direction: column; gap: 4px;
+  -webkit-user-select: none; user-select: none; touch-action: manipulation;
+}
+.home-card:active { border-color: var(--acc); background: var(--pan2); }
+.home-card-icon { font-size: 26px; line-height: 1; margin-bottom: 2px; }
+.home-card-name {
+  font-size: 11px; font-weight: 700; color: var(--tx); word-break: break-all;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3;
+}
+.home-card-date { font-size: 10px; color: var(--tx2); margin-top: auto; padding-top: 4px; }
+.home-card-del {
+  position: absolute; top: 5px; right: 5px; background: transparent;
+  border: none; color: var(--tx2); font-size: 14px; cursor: pointer;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
+.home-card-del:active { background: var(--red); color: #fff; }
+#home-empty {
+  display: none; flex-direction: column; align-items: center;
+  justify-content: center; flex: 1; gap: 14px; padding: 60px 20px;
+}
+.home-empty-icon { font-size: 52px; opacity: .25; }
+.home-empty-msg { font-size: 13px; color: var(--tx2); text-align: center; line-height: 1.8; }
+.home-drop-hint {
+  font-size: 11px; color: var(--tx2); text-align: center; padding: 10px 18px;
+  border: 1.5px dashed var(--brd); border-radius: 10px;
+  margin: 0 18px 18px; flex-shrink: 0;
+}
 
 /* 選択削除ボタン */
 #selbtn {
@@ -416,6 +475,7 @@ body {
     <button class="btn" id="btn-backup" title="注釈データをZIPでバックアップ">💾 バックアップ</button>
     <button class="btn" id="calcbtn">🧮 計算機</button>
     <div class="sp"></div>
+    <button class="btn" id="btn-home">⌂ ホーム</button>
     <button class="btn rd" id="btn-close">✕ 閉じる</button>
   </div>
   <!-- 行2: ページナビ / ズーム / ツール / カラー / 太さ -->
@@ -485,7 +545,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.37</div>
+    <div class="dzm">M_Viewer V0.40</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -493,6 +553,20 @@ body {
       🔍 2本指でピンチ拡大縮小 (最大800%)
     </div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
+  </div>
+  <!-- [V0.40] ホーム画面 -->
+  <div id="home">
+    <div class="home-hdr">
+      <div class="home-title">📐 M_Viewer</div>
+      <button class="home-open-btn" id="home-open">📂 PDFを開く</button>
+    </div>
+    <div class="home-section">最近開いた図面</div>
+    <div id="home-list"></div>
+    <div id="home-empty">
+      <div class="home-empty-icon">📂</div>
+      <div class="home-empty-msg">図面をドラッグ＆ドロップするか<br>「PDFを開く」で追加してください</div>
+    </div>
+    <div class="home-drop-hint">📄 PDFをここにドロップして開く</div>
   </div>
 </div>
 <button id="selbtn">🗑 削除</button>
@@ -667,6 +741,92 @@ function safeKey(s) {
   return s.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
 }
 
+/* ============================================================
+   [V0.39] DocumentManager - アプリ内部ドキュメント管理基盤
+   IDBキー:
+     'doclist'  → [{id, name, createdAt, updatedAt, pages, byteSize}]
+     'doc:{id}' → フルドキュメント (originalPdfBytes, strokes, ...)
+   既存の 'f:' / 'last:' キーは後方互換のため維持
+   ============================================================ */
+const DocMgr = (() => {
+  let _docId = null; // 現在編集中のドキュメントID
+
+  function _newId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  async function _getList() { return (await IDB.get('doclist')) || []; }
+  async function _setList(list) { await IDB.set('doclist', list); }
+
+  return {
+    get currentId() { return _docId; },
+
+    /** PDF読込時: 同名Documentを探して更新、なければ新規作成 */
+    async open(name, pdfBytes, strokes, currentPage) {
+      try {
+        const list  = await _getList();
+        let   entry = list.find(e => e.name === name);
+        const now   = Date.now();
+        if (!entry) {
+          entry = { id: _newId(), name, createdAt: now, updatedAt: now,
+                    pages: 0, byteSize: pdfBytes?.byteLength || 0 };
+          list.unshift(entry);
+        } else {
+          entry.updatedAt = now;
+          entry.byteSize  = pdfBytes?.byteLength || entry.byteSize;
+        }
+        _docId = entry.id;
+        await _setList(list);
+        await IDB.set('doc:' + _docId, {
+          id: _docId, name,
+          createdAt:        entry.createdAt,
+          updatedAt:        now,
+          originalPdfBytes: pdfBytes ? pdfBytes.slice(0) : null,
+          strokes:          strokes || {},
+          currentPage:      currentPage || 1,
+          settings:         {}   // 将来拡張用
+        });
+      } catch(e) { console.warn('[DocMgr.open]', e); }
+      return _docId;
+    },
+
+    /** strokes / currentPage を更新（schedSaveから呼ぶ） */
+    async updateStrokes(strokes, currentPage) {
+      if (!_docId) return;
+      try {
+        const doc = await IDB.get('doc:' + _docId);
+        if (!doc) return;
+        doc.strokes     = strokes;
+        doc.currentPage = currentPage || doc.currentPage;
+        doc.updatedAt   = Date.now();
+        await IDB.set('doc:' + _docId, doc);
+        // doclist の updatedAt も反映
+        const list  = await _getList();
+        const entry = list.find(e => e.id === _docId);
+        if (entry) { entry.updatedAt = doc.updatedAt; await _setList(list); }
+      } catch(e) { console.warn('[DocMgr.updateStrokes]', e); }
+    },
+
+    /** ドキュメント一覧（updatedAt降順） */
+    async list() {
+      const list = await _getList();
+      return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+
+    /** フルドキュメント取得 */
+    async get(id) { return IDB.get('doc:' + id); },
+
+    /** ドキュメント削除 */
+    async remove(id) {
+      await IDB.set('doc:' + id, null);
+      await _setList((await _getList()).filter(e => e.id !== id));
+      if (_docId === id) _docId = null;
+    },
+
+    /** closeFile時にIDをリセット */
+    reset() { _docId = null; }
+  };
+})();
+
 /* [V0.35] インスタンスID
  * sessionStorage はウインドウ毎に独立 → iPad Split View 2画面起動時に
  * 各ウインドウが別IDを持ち、IDBキーを分離して競合・上書きを防止する。
@@ -750,6 +910,7 @@ function _pruneEraserStrokes(strks) {
 
 function schedSave() {
   clearTimeout(_autoSaveTimer);
+  schedPdfSave(); // [V0.38] PDF自動保存も予約（30秒debounce・_fileHandleある時のみ）
   _autoSaveTimer = setTimeout(async () => {
     if (!App.pdfDoc || !App.origBuf) return;
     // eraser ストロークを保存しない（IDB 蓄積 → 復元後の freeze 防止）
@@ -771,10 +932,37 @@ function schedSave() {
     };
     await IDB.set(_KEY_LAST, data); // [V0.35] インスタンス別キー → 別ウインドウと競合しない
     await IDB.set('f:' + safeKey(App.fileName), data);
+    // [V0.39] DocumentManagerのstrokes更新（バックグラウンド）
+    DocMgr.updateStrokes(cleanStrokes, App.currentPage).catch(() => {});
   }, SAVE_DELAY);
 }
 
-// [V0.35] 画面が隠れる直前にもIDB保存を実行（iPad Split View切替・タブ切替時など）
+// [V0.38] PDF自動保存（_fileHandle がある時のみ・30秒無操作後）
+const PDF_AUTOSAVE_DELAY = 30000;
+let _pdfSaveTimer = null;
+let _pdfSaveBusy  = false;
+
+async function _doPdfSave() {
+  if (!App.pdfDoc || !App.origBuf || !_fileHandle || _pdfSaveBusy) return;
+  _pdfSaveBusy = true;
+  try {
+    const pages = Array.from({ length: App.totalPages }, (_, i) => i + 1);
+    const blob  = await _generateSubsetPDF(pages);
+    if (!blob) { _pdfSaveBusy = false; return; }
+    const w = await _fileHandle.createWritable();
+    await w.write(blob); await w.close();
+    showToast('💾 自動保存しました');
+  } catch(e) { console.warn('[AutoSave PDF]', e); }
+  _pdfSaveBusy = false;
+}
+
+function schedPdfSave() {
+  if (!_fileHandle) return; // File System Access API 未取得時はスキップ
+  clearTimeout(_pdfSaveTimer);
+  _pdfSaveTimer = setTimeout(_doPdfSave, PDF_AUTOSAVE_DELAY);
+}
+
+// [V0.38] 画面が隠れる直前：IDB保存 + _fileHandle があればPDF即時保存
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && App.pdfDoc && App.origBuf) {
     const clean = _pruneEraserStrokes(App.strokes);
@@ -787,6 +975,8 @@ document.addEventListener('visibilitychange', () => {
     };
     IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
     IDB.set(_KEY_LAST, data).catch(() => {});
+    // PDF保存タイマーをキャンセルして即時実行
+    if (_fileHandle) { clearTimeout(_pdfSaveTimer); _doPdfSave(); }
   }
 });
 
@@ -2106,20 +2296,25 @@ const App = (() => {
       renderScale = 1; cssExtraZoom = 1; pageCache.clear();
       subWindows.slice().forEach(sw => sw.close());
       document.getElementById('dz').style.display = 'none';
+      hideHome(); // [V0.40] ホーム画面を隠す
       cwEl.style.display = 'block';
 
-      // [V0.35] PDFのhidden JSONを優先復元、なければIDBにフォールバック
+      // [V0.38] hidden JSON優先復元 → なければIDB → renderPage/fit
       let stroksFromPdf = null;
       try { stroksFromPdf = await _extractMVData(origBuf); } catch(_) {}
       if (stroksFromPdf && Object.keys(stroksFromPdf).length > 0) {
         strokes = _pruneEraserStrokes(stroksFromPdf);
+        await renderPage(1); await fit();
         showToast('📝 PDFの書き込みデータを復元しました');
       } else {
         const saved = await IDB.get('f:' + safeKey(file.name));
         strokes = _pruneEraserStrokes(saved?.strokes || {});
+        await renderPage(1); await fit();
         if (saved?.strokes && Object.keys(saved.strokes).length > 0)
           showToast('📝 書き込みデータを復元しました');
       }
+      // [V0.39] DocumentManagerに登録・更新（バックグラウンドで実行）
+      DocMgr.open(file.name, origBuf, strokes, 1).catch(() => {});
       _postLoadFn?.(); // シートタブへ同期 (シートマネージャーが登録)
     } catch(e) { showToast('読み込みに失敗しました'); console.error(e); }
     showLoading(false);
@@ -2162,12 +2357,13 @@ const App = (() => {
     pdfDoc = null; origBuf = null; fileName = ''; curPage = 1; totalPages = 0; strokes = {};
     [pdfCvs, annCvs, ovlCvs].forEach(c => { c.width = 1; c.height = 1; });
     cwEl.style.display = 'none';
-    document.getElementById('dz').style.display = '';
+    showHome(); // [V0.40] ホーム画面を表示
     document.getElementById('fnlbl').textContent = 'ファイル未選択';
     document.getElementById('tpn').textContent   = '0';
     document.getElementById('zlbl').textContent  = '--';
     subWindows.slice().forEach(sw => sw.close());
     _fileHandle = null; renderScale = 1; cssExtraZoom = 1;
+    DocMgr.reset(); // [V0.39] 現在DocIDをリセット
   }
 
   /* ---- ファイル入力 ---- */
@@ -2220,7 +2416,7 @@ const App = (() => {
       cwEl.style.display = 'block';
       await renderPage(curPage);
     } else {
-      document.getElementById('dz').style.display = '';
+      showHome(); // [V0.40] ホーム画面を表示
       cwEl.style.display = 'none';
       document.getElementById('zlbl').textContent = '--';
       [pdfCvs, annCvs, ovlCvs].forEach(c => { c.width = 1; c.height = 1; });
@@ -2265,7 +2461,7 @@ const App = (() => {
       }
     }
   } catch(e) { console.error('[起動] IDB.get 失敗:', e); }
-  if (!saved?.buf) { clearTimeout(_safetyTimer); return; }
+  if (!saved?.buf) { clearTimeout(_safetyTimer); showHome(); return; }
 
   showLoading(true);
   try {
@@ -3330,11 +3526,70 @@ function showLoading(visible) {
 }
 
 /* ============================================================
+   [V0.40] ホーム画面
+   ============================================================ */
+async function _renderHome() {
+  const listEl  = document.getElementById('home-list');
+  const emptyEl = document.getElementById('home-empty');
+  listEl.innerHTML = '';
+  let docs = [];
+  try { docs = await DocMgr.list(); } catch(_) {}
+  if (!docs.length) { emptyEl.style.display = 'flex'; return; }
+  emptyEl.style.display = 'none';
+  docs.forEach(doc => {
+    const card = document.createElement('div');
+    card.className = 'home-card';
+    const dt  = new Date(doc.updatedAt);
+    const ds  = `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}`;
+    const nm  = doc.name.replace(/\.pdf$/i, '');
+    card.innerHTML =
+      `<div class="home-card-icon">📄</div>` +
+      `<div class="home-card-name" title="${doc.name}">${nm}</div>` +
+      `<div class="home-card-date">${ds}</div>` +
+      `<button class="home-card-del" title="削除">✕</button>`;
+    card.querySelector('.home-card-del').addEventListener('pointerdown', async e => {
+      e.stopPropagation();
+      if (confirm(`「${nm}」を削除しますか？`)) {
+        await DocMgr.remove(doc.id); _renderHome();
+      }
+    });
+    card.addEventListener('click', async () => {
+      const full = await DocMgr.get(doc.id);
+      if (!full?.originalPdfBytes) { showToast('データが見つかりません'); return; }
+      hideHome();
+      await App.loadPDF({ name: full.name }, new Uint8Array(full.originalPdfBytes));
+    });
+    listEl.appendChild(card);
+  });
+}
+
+function showHome() {
+  document.getElementById('home').style.display = 'flex';
+  document.getElementById('dz').style.display   = 'none';
+  _renderHome();
+}
+function hideHome() {
+  document.getElementById('home').style.display = 'none';
+}
+
+/* ============================================================
    イベントバインド (DOMContentLoaded後に実行)
    ============================================================ */
 (function bindEvents() {
   /* --- ヘッダー行1 --- */
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
+  document.getElementById('home-open').addEventListener('click', () => openFile());
+  document.getElementById('btn-home') .addEventListener('click', () => showHome());
+  // [V0.40] ホーム画面のD&D
+  ;(()=>{
+    const homeEl = document.getElementById('home');
+    homeEl.addEventListener('dragover', e => e.preventDefault());
+    homeEl.addEventListener('drop', e => {
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (f && f.type === 'application/pdf') { hideHome(); App.loadPDF(f); }
+    });
+  })();
   // [V0.35] undo: 最後に描画したパネルに振り分け
   document.getElementById('btn-undo').addEventListener('click', () => App.undo()); // [V0.35] 分割削除で常にメインへ
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
