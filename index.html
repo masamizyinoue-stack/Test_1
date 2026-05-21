@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.35</title>
+<title>M_Viewer V0.36</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -485,7 +485,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.35</div>
+    <div class="dzm">M_Viewer V0.36</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -3054,7 +3054,7 @@ function _parsePageRange(input, total) {
   return [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
 }
 
-/** ③ 指定ページのみ出力する PDF を生成 [V0.35] 正式注釈 + hidden JSON */
+/** ③ 指定ページのみ出力する PDF を生成 [V0.36] 注釈保持のため srcDoc 直接保存 */
 async function _generateSubsetPDF(pageNums) {
   const PL = window.PDFLib;
   if (!PL) { showToast('⚠ pdf-lib 未ロード'); return null; }
@@ -3065,7 +3065,6 @@ async function _generateSubsetPDF(pageNums) {
     const page = srcDoc.getPage(pn - 1);
     const { width, height } = page.getSize();
     if (ss.some(s => s.type === 'eraser')) {
-      // 消しゴムあり → 全ラスタ化（既存処理を維持）
       await _pdfRasterPage(srcDoc, page, pn, ss, width, height);
     } else {
       // [V0.35] 消しゴムなし → 正式PDF注釈を追加
@@ -3075,19 +3074,16 @@ async function _generateSubsetPDF(pageNums) {
   // [V0.35] 全ストロークを hidden JSON として Keywords に埋め込む
   await _embedMVData(srcDoc, App.strokes);
 
-  const newDoc = await PL.PDFDocument.create();
-  const indices = pageNums.map(n => n - 1);
-  const copied  = await newDoc.copyPages(srcDoc, indices);
-  copied.forEach((p, i) => {
-    newDoc.addPage(p);
-    // copyPages が Rotate メタデータを保持しない場合に備えて明示的に再設定
-    try {
-      const srcPage = srcDoc.getPage(indices[i]);
-      const rotAngle = srcPage.getRotation()?.angle ?? 0;
-      if (rotAngle) p.setRotation(PL.degrees(rotAngle));
-    } catch(_) {}
-  });
-  return new Blob([await newDoc.save()], { type: 'application/pdf' });
+  // [V0.36] copyPages を使わず srcDoc を直接保存（copyPages は /Annots を引き継がない）
+  // 部分ページ指定の場合は不要ページを後ろから削除して注釈を保持したまま出力
+  const total = srcDoc.getPageCount();
+  if (pageNums.length < total) {
+    const keep = new Set(pageNums);
+    for (let i = total - 1; i >= 0; i--) {
+      if (!keep.has(i + 1)) srcDoc.removePage(i);
+    }
+  }
+  return new Blob([await srcDoc.save()], { type: 'application/pdf' });
 }
 
 /** ③ 実際のPDF出力処理（ダイアログ確定後に呼ぶ） */
