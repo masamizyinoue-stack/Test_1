@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.33</title>
+<title>M_Viewer V0.34</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -29,15 +29,15 @@ body {
   background: var(--bg); color: var(--tx);
   font-family: 'Helvetica Neue', Arial, sans-serif;
   display: flex; flex-direction: column;
-  height: 100vh; /* [V0.33] fallback: 旧Safari */
-  height: 100dvh; /* [V0.33] dynamic viewport height (iOS Safari 15.4+, Split View対応) */
+  height: 100vh; /* [V0.34] fallback: 旧Safari */
+  height: 100dvh; /* [V0.34] dynamic viewport height (iOS Safari 15.4+, Split View対応) */
   user-select: none; -webkit-user-select: none;
 }
 
 /* ===== ヘッダー ===== */
-#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.33: スクロール防止 */
+#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.34: スクロール防止 */
 .hr {
-  /* V0.33: 高さを0.95倍縮小 (40→38px), padding微調整 */
+  /* V0.34: 高さを0.95倍縮小 (40→38px), padding微調整 */
   height: 38px; display: flex; align-items: center; gap: 5px; padding: 0 7px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   overflow-y: hidden; /* 縦スクロール防止 */
@@ -49,12 +49,12 @@ body {
   font-size: 12px; font-weight: 800; color: var(--acc); padding-right: 6px;
   border-right: 2px solid var(--brd); white-space: nowrap; flex-shrink: 0;
 }
-.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.33: 0.95倍 */
+.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.34: 0.95倍 */
 .sp { flex: 1; }
 
 /* ボタン共通 */
 .btn {
-  /* V0.33: 高さ0.95倍 (34→32px) */
+  /* V0.34: 高さ0.95倍 (34→32px) */
   height: 32px; padding: 0 9px; border: 1.5px solid var(--brd); background: var(--pan2);
   color: var(--tx); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
   white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;
@@ -83,7 +83,7 @@ body {
 
 /* カラースウォッチ */
 .csw {
-  /* V0.33: 0.95倍 (28→26px) */
+  /* V0.34: 0.95倍 (28→26px) */
   width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent;
   cursor: pointer; flex-shrink: 0; transition: transform .1s;
 }
@@ -205,7 +205,7 @@ body {
 .pgr-q { flex: 1; height: 32px; border-radius: 6px; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx2); font-size: 11px; cursor: pointer; font-weight: 600; }
 .pgr-q:active { background: var(--brd); }
 
-/* [V0.33] 分割ビュー削除により関連CSSを全削除 */
+/* [V0.34] 分割ビュー削除により関連CSSを全削除 */
 
 /* ===== タブバー ===== */
 #tabbar {
@@ -300,9 +300,9 @@ body {
 #toast.on { opacity: 1; }
 
 
-/* ===== タッチデバイス最適化 (pointer: coarse) V0.33調整版 ===== */
+/* ===== タッチデバイス最適化 (pointer: coarse) V0.34調整版 ===== */
 @media (pointer: coarse) {
-  /* [V0.33] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
+  /* [V0.34] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
   .hr {
     height: 46px;
     gap: 6px;
@@ -311,7 +311,7 @@ body {
     padding-right: max(9px, env(safe-area-inset-right));
     overflow-y: hidden; /* 縦スクロール防止 */
   }
-  /* [V0.33] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
+  /* [V0.34] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
   .btn {
     height: 38px;
     padding: 0 11px;
@@ -319,33 +319,33 @@ body {
     border-radius: 9px;
     gap: 4px;
   }
-  /* [V0.33] カラースウォッチ: 34→32px */
+  /* [V0.34] カラースウォッチ: 34→32px */
   .csw {
     width: 32px;
     height: 32px;
     border-width: 3px;
   }
-  /* [V0.33] 区切り線: 30→28px */
+  /* [V0.34] 区切り線: 30→28px */
   .vs {
     height: 28px;
     margin: 0 4px;
   }
-  /* [V0.33] ページ番号入力: 高さ34→32px */
+  /* [V0.34] ページ番号入力: 高さ34→32px */
   .pgni {
     width: 38px;
     font-size: 13px;
     height: 32px;
     padding: 3px 0;
   }
-  /* [V0.33] ページ合計・ズーム・ファイル名テキスト調整 */
+  /* [V0.34] ページ合計・ズーム・ファイル名テキスト調整 */
   .pgtot { font-size: 12px; }
   .zlbl { font-size: 13px; min-width: 40px; }
   #fnlbl { font-size: 12px; max-width: 180px; }
-  /* [V0.33] ドロップダウン: 44→42px */
+  /* [V0.34] ドロップダウン: 44→42px */
   .pkp button { height: 42px; font-size: 12px; }
-  /* [V0.33] ロゴ */
+  /* [V0.34] ロゴ */
   .logo { font-size: 12px; padding-right: 7px; }
-  /* [V0.33] safe-area: ヘッダー下端対応 */
+  /* [V0.34] safe-area: ヘッダー下端対応 */
   #hdr {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -353,7 +353,7 @@ body {
 
 /* ===== iPad横向き専用: ヘッダー収縮・スクロール防止 ===== */
 @media (pointer: coarse) and (orientation: landscape) {
-  /* [V0.33] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
+  /* [V0.34] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
   .hr {
     height: 42px;
     gap: 5px;
@@ -361,23 +361,23 @@ body {
     padding-left: max(8px, env(safe-area-inset-left));
     padding-right: max(8px, env(safe-area-inset-right));
   }
-  /* [V0.33] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
+  /* [V0.34] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
   .btn {
     height: 35px;
     padding: 0 10px;
     font-size: 12px;
     border-radius: 8px;
   }
-  /* [V0.33] 横向きスウォッチ */
+  /* [V0.34] 横向きスウォッチ */
   .csw { width: 30px; height: 30px; }
-  /* [V0.33] 横向き区切り線 */
+  /* [V0.34] 横向き区切り線 */
   .vs { height: 26px; margin: 0 3px; }
-  /* [V0.33] 横向きページ入力 */
+  /* [V0.34] 横向きページ入力 */
   .pgni { height: 30px; font-size: 12px; }
 }
 
 
-/* ===== [V0.33] iPad Split View / Slide Over: 横幅 ≤600px 時ツールバー圧縮 ===== */
+/* ===== [V0.34] iPad Split View / Slide Over: 横幅 ≤600px 時ツールバー圧縮 ===== */
 @media (pointer: coarse) and (max-width: 600px) {
   .hr {
     height: 40px; gap: 4px;
@@ -392,7 +392,7 @@ body {
   #fnlbl { max-width: 80px; font-size: 10px; }
   .pgni  { width: 32px; height: 28px; font-size: 12px; }
 }
-/* ===== [V0.33] iPad Split View 最小幅 (Slide Over / 1/3 分割) ≤430px ===== */
+/* ===== [V0.34] iPad Split View 最小幅 (Slide Over / 1/3 分割) ≤430px ===== */
 @media (pointer: coarse) and (max-width: 430px) {
   .hr  { height: 36px; gap: 3px; }
   .btn { height: 28px; padding: 0 5px; font-size: 10px; border-radius: 7px; }
@@ -407,7 +407,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.33</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.34</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -485,7 +485,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.33</div>
+    <div class="dzm">M_Viewer V0.34</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -667,6 +667,25 @@ function safeKey(s) {
   return s.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
 }
 
+/* [V0.34] インスタンスID
+ * sessionStorage はウインドウ毎に独立 → iPad Split View 2画面起動時に
+ * 各ウインドウが別IDを持ち、IDBキーを分離して競合・上書きを防止する。
+ * ページリロード時は同一IDを維持（セッション継続のため）。
+ */
+const _INST_ID = (() => {
+  const KEY = 'mv_iid';
+  let id = sessionStorage.getItem(KEY);
+  if (!id) {
+    id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    sessionStorage.setItem(KEY, id);
+  }
+  return id;
+})();
+/* [V0.34] インスタンス別IDBキー: last セーブデータ競合防止 */
+const _KEY_LAST   = 'last:'   + _INST_ID;
+const _KEY_BK_LAT = 'bk:lat:' + _INST_ID;
+const _KEY_BK_PRV = 'bk:prv:' + _INST_ID;
+
 let _autoSaveTimer;
 /* ============================================================
    診断用 機能フラグ制御 (freeze 原因特定システム)
@@ -750,7 +769,7 @@ function schedSave() {
       scale:   App.scale,
       ts:      Date.now()
     };
-    await IDB.set('last', data);
+    await IDB.set(_KEY_LAST, data); // [V0.34] インスタンス別キー → 別ウインドウと競合しない
     await IDB.set('f:' + safeKey(App.fileName), data);
   }, SAVE_DELAY);
 }
@@ -859,12 +878,12 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
  *    → 常に単純描画パス（temp canvas 生成ゼロ・compositing なし）
  */
 function _drawAnnotations(ctx, strks, sc) {
-  if (!strks?.length) return; // [V0.33] null safety 簡略化
+  if (!strks?.length) return; // [V0.34] null safety 簡略化
   strks.forEach(s => drawStroke(s, ctx, sc));
 }
 
 /**
- * [V0.33] ライブペン/蛍光ペン描画共通関数
+ * [V0.34] ライブペン/蛍光ペン描画共通関数
  * App / SubWin で共通化
  * @param {CanvasRenderingContext2D} ctx - 描画先 context
  * @param {object} s   - ストロークオブジェクト (type, color, size, points)
@@ -884,7 +903,7 @@ function _drawLivePen(ctx, s, p, sc) {
 }
 
 /**
- * [V0.33] 消しゴムカーソル（破線円）描画共通関数
+ * [V0.34] 消しゴムカーソル（破線円）描画共通関数
  * App / SubWin で共通化
  * ※呼び出し側で ovlCtx.clearRect は済ませること
  */
@@ -1041,15 +1060,15 @@ class SubWin {
     const rH = region.y2 - region.y1;
     this.winW = Math.max(180, Math.round(rW * this.innerScale) + 4);
     this.winH = Math.max(160, Math.round(rH * this.innerScale) + 30);
-    this.sx   = Math.max(4, Math.min(_vvWidth()  - this.winW - 10, screenX)); // [V0.33] visual viewport
-    this.sy   = Math.max(4, Math.min(_vvHeight() - this.winH - 10, screenY)); // [V0.33] visual viewport
+    this.sx   = Math.max(4, Math.min(_vvWidth()  - this.winW - 10, screenX)); // [V0.34] visual viewport
+    this.sy   = Math.max(4, Math.min(_vvHeight() - this.winH - 10, screenY)); // [V0.34] visual viewport
 
     this.pinch     = null; this.panSt    = null;
     this.curStroke = null; this.isDrawing = false;
     this.lastX = 0; this.lastY = 0;
     this.selPath = []; this.selectedIdx = []; // 選択ツール用
     this.swSelPath = []; this.swSelectedIdx = []; // 選択ツール用
-    this._drawRafId = null; // [V0.33] 図形プレビュー用rAF ID
+    this._drawRafId = null; // [V0.34] 図形プレビュー用rAF ID
 
     this._renderVer  = 0;
     this._pdfCache   = null; this._pdfCacheSc = 0; this._pdfCachePg = 0;
@@ -1269,7 +1288,7 @@ class SubWin {
       this.swSelPath = [{ x: p.x, y: p.y }]; this.isDrawing = true; return;
     }
     if (currentTool === 'text') {
-      txX = p.x; txY = p.y; // [V0.33] SubWinテキストは常にメイン(App)へ
+      txX = p.x; txY = p.y; // [V0.34] SubWinテキストは常にメイン(App)へ
       document.getElementById('txfld').value = '';
       document.getElementById('txov').classList.add('on');
       return;
@@ -1298,7 +1317,7 @@ class SubWin {
 
     if (['pen','hl'].includes(s.type)) {
       s.points.push([p.x, p.y]);
-      _drawLivePen(this.ctx, s, p, sc); // [V0.33] 共通関数化
+      _drawLivePen(this.ctx, s, p, sc); // [V0.34] 共通関数化
       this.lastX = p.x; this.lastY = p.y;
 
     } else if (s.type === 'eraser') {
@@ -1321,7 +1340,7 @@ class SubWin {
 
     } else {
       s.x2 = p.x; s.y2 = p.y;
-      // [V0.33] setTimeout(30ms)→rAFで表示レートに同期した滑らかなプレビュー
+      // [V0.34] setTimeout(30ms)→rAFで表示レートに同期した滑らかなプレビュー
       cancelAnimationFrame(this._drawRafId);
       this._drawRafId = requestAnimationFrame(() => this.render());
     }
@@ -1366,7 +1385,7 @@ class SubWin {
     const onMove = e => {
       if (!dragging) return;
       const s = e.touches ? e.touches[0] : e;
-      // [V0.33] viewport内に収まるようクランプ (サブ窓タイトルバーが画面外に出ない)
+      // [V0.34] viewport内に収まるようクランプ (サブ窓タイトルバーが画面外に出ない)
       const vw = window.innerWidth, vh = window.innerHeight;
       const ew = this.el.offsetWidth || this.winW || 200;
       const eh = this.el.offsetHeight || this.winH || 160;
@@ -1440,7 +1459,7 @@ class SubWin {
   /* ---- 選択ツール（メインウインドウと同等） ---- */
   _swFinishSel() {
     const arr = this.strokes[this.pageNum] || [];
-    // [V0.33] selModeを参照してなげなわ／矩形を分岐
+    // [V0.34] selModeを参照してなげなわ／矩形を分岐
     if (selMode === 'lasso' && this.swSelPath.length >= 3) {
       // なげなわ選択: 自由線ポリゴンでptInPoly判定
       const poly = this.swSelPath.map(p => [p.x, p.y]);
@@ -1477,7 +1496,7 @@ class SubWin {
     this.selCtx.save();
     this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
     const sc = this.innerScale;
-    // [V0.33] selModeに応じてなげなわ自由線／矩形を描き分け
+    // [V0.34] selModeに応じてなげなわ自由線／矩形を描き分け
     if (selMode === 'lasso') {
       // なげなわ: 自由線パスをlineTo描画
       this.selCtx.setLineDash([]);
@@ -1580,9 +1599,9 @@ class SubWin {
   }
 }
 
-/* [V0.33] SplitViewer クラス削除 */
+/* [V0.34] SplitViewer クラス削除 */
 
-/* [V0.33] 分割ビュー制御・スプリッタードラッグ削除 */
+/* [V0.34] 分割ビュー制御・スプリッタードラッグ削除 */
 
 /* ============================================================
    メインアプリ
@@ -1822,14 +1841,14 @@ const App = (() => {
 
     if (['pen','hl'].includes(s.type)) {
       s.points.push([p.x, p.y]);
-      _drawLivePen(annCtx, s, p, sc); // [V0.33] 共通関数化
+      _drawLivePen(annCtx, s, p, sc); // [V0.34] 共通関数化
       lastX = p.x; lastY = p.y;
 
     } else if (s.type === 'eraser') {
       s.points.push([p.x, p.y]); lastX = p.x; lastY = p.y;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       drawSubOverlays();
-      _drawEraserCursor(ovlCtx, p, s, sc, invEZ); // [V0.33] 共通関数化
+      _drawEraserCursor(ovlCtx, p, s, sc, invEZ); // [V0.34] 共通関数化
 
     } else {
       // 図形プレビューを ovlCvs へ描画（全注釈 redraw を回避 → touchmove 軽量化）
@@ -2210,7 +2229,19 @@ const App = (() => {
   }, 6000);
 
   let saved = null;
-  try { saved = await IDB.get('last'); } catch(e) { console.error('[起動] IDB.get 失敗:', e); }
+  try {
+    // [V0.34] インスタンス別キー優先（リロード時継続）→ 旧 'last' へフォールバック（初回起動互換）
+    saved = await IDB.get(_KEY_LAST);
+    if (!saved?.buf) {
+      const legacy = await IDB.get('last');
+      if (legacy?.buf) {
+        saved = legacy;
+        // 旧共有キーからインスタンス別キーへ移行し 'last' をクリア（競合防止）
+        await IDB.set(_KEY_LAST, legacy).catch(()=>{});
+        await IDB.set('last', null).catch(()=>{});
+      }
+    }
+  } catch(e) { console.error('[起動] IDB.get 失敗:', e); }
   if (!saved?.buf) { clearTimeout(_safetyTimer); return; }
 
   showLoading(true);
@@ -2378,7 +2409,7 @@ async function closeSheetAt(idx) {
     _thawSubWins(sh.subWinStates, sh.pdfDoc, App.strokes);
   }
   // PDF未選択状態になったら起動時復元キーをクリア（手動で閉じたデータを復元しない）
-  if (!App.pdfDoc) await IDB.set('last', null);
+  if (!App.pdfDoc) await IDB.set(_KEY_LAST, null); // [V0.34] インスタンス別キー
   _renderTabBar();
   showLoading(false);
 }
@@ -2396,7 +2427,7 @@ _renderTabBar();
    対象: 全シートの注釈・設定・プロジェクト状態 (PDFバイナリは除く)
    形式: MVIEWER_BACKUP_YYYYMMDD_HHMM.zip (JSZip)
    ============================================================ */
-const BACKUP_INTERVAL_MS = 10 * 60 * 1000; // [V0.33] 10分ごと自動バックアップ (負荷軽減)
+const BACKUP_INTERVAL_MS = 10 * 60 * 1000; // [V0.34] 10分ごと自動バックアップ (負荷軽減)
 
 /** ZIPデータ構造を生成 */
 async function _buildBackupZip() {
@@ -2466,7 +2497,7 @@ async function downloadBackup() {
   showLoading(false);
 }
 
-/** [V0.33] 自動バックアップ: IDBに最新2世代を保存（完全サイレント・非同期UI非妨害）
+/** [V0.34] 自動バックアップ: IDBに最新2世代を保存（完全サイレント・非同期UI非妨害）
  *  - ダウンロードダイアログ・ポップアップなし
  *  - 圧縮レベル1(高速)でUIカクつき軽減
  *  - await yield でUIスレッドを解放
@@ -2479,22 +2510,23 @@ async function _autoBackupToIDB() {
     await new Promise(r => setTimeout(r, 0));
     const zip = await _buildBackupZip();
     if (!zip) return;
-    // [V0.33] 圧縮レベル1(高速)→UIフリーズ軽減, 完全停止なし
+    // [V0.34] 圧縮レベル1(高速)→UIフリーズ軽減, 完全停止なし
     const buf = await zip.generateAsync({type:'arraybuffer', compression:'DEFLATE', compressionOptions:{level:1}});
     // UIスレッド再解放
     await new Promise(r => setTimeout(r, 0));
     const now = new Date();
     const p = n => String(n).padStart(2,'0');
     const ts = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
-    const prev = await IDB.get('backup:latest').catch(()=>null);
-    if (prev) await IDB.set('backup:prev', prev).catch(()=>{});
-    await IDB.set('backup:latest', {ts, buf});
-    // [V0.33] ログのみ。Toastは表示しない（操作妨害防止）
+    // [V0.34] インスタンス別バックアップキー → 別ウインドウが latest/prev を上書きしない
+    const prev = await IDB.get(_KEY_BK_LAT).catch(()=>null);
+    if (prev) await IDB.set(_KEY_BK_PRV, prev).catch(()=>{});
+    await IDB.set(_KEY_BK_LAT, {ts, buf});
+    // [V0.34] ログのみ。Toastは表示しない（操作妨害防止）
     console.log(`[Backup] 自動バックアップ完了 (${ts})`);
   } catch(e) { console.warn('[Backup] 自動バックアップ失敗:', e); }
 }
 
-// [V0.33] 自動バックアップ: IDB保存のみ（ダウンロードダイアログ廃止）
+// [V0.34] 自動バックアップ: IDB保存のみ（ダウンロードダイアログ廃止）
 // ダウンロードが必要な場合はヘッダーの「バックアップ」ボタンを手動で押下
 setInterval(_autoBackupToIDB, BACKUP_INTERVAL_MS);
 
@@ -2542,7 +2574,7 @@ function setTool(t) {
   subWindows.forEach(sw => { if (sw._swClearSel) sw._swClearSel(); });
   if (t !== 'sub') prevTool = currentTool;
   currentTool = t;
-  // [V0.33] t-split は分割状態ボタンなのでツール切替時に除外
+  // [V0.34] t-split は分割状態ボタンなのでツール切替時に除外
   document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
   document.getElementById('t-' + t)?.classList.add('on');
   closeAllPickers();
@@ -2564,7 +2596,7 @@ function pickShape(shapeName) {
   currentShape = shapeName; currentTool = 'shape';
   const LABELS = { arrow:'矢印▾', rect:'四角▾', circle:'円▾', line:'直線▾' };
   document.getElementById('t-shape').textContent = LABELS[shapeName];
-  // [V0.33] t-split は分割状態ボタンなのでツール切替時に除外
+  // [V0.34] t-split は分割状態ボタンなのでツール切替時に除外
   document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
   document.getElementById('t-shape').classList.add('on');
   document.querySelectorAll('#shapepop button').forEach(b => b.classList.remove('on'));
@@ -2579,27 +2611,27 @@ function setSelMode(mode) {
   selMode = mode; currentTool = 'select';
   document.getElementById('sel-rect').classList.toggle ('on', mode === 'rect');
   document.getElementById('sel-lasso').classList.toggle('on', mode === 'lasso');
-  // [V0.33] t-split は分割状態ボタンなのでツール切替時に除外
+  // [V0.34] t-split は分割状態ボタンなのでツール切替時に除外
   document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
   document.getElementById('t-select').classList.add('on');
   closeAllPickers();
 }
 
-/* [V0.33] visual viewport サイズ取得ヘルパー (iPad Split View / Slide Over 対応)
+/* [V0.34] visual viewport サイズ取得ヘルパー (iPad Split View / Slide Over 対応)
  * window.innerWidth は Split View 変化に遅延する場合があるため visualViewport 優先
  */
 function _vvWidth()  { return window.visualViewport?.width  ?? window.innerWidth;  }
 function _vvHeight() { return window.visualViewport?.height ?? window.innerHeight; }
 
-/* [V0.33] ポップオーバー位置補正共通関数
+/* [V0.34] ポップオーバー位置補正共通関数
  * el: position:fixed な要素, anchor: アンカーの getBoundingClientRect()
  * ・右端/下端はみ出し → 自動反転・シフト
  * ・safe-area-inset を 8px マージンで近似
  */
 function _clampPopover(el, anchor) {
   const mg = 8; // 最小マージン(safe-area近似含む)
-  const vw = _vvWidth();  // [V0.33] visual viewport 使用
-  const vh = _vvHeight(); // [V0.33] visual viewport 使用
+  const vw = _vvWidth();  // [V0.34] visual viewport 使用
+  const vh = _vvHeight(); // [V0.34] visual viewport 使用
   const ew = el.offsetWidth  || 260;
   const eh = el.offsetHeight || 120;
 
@@ -2629,7 +2661,7 @@ function togglePicker(id, btnEl) {
     pk.style.top  = (b.bottom + 4) + 'px';
     pk.style.left = b.left + 'px';
     pk.classList.add('on');
-    _clampPopover(pk, b); // [V0.33] viewport内に収まるよう補正
+    _clampPopover(pk, b); // [V0.34] viewport内に収まるよう補正
   }
 }
 function closeAllPickers() {
@@ -2656,7 +2688,7 @@ function toggleSzPanel(btnEl) {
   document.getElementById('sz-n').value   = strokeSize;
   drawSzPreview(strokeSize);
   p.classList.add('on');
-  _clampPopover(p, b); // [V0.33] viewport内に収まるよう補正
+  _clampPopover(p, b); // [V0.34] viewport内に収まるよう補正
 }
 function onSzChange(v) {
   szTmp = Math.max(1, Math.min(40, parseInt(v) || 1));
@@ -2685,7 +2717,7 @@ function drawSzPreview(sz) {
 /* ---- テキスト ---- */
 function cancelTx()  { document.getElementById('txov').classList.remove('on'); }
 function confirmTx() {
-  // [V0.33] 分割削除により常にメイン(App)へ保存
+  // [V0.34] 分割削除により常にメイン(App)へ保存
   const txt = document.getElementById('txfld').value.trim();
   if (txt) {
     if (!App.strokes[App.currentPage]) App.strokes[App.currentPage] = [];
@@ -3022,9 +3054,9 @@ function toggleCalc() {
   const nowOn = !el.classList.contains('on');
   el.classList.toggle('on');
   document.getElementById('calcbtn').classList.toggle('on', nowOn);
-  // [V0.33] 初回表示時: CSS bottom/right → left/top へ変換しクランプ
+  // [V0.34] 初回表示時: CSS bottom/right → left/top へ変換しクランプ
   if (nowOn && !el.style.left) {
-    const vw = _vvWidth(), vh = _vvHeight(); // [V0.33] visual viewport
+    const vw = _vvWidth(), vh = _vvHeight(); // [V0.34] visual viewport
     const ew = el.offsetWidth || 290, eh = el.offsetHeight || 380;
     el.style.left   = Math.max(8, vw - ew - 16) + 'px';
     el.style.top    = Math.max(8, vh - eh - 20) + 'px';
@@ -3046,7 +3078,7 @@ function toggleCalc() {
   const onMove = e => {
     if (!dragging) return;
     const s = e.touches ? e.touches[0] : e;
-    // [V0.33] viewport内に収まるようクランプ / [V0.33] visual viewport 使用
+    // [V0.34] viewport内に収まるようクランプ / [V0.34] visual viewport 使用
     const vw = _vvWidth(), vh = _vvHeight();
     const ew = el.offsetWidth || 290, eh = el.offsetHeight || 380;
     const newL = Math.max(0, Math.min(vw - ew, ex + s.clientX - ox));
@@ -3084,8 +3116,8 @@ function showLoading(visible) {
 (function bindEvents() {
   /* --- ヘッダー行1 --- */
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
-  // [V0.33] undo: 最後に描画したパネルに振り分け
-  document.getElementById('btn-undo').addEventListener('click', () => App.undo()); // [V0.33] 分割削除で常にメインへ
+  // [V0.34] undo: 最後に描画したパネルに振り分け
+  document.getElementById('btn-undo').addEventListener('click', () => App.undo()); // [V0.34] 分割削除で常にメインへ
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
   document.getElementById('btn-backup').addEventListener('click', () => downloadBackup());
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
@@ -3135,7 +3167,7 @@ function showLoading(visible) {
   document.getElementById('pgr-all').addEventListener('click', () => {
     const fld = document.getElementById('pgrfld');
     const total = App.totalPages;
-    // [V0.33] 総ページ数を「1-N」形式で入力欄に表示（空文字だと何も見えないため修正）
+    // [V0.34] 総ページ数を「1-N」形式で入力欄に表示（空文字だと何も見えないため修正）
     fld.value = total > 0 ? '1-' + total : '';
     // change/input イベントを発火してUI同期
     fld.dispatchEvent(new Event('input',  { bubbles: true }));
@@ -3161,9 +3193,9 @@ function showLoading(visible) {
   });
 
   /* --- 選択削除 --- */
-  // [V0.33] 削除ボタン: SubWin → 右パネル → メインの順に確認
+  // [V0.34] 削除ボタン: SubWin → 右パネル → メインの順に確認
   document.getElementById('selbtn').addEventListener('click', () => {
-    // [V0.33] 分割削除: SubWin → メインの順に確認
+    // [V0.34] 分割削除: SubWin → メインの順に確認
     if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
     else { App.deleteSelected(); }
   });
@@ -3192,7 +3224,7 @@ function showLoading(visible) {
 })();
 
 /* ============================================================
-   [V0.33] iPad Split View / Slide Over 対応
+   [V0.34] iPad Split View / Slide Over 対応
    visualViewport resize 監視 → Canvas再レンダ・位置再クランプ
    ============================================================ */
 ;(() => {
