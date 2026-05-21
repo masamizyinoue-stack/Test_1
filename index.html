@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.34</title>
+<title>M_Viewer V0.35</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -29,15 +29,15 @@ body {
   background: var(--bg); color: var(--tx);
   font-family: 'Helvetica Neue', Arial, sans-serif;
   display: flex; flex-direction: column;
-  height: 100vh; /* [V0.34] fallback: 旧Safari */
-  height: 100dvh; /* [V0.34] dynamic viewport height (iOS Safari 15.4+, Split View対応) */
+  height: 100vh; /* [V0.35] fallback: 旧Safari */
+  height: 100dvh; /* [V0.35] dynamic viewport height (iOS Safari 15.4+, Split View対応) */
   user-select: none; -webkit-user-select: none;
 }
 
 /* ===== ヘッダー ===== */
-#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.34: スクロール防止 */
+#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.35: スクロール防止 */
 .hr {
-  /* V0.34: 高さを0.95倍縮小 (40→38px), padding微調整 */
+  /* V0.35: 高さを0.95倍縮小 (40→38px), padding微調整 */
   height: 38px; display: flex; align-items: center; gap: 5px; padding: 0 7px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   overflow-y: hidden; /* 縦スクロール防止 */
@@ -49,12 +49,12 @@ body {
   font-size: 12px; font-weight: 800; color: var(--acc); padding-right: 6px;
   border-right: 2px solid var(--brd); white-space: nowrap; flex-shrink: 0;
 }
-.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.34: 0.95倍 */
+.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.35: 0.95倍 */
 .sp { flex: 1; }
 
 /* ボタン共通 */
 .btn {
-  /* V0.34: 高さ0.95倍 (34→32px) */
+  /* V0.35: 高さ0.95倍 (34→32px) */
   height: 32px; padding: 0 9px; border: 1.5px solid var(--brd); background: var(--pan2);
   color: var(--tx); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
   white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;
@@ -83,7 +83,7 @@ body {
 
 /* カラースウォッチ */
 .csw {
-  /* V0.34: 0.95倍 (28→26px) */
+  /* V0.35: 0.95倍 (28→26px) */
   width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent;
   cursor: pointer; flex-shrink: 0; transition: transform .1s;
 }
@@ -205,7 +205,7 @@ body {
 .pgr-q { flex: 1; height: 32px; border-radius: 6px; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx2); font-size: 11px; cursor: pointer; font-weight: 600; }
 .pgr-q:active { background: var(--brd); }
 
-/* [V0.34] 分割ビュー削除により関連CSSを全削除 */
+/* [V0.35] 分割ビュー削除により関連CSSを全削除 */
 
 /* ===== タブバー ===== */
 #tabbar {
@@ -300,9 +300,9 @@ body {
 #toast.on { opacity: 1; }
 
 
-/* ===== タッチデバイス最適化 (pointer: coarse) V0.34調整版 ===== */
+/* ===== タッチデバイス最適化 (pointer: coarse) V0.35調整版 ===== */
 @media (pointer: coarse) {
-  /* [V0.34] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
+  /* [V0.35] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
   .hr {
     height: 46px;
     gap: 6px;
@@ -311,7 +311,7 @@ body {
     padding-right: max(9px, env(safe-area-inset-right));
     overflow-y: hidden; /* 縦スクロール防止 */
   }
-  /* [V0.34] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
+  /* [V0.35] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
   .btn {
     height: 38px;
     padding: 0 11px;
@@ -319,33 +319,33 @@ body {
     border-radius: 9px;
     gap: 4px;
   }
-  /* [V0.34] カラースウォッチ: 34→32px */
+  /* [V0.35] カラースウォッチ: 34→32px */
   .csw {
     width: 32px;
     height: 32px;
     border-width: 3px;
   }
-  /* [V0.34] 区切り線: 30→28px */
+  /* [V0.35] 区切り線: 30→28px */
   .vs {
     height: 28px;
     margin: 0 4px;
   }
-  /* [V0.34] ページ番号入力: 高さ34→32px */
+  /* [V0.35] ページ番号入力: 高さ34→32px */
   .pgni {
     width: 38px;
     font-size: 13px;
     height: 32px;
     padding: 3px 0;
   }
-  /* [V0.34] ページ合計・ズーム・ファイル名テキスト調整 */
+  /* [V0.35] ページ合計・ズーム・ファイル名テキスト調整 */
   .pgtot { font-size: 12px; }
   .zlbl { font-size: 13px; min-width: 40px; }
   #fnlbl { font-size: 12px; max-width: 180px; }
-  /* [V0.34] ドロップダウン: 44→42px */
+  /* [V0.35] ドロップダウン: 44→42px */
   .pkp button { height: 42px; font-size: 12px; }
-  /* [V0.34] ロゴ */
+  /* [V0.35] ロゴ */
   .logo { font-size: 12px; padding-right: 7px; }
-  /* [V0.34] safe-area: ヘッダー下端対応 */
+  /* [V0.35] safe-area: ヘッダー下端対応 */
   #hdr {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -353,7 +353,7 @@ body {
 
 /* ===== iPad横向き専用: ヘッダー収縮・スクロール防止 ===== */
 @media (pointer: coarse) and (orientation: landscape) {
-  /* [V0.34] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
+  /* [V0.35] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
   .hr {
     height: 42px;
     gap: 5px;
@@ -361,23 +361,23 @@ body {
     padding-left: max(8px, env(safe-area-inset-left));
     padding-right: max(8px, env(safe-area-inset-right));
   }
-  /* [V0.34] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
+  /* [V0.35] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
   .btn {
     height: 35px;
     padding: 0 10px;
     font-size: 12px;
     border-radius: 8px;
   }
-  /* [V0.34] 横向きスウォッチ */
+  /* [V0.35] 横向きスウォッチ */
   .csw { width: 30px; height: 30px; }
-  /* [V0.34] 横向き区切り線 */
+  /* [V0.35] 横向き区切り線 */
   .vs { height: 26px; margin: 0 3px; }
-  /* [V0.34] 横向きページ入力 */
+  /* [V0.35] 横向きページ入力 */
   .pgni { height: 30px; font-size: 12px; }
 }
 
 
-/* ===== [V0.34] iPad Split View / Slide Over: 横幅 ≤600px 時ツールバー圧縮 ===== */
+/* ===== [V0.35] iPad Split View / Slide Over: 横幅 ≤600px 時ツールバー圧縮 ===== */
 @media (pointer: coarse) and (max-width: 600px) {
   .hr {
     height: 40px; gap: 4px;
@@ -392,7 +392,7 @@ body {
   #fnlbl { max-width: 80px; font-size: 10px; }
   .pgni  { width: 32px; height: 28px; font-size: 12px; }
 }
-/* ===== [V0.34] iPad Split View 最小幅 (Slide Over / 1/3 分割) ≤430px ===== */
+/* ===== [V0.35] iPad Split View 最小幅 (Slide Over / 1/3 分割) ≤430px ===== */
 @media (pointer: coarse) and (max-width: 430px) {
   .hr  { height: 36px; gap: 3px; }
   .btn { height: 28px; padding: 0 5px; font-size: 10px; border-radius: 7px; }
@@ -407,7 +407,7 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.34</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">V0.35</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -485,7 +485,7 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.34</div>
+    <div class="dzm">M_Viewer V0.35</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -667,7 +667,7 @@ function safeKey(s) {
   return s.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
 }
 
-/* [V0.34] インスタンスID
+/* [V0.35] インスタンスID
  * sessionStorage はウインドウ毎に独立 → iPad Split View 2画面起動時に
  * 各ウインドウが別IDを持ち、IDBキーを分離して競合・上書きを防止する。
  * ページリロード時は同一IDを維持（セッション継続のため）。
@@ -681,7 +681,7 @@ const _INST_ID = (() => {
   }
   return id;
 })();
-/* [V0.34] インスタンス別IDBキー: last セーブデータ競合防止 */
+/* [V0.35] インスタンス別IDBキー: last セーブデータ競合防止 */
 const _KEY_LAST   = 'last:'   + _INST_ID;
 const _KEY_BK_LAT = 'bk:lat:' + _INST_ID;
 const _KEY_BK_PRV = 'bk:prv:' + _INST_ID;
@@ -769,10 +769,26 @@ function schedSave() {
       scale:   App.scale,
       ts:      Date.now()
     };
-    await IDB.set(_KEY_LAST, data); // [V0.34] インスタンス別キー → 別ウインドウと競合しない
+    await IDB.set(_KEY_LAST, data); // [V0.35] インスタンス別キー → 別ウインドウと競合しない
     await IDB.set('f:' + safeKey(App.fileName), data);
   }, SAVE_DELAY);
 }
+
+// [V0.35] 画面が隠れる直前にもIDB保存を実行（iPad Split View切替・タブ切替時など）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && App.pdfDoc && App.origBuf) {
+    const clean = _pruneEraserStrokes(App.strokes);
+    const data  = {
+      buf:     App.origBuf.slice(0),
+      strokes: clean,
+      file:    App.fileName,
+      page:    App.currentPage,
+      ts:      Date.now()
+    };
+    IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
+    IDB.set(_KEY_LAST, data).catch(() => {});
+  }
+});
 
 /* ============================================================
    描画ユーティリティ
@@ -878,12 +894,12 @@ function drawStroke(s, ctx, sc, invEZ = 1) {
  *    → 常に単純描画パス（temp canvas 生成ゼロ・compositing なし）
  */
 function _drawAnnotations(ctx, strks, sc) {
-  if (!strks?.length) return; // [V0.34] null safety 簡略化
+  if (!strks?.length) return; // [V0.35] null safety 簡略化
   strks.forEach(s => drawStroke(s, ctx, sc));
 }
 
 /**
- * [V0.34] ライブペン/蛍光ペン描画共通関数
+ * [V0.35] ライブペン/蛍光ペン描画共通関数
  * App / SubWin で共通化
  * @param {CanvasRenderingContext2D} ctx - 描画先 context
  * @param {object} s   - ストロークオブジェクト (type, color, size, points)
@@ -903,7 +919,7 @@ function _drawLivePen(ctx, s, p, sc) {
 }
 
 /**
- * [V0.34] 消しゴムカーソル（破線円）描画共通関数
+ * [V0.35] 消しゴムカーソル（破線円）描画共通関数
  * App / SubWin で共通化
  * ※呼び出し側で ovlCtx.clearRect は済ませること
  */
@@ -1060,15 +1076,15 @@ class SubWin {
     const rH = region.y2 - region.y1;
     this.winW = Math.max(180, Math.round(rW * this.innerScale) + 4);
     this.winH = Math.max(160, Math.round(rH * this.innerScale) + 30);
-    this.sx   = Math.max(4, Math.min(_vvWidth()  - this.winW - 10, screenX)); // [V0.34] visual viewport
-    this.sy   = Math.max(4, Math.min(_vvHeight() - this.winH - 10, screenY)); // [V0.34] visual viewport
+    this.sx   = Math.max(4, Math.min(_vvWidth()  - this.winW - 10, screenX)); // [V0.35] visual viewport
+    this.sy   = Math.max(4, Math.min(_vvHeight() - this.winH - 10, screenY)); // [V0.35] visual viewport
 
     this.pinch     = null; this.panSt    = null;
     this.curStroke = null; this.isDrawing = false;
     this.lastX = 0; this.lastY = 0;
     this.selPath = []; this.selectedIdx = []; // 選択ツール用
     this.swSelPath = []; this.swSelectedIdx = []; // 選択ツール用
-    this._drawRafId = null; // [V0.34] 図形プレビュー用rAF ID
+    this._drawRafId = null; // [V0.35] 図形プレビュー用rAF ID
 
     this._renderVer  = 0;
     this._pdfCache   = null; this._pdfCacheSc = 0; this._pdfCachePg = 0;
@@ -1288,7 +1304,7 @@ class SubWin {
       this.swSelPath = [{ x: p.x, y: p.y }]; this.isDrawing = true; return;
     }
     if (currentTool === 'text') {
-      txX = p.x; txY = p.y; // [V0.34] SubWinテキストは常にメイン(App)へ
+      txX = p.x; txY = p.y; // [V0.35] SubWinテキストは常にメイン(App)へ
       document.getElementById('txfld').value = '';
       document.getElementById('txov').classList.add('on');
       return;
@@ -1317,7 +1333,7 @@ class SubWin {
 
     if (['pen','hl'].includes(s.type)) {
       s.points.push([p.x, p.y]);
-      _drawLivePen(this.ctx, s, p, sc); // [V0.34] 共通関数化
+      _drawLivePen(this.ctx, s, p, sc); // [V0.35] 共通関数化
       this.lastX = p.x; this.lastY = p.y;
 
     } else if (s.type === 'eraser') {
@@ -1340,7 +1356,7 @@ class SubWin {
 
     } else {
       s.x2 = p.x; s.y2 = p.y;
-      // [V0.34] setTimeout(30ms)→rAFで表示レートに同期した滑らかなプレビュー
+      // [V0.35] setTimeout(30ms)→rAFで表示レートに同期した滑らかなプレビュー
       cancelAnimationFrame(this._drawRafId);
       this._drawRafId = requestAnimationFrame(() => this.render());
     }
@@ -1385,7 +1401,7 @@ class SubWin {
     const onMove = e => {
       if (!dragging) return;
       const s = e.touches ? e.touches[0] : e;
-      // [V0.34] viewport内に収まるようクランプ (サブ窓タイトルバーが画面外に出ない)
+      // [V0.35] viewport内に収まるようクランプ (サブ窓タイトルバーが画面外に出ない)
       const vw = window.innerWidth, vh = window.innerHeight;
       const ew = this.el.offsetWidth || this.winW || 200;
       const eh = this.el.offsetHeight || this.winH || 160;
@@ -1459,7 +1475,7 @@ class SubWin {
   /* ---- 選択ツール（メインウインドウと同等） ---- */
   _swFinishSel() {
     const arr = this.strokes[this.pageNum] || [];
-    // [V0.34] selModeを参照してなげなわ／矩形を分岐
+    // [V0.35] selModeを参照してなげなわ／矩形を分岐
     if (selMode === 'lasso' && this.swSelPath.length >= 3) {
       // なげなわ選択: 自由線ポリゴンでptInPoly判定
       const poly = this.swSelPath.map(p => [p.x, p.y]);
@@ -1496,7 +1512,7 @@ class SubWin {
     this.selCtx.save();
     this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
     const sc = this.innerScale;
-    // [V0.34] selModeに応じてなげなわ自由線／矩形を描き分け
+    // [V0.35] selModeに応じてなげなわ自由線／矩形を描き分け
     if (selMode === 'lasso') {
       // なげなわ: 自由線パスをlineTo描画
       this.selCtx.setLineDash([]);
@@ -1599,9 +1615,9 @@ class SubWin {
   }
 }
 
-/* [V0.34] SplitViewer クラス削除 */
+/* [V0.35] SplitViewer クラス削除 */
 
-/* [V0.34] 分割ビュー制御・スプリッタードラッグ削除 */
+/* [V0.35] 分割ビュー制御・スプリッタードラッグ削除 */
 
 /* ============================================================
    メインアプリ
@@ -1841,14 +1857,14 @@ const App = (() => {
 
     if (['pen','hl'].includes(s.type)) {
       s.points.push([p.x, p.y]);
-      _drawLivePen(annCtx, s, p, sc); // [V0.34] 共通関数化
+      _drawLivePen(annCtx, s, p, sc); // [V0.35] 共通関数化
       lastX = p.x; lastY = p.y;
 
     } else if (s.type === 'eraser') {
       s.points.push([p.x, p.y]); lastX = p.x; lastY = p.y;
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       drawSubOverlays();
-      _drawEraserCursor(ovlCtx, p, s, sc, invEZ); // [V0.34] 共通関数化
+      _drawEraserCursor(ovlCtx, p, s, sc, invEZ); // [V0.35] 共通関数化
 
     } else {
       // 図形プレビューを ovlCvs へ描画（全注釈 redraw を回避 → touchmove 軽量化）
@@ -2092,11 +2108,18 @@ const App = (() => {
       document.getElementById('dz').style.display = 'none';
       cwEl.style.display = 'block';
 
-      const saved = await IDB.get('f:' + safeKey(file.name));
-      strokes = _pruneEraserStrokes(saved?.strokes || {});
-      await renderPage(1); await fit();
-      if (saved?.strokes && Object.keys(saved.strokes).length > 0)
-        showToast('📝 書き込みデータを復元しました');
+      // [V0.35] PDFのhidden JSONを優先復元、なければIDBにフォールバック
+      let stroksFromPdf = null;
+      try { stroksFromPdf = await _extractMVData(origBuf); } catch(_) {}
+      if (stroksFromPdf && Object.keys(stroksFromPdf).length > 0) {
+        strokes = _pruneEraserStrokes(stroksFromPdf);
+        showToast('📝 PDFの書き込みデータを復元しました');
+      } else {
+        const saved = await IDB.get('f:' + safeKey(file.name));
+        strokes = _pruneEraserStrokes(saved?.strokes || {});
+        if (saved?.strokes && Object.keys(saved.strokes).length > 0)
+          showToast('📝 書き込みデータを復元しました');
+      }
       _postLoadFn?.(); // シートタブへ同期 (シートマネージャーが登録)
     } catch(e) { showToast('読み込みに失敗しました'); console.error(e); }
     showLoading(false);
@@ -2230,7 +2253,7 @@ const App = (() => {
 
   let saved = null;
   try {
-    // [V0.34] インスタンス別キー優先（リロード時継続）→ 旧 'last' へフォールバック（初回起動互換）
+    // [V0.35] インスタンス別キー優先（リロード時継続）→ 旧 'last' へフォールバック（初回起動互換）
     saved = await IDB.get(_KEY_LAST);
     if (!saved?.buf) {
       const legacy = await IDB.get('last');
@@ -2409,7 +2432,7 @@ async function closeSheetAt(idx) {
     _thawSubWins(sh.subWinStates, sh.pdfDoc, App.strokes);
   }
   // PDF未選択状態になったら起動時復元キーをクリア（手動で閉じたデータを復元しない）
-  if (!App.pdfDoc) await IDB.set(_KEY_LAST, null); // [V0.34] インスタンス別キー
+  if (!App.pdfDoc) await IDB.set(_KEY_LAST, null); // [V0.35] インスタンス別キー
   _renderTabBar();
   showLoading(false);
 }
@@ -2427,7 +2450,7 @@ _renderTabBar();
    対象: 全シートの注釈・設定・プロジェクト状態 (PDFバイナリは除く)
    形式: MVIEWER_BACKUP_YYYYMMDD_HHMM.zip (JSZip)
    ============================================================ */
-const BACKUP_INTERVAL_MS = 10 * 60 * 1000; // [V0.34] 10分ごと自動バックアップ (負荷軽減)
+const BACKUP_INTERVAL_MS = 10 * 60 * 1000; // [V0.35] 10分ごと自動バックアップ (負荷軽減)
 
 /** ZIPデータ構造を生成 */
 async function _buildBackupZip() {
@@ -2497,7 +2520,7 @@ async function downloadBackup() {
   showLoading(false);
 }
 
-/** [V0.34] 自動バックアップ: IDBに最新2世代を保存（完全サイレント・非同期UI非妨害）
+/** [V0.35] 自動バックアップ: IDBに最新2世代を保存（完全サイレント・非同期UI非妨害）
  *  - ダウンロードダイアログ・ポップアップなし
  *  - 圧縮レベル1(高速)でUIカクつき軽減
  *  - await yield でUIスレッドを解放
@@ -2510,23 +2533,23 @@ async function _autoBackupToIDB() {
     await new Promise(r => setTimeout(r, 0));
     const zip = await _buildBackupZip();
     if (!zip) return;
-    // [V0.34] 圧縮レベル1(高速)→UIフリーズ軽減, 完全停止なし
+    // [V0.35] 圧縮レベル1(高速)→UIフリーズ軽減, 完全停止なし
     const buf = await zip.generateAsync({type:'arraybuffer', compression:'DEFLATE', compressionOptions:{level:1}});
     // UIスレッド再解放
     await new Promise(r => setTimeout(r, 0));
     const now = new Date();
     const p = n => String(n).padStart(2,'0');
     const ts = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
-    // [V0.34] インスタンス別バックアップキー → 別ウインドウが latest/prev を上書きしない
+    // [V0.35] インスタンス別バックアップキー → 別ウインドウが latest/prev を上書きしない
     const prev = await IDB.get(_KEY_BK_LAT).catch(()=>null);
     if (prev) await IDB.set(_KEY_BK_PRV, prev).catch(()=>{});
     await IDB.set(_KEY_BK_LAT, {ts, buf});
-    // [V0.34] ログのみ。Toastは表示しない（操作妨害防止）
+    // [V0.35] ログのみ。Toastは表示しない（操作妨害防止）
     console.log(`[Backup] 自動バックアップ完了 (${ts})`);
   } catch(e) { console.warn('[Backup] 自動バックアップ失敗:', e); }
 }
 
-// [V0.34] 自動バックアップ: IDB保存のみ（ダウンロードダイアログ廃止）
+// [V0.35] 自動バックアップ: IDB保存のみ（ダウンロードダイアログ廃止）
 // ダウンロードが必要な場合はヘッダーの「バックアップ」ボタンを手動で押下
 setInterval(_autoBackupToIDB, BACKUP_INTERVAL_MS);
 
@@ -2574,7 +2597,7 @@ function setTool(t) {
   subWindows.forEach(sw => { if (sw._swClearSel) sw._swClearSel(); });
   if (t !== 'sub') prevTool = currentTool;
   currentTool = t;
-  // [V0.34] t-split は分割状態ボタンなのでツール切替時に除外
+  // [V0.35] t-split は分割状態ボタンなのでツール切替時に除外
   document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
   document.getElementById('t-' + t)?.classList.add('on');
   closeAllPickers();
@@ -2596,7 +2619,7 @@ function pickShape(shapeName) {
   currentShape = shapeName; currentTool = 'shape';
   const LABELS = { arrow:'矢印▾', rect:'四角▾', circle:'円▾', line:'直線▾' };
   document.getElementById('t-shape').textContent = LABELS[shapeName];
-  // [V0.34] t-split は分割状態ボタンなのでツール切替時に除外
+  // [V0.35] t-split は分割状態ボタンなのでツール切替時に除外
   document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
   document.getElementById('t-shape').classList.add('on');
   document.querySelectorAll('#shapepop button').forEach(b => b.classList.remove('on'));
@@ -2611,27 +2634,27 @@ function setSelMode(mode) {
   selMode = mode; currentTool = 'select';
   document.getElementById('sel-rect').classList.toggle ('on', mode === 'rect');
   document.getElementById('sel-lasso').classList.toggle('on', mode === 'lasso');
-  // [V0.34] t-split は分割状態ボタンなのでツール切替時に除外
+  // [V0.35] t-split は分割状態ボタンなのでツール切替時に除外
   document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
   document.getElementById('t-select').classList.add('on');
   closeAllPickers();
 }
 
-/* [V0.34] visual viewport サイズ取得ヘルパー (iPad Split View / Slide Over 対応)
+/* [V0.35] visual viewport サイズ取得ヘルパー (iPad Split View / Slide Over 対応)
  * window.innerWidth は Split View 変化に遅延する場合があるため visualViewport 優先
  */
 function _vvWidth()  { return window.visualViewport?.width  ?? window.innerWidth;  }
 function _vvHeight() { return window.visualViewport?.height ?? window.innerHeight; }
 
-/* [V0.34] ポップオーバー位置補正共通関数
+/* [V0.35] ポップオーバー位置補正共通関数
  * el: position:fixed な要素, anchor: アンカーの getBoundingClientRect()
  * ・右端/下端はみ出し → 自動反転・シフト
  * ・safe-area-inset を 8px マージンで近似
  */
 function _clampPopover(el, anchor) {
   const mg = 8; // 最小マージン(safe-area近似含む)
-  const vw = _vvWidth();  // [V0.34] visual viewport 使用
-  const vh = _vvHeight(); // [V0.34] visual viewport 使用
+  const vw = _vvWidth();  // [V0.35] visual viewport 使用
+  const vh = _vvHeight(); // [V0.35] visual viewport 使用
   const ew = el.offsetWidth  || 260;
   const eh = el.offsetHeight || 120;
 
@@ -2661,7 +2684,7 @@ function togglePicker(id, btnEl) {
     pk.style.top  = (b.bottom + 4) + 'px';
     pk.style.left = b.left + 'px';
     pk.classList.add('on');
-    _clampPopover(pk, b); // [V0.34] viewport内に収まるよう補正
+    _clampPopover(pk, b); // [V0.35] viewport内に収まるよう補正
   }
 }
 function closeAllPickers() {
@@ -2688,7 +2711,7 @@ function toggleSzPanel(btnEl) {
   document.getElementById('sz-n').value   = strokeSize;
   drawSzPreview(strokeSize);
   p.classList.add('on');
-  _clampPopover(p, b); // [V0.34] viewport内に収まるよう補正
+  _clampPopover(p, b); // [V0.35] viewport内に収まるよう補正
 }
 function onSzChange(v) {
   szTmp = Math.max(1, Math.min(40, parseInt(v) || 1));
@@ -2717,7 +2740,7 @@ function drawSzPreview(sz) {
 /* ---- テキスト ---- */
 function cancelTx()  { document.getElementById('txov').classList.remove('on'); }
 function confirmTx() {
-  // [V0.34] 分割削除により常にメイン(App)へ保存
+  // [V0.35] 分割削除により常にメイン(App)へ保存
   const txt = document.getElementById('txfld').value.trim();
   if (txt) {
     if (!App.strokes[App.currentPage]) App.strokes[App.currentPage] = [];
@@ -2730,6 +2753,199 @@ function confirmTx() {
     schedSave();
   }
   cancelTx();
+}
+
+/* ============================================================
+   [V0.35] PDF ハイブリッド保存 ─ ヘルパー関数
+   ============================================================ */
+
+/** #rrggbb → [r, g, b] (0～1) */
+function _hexToRgb01(hex) {
+  const m = (hex || '#000000').replace('#', '').match(/../g);
+  return m ? m.map(h => parseInt(h, 16) / 255) : [0, 0, 0];
+}
+
+/** ストロークJSONをDeflate圧縮してPDFのKeywordsに埋め込む (MV1: プレフィックス) */
+async function _embedMVData(pdfDoc, allStrokes) {
+  const JSZip = window.JSZip;
+  if (!JSZip) return;
+  try {
+    const zip = new JSZip();
+    zip.file('d', JSON.stringify(allStrokes));
+    const b64 = await zip.generateAsync({
+      type: 'base64', compression: 'DEFLATE', compressionOptions: { level: 9 }
+    });
+    // 既存keywordsを保持しつつ MV1: エントリを上書き
+    let existing = [];
+    try { existing = (pdfDoc.getKeywords() || '').split('\n'); } catch(_) {}
+    const filtered = existing.filter(k => k && !k.startsWith('MV1:'));
+    pdfDoc.setKeywords([...filtered, 'MV1:' + b64]);
+  } catch(e) { console.warn('[V0.35] _embedMVData:', e); }
+}
+
+/** PDFのKeywordsから MV1: データを抽出してストロークオブジェクトを返す。
+ *  存在しない/失敗の場合は null を返す */
+async function _extractMVData(pdfBytes) {
+  const PL = window.PDFLib;
+  if (!PL) return null;
+  try {
+    const doc = await PL.PDFDocument.load(pdfBytes.slice(0),
+      { ignoreEncryption: true, throwOnInvalidObject: false });
+    const kw = doc.getKeywords() || '';
+    const line = kw.split('\n').find(k => k.startsWith('MV1:'));
+    if (!line) return null;
+    const b64 = line.slice(4);
+    const JSZip = window.JSZip;
+    if (!JSZip) return null;
+    const zip = await JSZip.loadAsync(b64, { base64: true });
+    const json = await zip.file('d').async('string');
+    const parsed = JSON.parse(json);
+    // ページキーを数値に変換（JSONは文字列キーで保存される）
+    const result = {};
+    Object.keys(parsed).forEach(k => { result[parseInt(k)] = parsed[k]; });
+    return result;
+  } catch(e) { console.warn('[V0.35] _extractMVData:', e); return null; }
+}
+
+/** [V0.35] PDF正式注釈（Ink/FreeText/Square/Circle/Line）をページに追加
+ *  消しゴムストロークはスキップ（_pdfRasterPage 側で処理）
+ *  @param {object} srcDoc     pdf-lib PDFDocument
+ *  @param {object} page       pdf-lib PDFPage（srcDocから取得済み）
+ *  @param {number} pageNum    1-indexed
+ *  @param {Array}  strks      ストローク配列
+ *  @param {number} pageWidth  PDF pts
+ *  @param {number} pageHeight PDF pts */
+async function _addPdfAnnotations(srcDoc, page, pageNum, strks, pageWidth, pageHeight) {
+  const PL = window.PDFLib;
+  if (!PL) return;
+  const { PDFName, PDFNumber, PDFArray, PDFDict, PDFString } = PL;
+  const ctx = srcDoc.context;
+
+  // 座標変換: app px (左上原点) → PDF pt (左下原点)
+  const toY = y => pageHeight - y;
+
+  // ヘルパー: PDFArrayに数値を詰める
+  const numArr = (...vals) => {
+    const a = PDFArray.withContext(ctx);
+    vals.forEach(v => a.push(PDFNumber.of(v)));
+    return a;
+  };
+  // ヘルパー: Rectを生成
+  const mkRect = (x1, y1, x2, y2, mg) => {
+    const mm = mg || 0;
+    return numArr(x1 - mm, y1 - mm, x2 + mm, y2 + mm);
+  };
+  // ヘルパー: BS辞書
+  const mkBs = w => {
+    const d = PDFDict.withContext(ctx);
+    d.set(PDFName.of('W'), PDFNumber.of(w));
+    d.set(PDFName.of('S'), PDFName.of('S'));
+    return d;
+  };
+  // ヘルパー: 色配列
+  const mkColor = (r, g, b) => numArr(r, g, b);
+  // ヘルパー: 注釈を登録してページに追加
+  const addAnnot = dict => {
+    const ref = ctx.register(dict);
+    page.node.addAnnot(ref);
+  };
+
+  for (const s of strks) {
+    if (s.type === 'eraser') continue;
+    try {
+      const lw = Math.max(0.5, s.size / 3);
+      const [r, g, b] = _hexToRgb01(s.color);
+
+      if (s.type === 'pen' || s.type === 'hl') {
+        const pts = s.points; if (!pts || pts.length < 2) continue;
+        const pdfPts = pts.map(p => [p[0], toY(p[1])]);
+        const xs = pdfPts.map(p => p[0]), ys = pdfPts.map(p => p[1]);
+
+        // InkList: [[x1,y1,x2,y2,...]]
+        const inkArr = PDFArray.withContext(ctx);
+        pdfPts.forEach(p => { inkArr.push(PDFNumber.of(p[0])); inkArr.push(PDFNumber.of(p[1])); });
+        const inkList = PDFArray.withContext(ctx); inkList.push(inkArr);
+
+        const an = PDFDict.withContext(ctx);
+        const margin = lw + 2;
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Ink'));
+        an.set(PDFName.of('Rect'),    mkRect(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), margin));
+        an.set(PDFName.of('InkList'), inkList);
+        an.set(PDFName.of('BS'),      mkBs(s.type === 'hl' ? Math.max(lw * 4, 5 / 3) : lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('CA'),      PDFNumber.of(s.type === 'hl' ? 0.38 : 1));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'text') {
+        const fontSize = Math.round(s.size * 6);
+        const lines = (s.text || '').split('\n');
+        const h = fontSize * 1.4 * lines.length + 4;
+        const w = fontSize * 0.65 * Math.max(...lines.map(l => l.length || 1)) + 4;
+        const pdfX = s.x, pdfY = toY(s.y);
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),     PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'),  PDFName.of('FreeText'));
+        an.set(PDFName.of('Rect'),     mkRect(pdfX, pdfY - h, pdfX + w, pdfY, 0));
+        an.set(PDFName.of('Contents'), PDFString.of(s.text || ''));
+        an.set(PDFName.of('DA'),       PDFString.of(
+          `/Helvetica ${fontSize} Tf ${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} rg`));
+        an.set(PDFName.of('Q'),        PDFNumber.of(0));
+        an.set(PDFName.of('F'),        PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'rect') {
+        const x1 = Math.min(s.x1, s.x2), x2 = Math.max(s.x1, s.x2);
+        const py1 = toY(Math.max(s.y1, s.y2)), py2 = toY(Math.min(s.y1, s.y2));
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Square'));
+        an.set(PDFName.of('Rect'),    mkRect(x1, py1, x2, py2, lw));
+        an.set(PDFName.of('BS'),      mkBs(lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'circle') {
+        const x1 = Math.min(s.x1, s.x2), x2 = Math.max(s.x1, s.x2);
+        const py1 = toY(Math.max(s.y1, s.y2)), py2 = toY(Math.min(s.y1, s.y2));
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Circle'));
+        an.set(PDFName.of('Rect'),    mkRect(x1, py1, x2, py2, lw));
+        an.set(PDFName.of('BS'),      mkBs(lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'line' || s.type === 'arrow') {
+        const px1 = s.x1, py1 = toY(s.y1), px2 = s.x2, py2 = toY(s.y2);
+        const minX = Math.min(px1, px2), minY = Math.min(py1, py2);
+        const maxX = Math.max(px1, px2), maxY = Math.max(py1, py2);
+
+        const lineArr = numArr(px1, py1, px2, py2);
+        const leArr = PDFArray.withContext(ctx);
+        // arrow: 終点(x2,y2)に矢印、始点はNone
+        leArr.push(PDFName.of('None'));
+        leArr.push(PDFName.of(s.type === 'arrow' ? 'OpenArrow' : 'None'));
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Line'));
+        an.set(PDFName.of('Rect'),    mkRect(minX, minY, maxX, maxY, lw + 6));
+        an.set(PDFName.of('L'),       lineArr);
+        an.set(PDFName.of('LE'),      leArr);
+        an.set(PDFName.of('BS'),      mkBs(lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+      }
+    } catch(e) { console.warn('[V0.35] annot skip:', s.type, e); }
+  }
 }
 
 /* ============================================================
@@ -2838,7 +3054,7 @@ function _parsePageRange(input, total) {
   return [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
 }
 
-/** ③ 指定ページのみ出力する PDF を生成 */
+/** ③ 指定ページのみ出力する PDF を生成 [V0.35] 正式注釈 + hidden JSON */
 async function _generateSubsetPDF(pageNums) {
   const PL = window.PDFLib;
   if (!PL) { showToast('⚠ pdf-lib 未ロード'); return null; }
@@ -2848,10 +3064,17 @@ async function _generateSubsetPDF(pageNums) {
     if (!ss.length) continue;
     const page = srcDoc.getPage(pn - 1);
     const { width, height } = page.getSize();
-    await (ss.some(s => s.type === 'eraser')
-      ? _pdfRasterPage(srcDoc, page, pn, ss, width, height)
-      : _pdfOverlayPage(srcDoc, page, pn, ss, width, height));
+    if (ss.some(s => s.type === 'eraser')) {
+      // 消しゴムあり → 全ラスタ化（既存処理を維持）
+      await _pdfRasterPage(srcDoc, page, pn, ss, width, height);
+    } else {
+      // [V0.35] 消しゴムなし → 正式PDF注釈を追加
+      await _addPdfAnnotations(srcDoc, page, pn, ss, width, height);
+    }
   }
+  // [V0.35] 全ストロークを hidden JSON として Keywords に埋め込む
+  await _embedMVData(srcDoc, App.strokes);
+
   const newDoc = await PL.PDFDocument.create();
   const indices = pageNums.map(n => n - 1);
   const copied  = await newDoc.copyPages(srcDoc, indices);
@@ -3054,9 +3277,9 @@ function toggleCalc() {
   const nowOn = !el.classList.contains('on');
   el.classList.toggle('on');
   document.getElementById('calcbtn').classList.toggle('on', nowOn);
-  // [V0.34] 初回表示時: CSS bottom/right → left/top へ変換しクランプ
+  // [V0.35] 初回表示時: CSS bottom/right → left/top へ変換しクランプ
   if (nowOn && !el.style.left) {
-    const vw = _vvWidth(), vh = _vvHeight(); // [V0.34] visual viewport
+    const vw = _vvWidth(), vh = _vvHeight(); // [V0.35] visual viewport
     const ew = el.offsetWidth || 290, eh = el.offsetHeight || 380;
     el.style.left   = Math.max(8, vw - ew - 16) + 'px';
     el.style.top    = Math.max(8, vh - eh - 20) + 'px';
@@ -3078,7 +3301,7 @@ function toggleCalc() {
   const onMove = e => {
     if (!dragging) return;
     const s = e.touches ? e.touches[0] : e;
-    // [V0.34] viewport内に収まるようクランプ / [V0.34] visual viewport 使用
+    // [V0.35] viewport内に収まるようクランプ / [V0.35] visual viewport 使用
     const vw = _vvWidth(), vh = _vvHeight();
     const ew = el.offsetWidth || 290, eh = el.offsetHeight || 380;
     const newL = Math.max(0, Math.min(vw - ew, ex + s.clientX - ox));
@@ -3116,8 +3339,8 @@ function showLoading(visible) {
 (function bindEvents() {
   /* --- ヘッダー行1 --- */
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
-  // [V0.34] undo: 最後に描画したパネルに振り分け
-  document.getElementById('btn-undo').addEventListener('click', () => App.undo()); // [V0.34] 分割削除で常にメインへ
+  // [V0.35] undo: 最後に描画したパネルに振り分け
+  document.getElementById('btn-undo').addEventListener('click', () => App.undo()); // [V0.35] 分割削除で常にメインへ
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
   document.getElementById('btn-backup').addEventListener('click', () => downloadBackup());
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
@@ -3167,7 +3390,7 @@ function showLoading(visible) {
   document.getElementById('pgr-all').addEventListener('click', () => {
     const fld = document.getElementById('pgrfld');
     const total = App.totalPages;
-    // [V0.34] 総ページ数を「1-N」形式で入力欄に表示（空文字だと何も見えないため修正）
+    // [V0.35] 総ページ数を「1-N」形式で入力欄に表示（空文字だと何も見えないため修正）
     fld.value = total > 0 ? '1-' + total : '';
     // change/input イベントを発火してUI同期
     fld.dispatchEvent(new Event('input',  { bubbles: true }));
@@ -3193,9 +3416,9 @@ function showLoading(visible) {
   });
 
   /* --- 選択削除 --- */
-  // [V0.34] 削除ボタン: SubWin → 右パネル → メインの順に確認
+  // [V0.35] 削除ボタン: SubWin → 右パネル → メインの順に確認
   document.getElementById('selbtn').addEventListener('click', () => {
-    // [V0.34] 分割削除: SubWin → メインの順に確認
+    // [V0.35] 分割削除: SubWin → メインの順に確認
     if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
     else { App.deleteSelected(); }
   });
@@ -3224,7 +3447,7 @@ function showLoading(visible) {
 })();
 
 /* ============================================================
-   [V0.34] iPad Split View / Slide Over 対応
+   [V0.35] iPad Split View / Slide Over 対応
    visualViewport resize 監視 → Canvas再レンダ・位置再クランプ
    ============================================================ */
 ;(() => {
