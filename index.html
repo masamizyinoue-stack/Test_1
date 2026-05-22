@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.47</title>
+<title>M_Viewer V0.48</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -221,10 +221,29 @@ body {
 }
 
 /* ===== サブウィンドウ ===== */
+/* [V0.48] touch-action:none でiPad Safari遅延を解消 */
+@keyframes swn-appear {
+  from { opacity: 0; transform: scale(.92); }
+  to   { opacity: 1; transform: scale(1);   }
+}
 .swn {
   position: fixed; z-index: 200; background: var(--pan); border: 2.5px solid var(--acc);
   border-radius: 11px; box-shadow: 0 6px 28px #000b; display: flex; flex-direction: column;
   min-width: 170px; min-height: 170px; overflow: hidden;
+  touch-action: none; /* [V0.48] Safari タッチ遅延排除 */
+}
+/* [V0.48] 生成時フェードイン */
+.swn-appearing { animation: swn-appear .15s ease-out both; }
+/* [V0.48] ローディング中ストライプ */
+@keyframes swn-stripe {
+  to { background-position: 22px 22px; }
+}
+.swn-loading .swn-body::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 10;
+  background: repeating-linear-gradient(-45deg,
+    transparent 0 8px, rgba(255,255,255,.06) 8px 16px);
+  background-size: 22px 22px; background-position: 0 0;
+  animation: swn-stripe .7s linear infinite;
 }
 .swn-tb {
   height: 30px; background: var(--pan2); display: flex; align-items: center;
@@ -736,6 +755,21 @@ let txX = 0, txY = 0;
 const subWindows  = [];
 let _activeSelSubWin = null; // サブ窓選択コンテキスト (null=メイン)
 let   swZIndex    = 200;
+
+/* [V0.48] サブ窓ドラッグ/リサイズ グローバルシングルトン
+   SubWin生成ごとにdocument.addEventListenerを追加すると
+   SubWin数×16本のリスナーが全touchmoveで走りiPadが遅延する。
+   1本のハンドラで集約し、アクティブなSubWinだけに委譲する。 */
+const _SW_ACTIVE = { onMove: null, onEnd: null };
+(function _initSWGlobal() {
+  const dm = e => { if (_SW_ACTIVE.onMove) { if (e.cancelable) e.preventDefault(); _SW_ACTIVE.onMove(e); } };
+  const de = e => { if (_SW_ACTIVE.onEnd)  _SW_ACTIVE.onEnd(e); };
+  document.addEventListener('touchmove', dm, { passive: false });
+  document.addEventListener('touchend',  de, { passive: true  });
+  document.addEventListener('mousemove', dm, { passive: true  });
+  document.addEventListener('mouseup',   de, { passive: true  });
+})();
+let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 let   _fileHandle = null;
 
 
@@ -1365,7 +1399,8 @@ class SubWin {
     this.swFill    = SW_FILLS [idx % MAX_SUBWIN];
 
     this._build();
-    this.render();
+    // [V0.48] 枠を先に表示し、PDF描画を非同期で後回しにすることで即時応答を実現
+    requestAnimationFrame(() => this.render());
   }
 
   _build() {
@@ -1395,6 +1430,9 @@ class SubWin {
     this.selCvs  = el.querySelector('.swn-sel');
     this.selCtx  = this.selCvs.getContext('2d');
     this.zlEl    = el.querySelector('.swn-zl');
+
+    // [V0.48] 生成アニメーション・ローディング表示（renderで解除）
+    el.classList.add('swn-appearing', 'swn-loading');
 
     el.querySelector('.swn-close').addEventListener('pointerdown', e => {
       e.stopPropagation(); this.close();
@@ -1461,6 +1499,7 @@ class SubWin {
     this.ctx.drawImage(this._annCvs,  0, 0);
     this._updateTransform();
     this.zlEl.textContent = Math.round(sc * 100) + '%';
+    this.el?.classList.remove('swn-loading'); // [V0.48] レンダリング完了でローディング解除
   }
 
   /* 入力バインド */
@@ -1660,7 +1699,7 @@ class SubWin {
     schedSave();
   }
 
-  /* ドラッグ (ウィンドウ移動) */
+  /* ドラッグ (ウィンドウ移動) [V0.48] _SW_ACTIVEシングルトン化でグローバルリスナー削減 */
   _bindDrag(handle) {
     let dragging = false, ox = 0, oy = 0, ex = 0, ey = 0;
     const onStart = e => {
@@ -1670,6 +1709,8 @@ class SubWin {
       ox = s.clientX; oy = s.clientY;
       const r = this.el.getBoundingClientRect(); ex = r.left; ey = r.top;
       e.preventDefault();
+      _SW_ACTIVE.onMove = onMove; // [V0.48] シングルトンに登録
+      _SW_ACTIVE.onEnd  = onEnd;
     };
     const onMove = e => {
       if (!dragging) return;
@@ -1677,28 +1718,25 @@ class SubWin {
       // [V0.35] viewport内に収まるようクランプ (サブ窓タイトルバーが画面外に出ない)
       const vw = window.innerWidth, vh = window.innerHeight;
       const ew = this.el.offsetWidth || this.winW || 200;
-      const eh = this.el.offsetHeight || this.winH || 160;
       const newL = Math.max(0, Math.min(vw - ew, ex + s.clientX - ox));
-      const newT = Math.max(0, Math.min(vh - 30, ey + s.clientY - oy)); // タイトルバー30pxは確保
+      const newT = Math.max(0, Math.min(vh - 30, ey + s.clientY - oy)); // タイトルバー30px確保
       this.el.style.left = newL + 'px';
       this.el.style.top  = newT + 'px';
     };
-    const onEnd = () => { dragging = false; };
+    const onEnd = () => {
+      dragging = false;
+      _SW_ACTIVE.onMove = null; // [V0.48] シングルトン解放
+      _SW_ACTIVE.onEnd  = null;
+    };
     handle.addEventListener('touchstart', onStart, { passive: false });
     handle.addEventListener('mousedown',  onStart);
-    document.addEventListener('touchmove', onMove, { passive: true });
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchend',  onEnd);
-    document.addEventListener('mouseup',   onEnd);
+    // [V0.48] document への個別追加廃止（_SW_ACTIVEシングルトンで集約）
     this._cleanups.push(() => {
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('touchend',  onEnd);
-      document.removeEventListener('mouseup',   onEnd);
+      if (dragging) { dragging = false; _SW_ACTIVE.onMove = null; _SW_ACTIVE.onEnd = null; }
     });
   }
 
-  /* リサイズ */
+  /* リサイズ [V0.48] _SW_ACTIVEシングルトン化 */
   _bindResize(handle, corner = 'se') {
     let dragging = false, ox = 0, oy = 0, w0 = 0, h0 = 0, lx0 = 0, ty0 = 0, initSc = 1;
     const onStart = e => {
@@ -1709,6 +1747,8 @@ class SubWin {
       w0 = r.width; h0 = r.height; lx0 = r.left; ty0 = r.top;
       initSc = this.innerScale;
       e.stopPropagation(); e.preventDefault();
+      _SW_ACTIVE.onMove = onMove; // [V0.48] シングルトンに登録
+      _SW_ACTIVE.onEnd  = onEnd;
     };
     const onMove = e => {
       if (!dragging) return;
@@ -1730,18 +1770,16 @@ class SubWin {
       clearTimeout(this._resizeTimer);
       this._resizeTimer = setTimeout(() => this.render(), 60);
     };
-    const onEnd = () => { dragging = false; };
+    const onEnd = () => {
+      dragging = false;
+      _SW_ACTIVE.onMove = null; // [V0.48] シングルトン解放
+      _SW_ACTIVE.onEnd  = null;
+    };
     handle.addEventListener('touchstart', onStart, { passive: false });
     handle.addEventListener('mousedown',  onStart);
-    document.addEventListener('touchmove', onMove, { passive: true });
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('touchend',  onEnd);
-    document.addEventListener('mouseup',   onEnd);
+    // [V0.48] document への個別追加廃止（_SW_ACTIVEシングルトンで集約）
     this._cleanups.push(() => {
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('touchend',  onEnd);
-      document.removeEventListener('mouseup',   onEnd);
+      if (dragging) { dragging = false; _SW_ACTIVE.onMove = null; _SW_ACTIVE.onEnd = null; }
     });
   }
 
@@ -2166,7 +2204,9 @@ const App = (() => {
       if ((r.x2-r.x1) > 10/scale && (r.y2-r.y1) > 10/scale) {
         if (subWindows.length >= MAX_SUBWIN) {
           showToast(`サブ窓は最大${MAX_SUBWIN}つです`);
-        } else {
+        } else if (!_subCreating) { // [V0.48] 連続生成ガード（二重生成防止）
+          _subCreating = true;
+          setTimeout(() => { _subCreating = false; }, 400);
           const cr = caEl.getBoundingClientRect();
           const sx = cr.left + panX + r.x1 * scale;
           const sy = cr.top  + panY + r.y1 * scale;
