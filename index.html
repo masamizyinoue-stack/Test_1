@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.42</title>
+<title>M_Viewer V0.43</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -2725,6 +2725,42 @@ async function _buildBackupZip() {
   return zip;
 }
 
+/**
+ * [V0.43] バックアップZIPファイル名を生成する
+ *  - 現在開いているPDF名ベース（拡張子 .pdf を除去）
+ *  - ファイル名禁止文字（\ / : * ? " < > |）を _ に置換
+ *  - 日付時刻サフィックスを付与して一意化
+ *  - PDFが未選択の場合は "MVIEWER_BACKUP" をベース名に使用
+ *  @param {Date} now - 現在日時
+ *  @returns {string} 例: "図面A_2026-05-22_1030.zip"
+ */
+function _makeBkName(now) {
+  const p = n => String(n).padStart(2, '0');
+  const ts = `${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
+
+  // 現在アクティブなPDF名を取得（App.fileName 優先）
+  const rawName = App.fileName ||
+    (_sheets||[]).find(s => s.fileName && s.fileName !== '(新規)')?.fileName ||
+    '';
+
+  let base;
+  if (rawName) {
+    // .pdf 拡張子を除去（拡張子重複防止: ○○.pdf.zip にならないように）
+    base = rawName.replace(/\.pdf$/i, '');
+    // ファイル名禁止文字を _ に置換（Windows/macOS/iOS 共通）
+    // 対象: \ / : * ? " < > |　および制御文字
+    base = base.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_');
+    // 連続する _ を圧縮、前後の _ と空白を除去
+    base = base.replace(/_+/g, '_').replace(/^[_\s]+|[_\s]+$/g, '');
+    // 空になった場合のフォールバック
+    if (!base) base = 'MVIEWER_BACKUP';
+  } else {
+    base = 'MVIEWER_BACKUP';
+  }
+
+  return `${base}_${ts}.zip`;
+}
+
 /** 手動バックアップ: ZIPをダウンロード */
 async function downloadBackup() {
   const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc||Object.keys(s.strokes||{}).length>0);
@@ -2734,10 +2770,7 @@ async function downloadBackup() {
     const zip = await _buildBackupZip();
     if (!zip) { showLoading(false); return; }
     const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{level:6} });
-    const now = new Date();
-    const p = n => String(n).padStart(2,'0');
-    const ts = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
-    const fname = `MVIEWER_BACKUP_${ts}.zip`;
+    const fname = _makeBkName(new Date()); // [V0.43] PDFファイル名ベースのZIP名
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href=url; a.download=fname; a.click();
     setTimeout(()=>URL.revokeObjectURL(url), 30000);
