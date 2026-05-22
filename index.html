@@ -2732,7 +2732,7 @@ const App = (() => {
       let doc = null;
       if (saved.docId) {
         doc = await IDB.get('doc:' + saved.docId).catch(() => null);
-        if (!doc?.originalPdfBytes) doc = null; // 無効なら次の手段へ
+        if (!doc?.originalPdfBytes) doc = null;
       }
       if (!doc) doc = await DocMgr.findByName(saved.file).catch(() => null);
       if (doc?.originalPdfBytes) {
@@ -4125,6 +4125,7 @@ async function _renderHome() {
     card.innerHTML =
       `<div class="home-card-icon">📄</div>` +
       `<div class="home-card-name" title="${doc.name}">${nm}</div>` +
+    
       `<div class="home-card-date">${ds}</div>` +
       `<button class="home-card-del" title="削除">✕</button>`;
     card.querySelector('.home-card-del').addEventListener('pointerdown', async e => {
@@ -4181,39 +4182,20 @@ function hideHome() {
   ;(()=>{
     const homeEl = document.getElementById('home');
     homeEl.addEventListener('dragover', e => e.preventDefault());
-    // [V0.44] ホームD&D: 既存PDFがある場合はバックアップ確認
-    homeEl.addEventListener('drop', async e => {
+    homeEl.addEventListener('drop', e => {
       e.preventDefault();
       const f = e.dataTransfer.files[0];
-      if (!f || f.type !== 'application/pdf') return;
-      if (App.pdfDoc) {
-        const result = await _confirmClose(App.fileName, '読み込む（バックアップしない）');
-        if (result === 'cancel') return;
-        if (result === 'backup') { await _backupThenClose(async () => { hideHome(); await App.loadPDF(f); }); return; }
-      }
-      hideHome(); App.loadPDF(f);
+      if (f && f.type === 'application/pdf') { hideHome(); App.loadPDF(f); }
     });
   })();
   // [V0.35] undo: 最後に描画したパネルに振り分け
-  document.getElementById('btn-undo').addEventListener('click', () => App.undo()); // [V0.35] 分割削除で常にメインへ
+  document.getElementById('btn-undo').addEventListener('click', () => App.undo());
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
   document.getElementById('btn-backup').addEventListener('click', () => downloadBackup());
-  // [V0.42] 復元ボタン: ZIPファイル選択 → restoreFromBackup
-  document.getElementById('btn-restore').addEventListener('click', () =>
-    document.getElementById('restoreInput').click());
-  document.getElementById('restoreInput').addEventListener('change', async e => {
-    const f = e.target.files[0];
-    if (f) await restoreFromBackup(f);
-    e.target.value = ''; // 同じファイルの再選択を許可
-  });
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
-  // [V0.44] ✕閉じるボタン: バックアップ確認ダイアログ経由で閉じる
-  document.getElementById('btn-close').addEventListener('click', async () => {
+  document.getElementById('btn-close').addEventListener('click', () => {
     if (!App.pdfDoc) return;
-    const result = await _confirmClose(App.fileName);
-    if (result === 'cancel') return;
-    if (result === 'backup') { await _backupThenClose(() => closeSheetAt(_sheetIdx)); return; }
-    closeSheetAt(_sheetIdx);
+    if (confirm('このタブを閉じますか？（保存済みデータは残ります）')) closeSheetAt(_sheetIdx);
   });
   document.getElementById('cclose')   .addEventListener('click', () => toggleCalc());
 
@@ -4257,9 +4239,7 @@ function hideHome() {
   document.getElementById('pgr-all').addEventListener('click', () => {
     const fld = document.getElementById('pgrfld');
     const total = App.totalPages;
-    // [V0.35] 総ページ数を「1-N」形式で入力欄に表示（空文字だと何も見えないため修正）
     fld.value = total > 0 ? '1-' + total : '';
-    // change/input イベントを発火してUI同期
     fld.dispatchEvent(new Event('input',  { bubbles: true }));
     fld.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -4283,9 +4263,7 @@ function hideHome() {
   });
 
   /* --- 選択削除 --- */
-  // [V0.35] 削除ボタン: SubWin → 右パネル → メインの順に確認
   document.getElementById('selbtn').addEventListener('click', () => {
-    // [V0.35] 分割削除: SubWin → メインの順に確認
     if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
     else { App.deleteSelected(); }
   });
@@ -4322,11 +4300,9 @@ function hideHome() {
   function _onVVResize() {
     clearTimeout(_vvRzTimer);
     _vvRzTimer = setTimeout(() => {
-      // メインPDFを再レンダリング（fit()でcanvasサイズも更新）
       if (App.pdfDoc) {
         requestAnimationFrame(() => App.fit());
       }
-      // SubWin位置をvisual viewport内に再クランプ
       subWindows.forEach(sw => {
         const vw = _vvWidth(), vh = _vvHeight();
         const nl = Math.max(4, Math.min(vw - sw.winW - 10, parseFloat(sw.el.style.left) || sw.sx));
@@ -4334,15 +4310,12 @@ function hideHome() {
         sw.el.style.left = nl + 'px';
         sw.el.style.top  = nt + 'px';
       });
-      // 開いているポップオーバーを再クランプ
       document.querySelectorAll('.pkp.on').forEach(el => _clampPopover(el, null));
-    }, 100); // 100ms debounce で乱発防止
+    }, 100);
   }
-  // visualViewport API 優先 (iPad Split View / Slide Over で確実に発火)
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', _onVVResize);
   }
-  // フォールバック: window resize (PC・旧Safari)
   window.addEventListener('resize', _onVVResize);
 })();
 </script>
