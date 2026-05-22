@@ -523,7 +523,8 @@ body {
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">V0.35</span></span>
+    <!-- [V0.48] バージョン番号はJS(APP_VERSION)で動的に設定 →更新漏れ防止 -->
+    <span class="logo" id="app-logo">M_Viewer <span id="app-ver-logo" style="font-size:10px">V0.48</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -604,7 +605,8 @@ body {
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V0.41</div>
+    <!-- [V0.48] APP_VERSIONで動的設定 -->
+    <div class="dzm" id="app-ver-dz">M_Viewer V0.48</div>
     <div class="dzs">
       📂 タップして選択 / ドラッグ＆ドロップ<br>
       ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
@@ -770,6 +772,10 @@ const _SW_ACTIVE = { onMove: null, onEnd: null };
   document.addEventListener('mouseup',   de, { passive: true  });
 })();
 let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
+
+/* [V0.48] バージョン一元管理定数
+   ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
+const APP_VERSION = 'V0.48';
 let   _fileHandle = null;
 
 
@@ -4020,6 +4026,14 @@ function hideHome() {
    イベントバインド (DOMContentLoaded後に実行)
    ============================================================ */
 (function bindEvents() {
+  /* [V0.48] APP_VERSION を全表示箇所へ反映（ここだけ変更すれば全箇所追従） */
+  document.title = 'M_Viewer ' + APP_VERSION;
+  const verLogo = document.getElementById('app-ver-logo');
+  const verDz   = document.getElementById('app-ver-dz');
+  if (verLogo) verLogo.textContent = APP_VERSION;
+  if (verDz)   verDz.textContent   = 'M_Viewer ' + APP_VERSION;
+  console.info('%c[M_Viewer] ' + APP_VERSION + ' 起動', 'color:#f07800;font-weight:bold');
+
   /* --- ヘッダー行1 --- */
   document.getElementById('dz-open')  .addEventListener('click', () => openFile());
   document.getElementById('home-open').addEventListener('click', () => openFile());
