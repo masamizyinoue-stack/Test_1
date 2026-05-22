@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.49</title>
+<title>M_Viewer V0.50</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.49';
+const APP_VERSION = 'V0.50';
 let   _fileHandle = null;
 
 
@@ -1004,6 +1004,18 @@ function _pruneEraserStrokes(strks) {
   return result;
 }
 
+/**
+ * [V0.50] 復元データ妥当性チェック
+ * buf:null は V0.41+ の正常形式。file フィールドで存在判定する。
+ * 30日以上古いデータは Safari の storage eviction を考慮して無効扱い。
+ */
+function _isValidSaved(s) {
+  if (!s || typeof s !== 'object') return false;
+  if (typeof s.file !== 'string' || !s.file) return false;
+  if (typeof s.ts === 'number' && Date.now() - s.ts > 30 * 24 * 60 * 60 * 1000) return false;
+  return true;
+}
+
 function schedSave() {
   clearTimeout(_autoSaveTimer);
   _bkDirty = true; // [V0.44] 変更ありフラグ → バックアップ確認ダイアログで使用
@@ -1036,6 +1048,13 @@ function schedSave() {
       };
       await IDB.set(_KEY_LAST, data); // [V0.35] インスタンス別キー → 別ウインドウと競合しない
       await IDB.set('f:' + safeKey(App.fileName), data);
+      // [V0.50] 安定キー保存（Safari再起動後もインスタンスIDに依存しない復元用）
+      // 書き込み前に現世代を前世代へ退避 → 破損時フォールバックに使用
+      try {
+        const _prevResume = await IDB.get('resume:last');
+        if (_isValidSaved(_prevResume)) await IDB.set('resume:prv', _prevResume);
+      } catch(_) {}
+      await IDB.set('resume:last', data);
       // [V0.39] DocumentManagerのstrokes更新（バックグラウンド）
       DocMgr.updateStrokes(cleanStrokes, App.currentPage).catch(() => {});
     } catch(e) { console.warn('[schedSave]', e); }
@@ -1068,6 +1087,10 @@ function schedPdfSave() {
   _pdfSaveTimer = setTimeout(_doPdfSave, PDF_AUTOSAVE_DELAY);
 }
 
+// [V0.50] 60秒おき周期バックグラウンド保存
+// 描画操作がない休止中でも resume:last を確実に保持する
+setInterval(() => { if (App.pdfDoc && App.origBuf) schedSave(); }, 60_000);
+
 // [V0.38] 画面が隠れる直前：IDB保存 + _fileHandle があればPDF即時保存
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && App.pdfDoc && App.origBuf) {
@@ -1086,6 +1109,7 @@ document.addEventListener('visibilitychange', () => {
     };
     IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
     IDB.set(_KEY_LAST, data).catch(() => {});
+    IDB.set('resume:last', data).catch(() => {}); // [V0.50] 安定キーへも即時保存
     // PDF保存タイマーをキャンセルして即時実行
     if (_fileHandle) { clearTimeout(_pdfSaveTimer); _doPdfSave(); }
   }
@@ -1111,6 +1135,7 @@ window.addEventListener('pagehide', () => {
   // 同期的に発行（pagehideは非同期保証なし・最善努力）
   IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
   IDB.set(_KEY_LAST, data).catch(() => {});
+  IDB.set('resume:last', data).catch(() => {}); // [V0.50] 安定キーへも保存
 });
 
 /* ============================================================
@@ -2647,9 +2672,30 @@ const App = (() => {
 
   let saved = null;
   try {
-    // [V0.35] インスタンス別キー優先（リロード時継続）→ 旧 'last' へフォールバック（初回起動互換）
+    // [V0.35] インスタンス別キー優先（同一セッション内のリロードで継続）
     saved = await IDB.get(_KEY_LAST);
-    if (!saved?.buf) {
+
+    // [V0.50] V0.41+ では buf:null が正常形式のため file フィールドで存在判定する
+    // （buf で判定すると常に「未取得」扱いになるバグを修正）
+    if (!_isValidSaved(saved)) {
+      // Safari再起動・タブ閉じ等でインスタンスIDが変わった場合
+      // → インスタンス非依存の安定キー 'resume:last' で前回作業を復元する
+      const resumeData = await IDB.get('resume:last').catch(() => null);
+      if (_isValidSaved(resumeData)) {
+        saved = resumeData;
+        console.info('[起動] resume:last から復元');
+      } else {
+        // resume:last が破損・欠損の場合は1世代前 'resume:prv' にフォールバック
+        const prevData = await IDB.get('resume:prv').catch(() => null);
+        if (_isValidSaved(prevData)) {
+          saved = prevData;
+          console.warn('[起動] resume:prv（前世代）から復元');
+        }
+      }
+    }
+
+    // 旧形式互換（V0.41以前: buf付き 'last' キー → インスタンス別キーへ移行）
+    if (!_isValidSaved(saved) && !saved?.buf) {
       const legacy = await IDB.get('last');
       if (legacy?.buf) {
         saved = legacy;
@@ -2659,6 +2705,7 @@ const App = (() => {
       }
     }
   } catch(e) { console.error('[起動] IDB.get 失敗:', e); }
+
   // [V0.41] buf がない（新方式）場合は DocMgr からバイナリを補完
   if (!saved?.buf && saved?.file) {
     try {
