@@ -1,0 +1,4107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>M_Viewer V0.49</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* ===== CSS変数 ===== */
+:root {
+  --bg:   #1e2228;
+  --pan:  #262c34;
+  --pan2: #2e363f;
+  --brd:  #4a5a6a;
+  --acc:  #f07800;
+  --tx:   #ffffff;
+  --tx2:  #c8d8e4;
+  --red:  #c02020;
+}
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg); color: var(--tx);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  display: flex; flex-direction: column;
+  height: 100vh; /* [V0.35] fallback: 旧Safari */
+  height: 100dvh; /* [V0.35] dynamic viewport height (iOS Safari 15.4+, Split View対応) */
+  user-select: none; -webkit-user-select: none;
+}
+
+/* ===== ヘッダー ===== */
+#hdr { flex-shrink: 0; background: var(--pan); border-bottom: 2px solid var(--acc); overflow: hidden; } /* V0.35: スクロール防止 */
+.hr {
+  /* V0.35: 高さを0.95倍縮小 (40→38px), padding微調整 */
+  height: 38px; display: flex; align-items: center; gap: 5px; padding: 0 7px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  overflow-y: hidden; /* 縦スクロール防止 */
+}
+.hr:first-child { border-bottom: 1px solid var(--brd); }
+.hr::-webkit-scrollbar { display: none; }
+
+.logo {
+  font-size: 12px; font-weight: 800; color: var(--acc); padding-right: 6px;
+  border-right: 2px solid var(--brd); white-space: nowrap; flex-shrink: 0;
+}
+.vs { width: 2px; height: 24px; background: var(--brd); flex-shrink: 0; margin: 0 3px; } /* V0.35: 0.95倍 */
+.sp { flex: 1; }
+
+/* ボタン共通 */
+.btn {
+  /* V0.35: 高さ0.95倍 (34→32px) */
+  height: 32px; padding: 0 9px; border: 1.5px solid var(--brd); background: var(--pan2);
+  color: var(--tx); border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; gap: 4px;
+  -webkit-user-select: none; transition: background .1s;
+}
+.btn:active  { background: var(--brd); }
+.btn.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+.btn.rd { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* ページ入力 */
+.pgni {
+  width: 32px; text-align: center; background: var(--pan2); border: 1.5px solid var(--brd);
+  color: var(--tx); border-radius: 5px; font-size: 12px; padding: 2px 0; flex-shrink: 0;
+}
+.pgni:focus { outline: none; border-color: var(--acc); }
+.pgtot { font-size: 11px; color: var(--tx2); white-space: nowrap; flex-shrink: 0; }
+
+/* ズーム % */
+.zlbl { font-size: 12px; font-weight: 700; color: var(--acc); min-width: 38px; text-align: center; flex-shrink: 0; }
+
+/* ファイル名 */
+#fnlbl {
+  font-size: 11px; color: #fff; font-weight: 600; max-width: 160px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0;
+}
+
+/* カラースウォッチ */
+.csw {
+  /* V0.35: 0.95倍 (28→26px) */
+  width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent;
+  cursor: pointer; flex-shrink: 0; transition: transform .1s;
+}
+.csw.on { border-color: #fff; transform: scale(1.25); }
+
+/* 太さ表示 */
+.szlbl { font-size: 11px; color: var(--tx2); flex-shrink: 0; }
+.sz-val {
+  font-size: 13px; font-weight: 700; color: var(--acc); min-width: 22px; text-align: center;
+  flex-shrink: 0; cursor: pointer; padding: 2px 6px; border: 1.5px solid var(--brd);
+  border-radius: 5px; background: var(--pan2);
+}
+
+/* ドロップダウンピッカー */
+.pkw { position: relative; flex-shrink: 0; }
+.pkp {
+  position: fixed; background: var(--pan); border: 1.5px solid var(--brd); border-radius: 9px;
+  padding: 5px; z-index: 300; box-shadow: 0 4px 20px #0008; display: none;
+  flex-direction: column; gap: 3px; min-width: 120px;
+}
+.pkp.on { display: flex; }
+.pkp button {
+  height: 38px; padding: 0 12px; background: var(--pan2); border: 1.5px solid var(--brd);
+  color: var(--tx); border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; text-align: left;
+}
+.pkp button:active, .pkp button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+
+/* ===== 太さパネル ===== */
+#szp {
+  display: none; position: fixed; z-index: 350; background: var(--pan);
+  border: 1.5px solid var(--brd); border-radius: 11px; padding: 12px 14px;
+  box-shadow: 0 4px 20px #0008; width: 250px;
+}
+#szp.on { display: block; }
+#szp-title { font-size: 12px; color: var(--tx2); font-weight: 700; margin-bottom: 9px; display: block; }
+.szp-row { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
+#sz-rng {
+  -webkit-appearance: none; flex: 1; height: 8px; background: var(--brd); border-radius: 4px; cursor: pointer;
+}
+#sz-rng::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--acc); cursor: pointer; border: 2px solid #fff;
+}
+#sz-n {
+  width: 42px; text-align: center; background: var(--pan2); border: 1.5px solid var(--brd);
+  color: var(--tx); border-radius: 5px; font-size: 13px; font-weight: 700; padding: 4px;
+}
+#sz-n:focus { outline: none; border-color: var(--acc); }
+#szp-prev { height: 42px; background: var(--pan2); border-radius: 7px; margin-bottom: 9px; display: flex; align-items: center; justify-content: center; }
+.szp-btns { display: flex; gap: 7px; }
+.szp-ok { flex: 1; height: 38px; background: var(--acc); color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.szp-cancel { height: 38px; padding: 0 12px; background: var(--pan2); color: var(--tx2); border: 1.5px solid var(--brd); border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+/* ===== キャンバス領域 ===== */
+#ca { flex: 1; overflow: hidden; position: relative; min-height: 0; touch-action: none; background: #444; overscroll-behavior: none; }
+#cw { position: absolute; top: 0; left: 0; transform-origin: 0 0; background: #fff; }
+#pdfCvs { display: block; }
+#annCvs, #ovlCvs { position: absolute; top: 0; left: 0; }
+#ovlCvs { pointer-events: none; }
+
+/* ドロップゾーン */
+#dz {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; z-index: 10; background: var(--bg);
+}
+.dzi { font-size: 48px; opacity: .4; }
+.dzm { font-size: 16px; color: var(--tx); font-weight: 700; }
+.dzs { font-size: 11px; color: var(--tx2); text-align: center; padding: 0 18px; line-height: 1.8; }
+.dzb { background: var(--acc); color: #fff; border: none; padding: 13px 28px; border-radius: 11px; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+/* ===== [V0.40] ホーム画面 ===== */
+#home {
+  position: absolute; inset: 0; z-index: 10; background: var(--bg);
+  display: none; flex-direction: column; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.home-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 18px 12px; flex-shrink: 0;
+  border-bottom: 1px solid var(--brd);
+}
+.home-title { font-size: 18px; font-weight: 700; color: var(--tx); }
+.home-open-btn {
+  background: var(--acc); color: #fff; border: none; padding: 10px 22px;
+  border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer;
+  touch-action: manipulation;
+}
+.home-open-btn:active { opacity: .8; }
+.home-section {
+  font-size: 11px; font-weight: 700; color: var(--tx2); padding: 14px 18px 6px;
+  flex-shrink: 0; text-transform: uppercase; letter-spacing: .05em;
+}
+#home-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px; padding: 6px 18px 20px; align-content: start;
+}
+.home-card {
+  background: var(--pan); border: 1.5px solid var(--brd); border-radius: 10px;
+  padding: 12px 10px 8px; cursor: pointer; position: relative;
+  display: flex; flex-direction: column; gap: 4px;
+  -webkit-user-select: none; user-select: none; touch-action: manipulation;
+}
+.home-card:active { border-color: var(--acc); background: var(--pan2); }
+.home-card-icon { font-size: 26px; line-height: 1; margin-bottom: 2px; }
+.home-card-name {
+  font-size: 11px; font-weight: 700; color: var(--tx); word-break: break-all;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3;
+}
+.home-card-date { font-size: 10px; color: var(--tx2); margin-top: auto; padding-top: 4px; }
+.home-card-del {
+  position: absolute; top: 5px; right: 5px; background: transparent;
+  border: none; color: var(--tx2); font-size: 14px; cursor: pointer;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
+.home-card-del:active { background: var(--red); color: #fff; }
+#home-empty {
+  display: none; flex-direction: column; align-items: center;
+  justify-content: center; flex: 1; gap: 14px; padding: 60px 20px;
+}
+.home-empty-icon { font-size: 52px; opacity: .25; }
+.home-empty-msg { font-size: 13px; color: var(--tx2); text-align: center; line-height: 1.8; }
+.home-drop-hint {
+  font-size: 11px; color: var(--tx2); text-align: center; padding: 10px 18px;
+  border: 1.5px dashed var(--brd); border-radius: 10px;
+  margin: 0 18px 18px; flex-shrink: 0;
+}
+
+/* 選択削除ボタン */
+#selbtn {
+  display: none; position: fixed; z-index: 150; background: var(--red); color: #fff;
+  border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700;
+  cursor: pointer; box-shadow: 0 2px 10px #0005;
+}
+
+/* ===== サブウィンドウ ===== */
+/* [V0.48] touch-action:none でiPad Safari遅延を解消 */
+@keyframes swn-appear {
+  from { opacity: 0; transform: scale(.92); }
+  to   { opacity: 1; transform: scale(1);   }
+}
+.swn {
+  position: fixed; z-index: 200; background: var(--pan); border: 2.5px solid var(--acc);
+  border-radius: 11px; box-shadow: 0 6px 28px #000b; display: flex; flex-direction: column;
+  min-width: 170px; min-height: 170px; overflow: hidden;
+  touch-action: none; /* [V0.48] Safari タッチ遅延排除 */
+}
+/* [V0.48] 生成時フェードイン */
+.swn-appearing { animation: swn-appear .15s ease-out both; }
+/* [V0.48] ローディング中ストライプ */
+@keyframes swn-stripe {
+  to { background-position: 22px 22px; }
+}
+.swn-loading .swn-body::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 10;
+  background: repeating-linear-gradient(-45deg,
+    transparent 0 8px, rgba(255,255,255,.06) 8px 16px);
+  background-size: 22px 22px; background-position: 0 0;
+  animation: swn-stripe .7s linear infinite;
+}
+.swn-tb {
+  height: 30px; background: var(--pan2); display: flex; align-items: center;
+  justify-content: space-between; padding: 0 8px; cursor: grab; flex-shrink: 0;
+  border-bottom: 1.5px solid var(--brd);
+}
+.swn-tb span { font-size: 11px; font-weight: 800; color: var(--acc); }
+.swn-close { background: transparent; border: none; color: var(--tx2); font-size: 16px; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
+.swn-body { flex: 1; overflow: hidden; position: relative; background: #fff; }
+.swn-cvs { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.swn-zl {
+  position: absolute; bottom: 3px; left: 5px; font-size: 10px; color: var(--acc);
+  pointer-events: none; font-weight: 800; text-shadow: 0 0 4px #000, 0 0 4px #000;
+}
+.swn-rz {
+  position: absolute; bottom: 0; right: 0; width: 22px; height: 22px; cursor: se-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--acc) 50%); border-radius: 0 0 8px 0;
+}
+/* ① SubWin 追加リサイズハンドル (左下・左上) */
+.swn-rz-sw {
+  position: absolute; bottom: 0; left: 0; width: 22px; height: 22px; cursor: sw-resize;
+  background: linear-gradient(225deg, transparent 50%, var(--acc) 50%); border-radius: 0 0 0 8px;
+}
+.swn-rz-nw {
+  position: absolute; top: 30px; left: 0; width: 22px; height: 22px; cursor: nw-resize;
+  background: linear-gradient(315deg, transparent 50%, var(--acc) 50%); border-radius: 8px 0 0 0;
+}
+
+/* ③ PDF出力ページ指定オーバーレイ */
+#pgrov { display: none; position: fixed; inset: 0; z-index: 500; background: #0009; align-items: center; justify-content: center; }
+#pgrov.on { display: flex; }
+#pgrpop { background: var(--pan); border: 1.5px solid var(--brd); border-radius: 13px; padding: 16px; width: 300px; display: flex; flex-direction: column; gap: 9px; }
+#pgrpop h3 { font-size: 13px; color: var(--tx2); }
+#pgrfld { background: var(--bg); border: 1.5px solid var(--brd); border-radius: 7px; color: var(--tx); font-size: 15px; padding: 8px; font-family: inherit; user-select: text; -webkit-user-select: text; }
+#pgrfld:focus { outline: none; border-color: var(--acc); }
+.pgr-qrow { display: flex; gap: 6px; }
+.pgr-q { flex: 1; height: 32px; border-radius: 6px; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx2); font-size: 11px; cursor: pointer; font-weight: 600; }
+.pgr-q:active { background: var(--brd); }
+
+/* [V0.44] バックアップ確認ダイアログ */
+#bk-confirm-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
+}
+#bk-confirm-overlay.open { display: flex; }
+#bk-confirm-box {
+  background: var(--pan); border: 1.5px solid var(--brd); border-radius: 14px;
+  padding: 22px 20px 18px; max-width: 340px; width: 90%; text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+#bk-confirm-box .bk-icon  { font-size: 28px; margin-bottom: 8px; }
+#bk-confirm-box .bk-title { font-size: 14px; font-weight: 800; color: var(--tx); margin-bottom: 6px; }
+#bk-confirm-box .bk-sub   { font-size: 12px; color: var(--tx2); margin-bottom: 18px; line-height: 1.5; }
+#bk-confirm-box .bk-warn  { color: #ffaa44; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
+#bk-confirm-box .bk-btns  { display: flex; flex-direction: column; gap: 8px; }
+#bk-confirm-box .bk-btns button {
+  width: 100%; height: 38px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  cursor: pointer; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx);
+}
+#bk-confirm-box .bk-btns .bk-do-backup { background: var(--acc); border-color: var(--acc); color: #fff; }
+#bk-confirm-box .bk-btns .bk-do-close  { background: var(--pan2); }
+#bk-confirm-box .bk-btns .bk-cancel    { color: var(--tx2); }
+
+/* [V0.35] 分割ビュー削除により関連CSSを全削除 */
+
+/* ===== タブバー ===== */
+#tabbar {
+  flex-shrink: 0; display: flex; align-items: stretch; min-height: 30px;
+  background: var(--pan2); border-bottom: 1.5px solid var(--brd);
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+#tabbar::-webkit-scrollbar { display: none; }
+.shtab {
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 6px 0 10px; min-width: 72px; max-width: 152px;
+  background: var(--pan2); color: var(--tx2); border-right: 1px solid var(--brd);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+  user-select: none; -webkit-user-select: none; transition: background .1s;
+}
+.shtab:hover { background: var(--brd); color: var(--tx); }
+.shtab.active {
+  background: var(--bg); color: var(--tx);
+  box-shadow: inset 0 -2px 0 var(--acc);
+}
+.shtab-nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.shtab-x {
+  flex-shrink: 0; background: none; border: none; color: var(--tx2);
+  cursor: pointer; font-size: 12px; padding: 1px 3px; border-radius: 3px; line-height: 1;
+}
+.shtab-x:hover { background: var(--red); color: #fff; }
+.shtab-add {
+  padding: 0 13px; background: none; border: none; color: var(--tx2);
+  font-size: 20px; cursor: pointer; flex-shrink: 0; align-self: center;
+  margin-left: auto; /* 常に右端へ固定（✕ボタンとの誤操作防止） */
+}
+.shtab-add:hover { color: var(--acc); }
+
+/* ===== 計算機 ===== */
+#calc {
+  display: none; position: fixed; z-index: 400; background: var(--pan);
+  border: 1.5px solid var(--brd); border-radius: 13px; width: 290px;
+  box-shadow: 0 8px 36px #000a; bottom: 20px; right: 16px;
+}
+#calc.on { display: block; }
+#ctb {
+  padding: 6px 12px 4px; display: flex; align-items: center; justify-content: space-between;
+  cursor: grab; border-bottom: 1px solid var(--brd);
+}
+#ctb span { font-size: 13px; font-weight: 700; color: var(--tx2); }
+#cclose { background: var(--pan2); border: 1.5px solid var(--brd); color: var(--tx); font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 5px; font-weight: 700; }
+#cclose:active { background: var(--acc); color: #fff; }
+#chist { max-height: 66px; overflow-y: auto; padding: 2px 10px; border-bottom: 1px solid var(--brd); }
+.chi { font-size: 11px; color: var(--tx2); text-align: right; padding: 2px 0; }
+#cdsp { padding: 5px 12px; text-align: right; border-bottom: 1px solid var(--brd); }
+#cexpr { font-size: 11px; color: var(--tx2); min-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cval { font-size: 26px; font-weight: 700; color: var(--tx); }
+#cdecrow { display: flex; align-items: center; gap: 5px; padding: 3px 10px; border-bottom: 1px solid var(--brd); }
+#cdecrow label { font-size: 11px; color: var(--tx2); }
+#cdec { width: 34px; text-align: center; background: var(--pan2); border: 1px solid var(--brd); color: var(--tx); border-radius: 4px; font-size: 12px; padding: 2px; }
+#cbtns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px; }
+.cb { height: 50px; border-radius: 9px; font-size: 22px; font-weight: 700; cursor: pointer; -webkit-user-select: none; transition: opacity .1s; border: 2px solid; }
+.cb:active { opacity: .6; }
+.cbn { background: var(--pan2); color: var(--tx);  border-color: #4a5a6a; }
+.cbo { background: #243040;    color: #ffa040;     border-color: #3a5070; }
+.cbeq{ background: var(--acc); color: #fff;        border-color: #c06000; }
+.cbf { background: #1e2530;    color: var(--tx2);  font-size: 16px; border-color: #3a4a58; }
+.cbw { grid-column: span 2; }
+.cbrs{ grid-row:    span 2; }
+
+/* ===== テキスト入力オーバーレイ ===== */
+#txov { display: none; position: fixed; inset: 0; z-index: 500; background: #0009; align-items: center; justify-content: center; }
+#txov.on { display: flex; }
+#txpop { background: var(--pan); border: 1.5px solid var(--brd); border-radius: 13px; padding: 16px; width: 300px; display: flex; flex-direction: column; gap: 9px; }
+#txpop h3 { font-size: 13px; color: var(--tx2); }
+#txfld {
+  background: var(--bg); border: 1.5px solid var(--brd); border-radius: 7px; color: var(--tx);
+  font-size: 16px; padding: 9px; resize: vertical; min-height: 60px; font-family: inherit;
+  user-select: text; -webkit-user-select: text;
+}
+#txfld:focus { outline: none; border-color: var(--acc); }
+.txbtns { display: flex; gap: 7px; justify-content: flex-end; }
+.txb { padding: 9px 16px; border-radius: 7px; border: none; cursor: pointer; font-size: 14px; font-weight: 700; }
+
+/* ===== ローディング / トースト ===== */
+#loading { display: none; position: fixed; inset: 0; z-index: 600; background: #000a; align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
+#loading.on { display: flex; }
+.spin { width: 34px; height: 34px; border: 3px solid var(--brd); border-top-color: var(--acc); border-radius: 50%; animation: sp .7s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+#toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--pan); border: 1.5px solid var(--brd); border-radius: 9px;
+  padding: 8px 16px; font-size: 13px; color: var(--tx);
+  opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 999; white-space: nowrap;
+}
+#toast.on { opacity: 1; }
+
+
+/* ===== タッチデバイス最適化 (pointer: coarse) V0.35調整版 ===== */
+@media (pointer: coarse) {
+  /* [V0.35] ツールバー行: 高さ縮小(48→46px)、スクロール防止 */
+  .hr {
+    height: 46px;
+    gap: 6px;
+    padding: 0 9px;
+    padding-left: max(9px, env(safe-area-inset-left));
+    padding-right: max(9px, env(safe-area-inset-right));
+    overflow-y: hidden; /* 縦スクロール防止 */
+  }
+  /* [V0.35] ボタン: 高さ40→38px、padding/font縮小でコンパクト化 */
+  .btn {
+    height: 38px;
+    padding: 0 11px;
+    font-size: 12px;
+    border-radius: 9px;
+    gap: 4px;
+  }
+  /* [V0.35] カラースウォッチ: 34→32px */
+  .csw {
+    width: 32px;
+    height: 32px;
+    border-width: 3px;
+  }
+  /* [V0.35] 区切り線: 30→28px */
+  .vs {
+    height: 28px;
+    margin: 0 4px;
+  }
+  /* [V0.35] ページ番号入力: 高さ34→32px */
+  .pgni {
+    width: 38px;
+    font-size: 13px;
+    height: 32px;
+    padding: 3px 0;
+  }
+  /* [V0.35] ページ合計・ズーム・ファイル名テキスト調整 */
+  .pgtot { font-size: 12px; }
+  .zlbl { font-size: 13px; min-width: 40px; }
+  #fnlbl { font-size: 12px; max-width: 180px; }
+  /* [V0.35] ドロップダウン: 44→42px */
+  .pkp button { height: 42px; font-size: 12px; }
+  /* [V0.35] ロゴ */
+  .logo { font-size: 12px; padding-right: 7px; }
+  /* [V0.35] safe-area: ヘッダー下端対応 */
+  #hdr {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ===== iPad横向き専用: ヘッダー収縮・スクロール防止 ===== */
+@media (pointer: coarse) and (orientation: landscape) {
+  /* [V0.35] 横向き時はさらに縮小してヘッダー2段を画面内に収める */
+  .hr {
+    height: 42px;
+    gap: 5px;
+    padding: 0 8px;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+  /* [V0.35] 横向き時ボタン: 高さ抑制で2段分の高さを節約 */
+  .btn {
+    height: 35px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+  /* [V0.35] 横向きスウォッチ */
+  .csw { width: 30px; height: 30px; }
+  /* [V0.35] 横向き区切り線 */
+  .vs { height: 26px; margin: 0 3px; }
+  /* [V0.35] 横向きページ入力 */
+  .pgni { height: 30px; font-size: 12px; }
+}
+
+
+/* ===== [V0.35] iPad Split View / Slide Over: 横幅 ≤600px 時ツールバー圧縮 ===== */
+@media (pointer: coarse) and (max-width: 600px) {
+  .hr {
+    height: 40px; gap: 4px;
+    padding: 0 6px;
+    padding-left: max(6px, env(safe-area-inset-left));
+    padding-right: max(6px, env(safe-area-inset-right));
+  }
+  .btn { height: 34px; padding: 0 8px; font-size: 11px; border-radius: 8px; gap: 3px; }
+  .csw { width: 28px; height: 28px; }
+  .vs  { height: 22px; margin: 0 2px; }
+  .logo { font-size: 11px; padding-right: 4px; }
+  #fnlbl { max-width: 80px; font-size: 10px; }
+  .pgni  { width: 32px; height: 28px; font-size: 12px; }
+}
+/* ===== [V0.35] iPad Split View 最小幅 (Slide Over / 1/3 分割) ≤430px ===== */
+@media (pointer: coarse) and (max-width: 430px) {
+  .hr  { height: 36px; gap: 3px; }
+  .btn { height: 28px; padding: 0 5px; font-size: 10px; border-radius: 7px; }
+  .csw { width: 22px; height: 22px; }
+  .logo { display: none; } /* 極狭時ロゴ省略 */
+  #fnlbl { max-width: 60px; }
+}
+</style>
+</head>
+<body>
+<!-- [V0.44] バックアップ確認ダイアログ（JS から open クラスを付与して表示） -->
+<div id="bk-confirm-overlay">
+  <div id="bk-confirm-box">
+    <div class="bk-icon" id="bk-icon">⚠️</div>
+    <div class="bk-title" id="bk-title">バックアップを作成しますか？</div>
+    <div class="bk-warn"  id="bk-warn"></div>
+    <div class="bk-sub"   id="bk-sub"></div>
+    <div class="bk-btns">
+      <button class="bk-do-backup" id="bk-do-backup">💾 バックアップして閉じる</button>
+      <button class="bk-do-close"  id="bk-do-close">閉じる（バックアップしない）</button>
+      <button class="bk-cancel"    id="bk-cancel">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<div id="hdr">
+  <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
+  <div class="hr">
+    <!-- [V0.48] バージョン番号はJS(APP_VERSION)で動的に設定 →更新漏れ防止 -->
+    <span class="logo" id="app-logo">M_Viewer <span id="app-ver-logo" style="font-size:10px">V0.48</span></span>
+    <input type="file" id="fileInput" accept="application/pdf" style="display:none">
+    <span id="fnlbl">ファイル未選択</span>
+    <div class="vs"></div>
+    <button class="btn" id="btn-undo">↩ 戻す</button>
+    <button class="btn on" id="btn-save">📤 PDF出力</button>
+    <button class="btn" id="btn-backup" title="PDF＋注釈データをZIPでバックアップ">💾 バックアップ</button>
+    <button class="btn" id="btn-restore" title="バックアップZIPから完全復元">📂 復元</button>
+    <input type="file" id="restoreInput" accept=".zip" style="display:none">
+    <button class="btn" id="calcbtn">🧮 計算機</button>
+    <div class="sp"></div>
+    <button class="btn" id="btn-home">⌂ ホーム</button>
+    <button class="btn rd" id="btn-close">✕ 閉じる</button>
+  </div>
+  <!-- 行2: ページナビ / ズーム / ツール / カラー / 太さ -->
+  <div class="hr">
+    <button class="btn" id="btn-prev">◀</button>
+    <input id="pgn" class="pgni" type="number" min="1" value="1">
+    <span class="pgtot">/<span id="tpn">0</span></span>
+    <button class="btn" id="btn-next">▶</button>
+    <span id="zlbl" class="zlbl">--</span>
+    <button class="btn" id="btn-fit">全体</button>
+    <div style="width:30px;flex-shrink:0"></div>
+    <button class="btn on" id="t-pen">✏️ ペン</button>
+    <button class="btn"    id="t-hl">蛍光ペン</button>
+    <div class="pkw">
+      <button class="btn" id="t-shape">図形▾</button>
+      <div class="pkp" id="shapepop">
+        <button data-shape="arrow">→ 矢印</button>
+        <button data-shape="rect">□ 四角</button>
+        <button data-shape="circle">○ 円</button>
+        <button data-shape="line">/ 直線</button>
+      </div>
+    </div>
+    <button class="btn" id="t-text">文字</button>
+    <button class="btn" id="t-eraser">消しゴム</button>
+    <div class="pkw">
+      <button class="btn" id="t-select">選択▾</button>
+      <div class="pkp" id="selpop">
+        <button id="sel-rect"  class="on" data-selmode="rect">□ 矩形</button>
+        <button id="sel-lasso"            data-selmode="lasso">〇 なげなわ</button>
+      </div>
+    </div>
+    <button class="btn" id="t-sub">サブ窓</button>
+    <div class="vs"></div>
+    <div class="csw on" id="sw0" style="background:#cc2020" data-c="#cc2020"></div>
+    <div class="csw"    id="sw1" style="background:#1a1a1a;border:2px solid #888" data-c="#1a1a1a"></div>
+    <div class="csw"    id="sw2" style="background:#1a55cc" data-c="#1a55cc"></div>
+    <div class="csw"    id="sw3" style="background:#108030" data-c="#108030"></div>
+    <div class="vs"></div>
+    <span class="szlbl">太さ</span>
+    <span id="sz-v" class="sz-val">3</span>
+  </div>
+</div>
+
+<!-- タブバー (シート切替) -->
+<div id="tabbar"></div>
+
+<!-- 太さパネル -->
+<div id="szp">
+  <span id="szp-title">ペンの太さ</span>
+  <div class="szp-row">
+    <input type="range"  id="sz-rng" min="1" max="40" value="3">
+    <input type="number" id="sz-n"   min="1" max="40" value="3">
+  </div>
+  <div id="szp-prev"><canvas id="szp-cvs" width="210" height="40"></canvas></div>
+  <div class="szp-btns">
+    <button class="szp-cancel" id="szp-cancel">キャンセル</button>
+    <button class="szp-ok"     id="szp-ok">✓ 決定</button>
+  </div>
+</div>
+
+<!-- キャンバス領域 -->
+<div id="ca">
+  <div id="cw" style="display:none">
+    <canvas id="pdfCvs"></canvas>
+    <canvas id="annCvs"></canvas>
+    <canvas id="ovlCvs"></canvas>
+  </div>
+  <div id="dz">
+    <div class="dzi">📄</div>
+    <!-- [V0.48] APP_VERSIONで動的設定 -->
+    <div class="dzm" id="app-ver-dz">M_Viewer V0.48</div>
+    <div class="dzs">
+      📂 タップして選択 / ドラッグ＆ドロップ<br>
+      ✏️ ペン・蛍光ペン: Apple Pencil専用<br>
+      👉 その他ツール・スクロール: 指でも操作可<br>
+      🔍 2本指でピンチ拡大縮小 (最大800%)
+    </div>
+    <button class="dzb" id="dz-open">📂 PDFを開く</button>
+  </div>
+  <!-- [V0.40] ホーム画面 -->
+  <div id="home">
+    <div class="home-hdr">
+      <div class="home-title">📐 M_Viewer</div>
+      <button class="home-open-btn" id="home-open">📂 PDFを開く</button>
+    </div>
+    <div class="home-section">最近開いた図面</div>
+    <div id="home-list"></div>
+    <div id="home-empty">
+      <div class="home-empty-icon">📂</div>
+      <div class="home-empty-msg">図面をドラッグ＆ドロップするか<br>「PDFを開く」で追加してください</div>
+    </div>
+    <div class="home-drop-hint">📄 PDFをここにドロップして開く</div>
+  </div>
+</div>
+<button id="selbtn">🗑 削除</button>
+
+<!-- 計算機 -->
+<div id="calc">
+  <div id="ctb"><span>🧮 計算機</span><button id="cclose">✕ 閉じる</button></div>
+  <div id="chist"></div>
+  <div id="cdsp"><div id="cexpr"></div><div id="cval">0</div></div>
+  <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="1">桁</div>
+  <div id="cbtns">
+    <button class="cb cbf" data-cfn="C">C</button>
+    <button class="cb cbf" data-cfn="sqrt">√</button>
+    <button class="cb cbf" data-cfn="sq">x²</button>
+    <button class="cb cbo" data-cop="/">÷</button>
+    <button class="cb cbf" data-cfn="⌫">⌫</button>
+    <button class="cb cbf" data-cfn="±">±</button>
+    <button class="cb cbf" data-cfn="%">%</button>
+    <button class="cb cbo" data-cop="*">×</button>
+    <button class="cb cbn" data-cnum="7">7</button>
+    <button class="cb cbn" data-cnum="8">8</button>
+    <button class="cb cbn" data-cnum="9">9</button>
+    <button class="cb cbo" data-cop="-">−</button>
+    <button class="cb cbn" data-cnum="4">4</button>
+    <button class="cb cbn" data-cnum="5">5</button>
+    <button class="cb cbn" data-cnum="6">6</button>
+    <button class="cb cbo" data-cop="+">＋</button>
+    <button class="cb cbn" data-cnum="1">1</button>
+    <button class="cb cbn" data-cnum="2">2</button>
+    <button class="cb cbn" data-cnum="3">3</button>
+    <button class="cb cbeq cbrs" data-cfn="=">=</button>
+    <button class="cb cbn cbw"   data-cnum="0">0</button>
+    <button class="cb cbn"       data-cnum=".">.</button>
+  </div>
+</div>
+
+<!-- ③ PDF出力ページ指定オーバーレイ -->
+<div id="pgrov">
+  <div id="pgrpop">
+    <h3>📤 PDF出力 — ページ指定</h3>
+    <div class="pgr-qrow">
+      <button class="pgr-q" id="pgr-cur">現在のページ</button>
+      <button class="pgr-q" id="pgr-all">全ページ</button>
+    </div>
+    <input id="pgrfld" type="text" placeholder="例: 1, 1-5, 1,3,5-8">
+    <div class="txbtns">
+      <button class="txb" id="pgrCancel" style="background:var(--pan2);color:var(--tx2)">キャンセル</button>
+      <button class="txb" id="pgrConfirm" style="background:var(--acc);color:#fff">📤 出力</button>
+    </div>
+  </div>
+</div>
+
+<!-- テキスト入力オーバーレイ -->
+<div id="txov">
+  <div id="txpop">
+    <h3>テキスト入力 (Ctrl+Enter で確定)</h3>
+    <textarea id="txfld" placeholder="テキストを入力…"></textarea>
+    <div class="txbtns">
+      <button class="txb" id="txCancel" style="background:var(--pan2);color:var(--tx2)">キャンセル</button>
+      <button class="txb" id="txConfirm" style="background:var(--acc);color:#fff">確定</button>
+    </div>
+  </div>
+</div>
+
+<div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ============================================================
+   定数
+   ============================================================ */
+const MAX_CANVAS  = 3600;  // GPU上限(A0対応)
+const MAX_SCALE   = 8;     // 最大800%
+const SAVE_DELAY  = 1200;  // 自動保存ディレイ(ms)
+const SAVE_RS     = 3;     // PDF保存時レンダリングスケール
+const PDF_MAX_DPR = 1.5;   // Retina対応最大DPR (iPad freeze 対策: 2→1.5)
+
+/* サブウィンドウ最大数 */
+const MAX_SUBWIN  = 5;
+const MAX_STROKES_PER_PAGE = 500; // [V0.47] 1ページあたりのストローク上限（フリーズ防止）
+
+/* サブウィンドウ枠色 / 塗り色 */
+const SW_COLORS = ['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
+const SW_FILLS  = [
+  'rgba(240,120,0,0.12)','rgba(0,160,255,0.12)',
+  'rgba(0,200,80,0.12)', 'rgba(255,80,160,0.12)',
+  'rgba(200,200,0,0.12)'
+];
+
+/* カラーパレット */
+const PEN_COLORS = [
+  {id:'sw0', c:'#cc2020'},
+  {id:'sw1', c:'#1a1a1a'},
+  {id:'sw2', c:'#1a55cc'},
+  {id:'sw3', c:'#108030'},
+];
+const HL_COLORS = [
+  {id:'sw0', c:'#ffd700'},
+  {id:'sw1', c:'#50c040'},
+  {id:'sw2', c:'#ff69b4'},
+  {id:'sw3', c:'#40d4e8'},
+];
+
+/* ツール別デフォルト太さ */
+const TOOL_DEFAULT_SIZES = {
+  pen:3, hl:3, eraser:20, text:3,   // [THIN2] defaults は元に戻し、lw/3 で細さ調整
+  arrow:2, rect:2, circle:2, line:2
+};
+
+/* ============================================================
+   グローバル状態
+   ============================================================ */
+let currentTool  = 'pen';
+let prevTool     = 'pen';
+let currentShape = 'arrow';
+let selMode      = 'rect';
+let strokeColor  = '#cc2020';
+let strokeSize   = 3;
+let penColor     = '#cc2020';
+let hlColor      = '#ffd700';
+let txX = 0, txY = 0;
+
+const subWindows  = [];
+let _activeSelSubWin = null; // サブ窓選択コンテキスト (null=メイン)
+let   swZIndex    = 200;
+
+/* [V0.48] サブ窓ドラッグ/リサイズ グローバルシングルトン
+   SubWin生成ごとにdocument.addEventListenerを追加すると
+   SubWin数×16本のリスナーが全touchmoveで走りiPadが遅延する。
+   1本のハンドラで集約し、アクティブなSubWinだけに委譲する。 */
+const _SW_ACTIVE = { onMove: null, onEnd: null };
+(function _initSWGlobal() {
+  const dm = e => { if (_SW_ACTIVE.onMove) { if (e.cancelable) e.preventDefault(); _SW_ACTIVE.onMove(e); } };
+  const de = e => { if (_SW_ACTIVE.onEnd)  _SW_ACTIVE.onEnd(e); };
+  document.addEventListener('touchmove', dm, { passive: false });
+  document.addEventListener('touchend',  de, { passive: true  });
+  document.addEventListener('mousemove', dm, { passive: true  });
+  document.addEventListener('mouseup',   de, { passive: true  });
+})();
+let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
+
+/* [V0.48] バージョン一元管理定数
+   ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
+const APP_VERSION = 'V0.49';
+let   _fileHandle = null;
+
+
+/* ツール別太さ (実行中に変更される) */
+const toolSizes = { ...TOOL_DEFAULT_SIZES };
+
+/* ============================================================
+   IDB (IndexedDB ラッパー)
+   ============================================================ */
+const IDB = {
+  _db: null,
+  async open() {
+    if (this._db) return this._db;
+    return this._db = await new Promise((res, rej) => {
+      const req = indexedDB.open('TekkoV11', 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore('d');
+      req.onsuccess       = e => res(e.target.result);
+      req.onerror         = e => rej(e.target.error);
+    });
+  },
+  async get(key) {
+    try {
+      const db = await this.open();
+      return await new Promise(res => {
+        const q = db.transaction('d','readonly').objectStore('d').get(key);
+        q.onsuccess = e => res(e.target.result ?? null);
+        q.onerror   = () => res(null);
+      });
+    } catch { return null; }
+  },
+  async set(key, val) {
+    try {
+      const db = await this.open();
+      await new Promise((res, rej) => {
+        const q = db.transaction('d','readwrite').objectStore('d').put(val, key);
+        q.onsuccess = res;
+        q.onerror   = rej;
+      });
+    } catch(e) { console.warn('IDB:', e); }
+  }
+};
+
+function safeKey(s) {
+  return s.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
+}
+
+/* ============================================================
+   [V0.39] DocumentManager - アプリ内部ドキュメント管理基盤
+   IDBキー:
+     'doclist'  → [{id, name, createdAt, updatedAt, pages, byteSize}]
+     'doc:{id}' → フルドキュメント (originalPdfBytes, strokes, ...)
+   既存の 'f:' / 'last:' キーは後方互換のため維持
+   ============================================================ */
+const DocMgr = (() => {
+  let _docId = null; // 現在編集中のドキュメントID
+
+  function _newId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  async function _getList() { return (await IDB.get('doclist')) || []; }
+  async function _setList(list) { await IDB.set('doclist', list); }
+
+  return {
+    get currentId() { return _docId; },
+
+    /** PDF読込時: 同名Documentを探して更新、なければ新規作成 */
+    async open(name, pdfBytes, strokes, currentPage) {
+      try {
+        const list  = await _getList();
+        let   entry = list.find(e => e.name === name);
+        const now   = Date.now();
+        if (!entry) {
+          entry = { id: _newId(), name, createdAt: now, updatedAt: now,
+                    pages: 0, byteSize: pdfBytes?.byteLength || 0 };
+          list.unshift(entry);
+        } else {
+          entry.updatedAt = now;
+          entry.byteSize  = pdfBytes?.byteLength || entry.byteSize;
+        }
+        _docId = entry.id;
+        await _setList(list);
+        await IDB.set('doc:' + _docId, {
+          id: _docId, name,
+          createdAt:        entry.createdAt,
+          updatedAt:        now,
+          originalPdfBytes: pdfBytes ? pdfBytes.slice(0) : null,
+          strokes:          strokes || {},
+          currentPage:      currentPage || 1,
+          settings:         {}   // 将来拡張用
+        });
+      } catch(e) { console.warn('[DocMgr.open]', e); }
+      return _docId;
+    },
+
+    /** strokes / currentPage を更新（schedSaveから呼ぶ） */
+    async updateStrokes(strokes, currentPage) {
+      if (!_docId) return;
+      try {
+        const doc = await IDB.get('doc:' + _docId);
+        if (!doc) return;
+        doc.strokes     = strokes;
+        doc.currentPage = currentPage || doc.currentPage;
+        doc.updatedAt   = Date.now();
+        await IDB.set('doc:' + _docId, doc);
+        // doclist の updatedAt も反映
+        const list  = await _getList();
+        const entry = list.find(e => e.id === _docId);
+        if (entry) { entry.updatedAt = doc.updatedAt; await _setList(list); }
+      } catch(e) { console.warn('[DocMgr.updateStrokes]', e); }
+    },
+
+    /** ファイル名でDocumentを検索（起動時復元のバイナリ補完用） */
+    async findByName(name) {
+      const list  = await _getList();
+      const entry = list.find(e => e.name === name);
+      if (!entry) return null;
+      return IDB.get('doc:' + entry.id);
+    },
+
+    /** ドキュメント一覧（updatedAt降順） */
+    async list() {
+      const list = await _getList();
+      return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+
+    /** フルドキュメント取得 */
+    async get(id) { return IDB.get('doc:' + id); },
+
+    /** ドキュメント削除 */
+    async remove(id) {
+      await IDB.set('doc:' + id, null);
+      await _setList((await _getList()).filter(e => e.id !== id));
+      if (_docId === id) _docId = null;
+    },
+
+    /** closeFile時にIDをリセット */
+    reset() { _docId = null; }
+  };
+})();
+
+/* [V0.35] インスタンスID
+ * sessionStorage はウインドウ毎に独立 → iPad Split View 2画面起動時に
+ * 各ウインドウが別IDを持ち、IDBキーを分離して競合・上書きを防止する。
+ * ページリロード時は同一IDを維持（セッション継続のため）。
+ */
+const _INST_ID = (() => {
+  const KEY = 'mv_iid';
+  let id = sessionStorage.getItem(KEY);
+  if (!id) {
+    id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    sessionStorage.setItem(KEY, id);
+  }
+  return id;
+})();
+/* [V0.35] インスタンス別IDBキー: last セーブデータ競合防止 */
+const _KEY_LAST   = 'last:'   + _INST_ID;
+const _KEY_BK_LAT = 'bk:lat:' + _INST_ID;
+const _KEY_BK_PRV = 'bk:prv:' + _INST_ID;
+
+let _autoSaveTimer;
+let _idbSaving      = false; // [V0.49] IDB多重保存競合防止フラグ
+let _pdfLoadingLock = false; // [V0.47] loadPDF 二重呼び出し防止ロック
+// [V0.44] バックアップ未実施フラグ: schedSave で true, downloadBackup 成功で false
+// true = 手動バックアップ未実施（ZIPダウンロード済みでない）
+let _bkDirty = false;
+// [V0.44] 確認ダイアログ多重表示防止フラグ
+let _confirmPending = false;
+/* ============================================================
+   診断用 機能フラグ制御 (freeze 原因特定システム)
+   ブラウザ開発者コンソールから以下を実行して機能を1つずつ停止:
+     DBG.off('subWindowUpdate')  → SubWin 更新停止
+     DBG.off('redraw')           → redraw() 停止
+     DBG.off('pdfRender')        → renderPage() 停止
+     DBG.off('raf')              → 慣性アニメーション停止
+     DBG.off('wheelZoom')        → ホイールズーム停止
+     DBG.off('touchMove')        → touchmove 処理停止
+     DBG.off('annotationDraw')   → 注釈描画停止
+     DBG.off('overlay')          → オーバーレイ canvas 停止
+     DBG.status()                → 現在の状態確認
+     DBG.reset()                 → 全て有効に戻す
+   ============================================================ */
+window.DBG = (() => {
+  const flags = {
+    subWindowUpdate: true, // subWindows.forEach(sw.update)
+    redraw:          true, // redraw()
+    pdfRender:       true, // renderPage()
+    raf:             true, // requestAnimationFrame 慣性ループ
+    wheelZoom:       true, // ホイールズーム
+    touchMove:       true, // touchmove 処理全体
+    annotationDraw:  true, // _drawAnnotations()
+    overlay:         true, // ovlCvs 描画
+  };
+  return {
+    flags,
+    off(k) {
+      if (!(k in flags)) { console.warn('Unknown flag:', k, Object.keys(flags)); return; }
+      flags[k] = false;
+      console.log(`%c[DBG] "${k}" STOPPED ← この状態でフリーズするか確認してください`, 'color:red;font-weight:bold');
+    },
+    on(k) { flags[k] = true; console.log(`%c[DBG] "${k}" RESTORED`, 'color:green;font-weight:bold'); },
+    reset() { Object.keys(flags).forEach(k => { flags[k] = true; }); console.log('[DBG] ALL RESTORED'); },
+    status() { console.table(Object.entries(flags).map(([k,v])=>({feature:k, enabled:v}))); }
+  };
+})();
+
+/** IDB 保存・復元時に eraser ストロークを除去（蓄積による freeze 防止） */
+/**
+ * Palm Rejection: タッチ接触面が手のひらサイズか判定
+ * Apple Pencil (touchType==='stylus') は必ず false を返す
+ * radiusX/Y が大きい = 手のひら or 太い指の腹 → 描画・パン操作を無視
+ */
+function _isPalmContact(t) {
+  if (!t) return false;
+  if (t.touchType === 'stylus') return false; // Apple Pencil は除外
+  const rx = t.radiusX || 0, ry = t.radiusY || 0;
+  if (!rx && !ry) return false; // 情報なし → 判定不可（通す）
+  return rx > 25 || ry > 25;   // 接触半径 25px 超 → 手のひら判定
+}
+
+function _pruneEraserStrokes(strks) {
+  const result = {};
+  for (const [pg, arr] of Object.entries(strks || {})) {
+    const filtered = (arr || []).filter(s => s.type !== 'eraser');
+    if (filtered.length) result[pg] = filtered;
+  }
+  return result;
+}
+
+function schedSave() {
+  clearTimeout(_autoSaveTimer);
+  _bkDirty = true; // [V0.44] 変更ありフラグ → バックアップ確認ダイアログで使用
+  schedPdfSave(); // [V0.38] PDF自動保存も予約（30秒debounce・_fileHandleある時のみ）
+  _autoSaveTimer = setTimeout(async () => {
+    if (!App.pdfDoc || !App.origBuf) return;
+    // [V0.49] IDB競合防止: 保存中の再要求は短いdelayで再スケジュール
+    if (_idbSaving) { _autoSaveTimer = setTimeout(() => schedSave(), 300); return; }
+    _idbSaving = true;
+    try {
+      // eraser ストロークを保存しない（IDB 蓄積 → 復元後の freeze 防止）
+      const rawStrokes = App.strokes;
+      const cleanStrokes = {};
+      for (const [pg, arr] of Object.entries(rawStrokes || {})) {
+        const filtered = (arr || []).filter(s => s.type !== 'eraser');
+        if (filtered.length) cleanStrokes[pg] = filtered;
+      }
+      const data = {
+        buf:          null,  // [V0.41] バイナリは doc:{id} のみ保存（重複排除）
+        file:         App.fileName,
+        strokes:      (typeof structuredClone === 'function'
+                        ? structuredClone(cleanStrokes)
+                        : JSON.parse(JSON.stringify(cleanStrokes))),
+        page:         App.currentPage,
+        scale:        App.scale,
+        panX:         App.panX,       // [V0.49] スクロール位置を保存
+        panY:         App.panY,
+        subWinStates: _snapSubWins(), // [V0.49] サブ窓状態を保存
+        ts:           Date.now()
+      };
+      await IDB.set(_KEY_LAST, data); // [V0.35] インスタンス別キー → 別ウインドウと競合しない
+      await IDB.set('f:' + safeKey(App.fileName), data);
+      // [V0.39] DocumentManagerのstrokes更新（バックグラウンド）
+      DocMgr.updateStrokes(cleanStrokes, App.currentPage).catch(() => {});
+    } catch(e) { console.warn('[schedSave]', e); }
+    finally { _idbSaving = false; } // [V0.49] 成否に関わらず必ず解放
+  }, SAVE_DELAY);
+}
+
+// [V0.38] PDF自動保存（_fileHandle がある時のみ・30秒無操作後）
+const PDF_AUTOSAVE_DELAY = 30000;
+let _pdfSaveTimer = null;
+let _pdfSaveBusy  = false;
+
+async function _doPdfSave() {
+  if (!App.pdfDoc || !App.origBuf || !_fileHandle || _pdfSaveBusy) return;
+  _pdfSaveBusy = true;
+  try {
+    const pages = Array.from({ length: App.totalPages }, (_, i) => i + 1);
+    const blob  = await _generateSubsetPDF(pages);
+    if (!blob) { _pdfSaveBusy = false; return; }
+    const w = await _fileHandle.createWritable();
+    await w.write(blob); await w.close();
+    showToast('💾 自動保存しました');
+  } catch(e) { console.warn('[AutoSave PDF]', e); }
+  _pdfSaveBusy = false;
+}
+
+function schedPdfSave() {
+  if (!_fileHandle) return; // File System Access API 未取得時はスキップ
+  clearTimeout(_pdfSaveTimer);
+  _pdfSaveTimer = setTimeout(_doPdfSave, PDF_AUTOSAVE_DELAY);
+}
+
+// [V0.38] 画面が隠れる直前：IDB保存 + _fileHandle があればPDF即時保存
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && App.pdfDoc && App.origBuf) {
+    clearTimeout(_autoSaveTimer); // [V0.49] 保留中のdebounceをキャンセルして即時保存
+    const clean = _pruneEraserStrokes(App.strokes);
+    const data  = {
+      buf:          null,  // [V0.41] バイナリは doc:{id} のみ保存（重複排除）
+      strokes:      clean,
+      file:         App.fileName,
+      page:         App.currentPage,
+      scale:        App.scale,
+      panX:         App.panX,       // [V0.49] スクロール位置
+      panY:         App.panY,
+      subWinStates: _snapSubWins(), // [V0.49] サブ窓状態
+      ts:           Date.now()
+    };
+    IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
+    IDB.set(_KEY_LAST, data).catch(() => {});
+    // PDF保存タイマーをキャンセルして即時実行
+    if (_fileHandle) { clearTimeout(_pdfSaveTimer); _doPdfSave(); }
+  }
+});
+
+// [V0.49] pagehide: iOS Safariではvisibilitychangeのhiddenよりpagehideが確実に発火する
+// （タブクローズ・アプリ切替・クラッシュ直前に対応）
+window.addEventListener('pagehide', () => {
+  if (!App.pdfDoc || !App.origBuf) return;
+  clearTimeout(_autoSaveTimer); // 保留中のdebounceをキャンセル
+  const clean = _pruneEraserStrokes(App.strokes);
+  const data  = {
+    buf:          null,
+    strokes:      clean,
+    file:         App.fileName,
+    page:         App.currentPage,
+    scale:        App.scale,
+    panX:         App.panX,
+    panY:         App.panY,
+    subWinStates: _snapSubWins(),
+    ts:           Date.now()
+  };
+  // 同期的に発行（pagehideは非同期保証なし・最善努力）
+  IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
+  IDB.set(_KEY_LAST, data).catch(() => {});
+});
+
+/* ============================================================
+   描画ユーティリティ
+   invEZ = 1/cssExtraZoom → lineWidth を CSS px 固定にする補正値
+   ============================================================ */
+
+/**
+ * midpoint Bezier で滑らかな曲線を描く (ライブ描画用・最後の3点分)
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number[][]} pts  全点配列
+ * @param {number[]}   cur  最新点 [x, y]
+ * @param {number}     sc   スケール
+ */
+function drawLiveBezierSegment(ctx, pts, cur, sc) {
+  if (pts.length >= 3) {
+    const pp = pts[pts.length - 3];
+    const cp = pts[pts.length - 2];
+    const pmx = (pp[0] + cp[0]) / 2 * sc;
+    const pmy = (pp[1] + cp[1]) / 2 * sc;
+    const cmx = (cp[0] + cur[0]) / 2 * sc;
+    const cmy = (cp[1] + cur[1]) / 2 * sc;
+    ctx.moveTo(pmx, pmy);
+    ctx.quadraticCurveTo(cp[0] * sc, cp[1] * sc, cmx, cmy);
+  } else if (pts.length >= 2) {
+    const prev = pts[pts.length - 2];
+    ctx.moveTo(prev[0] * sc, prev[1] * sc);
+    ctx.lineTo(cur[0] * sc, cur[1] * sc);
+  }
+}
+
+/**
+ * ストローク1本を描画する
+ * @param {object} s    ストロークオブジェクト
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} sc   スケール
+ * @param {number} invEZ 1/cssExtraZoom (省略時=1)
+ */
+// [FIX-ZOOM-SIZE] invEZ は PDF保存呼出し互換のため残すが不使用。lw は sc 比例に統一
+function drawStroke(s, ctx, sc, invEZ = 1) {
+  ctx.save();
+  const lw = s.size * sc / 3; // [THIN2] /3 で約1/3の細さに統一（ズーム比例は維持）
+
+  if (s.type === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = lw * 4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    s.points.forEach((p, i) => i ? ctx.lineTo(p[0]*sc, p[1]*sc) : ctx.moveTo(p[0]*sc, p[1]*sc));
+    ctx.stroke();
+
+  } else if (s.type === 'pen' || s.type === 'hl') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha   = s.type === 'hl' ? 0.38 : 1;
+    ctx.strokeStyle   = s.color;
+    ctx.lineWidth     = s.type === 'hl' ? Math.max(lw * 4, 5 * sc / 3) : lw; // [THIN2] HL最小幅も /3
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const pts = s.points;
+    if (pts && pts.length) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0] * sc, pts[0][1] * sc);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const mx = (pts[i][0] + pts[i+1][0]) / 2 * sc;
+        const my = (pts[i][1] + pts[i+1][1]) / 2 * sc;
+        ctx.quadraticCurveTo(pts[i][0]*sc, pts[i][1]*sc, mx, my);
+      }
+      if (pts.length > 1) ctx.lineTo(pts[pts.length-1][0]*sc, pts[pts.length-1][1]*sc);
+      ctx.stroke();
+    }
+
+  } else if (s.type === 'text') {
+    ctx.fillStyle = s.color;
+    ctx.font = `bold ${Math.round(s.size * 6 * sc)}px 'Helvetica Neue',Arial,sans-serif`; // [FIX-ZOOM-SIZE]
+    s.text.split('\n').forEach((line, i) =>
+      ctx.fillText(line, s.x * sc, s.y * sc + i * s.size * 7 * sc)); // [FIX-ZOOM-SIZE]
+
+  } else {
+    ctx.strokeStyle = s.color; ctx.lineWidth = lw; ctx.lineCap = 'round';
+    const [x1, y1, x2, y2] = [s.x1*sc, s.y1*sc, s.x2*sc, s.y2*sc];
+    if (s.type === 'rect') {
+      ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+    } else if (s.type === 'circle') {
+      const rx = (x2-x1)/2, ry = (y2-y1)/2;
+      ctx.beginPath(); ctx.ellipse(x1+rx, y1+ry, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI*2); ctx.stroke();
+    } else if (s.type === 'line') {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    } else if (s.type === 'arrow') {
+      const hl  = Math.max(lw * 4, 12 * sc); // [FIX-ZOOM-SIZE] 矢印頭もscベース
+      const ang = Math.atan2(y2-y1, x2-x1);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - hl*Math.cos(ang-Math.PI/6), y2 - hl*Math.sin(ang-Math.PI/6));
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - hl*Math.cos(ang+Math.PI/6), y2 - hl*Math.sin(ang+Math.PI/6));
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * ② アノテーション描画
+ *    eraser ストロークは endDraw 時に即時削除するため配列に残らない
+ *    → 常に単純描画パス（temp canvas 生成ゼロ・compositing なし）
+ */
+function _drawAnnotations(ctx, strks, sc) {
+  if (!strks?.length) return; // [V0.35] null safety 簡略化
+  strks.forEach(s => drawStroke(s, ctx, sc));
+}
+
+/**
+ * [V0.35] ライブペン/蛍光ペン描画共通関数
+ * App / SubWin で共通化
+ * @param {CanvasRenderingContext2D} ctx - 描画先 context
+ * @param {object} s   - ストロークオブジェクト (type, color, size, points)
+ * @param {object} p   - 現在座標 {x, y}
+ * @param {number} sc  - renderScale
+ */
+function _drawLivePen(ctx, s, p, sc) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha  = s.type === 'hl' ? 0.38 : 1;
+  ctx.strokeStyle  = s.color;
+  ctx.lineWidth    = s.type === 'hl' ? Math.max(s.size * 4, 5) * sc / 3 : s.size * sc / 3;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  drawLiveBezierSegment(ctx, s.points, [p.x, p.y], sc);
+  ctx.stroke(); ctx.restore();
+}
+
+/**
+ * [V0.35] 消しゴムカーソル（破線円）描画共通関数
+ * App / SubWin で共通化
+ * ※呼び出し側で ovlCtx.clearRect は済ませること
+ */
+function _drawEraserCursor(ctx, p, s, sc, invEZ) {
+  ctx.save();
+  ctx.strokeStyle = '#888'; ctx.lineWidth = Math.max(1, 1.5 * invEZ);
+  ctx.setLineDash([4 * invEZ, 2 * invEZ]);
+  ctx.beginPath();
+  ctx.arc(p.x * sc, p.y * sc, s.size * 2 * sc / 3, 0, Math.PI * 2);
+  ctx.stroke(); ctx.restore();
+}
+
+/**
+ * 消しゴム処理 (全消去対象タイプ対応版)
+ *   pen/hl → _applyEraser で部分消去（ポイント削除）
+ *   line/rect/circle/arrow → バウンディングボックス接触で図形全体を削除
+ *   text → 削除しない
+ * eraser ストロークは配列に保存せず即時削除 → compositing 不要 → redraw() が軽量
+ */
+function _applyEraserAll(stroke, erPts, hitR) {
+  if (stroke.type === 'text') return [stroke]; // text は消去しない
+  // pen / hl : ポイント単位の部分消去
+  if ((stroke.type === 'pen' || stroke.type === 'hl') && stroke.points?.length) {
+    return _applyEraser(stroke, erPts, hitR);
+  }
+  // 図形 (line/rect/circle/arrow) : バウンディングボックス接触で全体削除
+  const bb = strokeBBox(stroke);
+  if (!bb) return [stroke];
+  // 消しゴム点列のいずれかが BB+hitR 内に入るか、BB中心への線分距離が範囲内なら削除
+  for (let i = 0; i < erPts.length; i++) {
+    const [ex, ey] = erPts[i];
+    if (ex >= bb.x1 - hitR && ex <= bb.x2 + hitR &&
+        ey >= bb.y1 - hitR && ey <= bb.y2 + hitR) return []; // 点がBBに接触
+    if (i > 0) {
+      const cx = (bb.x1 + bb.x2) / 2, cy = (bb.y1 + bb.y2) / 2;
+      const reach = hitR + Math.hypot(bb.x2 - bb.x1, bb.y2 - bb.y1) / 2;
+      if (_distPtSeg(cx, cy, erPts[i-1][0], erPts[i-1][1], ex, ey) < reach) return []; // 線分がBBに近い
+    }
+  }
+  return [stroke]; // 接触なし → 保持
+}
+
+/**
+ * 消しゴム円内のポイントだけ除去し、残存部分を別ストロークとして返す（部分消去）
+ * stroke全体削除ではなく「カーソル範囲内のポイントのみ」を消すことで当たり判定を正確化
+ * @param {object}   penStroke - ペンストローク {points:[[x,y],...], size, ...}
+ * @param {number[][]} erPts   - 消しゴム経路の座標列 (PDF座標)
+ * @param {number}   hitR      - ヒット半径 (PDF座標単位) ← 視覚カーソル半径と完全一致させること
+ * @returns {object[]}         - 残存セグメント配列（0個以上）
+ */
+
+/** ペン点pから消しゴム線分a→bへの最短距離 (PDF座標) */
+function _distPtSeg(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay, len2 = dx*dx+dy*dy;
+  if (len2 === 0) return Math.hypot(px-ax, py-ay);
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/len2));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+
+function _applyEraser(penStroke, erPts, hitR) {
+  if (!penStroke.points?.length || erPts.length === 0) return [penStroke];
+
+  // [V0.46] 点→消しゴム経路ヒット判定を内部ヘルパーに共通化
+  // ペン点(px,py)が消しゴム経路(erPts)のhitR内に入るか
+  const ptHits = (px, py) => {
+    if (Math.hypot(px-erPts[0][0], py-erPts[0][1]) < hitR) return true;
+    for (let i = 1; i < erPts.length; i++) {
+      if (_distPtSeg(px, py, erPts[i-1][0], erPts[i-1][1], erPts[i][0], erPts[i][1]) < hitR)
+        return true;
+    }
+    return false;
+  };
+
+  // 既存: 各ペン点を消しゴム経路と照合（ペン点 → 消しゴム線分 距離）
+  const kept = penStroke.points.map(pp => ptHits(pp[0], pp[1]) ? null : pp);
+
+  // [V0.46] 追加: ペン線分の中点・1/4・3/4点も照合
+  // 目的: 高速ペン描画でペン点間隔が広い場合、消しゴム円がペン点を避けて
+  //       ペン線分の「隙間」を通過しても消去されない問題を修正
+  // メイン・サブウィンドウ共通の _applyEraser を修正するため両方に効果あり
+  for (let j = 1; j < kept.length; j++) {
+    if (kept[j-1] === null || kept[j] === null) continue; // 既に消去済みはスキップ
+    const [ax, ay] = kept[j-1], [bx, by] = kept[j];
+    // 中点チェック（基本補間）
+    if (ptHits((ax+bx)/2, (ay+by)/2)) {
+      kept[j-1] = null; kept[j] = null; continue;
+    }
+    // 線分が hitR×2 より長い場合は 1/4・3/4 点も追加チェック（高速ペン対策）
+    if (Math.hypot(bx-ax, by-ay) > hitR * 2) {
+      if (ptHits(ax*0.75+bx*0.25, ay*0.75+by*0.25) ||
+          ptHits(ax*0.25+bx*0.75, ay*0.25+by*0.75)) {
+        kept[j-1] = null; kept[j] = null;
+      }
+    }
+  }
+
+  // 連続する保持ポイントをセグメントに分割（消去ポイントで切断）
+  const result = [];
+  let seg = [];
+  for (const p of kept) {
+    if (p !== null) {
+      seg.push(p);
+    } else {
+      if (seg.length >= 2) result.push({ ...penStroke, points: [...seg] });
+      seg = [];
+    }
+  }
+  if (seg.length >= 2) result.push({ ...penStroke, points: [...seg] });
+  return result;
+}
+
+/**
+ * ストロークのバウンディングボックスを返す
+ */
+function strokeBBox(s) {
+  if (!s || s.type === 'eraser') return null;
+  if (s.points) {
+    const xs = s.points.map(p => p[0]), ys = s.points.map(p => p[1]);
+    return { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) };
+  }
+  if (s.type === 'text') {
+    return { x1: s.x-2, y1: s.y-s.size*8, x2: s.x+s.size*4*(s.text?.length||1), y2: s.y+4 };
+  }
+  return { x1: Math.min(s.x1,s.x2), y1: Math.min(s.y1,s.y2), x2: Math.max(s.x1,s.x2), y2: Math.max(s.y1,s.y2) };
+}
+
+/**
+ * 点(px,py)がポリゴン内にあるか (なげなわ選択用)
+ */
+function ptInPoly(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length-1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if (((yi > py) !== (yj > py)) && (px < (xj-xi)*(py-yi)/(yj-yi)+xi)) inside = !inside;
+  }
+  return inside;
+}
+
+/* ============================================================
+   ページ回転補正 (PDF保存用)
+   PDF Rotate=R は「表示時に R°CW 回転する」の意味。
+   pdf.js は Rotate 分を適用済みの display canvas を生成する。
+   保存時は display→native 変換を適用してネイティブ座標系に戻す。
+   数学的根拠 (canvas y-down, native WxH → display):
+     rot=90 : native(x,y)→display(ph-y, x)  逆変換: display(X,Y)→native(Y, ph-X)
+              → translate(0, ph*rs) + rotate(-π/2)
+     rot=180: native(x,y)→display(pw-x,ph-y) 逆変換: translate(pw,ph) + rotate(π)
+     rot=270: native(x,y)→display(y, pw-x)   逆変換: display(X,Y)→native(pw-Y, X)
+              → translate(pw*rs, 0) + rotate(+π/2)
+   ============================================================ */
+function rotateCanvas(src, jsPage, pw, ph, rs) {
+  const rot = jsPage.rotate || 0;
+  if (!rot) return src;
+  const dc = document.createElement('canvas');
+  dc.width = Math.round(pw * rs); dc.height = Math.round(ph * rs);
+  const ctx = dc.getContext('2d');
+  if      (rot === 90)  { ctx.translate(0,      ph*rs); ctx.rotate(-Math.PI / 2); } // 90°CCW (display→native)
+  else if (rot === 180) { ctx.translate(pw*rs, ph*rs);  ctx.rotate( Math.PI);     } // 180°   (unchanged)
+  else if (rot === 270) { ctx.translate(pw*rs, 0);      ctx.rotate( Math.PI / 2); } // 90°CW  (display→native)
+  ctx.drawImage(src, 0, 0);
+  return dc;
+}
+
+/* ============================================================
+   サブウィンドウ
+   ============================================================ */
+class SubWin {
+  constructor(pdfDoc, strokes, pageNum, region, screenX, screenY, initScale) {
+    this.pdfDoc     = pdfDoc;
+    this.strokes    = strokes;
+    this.pageNum    = pageNum;
+    this.innerScale = Math.max(0.2, Math.min(8, initScale || 1));
+    this.offX       = region.x1;
+    this.offY       = region.y1;
+
+    const rW = region.x2 - region.x1;
+    const rH = region.y2 - region.y1;
+    this.winW = Math.max(180, Math.round(rW * this.innerScale) + 4);
+    this.winH = Math.max(160, Math.round(rH * this.innerScale) + 30);
+    this.sx   = Math.max(4, Math.min(_vvWidth()  - this.winW - 10, screenX)); // [V0.35] visual viewport
+    this.sy   = Math.max(4, Math.min(_vvHeight() - this.winH - 10, screenY)); // [V0.35] visual viewport
+
+    this.pinch     = null; this.panSt    = null;
+    this.curStroke = null; this.isDrawing = false;
+    this.lastX = 0; this.lastY = 0;
+    this.selPath = []; this.selectedIdx = []; // 選択ツール用
+    this.swSelPath = []; this.swSelectedIdx = []; // 選択ツール用
+    this._drawRafId = null; // [V0.35] 図形プレビュー用rAF ID
+
+    this._renderVer  = 0;
+    this._pdfCache   = null; this._pdfCacheSc = 0; this._pdfCachePg = 0;
+    this._annCvs     = null; this._annDirty   = true;
+    this._cleanups   = [];
+
+    const idx      = subWindows.length;
+    this.swColor   = SW_COLORS[idx % MAX_SUBWIN];
+    this.swFill    = SW_FILLS [idx % MAX_SUBWIN];
+
+    this._build();
+    // [V0.48] 枠を先に表示し、PDF描画を非同期で後回しにすることで即時応答を実現
+    requestAnimationFrame(() => this.render());
+  }
+
+  _build() {
+    const el = document.createElement('div');
+    el.className = 'swn';
+    el.style.cssText = `left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${++swZIndex};border-color:${this.swColor}`;
+
+    const n = subWindows.length + 1;
+    el.innerHTML = `
+      <div class="swn-tb">
+        <span>🔍 サブ窓${n}</span>
+        <button class="swn-close">✕</button>
+      </div>
+      <div class="swn-body">
+        <canvas class="swn-cvs"></canvas>
+        <canvas class="swn-sel" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas>
+        <span class="swn-zl"></span>
+      </div>
+      <div class="swn-rz"></div>
+      <div class="swn-rz-sw"></div>
+      <div class="swn-rz-nw"></div>`;
+
+    this.el      = el;
+    this.body    = el.querySelector('.swn-body');
+    this.cvs     = el.querySelector('.swn-cvs');
+    this.ctx     = this.cvs.getContext('2d');
+    this.selCvs  = el.querySelector('.swn-sel');
+    this.selCtx  = this.selCvs.getContext('2d');
+    this.zlEl    = el.querySelector('.swn-zl');
+
+    // [V0.48] 生成アニメーション・ローディング表示（renderで解除）
+    el.classList.add('swn-appearing', 'swn-loading');
+
+    el.querySelector('.swn-close').addEventListener('pointerdown', e => {
+      e.stopPropagation(); this.close();
+    });
+    el.addEventListener('pointerdown', () => { el.style.zIndex = ++swZIndex; },
+      { capture: true, passive: true });
+
+    this._bindDrag  (el.querySelector('.swn-tb'));
+    this._bindResize(el.querySelector('.swn-rz'),    'se'); // 右下（既存）
+    this._bindResize(el.querySelector('.swn-rz-sw'), 'sw'); // 左下（追加）
+    this._bindResize(el.querySelector('.swn-rz-nw'), 'nw'); // 左上（追加）
+    this._bindInput();
+
+    document.body.appendChild(el);
+  }
+
+  _bodyRect() { return this.body.getBoundingClientRect(); }
+  _toDocPos(t) {
+    const r = this._bodyRect();
+    return { x: (t.clientX - r.left) / this.innerScale + this.offX,
+             y: (t.clientY - r.top)  / this.innerScale + this.offY };
+  }
+  _updateTransform() {
+    this.cvs.style.transform =
+      `translate(${-this.offX * this.innerScale}px,${-this.offY * this.innerScale}px)`;
+    App.redrawSelOv?.();
+  }
+
+  /* レンダリング (2層合成: PDF + アノテーション) */
+  async render() {
+    if (!this.pdfDoc) return;
+    const ver = ++this._renderVer;
+    const sc  = this.innerScale;
+    const page = await this.pdfDoc.getPage(this.pageNum);
+    const vp   = page.getViewport({ scale: sc });
+
+    // PDFキャッシュ
+    if (!this._pdfCache || this._pdfCacheSc !== sc || this._pdfCachePg !== this.pageNum) {
+      const offscr = document.createElement('canvas');
+      offscr.width = vp.width; offscr.height = vp.height;
+      const ctx = offscr.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, vp.width, vp.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      this._pdfCache = offscr; this._pdfCacheSc = sc; this._pdfCachePg = this.pageNum;
+    }
+
+    // アノテーションキャッシュ
+    const needAnn = this._annDirty || !this._annCvs
+      || this._annCvs.width !== vp.width || this._annCvs.height !== vp.height;
+    if (needAnn) {
+      if (!this._annCvs) this._annCvs = document.createElement('canvas');
+      this._annCvs.width = vp.width; this._annCvs.height = vp.height;
+      const actx = this._annCvs.getContext('2d');
+      actx.clearRect(0, 0, vp.width, vp.height);
+      _drawAnnotations(actx, this.strokes[this.pageNum] || [], sc); // ② 消しゴムは text 以外すべて対象
+      this._annDirty = false;
+    }
+
+    if (ver !== this._renderVer) return;
+    this.cvs.width = vp.width; this.cvs.height = vp.height;
+    this.cvs.style.width = vp.width + 'px'; this.cvs.style.height = vp.height + 'px';
+    this.ctx.clearRect(0, 0, vp.width, vp.height);
+    this.ctx.drawImage(this._pdfCache, 0, 0);
+    this.ctx.drawImage(this._annCvs,  0, 0);
+    this._updateTransform();
+    this.zlEl.textContent = Math.round(sc * 100) + '%';
+    this.el?.classList.remove('swn-loading'); // [V0.48] レンダリング完了でローディング解除
+  }
+
+  /* 入力バインド */
+  _bindInput() {
+    const cv = this.cvs;
+    const isStylus = t => (t.touchType === 'stylus' || t.touchType == null);
+
+    cv.addEventListener('touchstart', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (e.touches.length >= 2) {
+        const hasStylus = Array.from(e.touches).some(t => isStylus(t));
+        if (hasStylus || this.isDrawing) return;
+        this.panSt = null; this._startPinch(e.touches); return;
+      }
+      const t = e.touches[0];
+      if (_isPalmContact(t)) return; // Palm Rejection
+      const needPen = ['pen','hl'].includes(currentTool === 'shape' ? currentShape : currentTool);
+      // 'select' は _startDraw へ流す（サブ窓選択を有効化）
+      if ((needPen && !isStylus(t)) || currentTool === 'sub') {
+        this._startPan(t); return;
+      }
+      this._startDraw(t);
+    }, { passive: false });
+
+    cv.addEventListener('touchmove', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (e.touches.length >= 2 && this.pinch) { this._movePinch(e.touches); return; }
+      if (this.panSt)    { this._movePan(e.touches[0]); return; }
+      if (this.isDrawing) this._moveDraw(e.touches[0]);
+    }, { passive: false });
+
+    cv.addEventListener('touchend', e => {
+      e.stopPropagation();
+      if (this.pinch && e.touches.length < 2) { this._endPinch(); return; }
+      if (this.panSt)     { this.panSt = null; return; }
+      if (this.isDrawing)   this._endDraw();
+    });
+
+    cv.addEventListener('wheel', e => {
+      e.preventDefault(); e.stopPropagation();
+      const r  = e.deltaY < 0 ? 1.15 : 0.87;
+      const br = this._bodyRect();
+      const bx = e.clientX - br.left, by = e.clientY - br.top;
+      const pdfX = bx / this.innerScale + this.offX;
+      const pdfY = by / this.innerScale + this.offY;
+      const newSc = Math.max(0.2, Math.min(8, this.innerScale * r));
+      this.offX = pdfX - bx / newSc; this.offY = pdfY - by / newSc;
+      this.innerScale = newSc;
+      this._pdfCache = null; this.render();
+    }, { passive: false });
+  }
+
+  /* ピンチ */
+  _pinchDist(t) { const dx = t[1].clientX-t[0].clientX, dy = t[1].clientY-t[0].clientY; return Math.sqrt(dx*dx+dy*dy); }
+  _pinchMid(t)  { return { x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2 }; }
+
+  _startPinch(t) {
+    const m = this._pinchMid(t), br = this._bodyRect();
+    const bx = m.x - br.left, by = m.y - br.top;
+    this.pinch = {
+      d0: this._pinchDist(t), s0: this.innerScale,
+      pdfX: bx / this.innerScale + this.offX,
+      pdfY: by / this.innerScale + this.offY
+    };
+  }
+  _movePinch(t) {
+    const p = this.pinch, r = this._pinchDist(t) / p.d0;
+    const m = this._pinchMid(t), br = this._bodyRect();
+    p.lastMx = m.x - br.left; p.lastMy = m.y - br.top;
+    p.target = Math.max(0.2, Math.min(8, p.s0 * r));
+    const tx = p.lastMx - p.pdfX * p.target;
+    const ty = p.lastMy - p.pdfY * p.target;
+    const cssR = p.target / p.s0;
+    this.cvs.style.transformOrigin = '0 0';
+    this.cvs.style.transform = `translate(${tx}px,${ty}px) scale(${cssR})`;
+    this.zlEl.textContent = Math.round(p.target * 100) + '%';
+  }
+  _endPinch() {
+    if (!this.pinch) return;
+    const p = this.pinch; this.pinch = null;
+    this.innerScale = p.target;
+    if (p.lastMx !== undefined) {
+      this.offX = p.pdfX - p.lastMx / p.target;
+      this.offY = p.pdfY - p.lastMy / p.target;
+    }
+    this.cvs.style.transform = '';
+    this._pdfCache = null; this.render();
+  }
+
+  /* パン */
+  _startPan(t) { this.panSt = { x0: t.clientX, y0: t.clientY, ox0: this.offX, oy0: this.offY }; }
+  _movePan(t) {
+    if (!this.panSt) return;
+    this.offX = this.panSt.ox0 - (t.clientX - this.panSt.x0) / this.innerScale;
+    this.offY = this.panSt.oy0 - (t.clientY - this.panSt.y0) / this.innerScale;
+    this._updateTransform();
+  }
+
+  /* 描画 */
+  _startDraw(t) {
+    const p = this._toDocPos(t);
+    if (currentTool === 'select') {
+      if (this.swSelectedIdx.length > 0) {
+        const bb = this._swSelBBox();
+        if (bb && p.x >= bb.x1-10 && p.x <= bb.x2+10 && p.y >= bb.y1-10 && p.y <= bb.y2+10) {
+          this.isDrawing = true; this.lastX = p.x; this.lastY = p.y; return;
+        }
+        this._swClearSel();
+      }
+      this.swSelPath = [{ x: p.x, y: p.y }]; this.isDrawing = true; return;
+    }
+    if (currentTool === 'text') {
+      txX = p.x; txY = p.y; // [V0.35] SubWinテキストは常にメイン(App)へ
+      document.getElementById('txfld').value = '';
+      document.getElementById('txov').classList.add('on');
+      return;
+    }
+    this.isDrawing = true; this.lastX = p.x; this.lastY = p.y;
+    const tool = currentTool === 'shape' ? currentShape : currentTool;
+    this.curStroke = ['pen','hl','eraser'].includes(tool)
+      ? { type: tool, points: [[p.x, p.y]], color: strokeColor, size: strokeSize }
+      : { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: strokeColor, size: strokeSize };
+  }
+  _moveDraw(t) {
+    if (currentTool === 'select' && this.isDrawing) {
+      const p = this._toDocPos(t);
+      if (this.swSelectedIdx.length > 0 && !this.swSelPath.length) {
+        this._swMoveSel(p.x - this.lastX, p.y - this.lastY);
+        this.lastX = p.x; this.lastY = p.y;
+        this.render(); this._swDrawSelOv(); return;
+      }
+      this.swSelPath.push({ x: p.x, y: p.y });
+      this._swDrawSelPreview(); return;
+    }
+    if (!this.curStroke) return;
+    const p = this._toDocPos(t);
+    const s = this.curStroke;
+    const sc = this.innerScale;
+
+    if (['pen','hl'].includes(s.type)) {
+      s.points.push([p.x, p.y]);
+      _drawLivePen(this.ctx, s, p, sc); // [V0.35] 共通関数化
+      this.lastX = p.x; this.lastY = p.y;
+
+    } else if (s.type === 'eraser') {
+      s.points.push([p.x, p.y]); this.lastX = p.x; this.lastY = p.y;
+      const br = this._bodyRect();
+      if (this.selCvs.width  !== Math.round(br.width) ||
+          this.selCvs.height !== Math.round(br.height)) {
+        this.selCvs.width  = Math.round(br.width);
+        this.selCvs.height = Math.round(br.height);
+      } else {
+        this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+      }
+      const bx = (p.x - this.offX) * this.innerScale;
+      const by = (p.y - this.offY) * this.innerScale;
+      this.selCtx.save();
+      this.selCtx.strokeStyle = '#888'; this.selCtx.lineWidth = 1.5;
+      this.selCtx.setLineDash([4, 2]);
+      this.selCtx.beginPath(); this.selCtx.arc(bx, by, s.size * 2 * sc / 3, 0, Math.PI*2); this.selCtx.stroke(); // [THIN2]
+      this.selCtx.restore();
+
+    } else {
+      s.x2 = p.x; s.y2 = p.y;
+      // [V0.35] setTimeout(30ms)→rAFで表示レートに同期した滑らかなプレビュー
+      cancelAnimationFrame(this._drawRafId);
+      this._drawRafId = requestAnimationFrame(() => this.render());
+    }
+  }
+  _endDraw() {
+    if (currentTool === 'select' && this.isDrawing) {
+      this.isDrawing = false;
+      if (this.swSelectedIdx.length > 0 && !this.swSelPath.length) {
+        this.render(); this._swDrawSelOv(); schedSave(); return;
+      }
+      this._swFinishSel(); return;
+    }
+    if (!this.isDrawing || !this.curStroke) { this.isDrawing = false; return; }
+    this.isDrawing = false;
+    if (!this.strokes[this.pageNum]) this.strokes[this.pageNum] = [];
+    const s = this.curStroke;
+    if (s.type === 'eraser') {
+      // 全タイプを即時削除・eraser を配列に保存しない
+      const r = (s.size || 20) * 2 / 3, erPts = s.points || [];
+      this.strokes[this.pageNum] = (this.strokes[this.pageNum] || [])
+        .flatMap(st => _applyEraserAll(st, erPts, r));
+    } else {
+      // [V0.47] ストローク上限チェック（SubWin）
+      if (this.strokes[this.pageNum].length >= MAX_STROKES_PER_PAGE) {
+        this.strokes[this.pageNum].shift();
+      }
+      this.strokes[this.pageNum].push({ ...s, points: s.points ? [...s.points] : undefined });
+    }
+    this.curStroke = null; this._annDirty = true;
+    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    this.render(); App.redraw();
+    schedSave();
+  }
+
+  /* ドラッグ (ウィンドウ移動) [V0.48] _SW_ACTIVEシングルトン化でグローバルリスナー削減 */
+  _bindDrag(handle) {
+    let dragging = false, ox = 0, oy = 0, ex = 0, ey = 0;
+    const onStart = e => {
+      if (e.target.closest('.swn-close')) return;
+      dragging = true;
+      const s = e.touches ? e.touches[0] : e;
+      ox = s.clientX; oy = s.clientY;
+      const r = this.el.getBoundingClientRect(); ex = r.left; ey = r.top;
+      e.preventDefault();
+      _SW_ACTIVE.onMove = onMove; // [V0.48] シングルトンに登録
+      _SW_ACTIVE.onEnd  = onEnd;
+    };
+    const onMove = e => {
+      if (!dragging) return;
+      const s = e.touches ? e.touches[0] : e;
+      // [V0.35] viewport内に収まるようクランプ (サブ窓タイトルバーが画面外に出ない)
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const ew = this.el.offsetWidth || this.winW || 200;
+      const newL = Math.max(0, Math.min(vw - ew, ex + s.clientX - ox));
+      const newT = Math.max(0, Math.min(vh - 30, ey + s.clientY - oy)); // タイトルバー30px確保
+      this.el.style.left = newL + 'px';
+      this.el.style.top  = newT + 'px';
+    };
+    const onEnd = () => {
+      dragging = false;
+      _SW_ACTIVE.onMove = null; // [V0.48] シングルトン解放
+      _SW_ACTIVE.onEnd  = null;
+    };
+    handle.addEventListener('touchstart', onStart, { passive: false });
+    handle.addEventListener('mousedown',  onStart);
+    // [V0.48] document への個別追加廃止（_SW_ACTIVEシングルトンで集約）
+    this._cleanups.push(() => {
+      if (dragging) { dragging = false; _SW_ACTIVE.onMove = null; _SW_ACTIVE.onEnd = null; }
+    });
+  }
+
+  /* リサイズ [V0.48] _SW_ACTIVEシングルトン化 */
+  _bindResize(handle, corner = 'se') {
+    let dragging = false, ox = 0, oy = 0, w0 = 0, h0 = 0, lx0 = 0, ty0 = 0, initSc = 1;
+    const onStart = e => {
+      dragging = true;
+      const s = e.touches ? e.touches[0] : e;
+      ox = s.clientX; oy = s.clientY;
+      const r = this.el.getBoundingClientRect();
+      w0 = r.width; h0 = r.height; lx0 = r.left; ty0 = r.top;
+      initSc = this.innerScale;
+      e.stopPropagation(); e.preventDefault();
+      _SW_ACTIVE.onMove = onMove; // [V0.48] シングルトンに登録
+      _SW_ACTIVE.onEnd  = onEnd;
+    };
+    const onMove = e => {
+      if (!dragging) return;
+      const s = e.touches ? e.touches[0] : e;
+      const dx = s.clientX - ox, dy = s.clientY - oy;
+      let nW = w0, nH = h0;
+      if      (corner === 'se') { nW = Math.max(180, w0 + dx); nH = Math.max(160, h0 + dy); }
+      else if (corner === 'sw') { nW = Math.max(180, w0 - dx); nH = Math.max(160, h0 + dy);
+        this.el.style.left = (lx0 + w0 - nW) + 'px'; }
+      else if (corner === 'nw') { nW = Math.max(180, w0 - dx); nH = Math.max(160, h0 - dy);
+        this.el.style.left = (lx0 + w0 - nW) + 'px';
+        this.el.style.top  = (ty0 + h0 - nH) + 'px'; }
+      const k = Math.max(0.1, (nW - 4) / Math.max(1, w0 - 4));
+      this.winW = nW; this.winH = nH;
+      this.el.style.width  = nW + 'px';
+      this.el.style.height = nH + 'px';
+      this.innerScale = Math.max(0.2, Math.min(8, initSc * k));
+      this._pdfCache = null;
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => this.render(), 60);
+    };
+    const onEnd = () => {
+      dragging = false;
+      _SW_ACTIVE.onMove = null; // [V0.48] シングルトン解放
+      _SW_ACTIVE.onEnd  = null;
+    };
+    handle.addEventListener('touchstart', onStart, { passive: false });
+    handle.addEventListener('mousedown',  onStart);
+    // [V0.48] document への個別追加廃止（_SW_ACTIVEシングルトンで集約）
+    this._cleanups.push(() => {
+      if (dragging) { dragging = false; _SW_ACTIVE.onMove = null; _SW_ACTIVE.onEnd = null; }
+    });
+  }
+
+  /* ---- 選択ツール（メインウインドウと同等） ---- */
+  _swFinishSel() {
+    const arr = this.strokes[this.pageNum] || [];
+    // [V0.35] selModeを参照してなげなわ／矩形を分岐
+    if (selMode === 'lasso' && this.swSelPath.length >= 3) {
+      // なげなわ選択: 自由線ポリゴンでptInPoly判定
+      const poly = this.swSelPath.map(p => [p.x, p.y]);
+      this.swSelectedIdx = arr.reduce((a, s, i) => {
+        const bb = strokeBBox(s); if (!bb) return a;
+        if (ptInPoly((bb.x1+bb.x2)/2, (bb.y1+bb.y2)/2, poly)) a.push(i);
+        return a;
+      }, []);
+    } else if (this.swSelPath.length >= 2) {
+      // 矩形選択: BBOX重複判定
+      const xs = this.swSelPath.map(p => p.x), ys = this.swSelPath.map(p => p.y);
+      const rx1=Math.min(...xs), ry1=Math.min(...ys), rx2=Math.max(...xs), ry2=Math.max(...ys);
+      this.swSelectedIdx = arr.reduce((a, s, i) => {
+        const bb = strokeBBox(s); if (!bb) return a;
+        if (!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2)) a.push(i);
+        return a;
+      }, []);
+    }
+    this.swSelPath = [];
+    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    this._swDrawSelOv();
+    if (this.swSelectedIdx.length > 0) {
+      _activeSelSubWin = this;
+      document.getElementById('selbtn').style.display = 'block';
+      this._swPositionSelBtn();
+    }
+  }
+  _swDrawSelPreview() {
+    if (!this.swSelPath.length) return;
+    const br = this._bodyRect();
+    this.selCvs.width  = Math.round(br.width);
+    this.selCvs.height = Math.round(br.height);
+    this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    this.selCtx.save();
+    this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
+    // [V0.45] なげなわ・矩形どちらも同じ点線パターンで統一（メインウィンドウと揃える）
+    this.selCtx.setLineDash([6, 4]);
+    const sc = this.innerScale;
+    // [V0.35] selModeに応じてなげなわ自由線／矩形を描き分け
+    if (selMode === 'lasso') {
+      // なげなわ: 自由線パスをlineTo描画（点線スタイルは上記で設定済み）
+      this.selCtx.beginPath();
+      this.swSelPath.forEach((p, i) => {
+        const bx = (p.x - this.offX) * sc, by = (p.y - this.offY) * sc;
+        i ? this.selCtx.lineTo(bx, by) : this.selCtx.moveTo(bx, by);
+      });
+      this.selCtx.stroke();
+    } else {
+      // 矩形: 始点と終点からstrokeRect描画
+      this.selCtx.setLineDash([6, 4]);
+      const p0 = this.swSelPath[0], p1 = this.swSelPath[this.swSelPath.length-1];
+      this.selCtx.strokeRect(
+        (Math.min(p0.x,p1.x)-this.offX)*sc, (Math.min(p0.y,p1.y)-this.offY)*sc,
+        Math.abs(p1.x-p0.x)*sc, Math.abs(p1.y-p0.y)*sc
+      );
+    }
+    this.selCtx.restore();
+  }
+  _swDrawSelOv() {
+    const br = this._bodyRect();
+    this.selCvs.width  = Math.round(br.width);
+    this.selCvs.height = Math.round(br.height);
+    this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    if (!this.swSelectedIdx.length) return;
+    const arr = this.strokes[this.pageNum] || [];
+    const sc  = this.innerScale;
+    this.selCtx.save();
+    this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
+    this.selCtx.setLineDash([6, 3]);
+    this.swSelectedIdx.forEach(i => {
+      const bb = strokeBBox(arr[i]); if (!bb) return;
+      this.selCtx.strokeRect(
+        (bb.x1-this.offX)*sc-4, (bb.y1-this.offY)*sc-4,
+        (bb.x2-bb.x1)*sc+8,    (bb.y2-bb.y1)*sc+8
+      );
+    });
+    this.selCtx.restore();
+    this._swPositionSelBtn();
+  }
+  _swSelBBox() {
+    const arr = this.strokes[this.pageNum] || [];
+    const bbs = this.swSelectedIdx.map(i => strokeBBox(arr[i])).filter(Boolean);
+    if (!bbs.length) return null;
+    return {
+      x1: Math.min(...bbs.map(b => b.x1)), y1: Math.min(...bbs.map(b => b.y1)),
+      x2: Math.max(...bbs.map(b => b.x2)), y2: Math.max(...bbs.map(b => b.y2))
+    };
+  }
+  _swMoveSel(dx, dy) {
+    const arr = this.strokes[this.pageNum] || [];
+    this.swSelectedIdx.forEach(i => {
+      const s = arr[i]; if (!s) return;
+      if (s.points) s.points = s.points.map(p => [p[0]+dx, p[1]+dy]);
+      if (s.x1 !== undefined) { s.x1+=dx; s.y1+=dy; s.x2+=dx; s.y2+=dy; }
+      if (s.type === 'text') { s.x+=dx; s.y+=dy; }
+    });
+  }
+  _swClearSel() {
+    this.swSelectedIdx = []; this.swSelPath = [];
+    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    document.getElementById('selbtn').style.display = 'none';
+    if (_activeSelSubWin === this) _activeSelSubWin = null;
+  }
+  _swPositionSelBtn() {
+    const bb = this._swSelBBox(); if (!bb) return;
+    const br = this._bodyRect();
+    const sc = this.innerScale;
+    const btn = document.getElementById('selbtn');
+    btn.style.left = Math.max(0, br.left + (bb.x1-this.offX)*sc - 4) + 'px';
+    btn.style.top  = Math.max(0, br.top  + (bb.y2-this.offY)*sc + 6) + 'px';
+  }
+  _swDeleteSelected() {
+    if (!this.swSelectedIdx.length) return;
+    this.strokes[this.pageNum] = (this.strokes[this.pageNum]||[])
+      .filter((_, i) => !this.swSelectedIdx.includes(i));
+    this.swSelectedIdx = []; this._annDirty = true;
+    if (this.selCvs) this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
+    document.getElementById('selbtn').style.display = 'none';
+    if (_activeSelSubWin === this) _activeSelSubWin = null;
+    this.render(); App.redraw(); schedSave();
+  }
+
+  update(strokes, pageNum) {
+    if (!window.DBG?.flags?.subWindowUpdate) return; // ① DBG.off('subWindowUpdate') で停止可
+    this.strokes = strokes; this._annDirty = true;
+    if (pageNum !== undefined && pageNum !== this.pageNum) {
+      this.pageNum = pageNum; this._pdfCache = null;
+    }
+    this.render();
+  }
+
+  close() {
+    this._cleanups.forEach(fn => fn()); this._cleanups = [];
+    document.body.removeChild(this.el);
+    const i = subWindows.indexOf(this);
+    if (i >= 0) subWindows.splice(i, 1);
+    this.pdfDoc  = null; // [V0.47] pdfDoc参照を解放してGCを促す
+    this.strokes = null; // [V0.47] strokes参照も解放
+    App.redrawSelOv?.();
+  }
+}
+
+/* [V0.35] SplitViewer クラス削除 */
+
+/* [V0.35] 分割ビュー制御・スプリッタードラッグ削除 */
+
+/* ============================================================
+   メインアプリ
+   ============================================================ */
+const App = (() => {
+  /* DOM */
+  const caEl    = document.getElementById('ca');
+  const cwEl    = document.getElementById('cw');
+  const pdfCvs  = document.getElementById('pdfCvs');
+  const annCvs  = document.getElementById('annCvs');
+  const ovlCvs  = document.getElementById('ovlCvs');
+  const pdfCtx  = pdfCvs.getContext('2d');
+  const annCtx  = annCvs.getContext('2d');
+  const ovlCtx  = ovlCvs.getContext('2d');
+
+  /* 状態 */
+  let pdfDoc     = null, origBuf = null, fileName = '';
+  let curPage    = 1, totalPages = 0, scale = 1;
+  let strokes    = {};
+  let renderScale = 1, cssExtraZoom = 1;
+  let curStroke  = null, isDrawing = false, lastX = 0, lastY = 0;
+  let _wheelTimer = null;  // wheel連打 debounce 用
+  let _offscr     = null;  // offscreen canvas 再利用キャッシュ
+  let pinch      = null, panSt    = null;
+  let selectedIdx = [], selPath = [];
+  let subRect    = null;
+  let renderVer  = 0;
+  let panX = 16, panY = 16;
+  let velHist = [], rafId = null;
+
+  const pageCache = new Map();
+
+  /* ---- トランスフォーム ---- */
+  function updateTransform() {
+    cwEl.style.transformOrigin = '0 0';
+    cwEl.style.transform = Math.abs(cssExtraZoom - 1) > 0.0005
+      ? `translate(${panX}px,${panY}px) scale(${cssExtraZoom})`
+      : `translate(${panX}px,${panY}px)`;
+  }
+  function visualW() { return (parseFloat(pdfCvs.style.width)  || pdfCvs.width)  * cssExtraZoom; }
+  function visualH() { return (parseFloat(pdfCvs.style.height) || pdfCvs.height) * cssExtraZoom; }
+  function clampPan() {
+    const margin = 60;
+    const aW = caEl.clientWidth || 1, aH = caEl.clientHeight || 1;
+    panX = Math.max(-(visualW() - margin), Math.min(aW - margin, panX));
+    panY = Math.max(-(visualH() - margin), Math.min(aH - margin, panY));
+  }
+  function centerCanvas() {
+    const aW = caEl.clientWidth || 1, aH = caEl.clientHeight || 1;
+    panX = Math.max(16, (aW - visualW()) / 2);
+    panY = Math.max(16, (aH - visualH()) / 2);
+    updateTransform();
+  }
+  function cancelInertia() { cancelAnimationFrame(rafId); rafId = null; }
+
+  /* ---- 座標変換 ---- */
+  function getDocPos(src) {
+    const r = caEl.getBoundingClientRect();
+    return { x: (src.clientX - r.left - panX) / scale,
+             y: (src.clientY - r.top  - panY) / scale };
+  }
+  function isOnCanvas(src) {
+    const r = caEl.getBoundingClientRect();
+    const rx = src.clientX - r.left - panX;
+    const ry = src.clientY - r.top  - panY;
+    return rx >= -20 && rx <= visualW() + 20 && ry >= -20 && ry <= visualH() + 20;
+  }
+
+  /* ---- タッチハンドラ ---- */
+  caEl.addEventListener('touchstart', onTouchStart, { passive: false });
+  caEl.addEventListener('touchmove',  onTouchMove,  { passive: false });
+  caEl.addEventListener('touchend',   onTouchEnd,   { passive: true  });
+  caEl.addEventListener('mousedown',  e => { if (pdfDoc) { cancelInertia(); startDraw(e); } });
+  caEl.addEventListener('mousemove',  e => { if (isDrawing) moveDraw(e); else if (panSt) movePan(e); });
+  caEl.addEventListener('mouseup',    e => { if (isDrawing) endDraw(e); else if (panSt) endPan(e); });
+  caEl.addEventListener('wheel', e => {
+    if (!window.DBG?.flags?.wheelZoom) { e.preventDefault(); return; } // ⑤ DBG.off('wheelZoom') で停止可
+    if (!pdfDoc) return; e.preventDefault();
+    const r    = e.deltaY < 0 ? 1.15 : 0.87;
+    const cr   = caEl.getBoundingClientRect();
+    const vx   = e.clientX - cr.left, vy = e.clientY - cr.top;
+    const pdfX = (vx - panX) / scale, pdfY = (vy - panY) / scale;
+    scale = Math.max(0.2, Math.min(MAX_SCALE, scale * r));
+    panX  = vx - pdfX * scale; panY = vy - pdfY * scale;
+    clampPan();
+    // CSS プレビューで即時反映（renderPage は debounce して連打を防止）
+    const previewEZ = scale / renderScale;
+    cwEl.style.transformOrigin = '0 0';
+    cwEl.style.transform = `translate(${panX}px,${panY}px) scale(${previewEZ})`;
+    document.getElementById('zlbl').textContent = Math.round(scale * 100) + '%';
+    clearTimeout(_wheelTimer);
+    _wheelTimer = setTimeout(() => renderPage(curPage), 150);
+  }, { passive: false });
+
+  function onTouchStart(e) {
+    if (!pdfDoc) return; e.preventDefault(); cancelInertia();
+    if (e.touches.length >= 2) {
+      // Apple Pencil 描画中に手のひらが追加されても pinch に移行しない
+      const hasStylus = Array.from(e.touches).some(t => t.touchType === 'stylus');
+      if (hasStylus || isDrawing) return; // 描画継続を優先
+      isDrawing = false; curStroke = null; panSt = null;
+      startPinch(e.touches); return;
+    }
+    const t = e.touches[0];
+    // Palm Rejection: 手のひら接触は無視
+    if (_isPalmContact(t)) return;
+    if (!isOnCanvas(t)) { startPan(t); return; }
+    const needPen = ['pen','hl'].includes(currentTool);
+    if (needPen && t.touchType !== 'stylus') { startPan(t); return; }
+    startDraw(e);
+  }
+  function onTouchMove(e) {
+    e.preventDefault();
+    if (!window.DBG?.flags?.touchMove) return; // ⑥ DBG.off('touchMove') で停止可
+    if (e.touches.length >= 2 && pinch) { movePinch(e.touches); return; }
+    const t = e.touches[0];
+    if (panSt)     { movePan(t);   return; }
+    if (isDrawing)   moveDraw(e);
+  }
+  function onTouchEnd(e) {
+    if (pinch && e.touches.length < 2) { endPinch(); return; }
+    if (panSt)     { endPan(e.changedTouches[0]); return; }
+    if (isDrawing)   endDraw(e);
+  }
+
+  /* ---- ピンチ ---- */
+  function pinchDist(t) { const dx=t[1].clientX-t[0].clientX,dy=t[1].clientY-t[0].clientY; return Math.sqrt(dx*dx+dy*dy); }
+  function pinchMid(t)  { return { x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2 }; }
+
+  function startPinch(t) {
+    const m = pinchMid(t), cr = caEl.getBoundingClientRect();
+    const bx = m.x - cr.left, by = m.y - cr.top;
+    pinch = { d0: pinchDist(t), s0: scale, target: scale,
+              pdfX: (bx-panX)/scale, pdfY: (by-panY)/scale };
+  }
+  function movePinch(t) {
+    const p = pinch, r = pinchDist(t) / p.d0;
+    const m = pinchMid(t), cr = caEl.getBoundingClientRect();
+    const M1x = m.x - cr.left, M1y = m.y - cr.top;
+    p.target = Math.max(0.2, Math.min(MAX_SCALE, p.s0 * r));
+    panX = M1x - p.pdfX * p.target; panY = M1y - p.pdfY * p.target;
+    const previewEZ = p.target / renderScale;
+    cwEl.style.transformOrigin = '0 0';
+    cwEl.style.transform = `translate(${panX}px,${panY}px) scale(${previewEZ})`;
+    document.getElementById('zlbl').textContent = Math.round(p.target * 100) + '%';
+  }
+  function endPinch() {
+    if (!pinch) return;
+    scale = pinch.target; pinch = null;
+    renderPage(curPage);
+  }
+
+  /* ---- パン + 慣性 ---- */
+  function startPan(t) { panSt = { x0: t.clientX, y0: t.clientY, px0: panX, py0: panY }; velHist = []; }
+  function movePan(t) {
+    if (!panSt) return;
+    velHist.push({ x: t.clientX, y: t.clientY, tm: Date.now() });
+    if (velHist.length > 6) velHist.shift();
+    panX = panSt.px0 + (t.clientX - panSt.x0);
+    panY = panSt.py0 + (t.clientY - panSt.y0);
+    clampPan(); updateTransform();
+  }
+  function endPan(t) {
+    if (!panSt) return; panSt = null;
+    if (velHist.length >= 2) {
+      const n = velHist[velHist.length-1], f = velHist[0];
+      const dt = Math.max(1, n.tm - f.tm);
+      let vx = (n.x - f.x) / dt * 14, vy = (n.y - f.y) / dt * 14;
+      const step = () => {
+        if (!window.DBG?.flags?.raf) return; // ④ DBG.off('raf') で慣性ループ停止可
+        if (Math.abs(vx) < 0.4 && Math.abs(vy) < 0.4) return;
+        panX += vx; panY += vy; clampPan(); updateTransform();
+        vx *= 0.9; vy *= 0.9; rafId = requestAnimationFrame(step);
+      };
+      rafId = requestAnimationFrame(step);
+    }
+  }
+
+  /* ---- 描画 ---- */
+  function startDraw(e) {
+    const t = e.touches ? e.touches[0] : e;
+    const p = getDocPos(t);
+    if (currentTool === 'text') {
+      txX = p.x; txY = p.y;
+      document.getElementById('txfld').value = '';
+      document.getElementById('txov').classList.add('on');
+      return;
+    }
+    if (currentTool === 'select') {
+      if (selectedIdx.length > 0) {
+        const bb = selBBox();
+        if (bb && p.x >= bb.x1-10/scale && p.x <= bb.x2+10/scale
+               && p.y >= bb.y1-10/scale && p.y <= bb.y2+10/scale) {
+          isDrawing = true; lastX = p.x; lastY = p.y; return;
+        } else clearSel();
+      }
+      selPath = [{ x: p.x, y: p.y }]; isDrawing = true; return;
+    }
+    if (currentTool === 'sub') {
+      subRect = { x1: p.x, y1: p.y, x2: p.x, y2: p.y }; isDrawing = true; return;
+    }
+    isDrawing = true; lastX = p.x; lastY = p.y;
+    const tool = currentTool === 'shape' ? currentShape : currentTool;
+    curStroke = ['pen','hl','eraser'].includes(tool)
+      ? { type: tool, points: [[p.x, p.y]], color: strokeColor, size: strokeSize }
+      : { type: tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: strokeColor, size: strokeSize };
+  }
+
+  function moveDraw(e) {
+    const t   = e.touches ? e.touches[0] : e;
+    const p   = getDocPos(t);
+    const sc  = renderScale;
+    const invEZ = 1 / cssExtraZoom;
+
+    if (currentTool === 'select') {
+      if (selectedIdx.length > 0 && !selPath.length) {
+        moveSel(p.x - lastX, p.y - lastY); lastX = p.x; lastY = p.y;
+        redraw(); drawSelOv(); return;
+      }
+      selPath.push({ x: p.x, y: p.y }); drawSelPreview(); return;
+    }
+
+    if (currentTool === 'sub' && subRect) {
+      subRect.x2 = p.x; subRect.y2 = p.y;
+      ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+      ovlCtx.save();
+      ovlCtx.strokeStyle = '#f07800'; ovlCtx.lineWidth = 2 * invEZ;
+      ovlCtx.setLineDash([8*invEZ, 4*invEZ]);
+      ovlCtx.strokeRect(subRect.x1*sc, subRect.y1*sc, (subRect.x2-subRect.x1)*sc, (subRect.y2-subRect.y1)*sc);
+      ovlCtx.fillStyle = 'rgba(240,120,0,.08)';
+      ovlCtx.fillRect(subRect.x1*sc, subRect.y1*sc, (subRect.x2-subRect.x1)*sc, (subRect.y2-subRect.y1)*sc);
+      ovlCtx.restore(); return;
+    }
+
+    if (!curStroke) return;
+    const s = curStroke;
+
+    if (['pen','hl'].includes(s.type)) {
+      s.points.push([p.x, p.y]);
+      _drawLivePen(annCtx, s, p, sc); // [V0.35] 共通関数化
+      lastX = p.x; lastY = p.y;
+
+    } else if (s.type === 'eraser') {
+      s.points.push([p.x, p.y]); lastX = p.x; lastY = p.y;
+      ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+      drawSubOverlays();
+      _drawEraserCursor(ovlCtx, p, s, sc, invEZ); // [V0.35] 共通関数化
+
+    } else {
+      // 図形プレビューを ovlCvs へ描画（全注釈 redraw を回避 → touchmove 軽量化）
+      s.x2 = p.x; s.y2 = p.y;
+      ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+      drawSubOverlays();
+      drawStroke(s, ovlCtx, sc);
+    }
+  }
+
+  function endDraw(e) {
+    isDrawing = false;
+
+    if (currentTool === 'select') {
+      if (selectedIdx.length > 0 && !selPath.length) { drawSelOv(); schedSave(); return; }
+      finishSel(); return;
+    }
+    if (currentTool === 'sub' && subRect) {
+      const r = {
+        x1: Math.min(subRect.x1, subRect.x2), y1: Math.min(subRect.y1, subRect.y2),
+        x2: Math.max(subRect.x1, subRect.x2), y2: Math.max(subRect.y1, subRect.y2)
+      };
+      if ((r.x2-r.x1) > 10/scale && (r.y2-r.y1) > 10/scale) {
+        if (subWindows.length >= MAX_SUBWIN) {
+          showToast(`サブ窓は最大${MAX_SUBWIN}つです`);
+        } else if (!_subCreating) { // [V0.48] 連続生成ガード（二重生成防止）
+          _subCreating = true;
+          setTimeout(() => { _subCreating = false; }, 400);
+          const cr = caEl.getBoundingClientRect();
+          const sx = cr.left + panX + r.x1 * scale;
+          const sy = cr.top  + panY + r.y1 * scale;
+          subWindows.push(new SubWin(pdfDoc, strokes, curPage, r, sx, sy, scale));
+        }
+      }
+      subRect = null;
+      ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+      setTool('pen'); return; // サブ窓作成後は常にペンモードへ復帰
+    }
+    // ② 消しゴム: 全タイプを即時削除（eraser を配列に保存しない）
+    //    → _drawAnnotations が常に単純パス → temp canvas 生成ゼロ → freeze しない
+    //    pen/hl → _applyEraser で部分削除
+    //    shapes → _applyEraserAll で全体削除
+    //    text   → 保護
+    if (curStroke?.type === 'eraser') {
+      const er = curStroke;
+      const r  = (er.size || 20) * 2 / 3;
+      const erPts = er.points || [];
+      strokes[curPage] = (strokes[curPage] || []).flatMap(s => _applyEraserAll(s, erPts, r));
+      curStroke = null;
+      ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+      redraw(); drawSelOv();
+      subWindows.forEach(sw => sw.update(strokes, curPage));
+      schedSave(); return;
+    }
+    if (currentTool === 'eraser') drawSelOv();
+    if (!curStroke) return;
+    if (!strokes[curPage]) strokes[curPage] = [];
+    const s = curStroke;
+    // [V0.47] ストローク上限チェック: 古いものを先頭から除去してメモリ増大防止
+    if (strokes[curPage].length >= MAX_STROKES_PER_PAGE) {
+      strokes[curPage].shift();
+      showToast('⚠️ ストローク上限に達しました（古い線を削除）');
+    }
+    strokes[curPage].push({ ...s, points: s.points ? [...s.points] : undefined });
+    curStroke = null; redraw();
+    subWindows.forEach(sw => sw.update(strokes, curPage));
+    schedSave();
+  }
+
+  /* ---- 選択 ---- */
+  function finishSel() {
+    const arr = strokes[curPage] || [];
+    if (selMode === 'rect' && selPath.length >= 2) {
+      const xs  = selPath.map(p => p.x), ys = selPath.map(p => p.y);
+      const rx1 = Math.min(...xs), ry1 = Math.min(...ys);
+      const rx2 = Math.max(...xs), ry2 = Math.max(...ys);
+      selectedIdx = arr.reduce((a, s, i) => {
+        const bb = strokeBBox(s); if (!bb) return a;
+        if (!(bb.x2 < rx1 || bb.x1 > rx2 || bb.y2 < ry1 || bb.y1 > ry2)) a.push(i);
+        return a;
+      }, []);
+    } else if (selMode === 'lasso' && selPath.length >= 3) {
+      const poly = selPath.map(p => [p.x, p.y]);
+      selectedIdx = arr.reduce((a, s, i) => {
+        const bb = strokeBBox(s); if (!bb) return a;
+        if (ptInPoly((bb.x1+bb.x2)/2, (bb.y1+bb.y2)/2, poly)) a.push(i);
+        return a;
+      }, []);
+    }
+    selPath = []; ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+    drawSelOv();
+    document.getElementById('selbtn').style.display = selectedIdx.length ? 'block' : 'none';
+  }
+
+  function drawSelPreview() {
+    ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+    drawSubOverlays(); if (!selPath.length) return;
+    const sc = renderScale, invEZ = 1 / cssExtraZoom;
+    ovlCtx.save();
+    ovlCtx.strokeStyle = '#4488ff'; ovlCtx.lineWidth = 2 * invEZ;
+    // [V0.45] なげなわ・矩形どちらも同じ点線パターンで統一（矩形と見た目を合わせる）
+    ovlCtx.setLineDash([6*invEZ, 4*invEZ]);
+    if (selMode === 'rect') {
+      const p0 = selPath[0], p1 = selPath[selPath.length-1];
+      ovlCtx.strokeRect(Math.min(p0.x,p1.x)*sc, Math.min(p0.y,p1.y)*sc,
+                        Math.abs(p1.x-p0.x)*sc, Math.abs(p1.y-p0.y)*sc);
+    } else {
+      ovlCtx.beginPath();
+      selPath.forEach((p, i) => i ? ovlCtx.lineTo(p.x*sc, p.y*sc) : ovlCtx.moveTo(p.x*sc, p.y*sc));
+      ovlCtx.stroke();
+    }
+    ovlCtx.restore();
+  }
+
+  function selBBox() {
+    const arr = strokes[curPage] || [];
+    const bbs = selectedIdx.map(i => strokeBBox(arr[i])).filter(Boolean);
+    if (!bbs.length) return null;
+    return {
+      x1: Math.min(...bbs.map(b => b.x1)), y1: Math.min(...bbs.map(b => b.y1)),
+      x2: Math.max(...bbs.map(b => b.x2)), y2: Math.max(...bbs.map(b => b.y2))
+    };
+  }
+
+  function moveSel(dx, dy) {
+    const arr = strokes[curPage] || [];
+    selectedIdx.forEach(i => {
+      const s = arr[i]; if (!s) return;
+      if (s.points) s.points = s.points.map(p => [p[0]+dx, p[1]+dy]);
+      if (s.x1 !== undefined) { s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy; }
+      if (s.type === 'text')  { s.x  += dx; s.y  += dy; }
+    });
+  }
+
+  function clearSel() {
+    selectedIdx = []; selPath = [];
+    ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+    drawSubOverlays();
+    document.getElementById('selbtn').style.display = 'none';
+  }
+
+  function drawSelOv() {
+    ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
+    drawSubOverlays();
+    if (!selectedIdx.length) return;
+    const arr = strokes[curPage] || [];
+    const sc  = renderScale, invEZ = 1 / cssExtraZoom;
+    ovlCtx.save();
+    ovlCtx.strokeStyle = '#4488ff'; ovlCtx.lineWidth = 2 * invEZ;
+    ovlCtx.setLineDash([6*invEZ, 3*invEZ]);
+    selectedIdx.forEach(i => {
+      const bb = strokeBBox(arr[i]); if (!bb) return;
+      ovlCtx.strokeRect(bb.x1*sc-4*invEZ, bb.y1*sc-4*invEZ,
+                        (bb.x2-bb.x1)*sc+8*invEZ, (bb.y2-bb.y1)*sc+8*invEZ);
+    });
+    ovlCtx.restore();
+    const bb = selBBox();
+    if (bb) {
+      const wr  = cwEl.getBoundingClientRect();
+      const btn = document.getElementById('selbtn');
+      btn.style.left = Math.max(0, wr.left + bb.x1*scale - 4) + 'px';
+      btn.style.top  = Math.max(0, wr.top  + bb.y2*scale + 6) + 'px';
+    }
+  }
+
+  /* ---- サブ窓オーバーレイ ---- */
+  function drawSubOverlays() {
+    if (!pdfDoc || !subWindows.length) return;
+    const sc = renderScale, invEZ = 1 / cssExtraZoom;
+    subWindows.forEach(sw => {
+      const br = sw.body.getBoundingClientRect();
+      if (!br.width || !br.height) return;
+      const rX1 = sw.offX * sc, rY1 = sw.offY * sc;
+      const rW  = (br.width  / sw.innerScale) * sc;
+      const rH  = (br.height / sw.innerScale) * sc;
+      ovlCtx.save();
+      ovlCtx.fillStyle   = sw.swFill  || 'rgba(240,120,0,0.12)'; ovlCtx.fillRect(rX1, rY1, rW, rH);
+      ovlCtx.strokeStyle = sw.swColor || '#f07800';
+      ovlCtx.lineWidth   = 2 * invEZ; ovlCtx.setLineDash([8*invEZ, 4*invEZ]);
+      ovlCtx.strokeRect(rX1, rY1, rW, rH);
+      ovlCtx.restore();
+    });
+  }
+
+  function redraw() {
+    if (!window.DBG?.flags?.redraw) return; // ② DBG.off('redraw') で停止可
+    annCtx.clearRect(0, 0, annCvs.width, annCvs.height);
+    if (window.DBG?.flags?.annotationDraw)
+      _drawAnnotations(annCtx, strokes[curPage] || [], renderScale);
+    if (window.DBG?.flags?.overlay) drawSelOv();
+  }
+
+  /* ---- レンダリング ---- */
+  async function renderPage(num) {
+    if (!window.DBG?.flags?.pdfRender) return; // ③ DBG.off('pdfRender') で停止可
+    if (!pdfDoc) return;
+    const ver = ++renderVer;
+
+    let page = pageCache.get(num);
+    if (!page) { page = await pdfDoc.getPage(num); pageCache.set(num, page); }
+
+    const vp1    = page.getViewport({ scale: 1 });
+    const maxDim = Math.max(vp1.width, vp1.height);
+
+    renderScale  = Math.min(scale, MAX_CANVAS / maxDim);
+    cssExtraZoom = scale / renderScale;
+
+    const vp     = page.getViewport({ scale: renderScale });
+    const dpr    = Math.min(window.devicePixelRatio || 1, PDF_MAX_DPR);
+    const hiRS   = Math.min(renderScale * dpr, (4096 - 4) / maxDim);
+    const hiVP   = page.getViewport({ scale: hiRS });
+
+    // offscreen canvas を再利用（サイズ変更時のみ再生成して毎回の大型確保を回避）
+    if (!_offscr || _offscr.width !== hiVP.width || _offscr.height !== hiVP.height) {
+      _offscr = document.createElement('canvas');
+      _offscr.width = hiVP.width; _offscr.height = hiVP.height;
+    }
+    const offCtx = _offscr.getContext('2d');
+    offCtx.fillStyle = '#ffffff'; offCtx.fillRect(0, 0, hiVP.width, hiVP.height);
+    await page.render({ canvasContext: offCtx, viewport: hiVP }).promise;
+
+    if (ver !== renderVer) return;
+
+    pdfCvs.width  = hiVP.width; pdfCvs.height = hiVP.height;
+    pdfCvs.style.width  = vp.width  + 'px';
+    pdfCvs.style.height = vp.height + 'px';
+    [annCvs, ovlCvs].forEach(c => { c.width = vp.width; c.height = vp.height; });
+    pdfCtx.drawImage(_offscr, 0, 0);
+    redraw(); clearSel(); clampPan();
+    requestAnimationFrame(() => { clampPan(); updateTransform(); });
+
+    document.getElementById('pgn').value    = num;
+    document.getElementById('zlbl').textContent = Math.round(scale * 100) + '%';
+  }
+
+  /* ---- PDF読み込み ---- */
+  async function loadPDF(file, buf) {
+    // [V0.47] 二重呼び出し防止（ドラッグ連打・タップ連打対策）
+    if (_pdfLoadingLock) { console.warn('[V0.47] loadPDF: 読み込み中のため無視'); return; }
+    _pdfLoadingLock = true;
+    showLoading(true);
+    try {
+      origBuf    = buf || await file.arrayBuffer();
+      fileName   = file.name;
+      document.getElementById('fnlbl').textContent = fileName;
+      pdfDoc     = await pdfjsLib.getDocument({ data: origBuf.slice(0) }).promise;
+      totalPages = pdfDoc.numPages;
+      document.getElementById('tpn').textContent = totalPages;
+      curPage = 1; panX = 16; panY = 16; scale = 1;
+      renderScale = 1; cssExtraZoom = 1; pageCache.clear();
+      subWindows.slice().forEach(sw => sw.close());
+      document.getElementById('dz').style.display = 'none';
+      hideHome(); // [V0.40] ホーム画面を隠す
+      cwEl.style.display = 'block';
+
+      // [V0.38] hidden JSON優先復元 → なければIDB → renderPage/fit
+      let stroksFromPdf = null;
+      try { stroksFromPdf = await _extractMVData(origBuf); } catch(_) {}
+      if (stroksFromPdf && Object.keys(stroksFromPdf).length > 0) {
+        strokes = _pruneEraserStrokes(stroksFromPdf);
+        await renderPage(1); await fit();
+        showToast('📝 PDFの書き込みデータを復元しました');
+      } else {
+        const saved = await IDB.get('f:' + safeKey(file.name));
+        strokes = _pruneEraserStrokes(saved?.strokes || {});
+        await renderPage(1); await fit();
+        if (saved?.strokes && Object.keys(saved.strokes).length > 0)
+          showToast('📝 書き込みデータを復元しました');
+      }
+      // [V0.39] DocumentManagerに登録・更新（バックグラウンドで実行）
+      DocMgr.open(file.name, origBuf, strokes, 1).catch(() => {});
+      _postLoadFn?.(); // シートタブへ同期 (シートマネージャーが登録)
+    } catch(e) { showToast('読み込みに失敗しました'); console.error(e); }
+    showLoading(false);
+    _pdfLoadingLock = false; // [V0.47] ロック解除
+  }
+
+  /* ---- ページ操作 ---- */
+  async function gotoPage(d, abs = false) {
+    if (!pdfDoc) return;
+    const n = abs ? Math.max(1, Math.min(totalPages, d)) : curPage + d;
+    if (n < 1 || n > totalPages) return;
+    curPage = n; await renderPage(n);
+    subWindows.forEach(sw => sw.update(strokes, n));
+    schedSave();
+  }
+  async function fit() {
+    if (!pdfDoc) return;
+    const page = await pdfDoc.getPage(curPage);
+    const vp   = page.getViewport({ scale: 1 });
+    const aW   = caEl.clientWidth || 1, aH = caEl.clientHeight || 1;
+    scale = Math.max(0.2, Math.min((aW-32) / vp.width, (aH-32) / vp.height));
+    await renderPage(curPage); centerCanvas();
+  }
+  function undo() {
+    const a = strokes[curPage];
+    if (!a || !a.length) { showToast('操作がありません'); return; }
+    a.pop(); redraw(); subWindows.forEach(sw => sw.update(strokes, curPage)); schedSave();
+  }
+  function clear() {
+    if (!confirm('消去しますか？')) return;
+    strokes[curPage] = []; redraw();
+    subWindows.forEach(sw => sw.update(strokes, curPage)); schedSave();
+  }
+  function deleteSelected() {
+    if (!selectedIdx.length) return;
+    strokes[curPage] = (strokes[curPage] || []).filter((_, i) => !selectedIdx.includes(i));
+    clearSel(); redraw(); subWindows.forEach(sw => sw.update(strokes, curPage)); schedSave();
+  }
+  function closeFile() {
+    if (pdfDoc && !confirm('閉じますか？（保存済みデータは残ります）')) return;
+    pdfDoc = null; origBuf = null; fileName = ''; curPage = 1; totalPages = 0; strokes = {};
+    [pdfCvs, annCvs, ovlCvs].forEach(c => { c.width = 1; c.height = 1; });
+    cwEl.style.display = 'none';
+    showHome(); // [V0.40] ホーム画面を表示
+    document.getElementById('fnlbl').textContent = 'ファイル未選択';
+    document.getElementById('tpn').textContent   = '0';
+    document.getElementById('zlbl').textContent  = '--';
+    subWindows.slice().forEach(sw => sw.close());
+    _fileHandle = null; renderScale = 1; cssExtraZoom = 1;
+    DocMgr.reset(); // [V0.39] 現在DocIDをリセット
+  }
+
+  /* ---- ファイル入力 ---- */
+  // [V0.44] 別PDF読込: 既存PDFがある場合はバックアップ確認
+  document.getElementById('fileInput').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) { e.target.value = ''; return; }
+    if (App.pdfDoc) {
+      const result = await _confirmClose(App.fileName, '読み込む（バックアップしない）');
+      if (result === 'cancel') { e.target.value = ''; return; }
+      if (result === 'backup') { await _backupThenClose(async () => { await loadPDF(f); }); e.target.value = ''; return; }
+    }
+    await loadPDF(f); e.target.value = '';
+  });
+  caEl.addEventListener('dragover', e => e.preventDefault());
+  caEl.addEventListener('drop',     e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadPDF(f); });
+
+  /* ---- 起動時復元 ---- */
+  async function restore(saved) {
+    origBuf    = saved.buf; fileName = saved.file;
+    document.getElementById('fnlbl').textContent = fileName;
+    pdfDoc     = await pdfjsLib.getDocument({ data: saved.buf.slice(0) }).promise;
+    totalPages = pdfDoc.numPages;
+    document.getElementById('tpn').textContent = totalPages;
+    strokes    = _pruneEraserStrokes(saved.strokes || {});
+    curPage    = saved.page || 1; scale = saved.scale || 1;
+    renderScale = 1; cssExtraZoom = 1;
+    document.getElementById('dz').style.display = 'none';
+    cwEl.style.display = 'block';
+    await renderPage(curPage);
+    // [V0.49] 保存済みスクロール位置を優先復元（なければcenterCanvas）
+    if (saved.panX != null && saved.panY != null) {
+      panX = saved.panX; panY = saved.panY; clampPan(); updateTransform();
+    } else {
+      centerCanvas();
+    }
+    // [V0.49] サブ窓状態を復元（pdfDoc確定後・renderPage完了後に実行）
+    if (saved.subWinStates?.length) {
+      _thawSubWins(saved.subWinStates, pdfDoc, strokes);
+    }
+  }
+
+  /* ---- タブ連携: 状態保存・復元 ---- */
+  let _postLoadFn = null; // ファイル読み込み後フック (シートマネージャーが設定)
+
+  /** 現在のApp状態スナップショットを返す (参照渡し・コピーなし) */
+  function saveState() {
+    return { pdfDoc, origBuf, fileName, curPage, totalPages,
+             scale, renderScale, cssExtraZoom, panX, panY, strokes };
+  }
+
+  /** シート切替時にApp状態を一括復元してページ再描画 */
+  async function loadState(sh) {
+    pdfDoc       = sh.pdfDoc;       origBuf    = sh.origBuf;
+    fileName     = sh.fileName || ''; curPage  = sh.curPage || 1;
+    totalPages   = sh.totalPages || 0; scale   = sh.scale  || 1;
+    renderScale  = sh.renderScale  || 1; cssExtraZoom = sh.cssExtraZoom || 1;
+    panX         = sh.panX ?? 16;   panY       = sh.panY ?? 16;
+    strokes      = sh.strokes || {}; pageCache.clear();
+    selectedIdx  = []; selPath = [];
+
+    document.getElementById('fnlbl').textContent = fileName || 'ファイル未選択';
+    document.getElementById('tpn').textContent   = totalPages || '0';
+    document.getElementById('pgn').value         = curPage;
+
+    if (pdfDoc) {
+      document.getElementById('dz').style.display = 'none';
+      cwEl.style.display = 'block';
+      await renderPage(curPage);
+    } else {
+      showHome(); // [V0.40] ホーム画面を表示
+      cwEl.style.display = 'none';
+      document.getElementById('zlbl').textContent = '--';
+      [pdfCvs, annCvs, ovlCvs].forEach(c => { c.width = 1; c.height = 1; });
+    }
+  }
+
+  return {
+    gotoPage, fit, undo, clear, deleteSelected, closeFile, redraw, loadPDF,
+    drawSubOverlays, redrawSelOv: drawSelOv,
+    saveState, loadState,
+    setPostLoad(fn) { _postLoadFn = fn; }, // シートマネージャーから呼ぶ
+    get pdfDoc()      { return pdfDoc;      },
+    get origBuf()     { return origBuf;     },
+    get fileName()    { return fileName;    },
+    get strokes()     { return strokes;     },
+    get currentPage() { return curPage;     },
+    get totalPages()  { return totalPages;  },
+    get scale()       { return scale;       },
+    get panX()        { return panX;        }, // [V0.49] スクロール位置（schedSave用）
+    get panY()        { return panY;        }, // [V0.49]
+    restore
+  };
+})();
+
+/* 起動時復元 */
+(async () => {
+  // 安全ガード: 何があっても 6秒後には loading を強制解除 (ボタン操作ブロック防止)
+  const _safetyTimer = setTimeout(() => {
+    showLoading(false);
+    console.warn('[起動] restore タイムアウト: loading を強制解除しました');
+  }, 6000);
+
+  let saved = null;
+  try {
+    // [V0.35] インスタンス別キー優先（リロード時継続）→ 旧 'last' へフォールバック（初回起動互換）
+    saved = await IDB.get(_KEY_LAST);
+    if (!saved?.buf) {
+      const legacy = await IDB.get('last');
+      if (legacy?.buf) {
+        saved = legacy;
+        // 旧共有キーからインスタンス別キーへ移行し 'last' をクリア（競合防止）
+        await IDB.set(_KEY_LAST, legacy).catch(()=>{});
+        await IDB.set('last', null).catch(()=>{});
+      }
+    }
+  } catch(e) { console.error('[起動] IDB.get 失敗:', e); }
+  // [V0.41] buf がない（新方式）場合は DocMgr からバイナリを補完
+  if (!saved?.buf && saved?.file) {
+    try {
+      const doc = await DocMgr.findByName(saved.file);
+      if (doc?.originalPdfBytes) {
+        saved = { ...saved, buf: new Uint8Array(doc.originalPdfBytes) };
+      }
+    } catch(_) {}
+  }
+  if (!saved?.buf) { clearTimeout(_safetyTimer); showHome(); return; }
+
+  showLoading(true);
+  try {
+    // 5秒でタイムアウトする Promise.race でハング防止
+    const restoreWithTimeout = Promise.race([
+      (async () => {
+        await App.restore(saved);
+        if (typeof _sheetSync === 'function') _sheetSync();
+      })(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('restore timeout')), 5000))
+    ]);
+    await restoreWithTimeout;
+    showToast('前回の状態を復元しました');
+  } catch(e) {
+    console.error('[起動] restore 失敗 (timeout or error):', e);
+    // 失敗しても UI はそのまま使用可能（PDFを開き直せる状態に）
+  } finally {
+    clearTimeout(_safetyTimer);
+    showLoading(false); // finally で必ず解除（ハング・例外いずれでも）
+  }
+})();
+
+/* ============================================================
+   シートマネージャー (タブ管理)
+   各シートは pdfDoc・strokes・ズーム・ページ・サブ窓状態を独立保持。
+   タブ切替時のみ App 状態を保存/復元することで最小限の変更に抑える。
+   メモリ: 非アクティブ pdfDoc は参照保持のみ (pageCache は切替時クリア)
+   ============================================================ */
+const MAX_SHEETS = 8;   // タブ最大数
+let _sheets   = [];     // シート状態配列
+let _sheetIdx = 0;      // アクティブインデックス
+let _sheetSeq = 0;      // ID カウンタ
+
+/** 空シートオブジェクトを生成 */
+function _emptySheet() {
+  return { id: ++_sheetSeq, pdfDoc: null, origBuf: null, fileName: '(新規)',
+           curPage: 1, totalPages: 0, scale: 1, renderScale: 1, cssExtraZoom: 1,
+           panX: 16, panY: 16, strokes: {}, subWinStates: [], fh: null };
+}
+_sheets.push(_emptySheet()); // 初期シート
+
+/** サブ窓状態を保存して DOM を閉じる */
+/**
+ * [V0.49] サブ窓状態スナップショット（close不要・schedSave/visibilitychangeから呼ぶ用）
+ * _freezeSubWins() は sw.close() を呼ぶため自動保存には使用不可
+ */
+function _snapSubWins() {
+  return subWindows.map(sw => ({
+    pageNum:    sw.pageNum,
+    offX:       sw.offX,   offY: sw.offY,
+    innerScale: sw.innerScale,
+    winW:  sw.el.clientWidth  || sw.winW,
+    winH:  sw.el.clientHeight || sw.winH,
+    left:  sw.el.style.left,
+    top:   sw.el.style.top,
+    rW:    (sw.cvs.width  || 400) / sw.innerScale,
+    rH:    (sw.cvs.height || 300) / sw.innerScale
+  }));
+}
+
+function _freezeSubWins() {
+  const st = subWindows.map(sw => ({
+    pageNum: sw.pageNum, offX: sw.offX, offY: sw.offY,
+    innerScale: sw.innerScale,
+    winW: sw.el.clientWidth  || sw.winW,
+    winH: sw.el.clientHeight || sw.winH,
+    left: sw.el.style.left, top: sw.el.style.top,
+    rW: (sw.cvs.width  || 400) / sw.innerScale,
+    rH: (sw.cvs.height || 300) / sw.innerScale
+  }));
+  subWindows.slice().forEach(sw => sw.close());
+  return st;
+}
+
+/** 保存済みサブ窓状態から DOM を再構築 */
+function _thawSubWins(states, doc, strks) {
+  if (!states || !doc) return;
+  states.forEach(s => {
+    if (subWindows.length >= MAX_SUBWIN) return;
+    const region = { x1: s.offX, y1: s.offY,
+                     x2: s.offX + (s.rW || 200), y2: s.offY + (s.rH || 200) };
+    const sx = parseFloat(s.left) || 80, sy = parseFloat(s.top) || 80;
+    const sw = new SubWin(doc, strks, s.pageNum, region, sx, sy, s.innerScale);
+    if (s.winW && s.winH) {
+      sw.winW = s.winW; sw.winH = s.winH;
+      sw.el.style.width = s.winW + 'px'; sw.el.style.height = s.winH + 'px';
+    }
+    subWindows.push(sw);
+  });
+}
+
+/** 現在の App 状態を現在シートへ同期 (_postLoadFn 経由でも呼ばれる) */
+function _sheetSync() {
+  if (!_sheets[_sheetIdx]) return;
+  Object.assign(_sheets[_sheetIdx], App.saveState(), { fh: _fileHandle });
+  _renderTabBar();
+}
+
+/** タブバー DOM を再描画 */
+function _renderTabBar() {
+  const bar = document.getElementById('tabbar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  _sheets.forEach((sh, i) => {
+    const div = document.createElement('div');
+    div.className = 'shtab' + (i === _sheetIdx ? ' active' : '');
+    const raw = sh.fileName === '(新規)' ? '(新規)' : sh.fileName.replace(/\.pdf$/i, '');
+    const label = raw.length > 16 ? raw.slice(0, 15) + '…' : raw;
+    div.innerHTML = `<span class="shtab-nm" title="${sh.fileName}">📄 ${label}</span>`
+                  + `<button class="shtab-x" title="閉じる">✕</button>`;
+    div.addEventListener('click', e => {
+      if (!e.target.classList.contains('shtab-x')) switchToSheet(i);
+    });
+    // [V0.44] タブ×: バックアップ確認ダイアログ経由で閉じる
+    div.querySelector('.shtab-x').addEventListener('click', async e => {
+      e.stopPropagation();
+      const sh = _sheets[i];
+      if (!sh?.pdfDoc) { closeSheetAt(i); return; }
+      const result = await _confirmClose(sh.fileName);
+      if (result === 'cancel') return;
+      if (result === 'backup') {
+        // バックアップ対象シートへ切替してからバックアップ実行
+        if (i !== _sheetIdx) await switchToSheet(i);
+        await _backupThenClose(() => closeSheetAt(i));
+        return;
+      }
+      closeSheetAt(i);
+    });
+    bar.appendChild(div);
+  });
+  const add = document.createElement('button');
+  add.className = 'shtab-add'; add.title = 'PDFを追加 (新タブ)'; add.textContent = '＋';
+  add.addEventListener('click', () => addSheet());
+  bar.appendChild(add);
+}
+
+/** タブ切替 */
+async function switchToSheet(idx) {
+  if (idx === _sheetIdx || idx < 0 || idx >= _sheets.length) { _renderTabBar(); return; }
+  showLoading(true);
+  // 現在シートを保存
+  _sheets[_sheetIdx].subWinStates = _freezeSubWins();
+  Object.assign(_sheets[_sheetIdx], App.saveState(), { fh: _fileHandle });
+  // 新シートへ切替
+  _sheetIdx = idx;
+  const sh = _sheets[_sheetIdx];
+  _fileHandle = sh.fh || null;
+  await App.loadState(sh);
+  _thawSubWins(sh.subWinStates, sh.pdfDoc, App.strokes);
+  _renderTabBar();
+  showLoading(false);
+}
+
+/** 新タブを追加してファイル選択を促す */
+async function addSheet() {
+  if (_sheets.length >= MAX_SHEETS) { showToast(`タブは最大${MAX_SHEETS}つです`); return; }
+  // 現在シートを保存
+  _sheets[_sheetIdx].subWinStates = _freezeSubWins();
+  Object.assign(_sheets[_sheetIdx], App.saveState(), { fh: _fileHandle });
+  // 現サブ窓を再展開 (addSheet はタブ切替しないので現状維持)
+  _thawSubWins(_sheets[_sheetIdx].subWinStates, _sheets[_sheetIdx].pdfDoc, App.strokes);
+  // 新シート
+  const sh = _emptySheet();
+  _sheets.push(sh);
+  _sheetIdx = _sheets.length - 1;
+  _fileHandle = null;
+  await App.loadState(sh);
+  _renderTabBar();
+  openFile(); // ファイル選択 → loadPDF → _postLoadFn → _sheetSync で同期
+}
+
+/** タブを閉じる */
+async function closeSheetAt(idx) {
+  showLoading(true);
+  if (idx === _sheetIdx) _sheets[_sheetIdx].subWinStates = _freezeSubWins();
+  // pdfDoc 破棄 (メモリ解放)
+  if (_sheets[idx].pdfDoc) {
+    try { _sheets[idx].pdfDoc.destroy(); } catch(_) {}
+    _sheets[idx].pdfDoc = null;
+  }
+  if (_sheets.length === 1) {
+    // 最後の1枚は空にして維持
+    _sheets[0] = _emptySheet();
+    _sheetIdx  = 0; _fileHandle = null;
+    subWindows.slice().forEach(sw => sw.close());
+    await App.loadState(_sheets[0]);
+  } else {
+    _sheets.splice(idx, 1);
+    _sheetIdx = Math.min(idx, _sheets.length - 1);
+    const sh  = _sheets[_sheetIdx];
+    _fileHandle = sh.fh || null;
+    subWindows.slice().forEach(sw => sw.close());
+    await App.loadState(sh);
+    _thawSubWins(sh.subWinStates, sh.pdfDoc, App.strokes);
+  }
+  // PDF未選択状態になったら起動時復元キーをクリア（手動で閉じたデータを復元しない）
+  if (!App.pdfDoc) await IDB.set(_KEY_LAST, null); // [V0.35] インスタンス別キー
+  _renderTabBar();
+  showLoading(false);
+}
+
+// ファイル読み込み完了 → シートへ自動同期
+App.setPostLoad(() => _sheetSync());
+// 初期タブバー描画
+_renderTabBar();
+
+/* ============================================================
+   ファイルを開く
+   ============================================================ */
+/* ============================================================
+   自動バックアップ書き出し機能
+   対象: 全シートの注釈・設定・プロジェクト状態 (PDFバイナリは除く)
+   形式: MVIEWER_BACKUP_YYYYMMDD_HHMM.zip (JSZip)
+   ============================================================ */
+const BACKUP_INTERVAL_MS = 10 * 60 * 1000; // [V0.35] 10分ごと自動バックアップ (負荷軽減)
+
+/** ZIPデータ構造を生成 */
+async function _buildBackupZip() {
+  const JSZip = window.JSZip;
+  if (!JSZip) { console.warn('[Backup] JSZip 未ロード'); return null; }
+  const zip = new JSZip();
+
+  // project.json: シート・バージョン・UI状態
+  const project = {
+    appVersion: document.title,
+    exportTime: new Date().toISOString(),
+    activeSheetIdx: _sheetIdx,
+    sheets: (_sheets||[]).map((sh,i) => ({
+      id: sh.id, fileName: sh.fileName||'',
+      curPage: sh.curPage||1, totalPages: sh.totalPages||0,
+      scale: sh.scale||1, panX: sh.panX||0, panY: sh.panY||0,
+      isActive: i === _sheetIdx
+    }))
+  };
+  zip.file('project.json', JSON.stringify(project, null, 2));
+
+  // annotations.json: 全ファイルの注釈 (IDB + インメモリマージ)
+  const annotations = {};
+  const seen = new Set();
+  for (const sh of (_sheets||[])) {
+    const fn = sh.fileName; if (!fn || seen.has(fn)) continue; seen.add(fn);
+    try {
+      const saved = await IDB.get('f:'+safeKey(fn));
+      const strks = saved?.strokes || sh.strokes || null;
+      if (strks && Object.keys(strks).length > 0)
+        annotations[fn] = { fileName:fn, strokes:_pruneEraserStrokes(strks), savedAt:Date.now() };
+    } catch(_) {}
+  }
+  if (App.pdfDoc && App.fileName) {
+    annotations[App.fileName] = {
+      fileName:App.fileName, strokes:_pruneEraserStrokes(App.strokes||{}), savedAt:Date.now()
+    };
+  }
+  zip.file('annotations.json', JSON.stringify(annotations, null, 2));
+
+  // settings.json: ツール・カラー設定
+  zip.file('settings.json', JSON.stringify({
+    toolSizes:{...toolSizes}, penColor, hlColor, selMode, currentTool
+  }, null, 2));
+
+  // [V0.42] original.pdf: 元PDFバイナリをそのまま格納（IDB消失時の完全復元用）
+  // App.origBuf 優先、なければ DocMgr からバイナリ補完
+  let _pdfBuf = App.origBuf;
+  if (!_pdfBuf && App.fileName) {
+    try {
+      const _docEntry = await DocMgr.findByName(App.fileName);
+      if (_docEntry?.originalPdfBytes) _pdfBuf = new Uint8Array(_docEntry.originalPdfBytes);
+    } catch(_e) {}
+  }
+  if (_pdfBuf) zip.file('original.pdf', _pdfBuf);
+
+  return zip;
+}
+
+/**
+ * [V0.44] バックアップ確認ダイアログを表示する（非同期・カスタムUI）
+ *  iPad Safari でも confirm() 非依存で動作する。
+ *  二重表示防止: _confirmPending が true の間は即 'cancel' を返す。
+ *
+ *  @param {string} pdfName   - 対象PDFファイル名（表示用）
+ *  @param {string} [closeLabel] - 「閉じる」ボタンのラベル（省略時は「閉じる（バックアップしない）」）
+ *  @returns {Promise<'backup'|'close'|'cancel'>}
+ */
+function _confirmClose(pdfName, closeLabel) {
+  // 多重ダイアログ防止
+  if (_confirmPending) return Promise.resolve('cancel');
+  _confirmPending = true;
+
+  return new Promise(resolve => {
+    const overlay  = document.getElementById('bk-confirm-overlay');
+    const iconEl   = document.getElementById('bk-icon');
+    const titleEl  = document.getElementById('bk-title');
+    const warnEl   = document.getElementById('bk-warn');
+    const subEl    = document.getElementById('bk-sub');
+    const btnBk    = document.getElementById('bk-do-backup');
+    const btnClose = document.getElementById('bk-do-close');
+    const btnCancel= document.getElementById('bk-cancel');
+
+    // 表示テキストをダイアログ種別に応じて設定
+    const base = pdfName ? `「${pdfName.replace(/\.pdf$/i,'')}」` : '現在のPDF';
+    if (_bkDirty) {
+      iconEl.textContent  = '⚠️';
+      titleEl.textContent = 'バックアップ未実施の変更があります';
+      warnEl.textContent  = '⚠ ZIPバックアップがまだ作成されていません';
+      subEl.textContent   = `${base}を閉じる前にバックアップを作成しますか？\nIndexedDBのデータは7日以内に削除される場合があります。`;
+    } else {
+      iconEl.textContent  = '💾';
+      titleEl.textContent = '閉じる前にバックアップを作成しますか？';
+      warnEl.textContent  = '';
+      subEl.textContent   = `${base}を閉じます。\n最新のZIPバックアップを作成してから閉じることを推奨します。`;
+    }
+    btnClose.textContent = closeLabel || '閉じる（バックアップしない）';
+
+    // ダイアログを開く
+    overlay.classList.add('open');
+
+    // ボタンハンドラ（一度だけ発火）
+    const finish = result => {
+      overlay.classList.remove('open');
+      _confirmPending = false;
+      btnBk   .removeEventListener('click', onBk);
+      btnClose.removeEventListener('click', onCl);
+      btnCancel.removeEventListener('click', onCa);
+      resolve(result);
+    };
+    const onBk = () => finish('backup');
+    const onCl = () => finish('close');
+    const onCa = () => finish('cancel');
+    btnBk   .addEventListener('click', onBk,  { once: true });
+    btnClose.addEventListener('click', onCl,  { once: true });
+    btnCancel.addEventListener('click', onCa, { once: true });
+  });
+}
+
+/**
+ * [V0.44] 「バックアップして閉じる」を実行するヘルパー
+ *  - downloadBackup() 完了後にコールバックを呼ぶ
+ *  - バックアップ失敗時はキャンセル扱い（データ保護優先）
+ *  @param {Function} closeFn - バックアップ成功後に呼ぶクローズ処理
+ */
+async function _backupThenClose(closeFn) {
+  try {
+    await downloadBackup();
+  } catch(e) {
+    // バックアップ失敗 → 閉じない（データ保護優先）
+    showToast('バックアップ失敗のためキャンセルしました');
+    return;
+  }
+  closeFn();
+}
+
+/**
+ * [V0.43] バックアップZIPファイル名を生成する
+ *  - 現在開いているPDF名ベース（拡張子 .pdf を除去）
+ *  - ファイル名禁止文字（\ / : * ? " < > |）を _ に置換
+ *  - 日付時刻サフィックスを付与して一意化
+ *  - PDFが未選択の場合は "MVIEWER_BACKUP" をベース名に使用
+ *  @param {Date} now - 現在日時
+ *  @returns {string} 例: "図面A_2026-05-22_1030.zip"
+ */
+function _makeBkName(now) {
+  const p = n => String(n).padStart(2, '0');
+  const ts = `${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
+
+  // 現在アクティブなPDF名を取得（App.fileName 優先）
+  const rawName = App.fileName ||
+    (_sheets||[]).find(s => s.fileName && s.fileName !== '(新規)')?.fileName ||
+    '';
+
+  let base;
+  if (rawName) {
+    // .pdf 拡張子を除去（拡張子重複防止: ○○.pdf.zip にならないように）
+    base = rawName.replace(/\.pdf$/i, '');
+    // ファイル名禁止文字を _ に置換（Windows/macOS/iOS 共通）
+    // 対象: \ / : * ? " < > |　および制御文字
+    base = base.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_');
+    // 連続する _ を圧縮、前後の _ と空白を除去
+    base = base.replace(/_+/g, '_').replace(/^[_\s]+|[_\s]+$/g, '');
+    // 空になった場合のフォールバック
+    if (!base) base = 'MVIEWER_BACKUP';
+  } else {
+    base = 'MVIEWER_BACKUP';
+  }
+
+  return `${base}_${ts}.zip`;
+}
+
+/** 手動バックアップ: ZIPをダウンロード */
+async function downloadBackup() {
+  const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc||Object.keys(s.strokes||{}).length>0);
+  if (!hasData) { showToast('バックアップ対象データがありません'); return; }
+  showLoading(true);
+  try {
+    const zip = await _buildBackupZip();
+    if (!zip) { showLoading(false); return; }
+    const blob = await zip.generateAsync({ type:'blob', compression:'DEFLATE', compressionOptions:{level:6} });
+    const fname = _makeBkName(new Date()); // [V0.43] PDFファイル名ベースのZIP名
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=fname; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+    _bkDirty = false; // [V0.44] 手動バックアップ完了 → 確認不要状態へ
+    showToast(`💾 バックアップ完了: ${fname}`);
+  } catch(e) { showToast('バックアップ失敗: '+e.message); console.error('[Backup]',e); }
+  showLoading(false);
+}
+
+/** [V0.42] バックアップZIPから完全復元
+ *  original.pdf + annotations.json + settings.json を一括復元
+ *  旧形式（annotations.jsonのみ）も後方互換で対応
+ */
+async function restoreFromBackup(zipFile) {
+  const JSZip = window.JSZip;
+  if (!JSZip) { showToast('JSZip 未ロード'); return; }
+
+  showLoading(true);
+  try {
+    // ZIP読込・破損チェック
+    let zip;
+    try {
+      zip = await JSZip.loadAsync(zipFile);
+    } catch(e) {
+      showLoading(false);
+      alert('ZIPファイルが破損しています\n' + e.message);
+      return;
+    }
+
+    // project.json 取得（任意）
+    let project = null;
+    if (zip.file('project.json')) {
+      try { project = JSON.parse(await zip.file('project.json').async('string')); } catch(_e) {}
+    }
+
+    // バージョン不一致チェック（警告のみ・中断なし）
+    if (project?.appVersion && typeof project.appVersion === 'string' &&
+        !project.appVersion.includes('M_Viewer')) {
+      if (!confirm('バージョンが異なる可能性があります。\n' + project.appVersion + '\n続けますか？')) {
+        showLoading(false); return;
+      }
+    }
+
+    const hasPdf = !!zip.file('original.pdf');
+    const hasAnn = !!zip.file('annotations.json');
+
+    // 必須ファイルチェック
+    if (!hasAnn) {
+      showLoading(false);
+      alert('ZIPに必須データ(annotations.json)が含まれていません');
+      return;
+    }
+
+    const ann = JSON.parse(await zip.file('annotations.json').async('string'));
+
+    // ── 旧形式互換: original.pdf なし ──
+    if (!hasPdf) {
+      showLoading(false);
+      alert('元PDFが含まれていないため、別途PDF読込が必要です。\n現在開いているPDFへ注釈データのみ適用します。');
+      if (!App.pdfDoc) return;
+      const fn = App.fileName;
+      if (ann[fn]?.strokes) {
+        const pruned = _pruneEraserStrokes(ann[fn].strokes);
+        Object.keys(pruned).forEach(pg => { App.strokes[pg] = pruned[pg]; });
+        App.redraw();
+        schedSave();
+        showToast('注釈データを復元しました（旧形式）');
+      }
+      return;
+    }
+
+    // ── 新形式: original.pdf あり ──
+    let pdfBytes;
+    try {
+      pdfBytes = await zip.file('original.pdf').async('uint8array');
+    } catch(e) {
+      showLoading(false);
+      alert('PDF復元に失敗しました\n' + e.message);
+      return;
+    }
+
+    // ファイル名: project.json → アクティブシート名 → フォールバック
+    let restoreFileName = 'restored.pdf';
+    if (project?.sheets?.length) {
+      const activeIdx = project.activeSheetIdx ?? 0;
+      const sh = project.sheets[activeIdx] || project.sheets[0];
+      if (sh?.fileName && sh.fileName !== '(新規)') restoreFileName = sh.fileName;
+    }
+    // annotations.json のキーからも推定
+    if (restoreFileName === 'restored.pdf') {
+      const keys = Object.keys(ann);
+      if (keys.length > 0) restoreFileName = keys[0];
+    }
+
+    // settings.json 読込（任意）
+    let settings = null;
+    if (zip.file('settings.json')) {
+      try { settings = JSON.parse(await zip.file('settings.json').async('string')); } catch(_e) {}
+    }
+
+    // PDF を App へ読込（renderPage・IDB登録含む）
+    const fakeFile = { name: restoreFileName };
+    await App.loadPDF(fakeFile, pdfBytes);
+
+    // loadPDF が IDB/embedded から上書きした strokes を ZIP の注釈で再上書き
+    if (ann[restoreFileName]?.strokes) {
+      const pruned = _pruneEraserStrokes(ann[restoreFileName].strokes);
+      Object.keys(pruned).forEach(pg => { App.strokes[pg] = pruned[pg]; });
+      App.redraw();
+    }
+
+    // ズーム・ページ位置を project.json から復元
+    if (project?.sheets?.length) {
+      const activeIdx = project.activeSheetIdx ?? 0;
+      const sh = project.sheets[activeIdx] || project.sheets[0];
+      if (sh?.curPage && sh.curPage !== 1) await App.gotoPage(sh.curPage, true);
+    }
+
+    // ツール設定復元
+    if (settings) {
+      if (settings.toolSizes)   Object.assign(toolSizes, settings.toolSizes);
+      if (settings.penColor)    penColor  = settings.penColor;
+      if (settings.hlColor)     hlColor   = settings.hlColor;
+      if (settings.currentTool) setTool(settings.currentTool);
+      if (settings.selMode)     setSelMode(settings.selMode);
+    }
+
+    // IDBへ保存（次回起動時復元のため）
+    schedSave();
+
+    showToast('✅ バックアップから完全復元しました');
+  } catch(e) {
+    alert('復元に失敗しました\n' + e.message);
+    console.error('[Restore]', e);
+  }
+  showLoading(false);
+}
+
+/** [V0.35] 自動バックアップ: IDBに最新2世代を保存（完全サイレント・非同期UI非妨害）
+ *  - ダウンロードダイアログ・ポップアップなし
+ *  - 圧縮レベル1(高速)でUIカクつき軽減
+ *  - await yield でUIスレッドを解放
+ */
+async function _autoBackupToIDB() {
+  const hasData = App.pdfDoc || (_sheets||[]).some(s=>s.pdfDoc);
+  if (!hasData) return;
+  try {
+    // UIスレッドを一度解放してからバックアップ開始
+    await new Promise(r => setTimeout(r, 0));
+    const zip = await _buildBackupZip();
+    if (!zip) return;
+    // [V0.35] 圧縮レベル1(高速)→UIフリーズ軽減, 完全停止なし
+    const buf = await zip.generateAsync({type:'arraybuffer', compression:'DEFLATE', compressionOptions:{level:1}});
+    // UIスレッド再解放
+    await new Promise(r => setTimeout(r, 0));
+    const now = new Date();
+    const p = n => String(n).padStart(2,'0');
+    const ts = `${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}`;
+    // [V0.35] インスタンス別バックアップキー → 別ウインドウが latest/prev を上書きしない
+    const prev = await IDB.get(_KEY_BK_LAT).catch(()=>null);
+    if (prev) await IDB.set(_KEY_BK_PRV, prev).catch(()=>{});
+    await IDB.set(_KEY_BK_LAT, {ts, buf});
+    // [V0.35] ログのみ。Toastは表示しない（操作妨害防止）
+    console.log(`[Backup] 自動バックアップ完了 (${ts})`);
+  } catch(e) { console.warn('[Backup] 自動バックアップ失敗:', e); }
+}
+
+// [V0.35] 自動バックアップ: IDB保存のみ（ダウンロードダイアログ廃止）
+// ダウンロードが必要な場合はヘッダーの「バックアップ」ボタンを手動で押下
+setInterval(_autoBackupToIDB, BACKUP_INTERVAL_MS);
+
+// [V0.44] ページ離脱前: PDF開き中は常に警告（_bkDirty=未バックアップ時は強調メッセージ）
+// iPad Safari: e.returnValue='' でブラウザ標準「離脱しますか？」ダイアログを表示
+// ※ visibilitychange/pagehide では confirm() 非対応のため beforeunload のみダイアログを使用
+window.addEventListener('beforeunload', e => {
+  if (!App.pdfDoc) return;
+  // IDB は自動保存済みだが、ZIP未出力の変更がある場合は強い警告
+  const msg = _bkDirty
+    ? '未バックアップの変更があります。ページを離脱するとZIPバックアップは失われます。'
+    : 'PDFが開いています。ページを離脱しますか？';
+  e.preventDefault();
+  e.returnValue = msg; // Chrome/Safari 両対応
+});
+
+// [V0.44] pagehide: iOS PWA 終了・Split View 解除・タブ消去時に発火
+// iOS Safari では confirm() 不可のためサイレントIDB保存のみ実施
+window.addEventListener('pagehide', () => {
+  if (!App.pdfDoc || !App.origBuf) return;
+  const data = {
+    buf: null, strokes: _pruneEraserStrokes(App.strokes),
+    file: App.fileName, page: App.currentPage, ts: Date.now()
+  };
+  // sendBeacon 相当のサイレント保存（非同期・UIブロックなし）
+  IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
+  IDB.set(_KEY_LAST, data).catch(() => {});
+});
+
+async function openFile() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [fh] = await window.showOpenFilePicker({
+        types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]
+      });
+      _fileHandle = fh;
+      const file = await fh.getFile();
+      await App.loadPDF(file); return;
+    } catch(e) {
+      if (e.name !== 'AbortError') document.getElementById('fileInput').click();
+    }
+  } else {
+    document.getElementById('fileInput').click();
+  }
+}
+
+/* ============================================================
+   ツール / カラー / 太さ
+   ============================================================ */
+function updateSwatches(mode) {
+  const palette = mode === 'hl' ? HL_COLORS : PEN_COLORS;
+  const active  = mode === 'hl' ? hlColor   : penColor;
+  palette.forEach(p => {
+    const el = document.getElementById(p.id); if (!el) return;
+    el.dataset.c = p.c;
+    el.style.background  = p.c;
+    el.style.borderColor = p.c === active ? '#fff' : 'transparent';
+    el.classList.toggle('on', p.c === active);
+  });
+  strokeColor = active;
+}
+
+function setTool(t) {
+  // ツール切替時にサブ窓の選択をクリア
+  subWindows.forEach(sw => { if (sw._swClearSel) sw._swClearSel(); });
+  if (t !== 'sub') prevTool = currentTool;
+  currentTool = t;
+  // [V0.35] t-split は分割状態ボタンなのでツール切替時に除外
+  document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
+  document.getElementById('t-' + t)?.classList.add('on');
+  closeAllPickers();
+  if (t === 'sub') return;
+  updateSwatches(t === 'hl' ? 'hl' : 'pen');
+  const key = t === 'shape' ? currentShape : t;
+  strokeSize = toolSizes[key] || 3;
+  document.getElementById('sz-v').textContent = strokeSize;
+}
+
+function setColor(el) {
+  strokeColor = el.dataset.c;
+  if (currentTool === 'hl') hlColor = strokeColor; else penColor = strokeColor;
+  // updateSwatches 経由で再描画 → インラインstyle.borderColor と .on クラスを正しく同期
+  updateSwatches(currentTool === 'hl' ? 'hl' : 'pen');
+}
+
+function pickShape(shapeName) {
+  currentShape = shapeName; currentTool = 'shape';
+  const LABELS = { arrow:'矢印▾', rect:'四角▾', circle:'円▾', line:'直線▾' };
+  document.getElementById('t-shape').textContent = LABELS[shapeName];
+  // [V0.35] t-split は分割状態ボタンなのでツール切替時に除外
+  document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
+  document.getElementById('t-shape').classList.add('on');
+  document.querySelectorAll('#shapepop button').forEach(b => b.classList.remove('on'));
+  document.querySelector(`#shapepop [data-shape="${shapeName}"]`)?.classList.add('on');
+  closeAllPickers();
+  updateSwatches('pen'); // 図形は常にペン色を使用（蛍光ペン色の影響を排除）
+  strokeSize = toolSizes[shapeName] || 2;
+  document.getElementById('sz-v').textContent = strokeSize;
+}
+
+function setSelMode(mode) {
+  selMode = mode; currentTool = 'select';
+  document.getElementById('sel-rect').classList.toggle ('on', mode === 'rect');
+  document.getElementById('sel-lasso').classList.toggle('on', mode === 'lasso');
+  // [V0.35] t-split は分割状態ボタンなのでツール切替時に除外
+  document.querySelectorAll('[id^="t-"]').forEach(b => b.classList.remove('on'));
+  document.getElementById('t-select').classList.add('on');
+  closeAllPickers();
+}
+
+/* [V0.35] visual viewport サイズ取得ヘルパー (iPad Split View / Slide Over 対応)
+ * window.innerWidth は Split View 変化に遅延する場合があるため visualViewport 優先
+ */
+function _vvWidth()  { return window.visualViewport?.width  ?? window.innerWidth;  }
+function _vvHeight() { return window.visualViewport?.height ?? window.innerHeight; }
+
+/* [V0.35] ポップオーバー位置補正共通関数
+ * el: position:fixed な要素, anchor: アンカーの getBoundingClientRect()
+ * ・右端/下端はみ出し → 自動反転・シフト
+ * ・safe-area-inset を 8px マージンで近似
+ */
+function _clampPopover(el, anchor) {
+  const mg = 8; // 最小マージン(safe-area近似含む)
+  const vw = _vvWidth();  // [V0.35] visual viewport 使用
+  const vh = _vvHeight(); // [V0.35] visual viewport 使用
+  const ew = el.offsetWidth  || 260;
+  const eh = el.offsetHeight || 120;
+
+  // 水平: 右端はみ出し補正
+  let left = parseFloat(el.style.left) || 0;
+  if (left + ew > vw - mg) left = vw - ew - mg;
+  if (left < mg) left = mg;
+
+  // 垂直: 下端はみ出し → アンカー上に反転、それも無理なら上端吸着
+  let top = parseFloat(el.style.top) || 0;
+  if (top + eh > vh - mg) {
+    const aboveTop = anchor ? (anchor.top - eh - 4) : (top - eh - 4);
+    top = (aboveTop >= mg) ? aboveTop : Math.max(mg, vh - eh - mg);
+  }
+  if (top < mg) top = mg;
+
+  el.style.left = left + 'px';
+  el.style.top  = top  + 'px';
+}
+
+function togglePicker(id, btnEl) {
+  const pk  = document.getElementById(id);
+  const was = pk.classList.contains('on');
+  closeAllPickers();
+  if (!was) {
+    const b = btnEl.getBoundingClientRect();
+    pk.style.top  = (b.bottom + 4) + 'px';
+    pk.style.left = b.left + 'px';
+    pk.classList.add('on');
+    _clampPopover(pk, b); // [V0.35] viewport内に収まるよう補正
+  }
+}
+function closeAllPickers() {
+  document.querySelectorAll('.pkp').forEach(p => p.classList.remove('on'));
+}
+
+/* ---- 太さパネル ---- */
+let szTmp = 3;
+function toggleSzPanel(btnEl) {
+  const p = document.getElementById('szp');
+  if (p.classList.contains('on')) { p.classList.remove('on'); return; }
+  const b = btnEl.getBoundingClientRect();
+  p.style.top  = (b.bottom + 5) + 'px';
+  p.style.left = Math.max(4, b.left - 80) + 'px';
+  const key = currentTool === 'shape' ? currentShape : currentTool;
+  const TITLES = {
+    pen:'ペンの太さ', hl:'蛍光ペンの太さ', eraser:'消しゴムの太さ',
+    text:'文字の大きさ', arrow:'矢印の太さ', rect:'四角の太さ',
+    circle:'円の太さ', line:'直線の太さ'
+  };
+  document.getElementById('szp-title').textContent = TITLES[key] || '太さ';
+  szTmp = strokeSize;
+  document.getElementById('sz-rng').value = strokeSize;
+  document.getElementById('sz-n').value   = strokeSize;
+  drawSzPreview(strokeSize);
+  p.classList.add('on');
+  _clampPopover(p, b); // [V0.35] viewport内に収まるよう補正
+}
+function onSzChange(v) {
+  szTmp = Math.max(1, Math.min(40, parseInt(v) || 1));
+  document.getElementById('sz-rng').value = szTmp;
+  document.getElementById('sz-n').value   = szTmp;
+  drawSzPreview(szTmp);
+}
+function applySz() {
+  strokeSize = szTmp;
+  const key = currentTool === 'shape' ? currentShape : currentTool;
+  toolSizes[key] = strokeSize;
+  document.getElementById('sz-v').textContent = strokeSize;
+  document.getElementById('szp').classList.remove('on');
+  showToast('太さ ' + strokeSize + ' に設定');
+}
+function drawSzPreview(sz) {
+  const c   = document.getElementById('szp-cvs');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = strokeColor || '#cc2020';
+  ctx.lineWidth   = Math.min(sz, c.height * 0.85);
+  ctx.lineCap     = 'round';
+  ctx.beginPath(); ctx.moveTo(14, c.height/2); ctx.lineTo(c.width-14, c.height/2); ctx.stroke();
+}
+
+/* ---- テキスト ---- */
+function cancelTx()  { document.getElementById('txov').classList.remove('on'); }
+function confirmTx() {
+  // [V0.35] 分割削除により常にメイン(App)へ保存
+  const txt = document.getElementById('txfld').value.trim();
+  if (txt) {
+    if (!App.strokes[App.currentPage]) App.strokes[App.currentPage] = [];
+    App.strokes[App.currentPage].push({
+      type: 'text', text: txt, x: txX, y: txY,
+      color: strokeColor, size: Math.max(strokeSize, 2)
+    });
+    App.redraw();
+    subWindows.forEach(sw => sw.update(App.strokes, App.currentPage));
+    schedSave();
+  }
+  cancelTx();
+}
+
+/* ============================================================
+   [V0.35] PDF ハイブリッド保存 ─ ヘルパー関数
+   ============================================================ */
+
+/** #rrggbb → [r, g, b] (0～1) */
+function _hexToRgb01(hex) {
+  const m = (hex || '#000000').replace('#', '').match(/../g);
+  return m ? m.map(h => parseInt(h, 16) / 255) : [0, 0, 0];
+}
+
+/** ストロークJSONをDeflate圧縮してPDFのKeywordsに埋め込む (MV1: プレフィックス) */
+async function _embedMVData(pdfDoc, allStrokes) {
+  const JSZip = window.JSZip;
+  if (!JSZip) return;
+  try {
+    const zip = new JSZip();
+    zip.file('d', JSON.stringify(allStrokes));
+    const b64 = await zip.generateAsync({
+      type: 'base64', compression: 'DEFLATE', compressionOptions: { level: 9 }
+    });
+    // 既存keywordsを保持しつつ MV1: エントリを上書き
+    let existing = [];
+    try { existing = (pdfDoc.getKeywords() || '').split('\n'); } catch(_) {}
+    const filtered = existing.filter(k => k && !k.startsWith('MV1:'));
+    pdfDoc.setKeywords([...filtered, 'MV1:' + b64]);
+  } catch(e) { console.warn('[V0.35] _embedMVData:', e); }
+}
+
+/** PDFのKeywordsから MV1: データを抽出してストロークオブジェクトを返す。
+ *  存在しない/失敗の場合は null を返す */
+async function _extractMVData(pdfBytes) {
+  const PL = window.PDFLib;
+  if (!PL) return null;
+  try {
+    const doc = await PL.PDFDocument.load(pdfBytes.slice(0),
+      { ignoreEncryption: true, throwOnInvalidObject: false });
+    const kw = doc.getKeywords() || '';
+    const line = kw.split('\n').find(k => k.startsWith('MV1:'));
+    if (!line) return null;
+    const b64 = line.slice(4);
+    const JSZip = window.JSZip;
+    if (!JSZip) return null;
+    const zip = await JSZip.loadAsync(b64, { base64: true });
+    const json = await zip.file('d').async('string');
+    const parsed = JSON.parse(json);
+    // ページキーを数値に変換（JSONは文字列キーで保存される）
+    const result = {};
+    Object.keys(parsed).forEach(k => { result[parseInt(k)] = parsed[k]; });
+    return result;
+  } catch(e) { console.warn('[V0.35] _extractMVData:', e); return null; }
+}
+
+/** [V0.35] PDF正式注釈（Ink/FreeText/Square/Circle/Line）をページに追加
+ *  消しゴムストロークはスキップ（_pdfRasterPage 側で処理）
+ *  @param {object} srcDoc     pdf-lib PDFDocument
+ *  @param {object} page       pdf-lib PDFPage（srcDocから取得済み）
+ *  @param {number} pageNum    1-indexed
+ *  @param {Array}  strks      ストローク配列
+ *  @param {number} pageWidth  PDF pts
+ *  @param {number} pageHeight PDF pts */
+async function _addPdfAnnotations(srcDoc, page, pageNum, strks, pageWidth, pageHeight) {
+  const PL = window.PDFLib;
+  if (!PL) return;
+  const { PDFName, PDFNumber, PDFArray, PDFDict, PDFString } = PL;
+  const ctx = srcDoc.context;
+
+  // 座標変換: app px (左上原点) → PDF pt (左下原点)
+  const toY = y => pageHeight - y;
+
+  // ヘルパー: PDFArrayに数値を詰める
+  const numArr = (...vals) => {
+    const a = PDFArray.withContext(ctx);
+    vals.forEach(v => a.push(PDFNumber.of(v)));
+    return a;
+  };
+  // ヘルパー: Rectを生成
+  const mkRect = (x1, y1, x2, y2, mg) => {
+    const mm = mg || 0;
+    return numArr(x1 - mm, y1 - mm, x2 + mm, y2 + mm);
+  };
+  // ヘルパー: BS辞書
+  const mkBs = w => {
+    const d = PDFDict.withContext(ctx);
+    d.set(PDFName.of('W'), PDFNumber.of(w));
+    d.set(PDFName.of('S'), PDFName.of('S'));
+    return d;
+  };
+  // ヘルパー: 色配列
+  const mkColor = (r, g, b) => numArr(r, g, b);
+  // ヘルパー: 注釈を登録してページに追加
+  const addAnnot = dict => {
+    const ref = ctx.register(dict);
+    page.node.addAnnot(ref);
+  };
+
+  for (const s of strks) {
+    if (s.type === 'eraser') continue;
+    try {
+      const lw = Math.max(0.5, s.size / 3);
+      const [r, g, b] = _hexToRgb01(s.color);
+
+      if (s.type === 'pen' || s.type === 'hl') {
+        const pts = s.points; if (!pts || pts.length < 2) continue;
+        const pdfPts = pts.map(p => [p[0], toY(p[1])]);
+        const xs = pdfPts.map(p => p[0]), ys = pdfPts.map(p => p[1]);
+
+        // InkList: [[x1,y1,x2,y2,...]]
+        const inkArr = PDFArray.withContext(ctx);
+        pdfPts.forEach(p => { inkArr.push(PDFNumber.of(p[0])); inkArr.push(PDFNumber.of(p[1])); });
+        const inkList = PDFArray.withContext(ctx); inkList.push(inkArr);
+
+        const an = PDFDict.withContext(ctx);
+        const margin = lw + 2;
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Ink'));
+        an.set(PDFName.of('Rect'),    mkRect(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), margin));
+        an.set(PDFName.of('InkList'), inkList);
+        an.set(PDFName.of('BS'),      mkBs(s.type === 'hl' ? Math.max(lw * 4, 5 / 3) : lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('CA'),      PDFNumber.of(s.type === 'hl' ? 0.38 : 1));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'text') {
+        const fontSize = Math.round(s.size * 6);
+        const lines = (s.text || '').split('\n');
+        const h = fontSize * 1.4 * lines.length + 4;
+        const w = fontSize * 0.65 * Math.max(...lines.map(l => l.length || 1)) + 4;
+        const pdfX = s.x, pdfY = toY(s.y);
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),     PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'),  PDFName.of('FreeText'));
+        an.set(PDFName.of('Rect'),     mkRect(pdfX, pdfY - h, pdfX + w, pdfY, 0));
+        an.set(PDFName.of('Contents'), PDFString.of(s.text || ''));
+        an.set(PDFName.of('DA'),       PDFString.of(
+          `/Helvetica ${fontSize} Tf ${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} rg`));
+        an.set(PDFName.of('Q'),        PDFNumber.of(0));
+        an.set(PDFName.of('F'),        PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'rect') {
+        const x1 = Math.min(s.x1, s.x2), x2 = Math.max(s.x1, s.x2);
+        const py1 = toY(Math.max(s.y1, s.y2)), py2 = toY(Math.min(s.y1, s.y2));
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Square'));
+        an.set(PDFName.of('Rect'),    mkRect(x1, py1, x2, py2, lw));
+        an.set(PDFName.of('BS'),      mkBs(lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'circle') {
+        const x1 = Math.min(s.x1, s.x2), x2 = Math.max(s.x1, s.x2);
+        const py1 = toY(Math.max(s.y1, s.y2)), py2 = toY(Math.min(s.y1, s.y2));
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Circle'));
+        an.set(PDFName.of('Rect'),    mkRect(x1, py1, x2, py2, lw));
+        an.set(PDFName.of('BS'),      mkBs(lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+
+      } else if (s.type === 'line' || s.type === 'arrow') {
+        const px1 = s.x1, py1 = toY(s.y1), px2 = s.x2, py2 = toY(s.y2);
+        const minX = Math.min(px1, px2), minY = Math.min(py1, py2);
+        const maxX = Math.max(px1, px2), maxY = Math.max(py1, py2);
+
+        const lineArr = numArr(px1, py1, px2, py2);
+        const leArr = PDFArray.withContext(ctx);
+        // arrow: 終点(x2,y2)に矢印、始点はNone
+        leArr.push(PDFName.of('None'));
+        leArr.push(PDFName.of(s.type === 'arrow' ? 'OpenArrow' : 'None'));
+
+        const an = PDFDict.withContext(ctx);
+        an.set(PDFName.of('Type'),    PDFName.of('Annot'));
+        an.set(PDFName.of('Subtype'), PDFName.of('Line'));
+        an.set(PDFName.of('Rect'),    mkRect(minX, minY, maxX, maxY, lw + 6));
+        an.set(PDFName.of('L'),       lineArr);
+        an.set(PDFName.of('LE'),      leArr);
+        an.set(PDFName.of('BS'),      mkBs(lw));
+        an.set(PDFName.of('C'),       mkColor(r, g, b));
+        an.set(PDFName.of('F'),       PDFNumber.of(4));
+        addAnnot(an);
+      }
+    } catch(e) { console.warn('[V0.35] annot skip:', s.type, e); }
+  }
+}
+
+/* ============================================================
+   PDF保存
+   ============================================================ */
+async function _pdfOverlayPage(srcDoc, page, pageNum, strks, pw, ph) {
+  const jsPage = await App.pdfDoc.getPage(pageNum);
+  const vp     = jsPage.getViewport({ scale: SAVE_RS });
+  const cvs    = document.createElement('canvas');
+  cvs.width = vp.width; cvs.height = vp.height;
+  strks.forEach(s => drawStroke(s, cvs.getContext('2d'), SAVE_RS, SAVE_RS));
+  const embed  = rotateCanvas(cvs, jsPage, pw, ph, SAVE_RS);
+  const blob   = await new Promise(r => embed.toBlob(r, 'image/png'));
+  const img    = await srcDoc.embedPng(new Uint8Array(await blob.arrayBuffer()));
+  // pdf-lib はページ左下を(0,0)とする座標系。画像はページ全体を覆うよう配置
+  page.drawImage(img, { x: 0, y: 0, width: pw, height: ph, opacity: 1 });
+}
+
+async function _pdfRasterPage(srcDoc, page, pageNum, strks, pw, ph) {
+  const jsPage = await App.pdfDoc.getPage(pageNum);
+  const vp     = jsPage.getViewport({ scale: SAVE_RS });
+  const c      = document.createElement('canvas');
+  c.width = vp.width; c.height = vp.height;
+  const ctx    = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, vp.width, vp.height);
+  await jsPage.render({ canvasContext: ctx, viewport: vp }).promise;
+  const ann    = document.createElement('canvas');
+  ann.width = vp.width; ann.height = vp.height;
+  _drawAnnotations(ann.getContext('2d'), strks, SAVE_RS); // ② 消しゴムは text 以外すべて対象
+  ctx.drawImage(ann, 0, 0);
+  const embed  = rotateCanvas(c, jsPage, pw, ph, SAVE_RS);
+  const blob   = await new Promise(r => embed.toBlob(r, 'image/jpeg', 0.94));
+  const img    = await srcDoc.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+  // 白背景で既存コンテンツを塗りつぶし、ラスタ画像（PDF+注釈）で全面置換
+  page.drawRectangle({ x:0, y:0, width:pw, height:ph,
+    color: window.PDFLib.rgb(1,1,1), borderWidth: 0 });
+  page.drawImage(img, { x: 0, y: 0, width: pw, height: ph, opacity: 1 });
+}
+
+async function generatePDFBlob() {
+  const PL = window.PDFLib;
+  if (!PL) { showToast('⚠ pdf-lib 未ロード'); return _generatePDFBlobFallback(); }
+  const srcDoc = await PL.PDFDocument.load(App.origBuf.slice(0));
+  for (let i = 0; i < App.totalPages; i++) {
+    const pn = i + 1, ss = App.strokes[pn] || [];
+    if (!ss.length) continue;
+    const page = srcDoc.getPage(i);
+    const { width, height } = page.getSize();
+    await (ss.some(s => s.type === 'eraser')
+      ? _pdfRasterPage (srcDoc, page, pn, ss, width, height)
+      : _pdfOverlayPage(srcDoc, page, pn, ss, width, height));
+  }
+  return new Blob([await srcDoc.save()], { type: 'application/pdf' });
+}
+
+async function _generatePDFBlobFallback() {
+  const { jsPDF } = window.jspdf; const RS = 4;
+  const pg1 = await App.pdfDoc.getPage(1);
+  const vp1 = pg1.getViewport({ scale: 1 });
+  const doc = new jsPDF({ unit:'pt', format:[vp1.width,vp1.height],
+    orientation: vp1.width > vp1.height ? 'l' : 'p' });
+  for (let i = 1; i <= App.totalPages; i++) {
+    if (i > 1) {
+      const pgi = await App.pdfDoc.getPage(i);
+      const vpi = pgi.getViewport({ scale: 1 });
+      doc.addPage([vpi.width, vpi.height], vpi.width > vpi.height ? 'l' : 'p');
+    }
+    const pg = await App.pdfDoc.getPage(i);
+    const vp = pg.getViewport({ scale: RS });
+    const c  = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, vp.width, vp.height);
+    await pg.render({ canvasContext: ctx, viewport: vp }).promise;
+    const ann = document.createElement('canvas'); ann.width = vp.width; ann.height = vp.height;
+    (App.strokes[i] || []).forEach(s => drawStroke(s, ann.getContext('2d'), RS));
+    ctx.drawImage(ann, 0, 0);
+    doc.addImage(c.toDataURL('image/jpeg', 0.94), 'JPEG', 0, 0, vp.width/RS, vp.height/RS);
+  }
+  return doc.output('blob');
+}
+
+/** ③ PDF出力ボタン → ページ指定ダイアログを表示 */
+function savePDF() {
+  if (!App.pdfDoc) { showToast('PDFが開かれていません'); return; }
+  document.getElementById('pgrov').classList.add('on');
+  document.getElementById('pgrfld').value       = '';
+  document.getElementById('pgrfld').placeholder = `全ページ / 例: 1, 1-${App.totalPages}, 1,3`;
+}
+
+/** ③ ページ範囲文字列をページ番号配列に変換
+ *  対応形式: "" / "全ページ" / "1" / "1-5" / "1,3,5" / "1-3,8,10-12"
+ */
+function _parsePageRange(input, total) {
+  const s = (input || '').trim();
+  if (!s || s === '全ページ') return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set();
+  s.split(',').forEach(part => {
+    const t = part.trim();
+    if (/^\d+$/.test(t)) {
+      pages.add(parseInt(t));
+    } else if (/^(\d+)-(\d+)$/.test(t)) {
+      const [, a, b] = t.match(/^(\d+)-(\d+)$/);
+      for (let i = parseInt(a); i <= parseInt(b); i++) pages.add(i);
+    }
+  });
+  return [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+}
+
+/** ③ 指定ページのみ出力する PDF を生成 [V0.36] 注釈保持のため srcDoc 直接保存 */
+async function _generateSubsetPDF(pageNums) {
+  const PL = window.PDFLib;
+  if (!PL) { showToast('⚠ pdf-lib 未ロード'); return null; }
+  const srcDoc = await PL.PDFDocument.load(App.origBuf.slice(0));
+  for (const pn of pageNums) {
+    const ss = App.strokes[pn] || [];
+    if (!ss.length) continue;
+    const page = srcDoc.getPage(pn - 1);
+    const { width, height } = page.getSize();
+    if (ss.some(s => s.type === 'eraser')) {
+      await _pdfRasterPage(srcDoc, page, pn, ss, width, height);
+    } else {
+      // [V0.37] PNG画像オーバーレイ（確実に他ビューワーで表示可能）
+      await _pdfOverlayPage(srcDoc, page, pn, ss, width, height);
+    }
+  }
+  // [V0.35] 全ストロークを hidden JSON として Keywords に埋め込む
+  await _embedMVData(srcDoc, App.strokes);
+
+  // [V0.36] copyPages を使わず srcDoc を直接保存（copyPages は /Annots を引き継がない）
+  // 部分ページ指定の場合は不要ページを後ろから削除して注釈を保持したまま出力
+  const total = srcDoc.getPageCount();
+  if (pageNums.length < total) {
+    const keep = new Set(pageNums);
+    for (let i = total - 1; i >= 0; i--) {
+      if (!keep.has(i + 1)) srcDoc.removePage(i);
+    }
+  }
+  return new Blob([await srcDoc.save()], { type: 'application/pdf' });
+}
+
+/** ③ 実際のPDF出力処理（ダイアログ確定後に呼ぶ） */
+async function _executeSave(rangeStr) {
+  document.getElementById('pgrov').classList.remove('on');
+  if (!App.pdfDoc) return;
+  showLoading(true);
+  try {
+    const pages = _parsePageRange(rangeStr, App.totalPages);
+    if (!pages.length) { showToast('有効なページがありません'); showLoading(false); return; }
+    const isAll = pages.length === App.totalPages;
+    // 全ページ・部分ページとも _generateSubsetPDF で統一（コードパスを単一化して安定化）
+    const blob  = await _generateSubsetPDF(pages);
+    if (!blob) { showLoading(false); return; }
+    const suffix = isAll ? '' : '_p' + rangeStr.replace(/\s/g, '');
+    const fname  = (App.fileName || 'drawing.pdf').replace(/\.pdf$/i, '') + suffix + '.pdf';
+    if (_fileHandle && isAll) {
+      try {
+        const w = await _fileHandle.createWritable();
+        await w.write(blob); await w.close();
+        showToast('📤 PDF出力しました'); showLoading(false); return;
+      } catch(e) { console.warn('write:', e); }
+    }
+    if (window.showSaveFilePicker) {
+      try {
+        const fh = await window.showSaveFilePicker({
+          suggestedName: fname,
+          types: [{ description:'PDF', accept:{'application/pdf':['.pdf']} }]
+        });
+        if (isAll) _fileHandle = fh;
+        const w = await fh.createWritable(); await w.write(blob); await w.close();
+        showToast('📤 PDF出力しました'); showLoading(false); return;
+      } catch(e) { if (e.name === 'AbortError') { showLoading(false); return; } }
+    }
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.download = fname; a.href = url; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    showToast('📤 PDF出力: ' + fname);
+  } catch(e) { showToast('出力失敗: ' + e.message); console.error(e); }
+  showLoading(false);
+}
+
+/* ============================================================
+   計算機
+   ============================================================ */
+let calcExpr = '', calcOper = '', calcVal = '', calcJustEq = false;
+const calcHistory = [];
+
+function calcDecPlaces() { return Math.max(0, parseInt(document.getElementById('cdec').value) || 0); }
+
+/* --- [FIX-CALC] 安全性・精度強化ユーティリティ --- */
+
+/** 全角数字・記号→半角変換 */
+function _calcNorm(s) {
+  return String(s)
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[．]/g, '.').trim();
+}
+
+/** 安全な数値変換: 無効値・空文字は null を返す (|| 0 による誤魔化しを排除) */
+function _safeNum(s) {
+  const norm = _calcNorm(String(s));
+  if (norm === '') return null;          // [FIX-CALC] 空文字→null (Numberは0を返すため明示ガード)
+  const n = Number(norm);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 浮動小数点ノイズ除去 + 表示桁丸め (toPrecision(14) で mm単位精度を確保) */
+function _calcFmt(n, places) {
+  const cleaned = parseFloat(n.toPrecision(14));
+  return String(+cleaned.toFixed(places));
+}
+
+/** エラー状態か判定 */
+function _isErr(v) { return v === 'エラー' || v === '÷0エラー'; }
+
+/** 演算実行: ゼロ除算は null を返す (旧: 0 返却バグを修正) */
+function _calcCompute(a, op, b) {
+  if (op === '+') return a + b;
+  if (op === '-') return a - b;
+  if (op === '*') return a * b;
+  if (op === '/') return b === 0 ? null : a / b; // [FIX-CALC] ゼロ除算→null
+  return a;
+}
+
+/** 履歴DOM更新 */
+function _calcUpdateHist() {
+  document.getElementById('chist').innerHTML =
+    calcHistory.map(h => `<div class="chi">${h}</div>`).join('');
+}
+
+/** calcExpr の先頭数値部分を取得 (末尾の演算子記号を除去) */
+function _calcGetA() { return _safeNum(calcExpr.replace(/[÷×＋−]$/, '').trim()); }
+
+/** エラー設定 (メッセージ + 状態リセット) */
+function _calcSetError(msg) {
+  calcHistory.unshift(msg);
+  if (calcHistory.length > 20) calcHistory.pop();
+  _calcUpdateHist();
+  calcExpr = ''; calcVal = 'エラー'; calcOper = ''; calcJustEq = true;
+}
+
+/* --- 表示更新 --- */
+function calcDisplay() {
+  document.getElementById('cexpr').textContent = calcExpr;
+  const el = document.getElementById('cval');
+  el.textContent = calcVal || '0';
+  el.style.color = _isErr(calcVal) ? '#ff6060' : ''; // [FIX-CALC] エラー時に赤表示
+}
+
+/* --- 数値ボタン --- */
+function calcNum(n) {
+  if (_isErr(calcVal)) return;                         // [FIX-CALC] エラー中は入力ブロック
+  if (calcJustEq) { calcVal = ''; calcExpr = ''; calcJustEq = false; }
+  n = _calcNorm(n);                                    // [FIX-CALC] 全角正規化
+  if (n === '.' && calcVal.includes('.')) return;
+  if (n === '.' && calcVal === '') calcVal = '0';      // 先頭ドット補完
+  calcVal += n; calcDisplay();
+}
+
+/* --- 演算子ボタン --- */
+function calcOp(op) {
+  if (_isErr(calcVal)) return;                         // [FIX-CALC] エラー中はブロック
+  calcJustEq = false;
+  if (calcVal !== '' && calcOper !== '') {
+    const a = _calcGetA(), b = _safeNum(calcVal);      // [FIX-CALC] 安全パース
+    if (a === null || b === null) { _calcSetError('入力エラー'); calcDisplay(); return; }
+    const r = _calcCompute(a, calcOper, b);
+    if (r === null) { _calcSetError(calcExpr + calcVal + ' = ÷0エラー'); calcDisplay(); return; }
+    calcVal = _calcFmt(r, calcDecPlaces());             // [FIX-CALC] 高精度フォーマット
+  }
+  const OP_SYMBOLS = { '+': '＋', '-': '−', '*': '×', '/': '÷' };
+  calcExpr = (calcVal || '0') + OP_SYMBOLS[op];
+  calcOper = op; calcVal = ''; calcDisplay();
+}
+
+/* --- イコール --- */
+function calcEq() {
+  if (!calcOper || calcVal === '' || _isErr(calcVal)) return;
+  const a = _calcGetA(), b = _safeNum(calcVal);        // [FIX-CALC] 安全パース
+  if (a === null || b === null) { _calcSetError('入力エラー'); calcDisplay(); return; }
+  const r = _calcCompute(a, calcOper, b);
+  if (r === null) {                                    // [FIX-CALC] ゼロ除算→エラー表示
+    _calcSetError(calcExpr + calcVal + ' = ÷0エラー');
+    calcDisplay(); return;
+  }
+  const rs = _calcFmt(r, calcDecPlaces());             // [FIX-CALC] 高精度フォーマット
+  calcHistory.unshift(calcExpr + calcVal + ' = ' + rs);
+  if (calcHistory.length > 20) calcHistory.pop();
+  _calcUpdateHist();
+  calcExpr = calcExpr + calcVal + '='; calcVal = rs;
+  calcOper = ''; calcJustEq = true; calcDisplay();
+}
+
+/* --- 特殊ボタン --- */
+function calcFn(f) {
+  if (f === 'C') {
+    calcExpr = ''; calcVal = ''; calcOper = ''; calcJustEq = false;
+  } else if (f === '±') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = String(-n);
+  } else if (f === '%') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = String(parseFloat((n / 100).toPrecision(14))); // [FIX-CALC] 精度保持
+  } else if (f === '⌫') {
+    if (_isErr(calcVal)) { calcVal = ''; }              // [FIX-CALC] エラー→クリア
+    else calcVal = calcVal.length > 1 ? calcVal.slice(0, -1) : '';
+  } else if (f === 'sqrt') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = n < 0 ? 'エラー' : _calcFmt(Math.sqrt(n), calcDecPlaces());
+  } else if (f === 'sq') {
+    if (!calcVal || _isErr(calcVal)) return;
+    const n = _safeNum(calcVal); if (n === null) return; // [FIX-CALC] 安全パース
+    calcVal = _calcFmt(n * n, calcDecPlaces());
+  } else if (f === '=') {
+    calcEq(); return;
+  }
+  calcDisplay();
+}
+
+function toggleCalc() {
+  const el = document.getElementById('calc');
+  const nowOn = !el.classList.contains('on');
+  el.classList.toggle('on');
+  document.getElementById('calcbtn').classList.toggle('on', nowOn);
+  // [V0.35] 初回表示時: CSS bottom/right → left/top へ変換しクランプ
+  if (nowOn && !el.style.left) {
+    const vw = _vvWidth(), vh = _vvHeight(); // [V0.35] visual viewport
+    const ew = el.offsetWidth || 290, eh = el.offsetHeight || 380;
+    el.style.left   = Math.max(8, vw - ew - 16) + 'px';
+    el.style.top    = Math.max(8, vh - eh - 20) + 'px';
+    el.style.bottom = 'auto'; el.style.right = 'auto';
+  }
+}
+
+/* 計算機ドラッグ */
+(() => {
+  const el = document.getElementById('calc');
+  let dragging = false, ox = 0, oy = 0, ex = 0, ey = 0;
+  const onStart = e => {
+    if (e.target.closest('#cclose')) return;
+    const s = e.touches ? e.touches[0] : e;
+    dragging = true; ox = s.clientX; oy = s.clientY;
+    const r = el.getBoundingClientRect(); ex = r.left; ey = r.top;
+    if (e.cancelable) e.preventDefault(); e.stopPropagation();
+  };
+  const onMove = e => {
+    if (!dragging) return;
+    const s = e.touches ? e.touches[0] : e;
+    // [V0.35] viewport内に収まるようクランプ / [V0.35] visual viewport 使用
+    const vw = _vvWidth(), vh = _vvHeight();
+    const ew = el.offsetWidth || 290, eh = el.offsetHeight || 380;
+    const newL = Math.max(0, Math.min(vw - ew, ex + s.clientX - ox));
+    const newT = Math.max(0, Math.min(vh - eh, ey + s.clientY - oy));
+    el.style.left   = newL + 'px';
+    el.style.top    = newT + 'px';
+    el.style.bottom = 'auto'; el.style.right = 'auto';
+  };
+  const onEnd = () => { dragging = false; };
+  document.getElementById('ctb').addEventListener('touchstart', onStart, { passive: false });
+  document.getElementById('ctb').addEventListener('mousedown',  onStart);
+  document.addEventListener('touchmove', onMove, { passive: true });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchend',  onEnd);
+  document.addEventListener('mouseup',   onEnd);
+})();
+
+/* ============================================================
+   トースト / ローディング
+   ============================================================ */
+let _toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('on'), 2800);
+}
+function showLoading(visible) {
+  document.getElementById('loading').classList.toggle('on', visible);
+}
+
+/* ============================================================
+   [V0.40] ホーム画面
+   ============================================================ */
+async function _renderHome() {
+  const listEl  = document.getElementById('home-list');
+  const emptyEl = document.getElementById('home-empty');
+  listEl.innerHTML = '';
+  let docs = [];
+  try { docs = await DocMgr.list(); } catch(_) {}
+  if (!docs.length) { emptyEl.style.display = 'flex'; return; }
+  emptyEl.style.display = 'none';
+  docs.forEach(doc => {
+    const card = document.createElement('div');
+    card.className = 'home-card';
+    const dt  = new Date(doc.updatedAt);
+    const ds  = `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}`;
+    const nm  = doc.name.replace(/\.pdf$/i, '');
+    card.innerHTML =
+      `<div class="home-card-icon">📄</div>` +
+      `<div class="home-card-name" title="${doc.name}">${nm}</div>` +
+      `<div class="home-card-date">${ds}</div>` +
+      `<button class="home-card-del" title="削除">✕</button>`;
+    card.querySelector('.home-card-del').addEventListener('pointerdown', async e => {
+      e.stopPropagation();
+      if (confirm(`「${nm}」を削除しますか？`)) {
+        await DocMgr.remove(doc.id); _renderHome();
+      }
+    });
+    // [V0.44] ホームカード: 既存PDFがある場合はバックアップ確認
+    card.addEventListener('click', async () => {
+      const full = await DocMgr.get(doc.id);
+      if (!full?.originalPdfBytes) { showToast('データが見つかりません'); return; }
+      if (App.pdfDoc) {
+        const result = await _confirmClose(App.fileName, '読み込む（バックアップしない）');
+        if (result === 'cancel') return;
+        if (result === 'backup') {
+          await _backupThenClose(async () => { hideHome(); await App.loadPDF({ name: full.name }, new Uint8Array(full.originalPdfBytes)); });
+          return;
+        }
+      }
+      hideHome();
+      await App.loadPDF({ name: full.name }, new Uint8Array(full.originalPdfBytes));
+    });
+    listEl.appendChild(card);
+  });
+}
+
+function showHome() {
+  document.getElementById('home').style.display = 'flex';
+  document.getElementById('dz').style.display   = 'none';
+  _renderHome();
+}
+function hideHome() {
+  document.getElementById('home').style.display = 'none';
+}
+
+/* ============================================================
+   イベントバインド (DOMContentLoaded後に実行)
+   ============================================================ */
+(function bindEvents() {
+  /* [V0.48] APP_VERSION を全表示箇所へ反映（ここだけ変更すれば全箇所追従） */
+  document.title = 'M_Viewer ' + APP_VERSION;
+  const verLogo = document.getElementById('app-ver-logo');
+  const verDz   = document.getElementById('app-ver-dz');
+  if (verLogo) verLogo.textContent = APP_VERSION;
+  if (verDz)   verDz.textContent   = 'M_Viewer ' + APP_VERSION;
+  console.info('%c[M_Viewer] ' + APP_VERSION + ' 起動', 'color:#f07800;font-weight:bold');
+
+  /* --- ヘッダー行1 --- */
+  document.getElementById('dz-open')  .addEventListener('click', () => openFile());
+  document.getElementById('home-open').addEventListener('click', () => openFile());
+  document.getElementById('btn-home') .addEventListener('click', (
