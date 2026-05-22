@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.43</title>
+<title>M_Viewer V0.44</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -264,6 +264,30 @@ body {
 .pgr-q { flex: 1; height: 32px; border-radius: 6px; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx2); font-size: 11px; cursor: pointer; font-weight: 600; }
 .pgr-q:active { background: var(--brd); }
 
+/* [V0.44] バックアップ確認ダイアログ */
+#bk-confirm-overlay {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
+}
+#bk-confirm-overlay.open { display: flex; }
+#bk-confirm-box {
+  background: var(--pan); border: 1.5px solid var(--brd); border-radius: 14px;
+  padding: 22px 20px 18px; max-width: 340px; width: 90%; text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+#bk-confirm-box .bk-icon  { font-size: 28px; margin-bottom: 8px; }
+#bk-confirm-box .bk-title { font-size: 14px; font-weight: 800; color: var(--tx); margin-bottom: 6px; }
+#bk-confirm-box .bk-sub   { font-size: 12px; color: var(--tx2); margin-bottom: 18px; line-height: 1.5; }
+#bk-confirm-box .bk-warn  { color: #ffaa44; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
+#bk-confirm-box .bk-btns  { display: flex; flex-direction: column; gap: 8px; }
+#bk-confirm-box .bk-btns button {
+  width: 100%; height: 38px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  cursor: pointer; border: 1.5px solid var(--brd); background: var(--pan2); color: var(--tx);
+}
+#bk-confirm-box .bk-btns .bk-do-backup { background: var(--acc); border-color: var(--acc); color: #fff; }
+#bk-confirm-box .bk-btns .bk-do-close  { background: var(--pan2); }
+#bk-confirm-box .bk-btns .bk-cancel    { color: var(--tx2); }
+
 /* [V0.35] 分割ビュー削除により関連CSSを全削除 */
 
 /* ===== タブバー ===== */
@@ -462,6 +486,20 @@ body {
 </style>
 </head>
 <body>
+<!-- [V0.44] バックアップ確認ダイアログ（JS から open クラスを付与して表示） -->
+<div id="bk-confirm-overlay">
+  <div id="bk-confirm-box">
+    <div class="bk-icon" id="bk-icon">⚠️</div>
+    <div class="bk-title" id="bk-title">バックアップを作成しますか？</div>
+    <div class="bk-warn"  id="bk-warn"></div>
+    <div class="bk-sub"   id="bk-sub"></div>
+    <div class="bk-btns">
+      <button class="bk-do-backup" id="bk-do-backup">💾 バックアップして閉じる</button>
+      <button class="bk-do-close"  id="bk-do-close">閉じる（バックアップしない）</button>
+      <button class="bk-cancel"    id="bk-cancel">キャンセル</button>
+    </div>
+  </div>
+</div>
 
 <div id="hdr">
   <!-- 行1: ロゴ / ファイル操作 / ツール操作 -->
@@ -857,6 +895,11 @@ const _KEY_BK_LAT = 'bk:lat:' + _INST_ID;
 const _KEY_BK_PRV = 'bk:prv:' + _INST_ID;
 
 let _autoSaveTimer;
+// [V0.44] バックアップ未実施フラグ: schedSave で true, downloadBackup 成功で false
+// true = 手動バックアップ未実施（ZIPダウンロード済みでない）
+let _bkDirty = false;
+// [V0.44] 確認ダイアログ多重表示防止フラグ
+let _confirmPending = false;
 /* ============================================================
    診断用 機能フラグ制御 (freeze 原因特定システム)
    ブラウザ開発者コンソールから以下を実行して機能を1つずつ停止:
@@ -920,6 +963,7 @@ function _pruneEraserStrokes(strks) {
 
 function schedSave() {
   clearTimeout(_autoSaveTimer);
+  _bkDirty = true; // [V0.44] 変更ありフラグ → バックアップ確認ダイアログで使用
   schedPdfSave(); // [V0.38] PDF自動保存も予約（30秒debounce・_fileHandleある時のみ）
   _autoSaveTimer = setTimeout(async () => {
     if (!App.pdfDoc || !App.origBuf) return;
@@ -2377,8 +2421,15 @@ const App = (() => {
   }
 
   /* ---- ファイル入力 ---- */
+  // [V0.44] 別PDF読込: 既存PDFがある場合はバックアップ確認
   document.getElementById('fileInput').addEventListener('change', async e => {
-    const f = e.target.files[0]; if (f) await loadPDF(f); e.target.value = '';
+    const f = e.target.files[0]; if (!f) { e.target.value = ''; return; }
+    if (App.pdfDoc) {
+      const result = await _confirmClose(App.fileName, '読み込む（バックアップしない）');
+      if (result === 'cancel') { e.target.value = ''; return; }
+      if (result === 'backup') { await _backupThenClose(async () => { await loadPDF(f); }); e.target.value = ''; return; }
+    }
+    await loadPDF(f); e.target.value = '';
   });
   caEl.addEventListener('dragover', e => e.preventDefault());
   caEl.addEventListener('drop',     e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadPDF(f); });
@@ -2576,8 +2627,20 @@ function _renderTabBar() {
     div.addEventListener('click', e => {
       if (!e.target.classList.contains('shtab-x')) switchToSheet(i);
     });
-    div.querySelector('.shtab-x').addEventListener('click', e => {
-      e.stopPropagation(); closeSheetAt(i);
+    // [V0.44] タブ×: バックアップ確認ダイアログ経由で閉じる
+    div.querySelector('.shtab-x').addEventListener('click', async e => {
+      e.stopPropagation();
+      const sh = _sheets[i];
+      if (!sh?.pdfDoc) { closeSheetAt(i); return; }
+      const result = await _confirmClose(sh.fileName);
+      if (result === 'cancel') return;
+      if (result === 'backup') {
+        // バックアップ対象シートへ切替してからバックアップ実行
+        if (i !== _sheetIdx) await switchToSheet(i);
+        await _backupThenClose(() => closeSheetAt(i));
+        return;
+      }
+      closeSheetAt(i);
     });
     bar.appendChild(div);
   });
@@ -2726,6 +2789,83 @@ async function _buildBackupZip() {
 }
 
 /**
+ * [V0.44] バックアップ確認ダイアログを表示する（非同期・カスタムUI）
+ *  iPad Safari でも confirm() 非依存で動作する。
+ *  二重表示防止: _confirmPending が true の間は即 'cancel' を返す。
+ *
+ *  @param {string} pdfName   - 対象PDFファイル名（表示用）
+ *  @param {string} [closeLabel] - 「閉じる」ボタンのラベル（省略時は「閉じる（バックアップしない）」）
+ *  @returns {Promise<'backup'|'close'|'cancel'>}
+ */
+function _confirmClose(pdfName, closeLabel) {
+  // 多重ダイアログ防止
+  if (_confirmPending) return Promise.resolve('cancel');
+  _confirmPending = true;
+
+  return new Promise(resolve => {
+    const overlay  = document.getElementById('bk-confirm-overlay');
+    const iconEl   = document.getElementById('bk-icon');
+    const titleEl  = document.getElementById('bk-title');
+    const warnEl   = document.getElementById('bk-warn');
+    const subEl    = document.getElementById('bk-sub');
+    const btnBk    = document.getElementById('bk-do-backup');
+    const btnClose = document.getElementById('bk-do-close');
+    const btnCancel= document.getElementById('bk-cancel');
+
+    // 表示テキストをダイアログ種別に応じて設定
+    const base = pdfName ? `「${pdfName.replace(/\.pdf$/i,'')}」` : '現在のPDF';
+    if (_bkDirty) {
+      iconEl.textContent  = '⚠️';
+      titleEl.textContent = 'バックアップ未実施の変更があります';
+      warnEl.textContent  = '⚠ ZIPバックアップがまだ作成されていません';
+      subEl.textContent   = `${base}を閉じる前にバックアップを作成しますか？\nIndexedDBのデータは7日以内に削除される場合があります。`;
+    } else {
+      iconEl.textContent  = '💾';
+      titleEl.textContent = '閉じる前にバックアップを作成しますか？';
+      warnEl.textContent  = '';
+      subEl.textContent   = `${base}を閉じます。\n最新のZIPバックアップを作成してから閉じることを推奨します。`;
+    }
+    btnClose.textContent = closeLabel || '閉じる（バックアップしない）';
+
+    // ダイアログを開く
+    overlay.classList.add('open');
+
+    // ボタンハンドラ（一度だけ発火）
+    const finish = result => {
+      overlay.classList.remove('open');
+      _confirmPending = false;
+      btnBk   .removeEventListener('click', onBk);
+      btnClose.removeEventListener('click', onCl);
+      btnCancel.removeEventListener('click', onCa);
+      resolve(result);
+    };
+    const onBk = () => finish('backup');
+    const onCl = () => finish('close');
+    const onCa = () => finish('cancel');
+    btnBk   .addEventListener('click', onBk,  { once: true });
+    btnClose.addEventListener('click', onCl,  { once: true });
+    btnCancel.addEventListener('click', onCa, { once: true });
+  });
+}
+
+/**
+ * [V0.44] 「バックアップして閉じる」を実行するヘルパー
+ *  - downloadBackup() 完了後にコールバックを呼ぶ
+ *  - バックアップ失敗時はキャンセル扱い（データ保護優先）
+ *  @param {Function} closeFn - バックアップ成功後に呼ぶクローズ処理
+ */
+async function _backupThenClose(closeFn) {
+  try {
+    await downloadBackup();
+  } catch(e) {
+    // バックアップ失敗 → 閉じない（データ保護優先）
+    showToast('バックアップ失敗のためキャンセルしました');
+    return;
+  }
+  closeFn();
+}
+
+/**
  * [V0.43] バックアップZIPファイル名を生成する
  *  - 現在開いているPDF名ベース（拡張子 .pdf を除去）
  *  - ファイル名禁止文字（\ / : * ? " < > |）を _ に置換
@@ -2774,6 +2914,7 @@ async function downloadBackup() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href=url; a.download=fname; a.click();
     setTimeout(()=>URL.revokeObjectURL(url), 30000);
+    _bkDirty = false; // [V0.44] 手動バックアップ完了 → 確認不要状態へ
     showToast(`💾 バックアップ完了: ${fname}`);
   } catch(e) { showToast('バックアップ失敗: '+e.message); console.error('[Backup]',e); }
   showLoading(false);
@@ -2941,10 +3082,30 @@ async function _autoBackupToIDB() {
 // ダウンロードが必要な場合はヘッダーの「バックアップ」ボタンを手動で押下
 setInterval(_autoBackupToIDB, BACKUP_INTERVAL_MS);
 
-// ページ離脱前: 未保存データがある場合は警告
+// [V0.44] ページ離脱前: PDF開き中は常に警告（_bkDirty=未バックアップ時は強調メッセージ）
+// iPad Safari: e.returnValue='' でブラウザ標準「離脱しますか？」ダイアログを表示
+// ※ visibilitychange/pagehide では confirm() 非対応のため beforeunload のみダイアログを使用
 window.addEventListener('beforeunload', e => {
-  const dirty = App.pdfDoc && Object.keys(App.strokes||{}).some(pg=>(App.strokes[pg]||[]).length>0);
-  if (dirty) { e.preventDefault(); e.returnValue=''; }
+  if (!App.pdfDoc) return;
+  // IDB は自動保存済みだが、ZIP未出力の変更がある場合は強い警告
+  const msg = _bkDirty
+    ? '未バックアップの変更があります。ページを離脱するとZIPバックアップは失われます。'
+    : 'PDFが開いています。ページを離脱しますか？';
+  e.preventDefault();
+  e.returnValue = msg; // Chrome/Safari 両対応
+});
+
+// [V0.44] pagehide: iOS PWA 終了・Split View 解除・タブ消去時に発火
+// iOS Safari では confirm() 不可のためサイレントIDB保存のみ実施
+window.addEventListener('pagehide', () => {
+  if (!App.pdfDoc || !App.origBuf) return;
+  const data = {
+    buf: null, strokes: _pruneEraserStrokes(App.strokes),
+    file: App.fileName, page: App.currentPage, ts: Date.now()
+  };
+  // sendBeacon 相当のサイレント保存（非同期・UIブロックなし）
+  IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
+  IDB.set(_KEY_LAST, data).catch(() => {});
 });
 
 async function openFile() {
@@ -3745,9 +3906,18 @@ async function _renderHome() {
         await DocMgr.remove(doc.id); _renderHome();
       }
     });
+    // [V0.44] ホームカード: 既存PDFがある場合はバックアップ確認
     card.addEventListener('click', async () => {
       const full = await DocMgr.get(doc.id);
       if (!full?.originalPdfBytes) { showToast('データが見つかりません'); return; }
+      if (App.pdfDoc) {
+        const result = await _confirmClose(App.fileName, '読み込む（バックアップしない）');
+        if (result === 'cancel') return;
+        if (result === 'backup') {
+          await _backupThenClose(async () => { hideHome(); await App.loadPDF({ name: full.name }, new Uint8Array(full.originalPdfBytes)); });
+          return;
+        }
+      }
       hideHome();
       await App.loadPDF({ name: full.name }, new Uint8Array(full.originalPdfBytes));
     });
@@ -3776,10 +3946,17 @@ function hideHome() {
   ;(()=>{
     const homeEl = document.getElementById('home');
     homeEl.addEventListener('dragover', e => e.preventDefault());
-    homeEl.addEventListener('drop', e => {
+    // [V0.44] ホームD&D: 既存PDFがある場合はバックアップ確認
+    homeEl.addEventListener('drop', async e => {
       e.preventDefault();
       const f = e.dataTransfer.files[0];
-      if (f && f.type === 'application/pdf') { hideHome(); App.loadPDF(f); }
+      if (!f || f.type !== 'application/pdf') return;
+      if (App.pdfDoc) {
+        const result = await _confirmClose(App.fileName, '読み込む（バックアップしない）');
+        if (result === 'cancel') return;
+        if (result === 'backup') { await _backupThenClose(async () => { hideHome(); await App.loadPDF(f); }); return; }
+      }
+      hideHome(); App.loadPDF(f);
     });
   })();
   // [V0.35] undo: 最後に描画したパネルに振り分け
@@ -3795,9 +3972,13 @@ function hideHome() {
     e.target.value = ''; // 同じファイルの再選択を許可
   });
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
-  document.getElementById('btn-close').addEventListener('click', () => {
+  // [V0.44] ✕閉じるボタン: バックアップ確認ダイアログ経由で閉じる
+  document.getElementById('btn-close').addEventListener('click', async () => {
     if (!App.pdfDoc) return;
-    if (confirm('このタブを閉じますか？（保存済みデータは残ります）')) closeSheetAt(_sheetIdx);
+    const result = await _confirmClose(App.fileName);
+    if (result === 'cancel') return;
+    if (result === 'backup') { await _backupThenClose(() => closeSheetAt(_sheetIdx)); return; }
+    closeSheetAt(_sheetIdx);
   });
   document.getElementById('cclose')   .addEventListener('click', () => toggleCalc());
 
