@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.41</title>
+<title>M_Viewer V0.42</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -472,7 +472,9 @@ body {
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
     <button class="btn on" id="btn-save">📤 PDF出力</button>
-    <button class="btn" id="btn-backup" title="注釈データをZIPでバックアップ">💾 バックアップ</button>
+    <button class="btn" id="btn-backup" title="PDF＋注釈データをZIPでバックアップ">💾 バックアップ</button>
+    <button class="btn" id="btn-restore" title="バックアップZIPから完全復元">📂 復元</button>
+    <input type="file" id="restoreInput" accept=".zip" style="display:none">
     <button class="btn" id="calcbtn">🧮 計算機</button>
     <div class="sp"></div>
     <button class="btn" id="btn-home">⌂ ホーム</button>
@@ -2709,6 +2711,17 @@ async function _buildBackupZip() {
     toolSizes:{...toolSizes}, penColor, hlColor, selMode, currentTool
   }, null, 2));
 
+  // [V0.42] original.pdf: 元PDFバイナリをそのまま格納（IDB消失時の完全復元用）
+  // App.origBuf 優先、なければ DocMgr からバイナリ補完
+  let _pdfBuf = App.origBuf;
+  if (!_pdfBuf && App.fileName) {
+    try {
+      const _docEntry = await DocMgr.findByName(App.fileName);
+      if (_docEntry?.originalPdfBytes) _pdfBuf = new Uint8Array(_docEntry.originalPdfBytes);
+    } catch(_e) {}
+  }
+  if (_pdfBuf) zip.file('original.pdf', _pdfBuf);
+
   return zip;
 }
 
@@ -2730,6 +2743,135 @@ async function downloadBackup() {
     setTimeout(()=>URL.revokeObjectURL(url), 30000);
     showToast(`💾 バックアップ完了: ${fname}`);
   } catch(e) { showToast('バックアップ失敗: '+e.message); console.error('[Backup]',e); }
+  showLoading(false);
+}
+
+/** [V0.42] バックアップZIPから完全復元
+ *  original.pdf + annotations.json + settings.json を一括復元
+ *  旧形式（annotations.jsonのみ）も後方互換で対応
+ */
+async function restoreFromBackup(zipFile) {
+  const JSZip = window.JSZip;
+  if (!JSZip) { showToast('JSZip 未ロード'); return; }
+
+  showLoading(true);
+  try {
+    // ZIP読込・破損チェック
+    let zip;
+    try {
+      zip = await JSZip.loadAsync(zipFile);
+    } catch(e) {
+      showLoading(false);
+      alert('ZIPファイルが破損しています\n' + e.message);
+      return;
+    }
+
+    // project.json 取得（任意）
+    let project = null;
+    if (zip.file('project.json')) {
+      try { project = JSON.parse(await zip.file('project.json').async('string')); } catch(_e) {}
+    }
+
+    // バージョン不一致チェック（警告のみ・中断なし）
+    if (project?.appVersion && typeof project.appVersion === 'string' &&
+        !project.appVersion.includes('M_Viewer')) {
+      if (!confirm('バージョンが異なる可能性があります。\n' + project.appVersion + '\n続けますか？')) {
+        showLoading(false); return;
+      }
+    }
+
+    const hasPdf = !!zip.file('original.pdf');
+    const hasAnn = !!zip.file('annotations.json');
+
+    // 必須ファイルチェック
+    if (!hasAnn) {
+      showLoading(false);
+      alert('ZIPに必須データ(annotations.json)が含まれていません');
+      return;
+    }
+
+    const ann = JSON.parse(await zip.file('annotations.json').async('string'));
+
+    // ── 旧形式互換: original.pdf なし ──
+    if (!hasPdf) {
+      showLoading(false);
+      alert('元PDFが含まれていないため、別途PDF読込が必要です。\n現在開いているPDFへ注釈データのみ適用します。');
+      if (!App.pdfDoc) return;
+      const fn = App.fileName;
+      if (ann[fn]?.strokes) {
+        const pruned = _pruneEraserStrokes(ann[fn].strokes);
+        Object.keys(pruned).forEach(pg => { App.strokes[pg] = pruned[pg]; });
+        App.redraw();
+        schedSave();
+        showToast('注釈データを復元しました（旧形式）');
+      }
+      return;
+    }
+
+    // ── 新形式: original.pdf あり ──
+    let pdfBytes;
+    try {
+      pdfBytes = await zip.file('original.pdf').async('uint8array');
+    } catch(e) {
+      showLoading(false);
+      alert('PDF復元に失敗しました\n' + e.message);
+      return;
+    }
+
+    // ファイル名: project.json → アクティブシート名 → フォールバック
+    let restoreFileName = 'restored.pdf';
+    if (project?.sheets?.length) {
+      const activeIdx = project.activeSheetIdx ?? 0;
+      const sh = project.sheets[activeIdx] || project.sheets[0];
+      if (sh?.fileName && sh.fileName !== '(新規)') restoreFileName = sh.fileName;
+    }
+    // annotations.json のキーからも推定
+    if (restoreFileName === 'restored.pdf') {
+      const keys = Object.keys(ann);
+      if (keys.length > 0) restoreFileName = keys[0];
+    }
+
+    // settings.json 読込（任意）
+    let settings = null;
+    if (zip.file('settings.json')) {
+      try { settings = JSON.parse(await zip.file('settings.json').async('string')); } catch(_e) {}
+    }
+
+    // PDF を App へ読込（renderPage・IDB登録含む）
+    const fakeFile = { name: restoreFileName };
+    await App.loadPDF(fakeFile, pdfBytes);
+
+    // loadPDF が IDB/embedded から上書きした strokes を ZIP の注釈で再上書き
+    if (ann[restoreFileName]?.strokes) {
+      const pruned = _pruneEraserStrokes(ann[restoreFileName].strokes);
+      Object.keys(pruned).forEach(pg => { App.strokes[pg] = pruned[pg]; });
+      App.redraw();
+    }
+
+    // ズーム・ページ位置を project.json から復元
+    if (project?.sheets?.length) {
+      const activeIdx = project.activeSheetIdx ?? 0;
+      const sh = project.sheets[activeIdx] || project.sheets[0];
+      if (sh?.curPage && sh.curPage !== 1) await App.gotoPage(sh.curPage, true);
+    }
+
+    // ツール設定復元
+    if (settings) {
+      if (settings.toolSizes)   Object.assign(toolSizes, settings.toolSizes);
+      if (settings.penColor)    penColor  = settings.penColor;
+      if (settings.hlColor)     hlColor   = settings.hlColor;
+      if (settings.currentTool) setTool(settings.currentTool);
+      if (settings.selMode)     setSelMode(settings.selMode);
+    }
+
+    // IDBへ保存（次回起動時復元のため）
+    schedSave();
+
+    showToast('✅ バックアップから完全復元しました');
+  } catch(e) {
+    alert('復元に失敗しました\n' + e.message);
+    console.error('[Restore]', e);
+  }
   showLoading(false);
 }
 
@@ -3611,6 +3753,14 @@ function hideHome() {
   document.getElementById('btn-undo').addEventListener('click', () => App.undo()); // [V0.35] 分割削除で常にメインへ
   document.getElementById('btn-save') .addEventListener('click', () => savePDF());
   document.getElementById('btn-backup').addEventListener('click', () => downloadBackup());
+  // [V0.42] 復元ボタン: ZIPファイル選択 → restoreFromBackup
+  document.getElementById('btn-restore').addEventListener('click', () =>
+    document.getElementById('restoreInput').click());
+  document.getElementById('restoreInput').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (f) await restoreFromBackup(f);
+    e.target.value = ''; // 同じファイルの再選択を許可
+  });
   document.getElementById('calcbtn')  .addEventListener('click', () => toggleCalc());
   document.getElementById('btn-close').addEventListener('click', () => {
     if (!App.pdfDoc) return;
