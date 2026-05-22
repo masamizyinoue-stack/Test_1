@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.44</title>
+<title>M_Viewer V0.46</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -1224,19 +1224,42 @@ function _distPtSeg(px, py, ax, ay, bx, by) {
 }
 
 function _applyEraser(penStroke, erPts, hitR) {
-  // 各ペンポイントと消しゴム【線分】の最短距離で判定（点列のみより高精度）
-  const kept = penStroke.points.map(pp => {
-    const px = pp[0], py = pp[1];
-    if (erPts.length === 0) return pp;
-    // 1点目: 点との距離
-    if (Math.hypot(px-erPts[0][0], py-erPts[0][1]) < hitR) return null;
-    // 2点目以降: 各線分との最短距離
+  if (!penStroke.points?.length || erPts.length === 0) return [penStroke];
+
+  // [V0.46] 点→消しゴム経路ヒット判定を内部ヘルパーに共通化
+  // ペン点(px,py)が消しゴム経路(erPts)のhitR内に入るか
+  const ptHits = (px, py) => {
+    if (Math.hypot(px-erPts[0][0], py-erPts[0][1]) < hitR) return true;
     for (let i = 1; i < erPts.length; i++) {
       if (_distPtSeg(px, py, erPts[i-1][0], erPts[i-1][1], erPts[i][0], erPts[i][1]) < hitR)
-        return null;
+        return true;
     }
-    return pp;
-  });
+    return false;
+  };
+
+  // 既存: 各ペン点を消しゴム経路と照合（ペン点 → 消しゴム線分 距離）
+  const kept = penStroke.points.map(pp => ptHits(pp[0], pp[1]) ? null : pp);
+
+  // [V0.46] 追加: ペン線分の中点・1/4・3/4点も照合
+  // 目的: 高速ペン描画でペン点間隔が広い場合、消しゴム円がペン点を避けて
+  //       ペン線分の「隙間」を通過しても消去されない問題を修正
+  // メイン・サブウィンドウ共通の _applyEraser を修正するため両方に効果あり
+  for (let j = 1; j < kept.length; j++) {
+    if (kept[j-1] === null || kept[j] === null) continue; // 既に消去済みはスキップ
+    const [ax, ay] = kept[j-1], [bx, by] = kept[j];
+    // 中点チェック（基本補間）
+    if (ptHits((ax+bx)/2, (ay+by)/2)) {
+      kept[j-1] = null; kept[j] = null; continue;
+    }
+    // 線分が hitR×2 より長い場合は 1/4・3/4 点も追加チェック（高速ペン対策）
+    if (Math.hypot(bx-ax, by-ay) > hitR * 2) {
+      if (ptHits(ax*0.75+bx*0.25, ay*0.75+by*0.25) ||
+          ptHits(ax*0.25+bx*0.75, ay*0.25+by*0.75)) {
+        kept[j-1] = null; kept[j] = null;
+      }
+    }
+  }
+
   // 連続する保持ポイントをセグメントに分割（消去ポイントで切断）
   const result = [];
   let seg = [];
@@ -1755,11 +1778,12 @@ class SubWin {
     this.selCtx.clearRect(0, 0, this.selCvs.width, this.selCvs.height);
     this.selCtx.save();
     this.selCtx.strokeStyle = '#4488ff'; this.selCtx.lineWidth = 2;
+    // [V0.45] なげなわ・矩形どちらも同じ点線パターンで統一（メインウィンドウと揃える）
+    this.selCtx.setLineDash([6, 4]);
     const sc = this.innerScale;
     // [V0.35] selModeに応じてなげなわ自由線／矩形を描き分け
     if (selMode === 'lasso') {
-      // なげなわ: 自由線パスをlineTo描画
-      this.selCtx.setLineDash([]);
+      // なげなわ: 自由線パスをlineTo描画（点線スタイルは上記で設定済み）
       this.selCtx.beginPath();
       this.swSelPath.forEach((p, i) => {
         const bx = (p.x - this.offX) * sc, by = (p.y - this.offY) * sc;
@@ -2202,7 +2226,8 @@ const App = (() => {
     const sc = renderScale, invEZ = 1 / cssExtraZoom;
     ovlCtx.save();
     ovlCtx.strokeStyle = '#4488ff'; ovlCtx.lineWidth = 2 * invEZ;
-    ovlCtx.setLineDash(selMode === 'rect' ? [6*invEZ, 4*invEZ] : []);
+    // [V0.45] なげなわ・矩形どちらも同じ点線パターンで統一（矩形と見た目を合わせる）
+    ovlCtx.setLineDash([6*invEZ, 4*invEZ]);
     if (selMode === 'rect') {
       const p0 = selPath[0], p1 = selPath[selPath.length-1];
       ovlCtx.strokeRect(Math.min(p0.x,p1.x)*sc, Math.min(p0.y,p1.y)*sc,
