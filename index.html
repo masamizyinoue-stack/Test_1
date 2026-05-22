@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.50';
+const APP_VERSION = 'V0.51';
 let   _fileHandle = null;
 
 
@@ -1035,6 +1035,7 @@ function schedSave() {
       }
       const data = {
         buf:          null,  // [V0.41] バイナリは doc:{id} のみ保存（重複排除）
+        docId:        DocMgr.currentId, // [V0.51] 直接バイナリ参照用DocID
         file:         App.fileName,
         strokes:      (typeof structuredClone === 'function'
                         ? structuredClone(cleanStrokes)
@@ -1055,6 +1056,7 @@ function schedSave() {
         if (_isValidSaved(_prevResume)) await IDB.set('resume:prv', _prevResume);
       } catch(_) {}
       await IDB.set('resume:last', data);
+      IDB.set('resume:fname', App.fileName).catch(() => {}); // [V0.51] 最終フォールバック用ファイル名
       // [V0.39] DocumentManagerのstrokes更新（バックグラウンド）
       DocMgr.updateStrokes(cleanStrokes, App.currentPage).catch(() => {});
     } catch(e) { console.warn('[schedSave]', e); }
@@ -1097,7 +1099,9 @@ document.addEventListener('visibilitychange', () => {
     clearTimeout(_autoSaveTimer); // [V0.49] 保留中のdebounceをキャンセルして即時保存
     const clean = _pruneEraserStrokes(App.strokes);
     const data  = {
-      buf:          null,  // [V0.41] バイナリは doc:{id} のみ保存（重複排除）
+      // [V0.51] buf に実バイナリを含める → DocMgr不要で自己完結復元
+      buf:          App.origBuf,
+      docId:        DocMgr.currentId,
       strokes:      clean,
       file:         App.fileName,
       page:         App.currentPage,
@@ -1110,6 +1114,7 @@ document.addEventListener('visibilitychange', () => {
     IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
     IDB.set(_KEY_LAST, data).catch(() => {});
     IDB.set('resume:last', data).catch(() => {}); // [V0.50] 安定キーへも即時保存
+    IDB.set('resume:fname', App.fileName).catch(() => {}); // [V0.51] 最終フォールバック用
     // PDF保存タイマーをキャンセルして即時実行
     if (_fileHandle) { clearTimeout(_pdfSaveTimer); _doPdfSave(); }
   }
@@ -1122,7 +1127,9 @@ window.addEventListener('pagehide', () => {
   clearTimeout(_autoSaveTimer); // 保留中のdebounceをキャンセル
   const clean = _pruneEraserStrokes(App.strokes);
   const data  = {
-    buf:          null,
+    // [V0.51] buf に実バイナリを含める → DocMgr不要で自己完結復元
+    buf:          App.origBuf,
+    docId:        DocMgr.currentId,
     strokes:      clean,
     file:         App.fileName,
     page:         App.currentPage,
@@ -1136,6 +1143,7 @@ window.addEventListener('pagehide', () => {
   IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
   IDB.set(_KEY_LAST, data).catch(() => {});
   IDB.set('resume:last', data).catch(() => {}); // [V0.50] 安定キーへも保存
+  IDB.set('resume:fname', App.fileName).catch(() => {}); // [V0.51] 最終フォールバック用
 });
 
 /* ============================================================
@@ -2693,6 +2701,17 @@ const App = (() => {
         }
       }
     }
+    // [V0.51] 全安定キー失敗時: resume:fname → f:{fname} で最終フォールバック
+    if (!_isValidSaved(saved)) {
+      const fname = await IDB.get('resume:fname').catch(() => null);
+      if (fname && typeof fname === 'string') {
+        const fData = await IDB.get('f:' + safeKey(fname)).catch(() => null);
+        if (_isValidSaved(fData)) {
+          saved = fData;
+          console.warn('[起動] resume:fname → f: キーから復元');
+        }
+      }
+    }
 
     // 旧形式互換（V0.41以前: buf付き 'last' キー → インスタンス別キーへ移行）
     if (!_isValidSaved(saved) && !saved?.buf) {
@@ -2707,9 +2726,15 @@ const App = (() => {
   } catch(e) { console.error('[起動] IDB.get 失敗:', e); }
 
   // [V0.41] buf がない（新方式）場合は DocMgr からバイナリを補完
+  // [V0.51] docId があれば doc:{id} を直接参照 → findByName() より確実
   if (!saved?.buf && saved?.file) {
     try {
-      const doc = await DocMgr.findByName(saved.file);
+      let doc = null;
+      if (saved.docId) {
+        doc = await IDB.get('doc:' + saved.docId).catch(() => null);
+        if (!doc?.originalPdfBytes) doc = null; // 無効なら次の手段へ
+      }
+      if (!doc) doc = await DocMgr.findByName(saved.file).catch(() => null);
       if (doc?.originalPdfBytes) {
         saved = { ...saved, buf: new Uint8Array(doc.originalPdfBytes) };
       }
