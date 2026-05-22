@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>M_Viewer V0.46</title>
+<title>M_Viewer V0.47</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -690,6 +690,7 @@ const PDF_MAX_DPR = 1.5;   // Retina対応最大DPR (iPad freeze 対策: 2→1.5
 
 /* サブウィンドウ最大数 */
 const MAX_SUBWIN  = 5;
+const MAX_STROKES_PER_PAGE = 500; // [V0.47] 1ページあたりのストローク上限（フリーズ防止）
 
 /* サブウィンドウ枠色 / 塗り色 */
 const SW_COLORS = ['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
@@ -895,6 +896,7 @@ const _KEY_BK_LAT = 'bk:lat:' + _INST_ID;
 const _KEY_BK_PRV = 'bk:prv:' + _INST_ID;
 
 let _autoSaveTimer;
+let _pdfLoadingLock = false; // [V0.47] loadPDF 二重呼び出し防止ロック
 // [V0.44] バックアップ未実施フラグ: schedSave で true, downloadBackup 成功で false
 // true = 手動バックアップ未実施（ZIPダウンロード済みでない）
 let _bkDirty = false;
@@ -1646,6 +1648,10 @@ class SubWin {
       this.strokes[this.pageNum] = (this.strokes[this.pageNum] || [])
         .flatMap(st => _applyEraserAll(st, erPts, r));
     } else {
+      // [V0.47] ストローク上限チェック（SubWin）
+      if (this.strokes[this.pageNum].length >= MAX_STROKES_PER_PAGE) {
+        this.strokes[this.pageNum].shift();
+      }
       this.strokes[this.pageNum].push({ ...s, points: s.points ? [...s.points] : undefined });
     }
     this.curStroke = null; this._annDirty = true;
@@ -1879,6 +1885,8 @@ class SubWin {
     document.body.removeChild(this.el);
     const i = subWindows.indexOf(this);
     if (i >= 0) subWindows.splice(i, 1);
+    this.pdfDoc  = null; // [V0.47] pdfDoc参照を解放してGCを促す
+    this.strokes = null; // [V0.47] strokes参照も解放
     App.redrawSelOv?.();
   }
 }
@@ -2189,6 +2197,11 @@ const App = (() => {
     if (!curStroke) return;
     if (!strokes[curPage]) strokes[curPage] = [];
     const s = curStroke;
+    // [V0.47] ストローク上限チェック: 古いものを先頭から除去してメモリ増大防止
+    if (strokes[curPage].length >= MAX_STROKES_PER_PAGE) {
+      strokes[curPage].shift();
+      showToast('⚠️ ストローク上限に達しました（古い線を削除）');
+    }
     strokes[curPage].push({ ...s, points: s.points ? [...s.points] : undefined });
     curStroke = null; redraw();
     subWindows.forEach(sw => sw.update(strokes, curPage));
@@ -2363,6 +2376,9 @@ const App = (() => {
 
   /* ---- PDF読み込み ---- */
   async function loadPDF(file, buf) {
+    // [V0.47] 二重呼び出し防止（ドラッグ連打・タップ連打対策）
+    if (_pdfLoadingLock) { console.warn('[V0.47] loadPDF: 読み込み中のため無視'); return; }
+    _pdfLoadingLock = true;
     showLoading(true);
     try {
       origBuf    = buf || await file.arrayBuffer();
@@ -2397,6 +2413,7 @@ const App = (() => {
       _postLoadFn?.(); // シートタブへ同期 (シートマネージャーが登録)
     } catch(e) { showToast('読み込みに失敗しました'); console.error(e); }
     showLoading(false);
+    _pdfLoadingLock = false; // [V0.47] ロック解除
   }
 
   /* ---- ページ操作 ---- */
