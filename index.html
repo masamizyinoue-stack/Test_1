@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.51';
+const APP_VERSION = 'V0.52';
 let   _fileHandle = null;
 
 
@@ -810,11 +810,32 @@ const IDB = {
     try {
       const db = await this.open();
       await new Promise((res, rej) => {
-        const q = db.transaction('d','readwrite').objectStore('d').put(val, key);
-        q.onsuccess = res;
-        q.onerror   = rej;
+        // [V0.52] request.onsuccess → tx.oncomplete に変更
+        // request.onsuccessはdisk書き込み前に発火する場合があり、
+        // iOS Safariのページ終了タイミングでデータが消失する根本原因だった
+        const tx = db.transaction('d', 'readwrite');
+        tx.objectStore('d').put(val, key);
+        tx.oncomplete = res;                           // disk書き込み完了を保証
+        tx.onerror    = e => rej(e.target.error);
+        tx.onabort    = () => rej(new Error('IDB tx aborted: ' + key));
       });
-    } catch(e) { console.warn('IDB:', e); }
+    } catch(e) { console.warn('[IDB.set] key=' + key, e); }
+  },
+
+  // [V0.52] 複数キーを1トランザクションで確実に書く（終了時保存専用）
+  // 4つ別々のトランザクションはiOS Safari終了時に途中abortされる → 1つにまとめる
+  async setMulti(pairs) {
+    try {
+      const db = await this.open();
+      await new Promise((res, rej) => {
+        const tx = db.transaction('d', 'readwrite');
+        const st = tx.objectStore('d');
+        pairs.forEach(([k, v]) => st.put(v, k));
+        tx.oncomplete = res;
+        tx.onerror    = e => rej(e.target.error);
+        tx.onabort    = () => rej(new Error('IDB setMulti aborted'));
+      });
+    } catch(e) { console.warn('[IDB.setMulti]', e); throw e; }
   }
 };
 
@@ -1056,10 +1077,14 @@ function schedSave() {
         if (_isValidSaved(_prevResume)) await IDB.set('resume:prv', _prevResume);
       } catch(_) {}
       await IDB.set('resume:last', data);
-      IDB.set('resume:fname', App.fileName).catch(() => {}); // [V0.51] 最終フォールバック用ファイル名
+      await IDB.set('resume:fname', App.fileName); // [V0.51] 最終フォールバック用ファイル名
+      // [V0.52] 保存成功ログ（デバッグ・問題追跡用）
+      const strokeCount = Object.values(cleanStrokes).reduce((n,a) => n + a.length, 0);
+      console.info('[自動保存] 完了 file=' + App.fileName +
+        ' page=' + App.currentPage + ' strokes=' + strokeCount + ' ts=' + data.ts);
       // [V0.39] DocumentManagerのstrokes更新（バックグラウンド）
       DocMgr.updateStrokes(cleanStrokes, App.currentPage).catch(() => {});
-    } catch(e) { console.warn('[schedSave]', e); }
+    } catch(e) { console.error('[自動保存] 失敗:', e); }
     finally { _idbSaving = false; } // [V0.49] 成否に関わらず必ず解放
   }, SAVE_DELAY);
 }
@@ -1099,23 +1124,26 @@ document.addEventListener('visibilitychange', () => {
     clearTimeout(_autoSaveTimer); // [V0.49] 保留中のdebounceをキャンセルして即時保存
     const clean = _pruneEraserStrokes(App.strokes);
     const data  = {
-      // [V0.51] buf に実バイナリを含める → DocMgr不要で自己完結復元
-      buf:          App.origBuf,
+      buf:          App.origBuf,    // [V0.51] バイナリ込み → 自己完結復元
       docId:        DocMgr.currentId,
       strokes:      clean,
       file:         App.fileName,
       page:         App.currentPage,
       scale:        App.scale,
-      panX:         App.panX,       // [V0.49] スクロール位置
+      panX:         App.panX,
       panY:         App.panY,
-      subWinStates: _snapSubWins(), // [V0.49] サブ窓状態
+      subWinStates: _snapSubWins(),
       ts:           Date.now()
     };
-    IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
-    IDB.set(_KEY_LAST, data).catch(() => {});
-    IDB.set('resume:last', data).catch(() => {}); // [V0.50] 安定キーへも即時保存
-    IDB.set('resume:fname', App.fileName).catch(() => {}); // [V0.51] 最終フォールバック用
-    // PDF保存タイマーをキャンセルして即時実行
+    // [V0.52] 4キーを1トランザクションで確実に書く
+    // 別々のトランザクションはiOS Safari終了時に途中abortされデータ消失の原因だった
+    IDB.setMulti([
+      ['f:' + safeKey(App.fileName), data],
+      [_KEY_LAST,       data],
+      ['resume:last',   data],
+      ['resume:fname',  App.fileName]
+    ]).then(() => console.info('[終了時保存] visibilitychange 完了'))
+      .catch(e => console.error('[終了時保存] visibilitychange 失敗:', e));
     if (_fileHandle) { clearTimeout(_pdfSaveTimer); _doPdfSave(); }
   }
 });
@@ -1124,11 +1152,10 @@ document.addEventListener('visibilitychange', () => {
 // （タブクローズ・アプリ切替・クラッシュ直前に対応）
 window.addEventListener('pagehide', () => {
   if (!App.pdfDoc || !App.origBuf) return;
-  clearTimeout(_autoSaveTimer); // 保留中のdebounceをキャンセル
+  clearTimeout(_autoSaveTimer);
   const clean = _pruneEraserStrokes(App.strokes);
   const data  = {
-    // [V0.51] buf に実バイナリを含める → DocMgr不要で自己完結復元
-    buf:          App.origBuf,
+    buf:          App.origBuf,    // [V0.51] バイナリ込み
     docId:        DocMgr.currentId,
     strokes:      clean,
     file:         App.fileName,
@@ -1139,11 +1166,33 @@ window.addEventListener('pagehide', () => {
     subWinStates: _snapSubWins(),
     ts:           Date.now()
   };
-  // 同期的に発行（pagehideは非同期保証なし・最善努力）
-  IDB.set('f:' + safeKey(App.fileName), data).catch(() => {});
-  IDB.set(_KEY_LAST, data).catch(() => {});
-  IDB.set('resume:last', data).catch(() => {}); // [V0.50] 安定キーへも保存
-  IDB.set('resume:fname', App.fileName).catch(() => {}); // [V0.51] 最終フォールバック用
+  // [V0.52] 1トランザクションで確実に書く
+  IDB.setMulti([
+    ['f:' + safeKey(App.fileName), data],
+    [_KEY_LAST,       data],
+    ['resume:last',   data],
+    ['resume:fname',  App.fileName]
+  ]).catch(e => console.error('[終了時保存] pagehide 失敗:', e));
+});
+
+// [V0.52] freeze: Page Lifecycle API - iOS Safariがページをバックグラウンドで一時停止
+document.addEventListener('freeze', () => {
+  if (!App.pdfDoc || !App.origBuf) return;
+  const clean = _pruneEraserStrokes(App.strokes);
+  const data  = {
+    buf: App.origBuf, docId: DocMgr.currentId, strokes: clean,
+    file: App.fileName, page: App.currentPage, scale: App.scale,
+    panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts: Date.now()
+  };
+  IDB.setMulti([
+    ['f:' + safeKey(App.fileName), data],
+    [_KEY_LAST, data], ['resume:last', data], ['resume:fname', App.fileName]
+  ]).catch(e => console.error('[終了時保存] freeze 失敗:', e));
+});
+
+// [V0.52] blur: iPadホーム画面遷移・アプリ切替でウインドウがフォーカスを失った時
+window.addEventListener('blur', () => {
+  if (App.pdfDoc && App.origBuf) schedSave();
 });
 
 /* ============================================================
