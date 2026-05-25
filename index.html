@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.56';
+const APP_VERSION = 'V0.57';
 let   _fileHandle = null;
 
 
@@ -961,6 +961,7 @@ const _KEY_BK_PRV = 'bk:prv:' + _INST_ID;
 
 let _autoSaveTimer;
 let _idbSaving      = false; // [V0.49] IDB多重保存競合防止フラグ
+let _pendingSave    = false; // [V0.57] 保存キュー: 保存中に要求が来た場合true→完了後に再保存
 let _pdfLoadingLock = false; // [V0.47] loadPDF 二重呼び出し防止ロック
 // [V0.44] バックアップ未実施フラグ: schedSave で true, downloadBackup 成功で false
 // true = 手動バックアップ未実施（ZIPダウンロード済みでない）
@@ -1046,10 +1047,10 @@ function schedSave() {
   schedPdfSave(); // [V0.38] PDF自動保存も予約（30秒debounce・_fileHandleある時のみ）
   _autoSaveTimer = setTimeout(async () => {
     if (!App.pdfDoc || !App.origBuf) return;
-    // [V0.49] IDB競合防止: 保存中の再要求は短いdelayで再スケジュール
+    // [V0.57] 保存中の再要求はpendingSaveフラグで記録 → 完了後に即再保存（300ms待機廃止）
     if (_idbSaving) {
-      console.info('[自動保存] 保存中のため300ms後に再スケジュール');
-      _autoSaveTimer = setTimeout(() => schedSave(), 300); return;
+      console.info('[自動保存] 保存中 → pendingSave=true（完了後に再保存）');
+      _pendingSave = true; return;
     }
     _idbSaving = true;
     // [V0.56] ts を最初に取得して全キーで統一（Date.now()の取得位置を保存開始時刻に固定）
@@ -1085,17 +1086,38 @@ function schedSave() {
         ['resume:last',                data], // [V0.50] 安定キー
         ['resume:fname',               App.fileName], // [V0.51] フォールバック
       ]);
-      // resume:prvはsetMulti完了後にベストエフォートで退避（メイン保存には影響しない）
+      // [V0.56] resume:prvはsetMulti完了後にベストエフォートで退避
       IDB.set('resume:prv', data).catch(() => {});
-      // [V0.52][V0.56] 保存完了ログ（IDB transaction.oncomplete後に到達 = 確実にディスクへ書かれた証拠）
-      const strokeCount = Object.values(cleanStrokes).reduce((n,a) => n + a.length, 0);
-      console.info('[自動保存] 完了 file=' + App.fileName +
-        ' page=' + App.currentPage + ' strokes=' + strokeCount
-        + ' 所要=' + (Date.now() - _saveTs) + 'ms ts=' + data.ts);
+      // [V0.57] 保存後検証: resume:last を読み返してts一致確認（IDB書き込み失敗検出）
+      const _vfy = await IDB.get('resume:last').catch(() => null);
+      if (!_vfy || _vfy.ts < data.ts) {
+        // 古いtsまたはnull → 書き込み失敗とみなして再保存
+        console.warn('[自動保存] 検証失敗 期待ts=' + data.ts
+          + ' 実際ts=' + (_vfy?.ts) + ' → 再保存実行');
+        await IDB.setMulti([
+          [_KEY_LAST, data], ['f:' + safeKey(App.fileName), data],
+          ['resume:last', data], ['resume:fname', App.fileName],
+        ]).catch(e => console.error('[自動保存] 再保存失敗:', e));
+      } else {
+        // [V0.57] ここはIDB transaction.oncomplete完了後（= 確実にディスクに書かれた）
+        const strokeCount = Object.values(cleanStrokes).reduce((n,a) => n + a.length, 0);
+        console.info('[自動保存] transaction.oncomplete確認 + 検証OK'
+          + ' file=' + App.fileName + ' page=' + App.currentPage
+          + ' strokes=' + strokeCount
+          + ' 所要=' + (Date.now() - _saveTs) + 'ms ts=' + data.ts);
+      }
       // [V0.39] DocumentManagerのstrokes更新（バックグラウンド）
       DocMgr.updateStrokes(cleanStrokes, App.currentPage).catch(() => {});
     } catch(e) { console.error('[自動保存] 失敗:', e); }
-    finally { _idbSaving = false; } // [V0.49] 成否に関わらず必ず解放
+    finally {
+      _idbSaving = false;
+      // [V0.57] pendingSaveが立っていれば即再保存（遅延なし）
+      if (_pendingSave) {
+        _pendingSave = false;
+        console.info('[自動保存] pendingSave → 即再保存実行');
+        schedSave();
+      }
+    }
   }, SAVE_DELAY);
 }
 
@@ -1106,6 +1128,7 @@ function _immediSave() {
   if (!App.pdfDoc || !App.origBuf) return;
   const clean = _pruneEraserStrokes(App.strokes);
   const ts    = Date.now();
+  console.info('[即時保存] 開始 file=' + App.fileName + ' page=' + App.currentPage + ' ts=' + ts);
   // [V0.55] localStorage同期バックアップ（setItemは同期 → iOS JS停止直前でも確実に書かれる）
   // IDB非同期がiOS強制停止で完了しない場合の最後の砦
   try {
@@ -1159,6 +1182,7 @@ setInterval(() => { if (App.pdfDoc && App.origBuf) schedSave(); }, 60_000);
 // [V0.38] 画面が隠れる直前：IDB保存 + _fileHandle があればPDF即時保存
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && App.pdfDoc && App.origBuf) {
+    console.info('[終了時保存] visibilitychange hidden 発火'); // [V0.57]
     clearTimeout(_autoSaveTimer); // [V0.49] 保留中のdebounceをキャンセルして即時保存
     const clean = _pruneEraserStrokes(App.strokes);
     const ts    = Date.now();
@@ -1194,6 +1218,7 @@ document.addEventListener('visibilitychange', () => {
 // （タブクローズ・アプリ切替・クラッシュ直前に対応）
 window.addEventListener('pagehide', () => {
   if (!App.pdfDoc || !App.origBuf) return;
+  console.info('[終了時保存] pagehide 発火'); // [V0.57]
   clearTimeout(_autoSaveTimer);
   const clean = _pruneEraserStrokes(App.strokes);
   const ts    = Date.now();
@@ -1223,6 +1248,7 @@ window.addEventListener('pagehide', () => {
 // [V0.52] freeze: Page Lifecycle API - iOS Safariがページをバックグラウンドで一時停止
 document.addEventListener('freeze', () => {
   if (!App.pdfDoc || !App.origBuf) return;
+  console.info('[終了時保存] freeze 発火'); // [V0.57]
   const clean = _pruneEraserStrokes(App.strokes);
   const ts    = Date.now();
   const data  = {
@@ -1238,9 +1264,30 @@ document.addEventListener('freeze', () => {
   ]).catch(e => console.error('[終了時保存] freeze 失敗:', e));
 });
 
-// [V0.52] blur: iPadホーム画面遷移・アプリ切替でウインドウがフォーカスを失った時
+// [V0.52][V0.57] blur: iPadホーム画面遷移・アプリ切替でウインドウがフォーカスを失った時
+// schedSaveのdebounce依存をやめ_immediSaveで即保存（V0.57）
 window.addEventListener('blur', () => {
-  if (App.pdfDoc && App.origBuf) schedSave();
+  if (App.pdfDoc && App.origBuf) {
+    console.info('[終了時保存] blur 発火 → 即時保存');
+    _immediSave();
+  }
+});
+
+// [V0.57] beforeunload: ページ離脱直前（iOS Safariでは発火しない場合あり・追加保険）
+window.addEventListener('beforeunload', () => {
+  if (!App.pdfDoc || !App.origBuf) return;
+  console.info('[終了時保存] beforeunload 発火');
+  const clean = _pruneEraserStrokes(App.strokes);
+  const ts    = Date.now();
+  try { localStorage.setItem('mv_lsbk', JSON.stringify({ file: App.fileName, page: App.currentPage, strokes: clean, ts })); } catch(e) {}
+  const data  = { buf: null, docId: DocMgr.currentId, file: App.fileName,
+    strokes: clean, page: App.currentPage, scale: App.scale,
+    panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts };
+  IDB.setMulti([
+    ['f:' + safeKey(App.fileName), data],
+    [_KEY_LAST, data], ['resume:last', data], ['resume:fname', App.fileName]
+  ]).then(() => console.info('[終了時保存] beforeunload 完了'))
+    .catch(e => console.error('[終了時保存] beforeunload 失敗:', e));
 });
 
 /* ============================================================
