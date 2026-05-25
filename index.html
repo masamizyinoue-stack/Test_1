@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.55';
+const APP_VERSION = 'V0.56';
 let   _fileHandle = null;
 
 
@@ -1047,8 +1047,14 @@ function schedSave() {
   _autoSaveTimer = setTimeout(async () => {
     if (!App.pdfDoc || !App.origBuf) return;
     // [V0.49] IDB競合防止: 保存中の再要求は短いdelayで再スケジュール
-    if (_idbSaving) { _autoSaveTimer = setTimeout(() => schedSave(), 300); return; }
+    if (_idbSaving) {
+      console.info('[自動保存] 保存中のため300ms後に再スケジュール');
+      _autoSaveTimer = setTimeout(() => schedSave(), 300); return;
+    }
     _idbSaving = true;
+    // [V0.56] ts を最初に取得して全キーで統一（Date.now()の取得位置を保存開始時刻に固定）
+    const _saveTs = Date.now();
+    console.info('[自動保存] 開始 file=' + App.fileName + ' ts=' + _saveTs); // [V0.56] 開始ログ
     try {
       // eraser ストロークを保存しない（IDB 蓄積 → 復元後の freeze 防止）
       const rawStrokes = App.strokes;
@@ -1069,7 +1075,7 @@ function schedSave() {
         panX:         App.panX,       // [V0.49] スクロール位置を保存
         panY:         App.panY,
         subWinStates: _snapSubWins(), // [V0.49] サブ窓状態を保存
-        ts:           Date.now()
+        ts:           _saveTs         // [V0.56] 保存開始時刻を統一使用
       };
       // [V0.55] setMultiを最優先で実行（resume:prv退避のawaitで遅延させない）
       // 旧: IDB.get('resume:last') の await が iOS停止タイミングとかぶり setMulti 未到達になっていた
@@ -1081,10 +1087,11 @@ function schedSave() {
       ]);
       // resume:prvはsetMulti完了後にベストエフォートで退避（メイン保存には影響しない）
       IDB.set('resume:prv', data).catch(() => {});
-      // [V0.52] 保存成功ログ（デバッグ・問題追跡用）
+      // [V0.52][V0.56] 保存完了ログ（IDB transaction.oncomplete後に到達 = 確実にディスクへ書かれた証拠）
       const strokeCount = Object.values(cleanStrokes).reduce((n,a) => n + a.length, 0);
       console.info('[自動保存] 完了 file=' + App.fileName +
-        ' page=' + App.currentPage + ' strokes=' + strokeCount + ' ts=' + data.ts);
+        ' page=' + App.currentPage + ' strokes=' + strokeCount
+        + ' 所要=' + (Date.now() - _saveTs) + 'ms ts=' + data.ts);
       // [V0.39] DocumentManagerのstrokes更新（バックグラウンド）
       DocMgr.updateStrokes(cleanStrokes, App.currentPage).catch(() => {});
     } catch(e) { console.error('[自動保存] 失敗:', e); }
@@ -4343,7 +4350,72 @@ function hideHome() {
     el.addEventListener('click', () => setColor(el)));
 
   /* --- 太さ --- */
-  document.getElementById('sz-v').addE
+  document.getElementById('sz-v').addEventListener('click', e => toggleSzPanel(e.currentTarget));
+  document.getElementById('sz-rng').addEventListener('input',  e => onSzChange(e.target.value));
+  document.getElementById('sz-n')  .addEventListener('change', e => onSzChange(e.target.value));
+  document.getElementById('szp-ok')    .addEventListener('click', () => applySz());
+  document.getElementById('szp-cancel').addEventListener('click', () =>
+    document.getElementById('szp').classList.remove('on'));
+
+  /* --- ③ PDF出力ページ指定 --- */
+  document.getElementById('pgr-cur').addEventListener('click', () => {
+    document.getElementById('pgrfld').value = String(App.currentPage);
+  });
+  document.getElementById('pgr-all').addEventListener('click', () => {
+    const fld = document.getElementById('pgrfld');
+    const total = App.totalPages;
+    fld.value = total > 0 ? '1-' + total : '';
+    fld.dispatchEvent(new Event('input',  { bubbles: true }));
+    fld.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  document.getElementById('pgrConfirm').addEventListener('click', () => {
+    _executeSave(document.getElementById('pgrfld').value);
+  });
+  document.getElementById('pgrCancel').addEventListener('click', () => {
+    document.getElementById('pgrov').classList.remove('on');
+  });
+  document.getElementById('pgrfld').addEventListener('keydown', e => {
+    if (e.key === 'Enter')  _executeSave(document.getElementById('pgrfld').value);
+    if (e.key === 'Escape') document.getElementById('pgrov').classList.remove('on');
+  });
+
+  /* --- テキスト入力 --- */
+  document.getElementById('txConfirm').addEventListener('click', () => confirmTx());
+  document.getElementById('txCancel') .addEventListener('click', () => cancelTx());
+  document.getElementById('txfld').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) confirmTx();
+    if (e.key === 'Escape') cancelTx();
+  });
+
+  /* --- 選択削除 --- */
+  document.getElementById('selbtn').addEventListener('click', () => {
+    if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
+    else { App.deleteSelected(); }
+  });
+
+  /* --- 計算機ボタン (data属性でディスパッチ) --- */
+  document.getElementById('cbtns').addEventListener('click', e => {
+    const btn = e.target.closest('[data-cnum],[data-cop],[data-cfn]');
+    if (!btn) return;
+    if (btn.dataset.cnum !== undefined) calcNum(btn.dataset.cnum);
+    else if (btn.dataset.cop  !== undefined) calcOp(btn.dataset.cop);
+    else if (btn.dataset.cfn  !== undefined) calcFn(btn.dataset.cfn);
+  });
+
+  /* --- Ctrl+P 印刷ショートカット無効化 --- */
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); }
+  });
+
+  /* --- グローバルクリック: ピッカー & 太さパネルを閉じる --- */
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.pkw'))
+      closeAllPickers();
+    if (!e.target.closest('#szp') && !e.target.closest('.sz-val'))
+      document.getElementById('szp').classList.remove('on');
+  });
+})();
+
 /* ============================================================
    [V0.35] iPad Split View / Slide Over 対応
    visualViewport resize 監視 → Canvas再レンダ・位置再クランプ
