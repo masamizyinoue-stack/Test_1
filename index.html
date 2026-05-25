@@ -4343,72 +4343,7 @@ function hideHome() {
     el.addEventListener('click', () => setColor(el)));
 
   /* --- 太さ --- */
-  document.getElementById('sz-v').addEventListener('click', e => toggleSzPanel(e.currentTarget));
-  document.getElementById('sz-rng').addEventListener('input',  e => onSzChange(e.target.value));
-  document.getElementById('sz-n')  .addEventListener('change', e => onSzChange(e.target.value));
-  document.getElementById('szp-ok')    .addEventListener('click', () => applySz());
-  document.getElementById('szp-cancel').addEventListener('click', () =>
-    document.getElementById('szp').classList.remove('on'));
-
-  /* --- ③ PDF出力ページ指定 --- */
-  document.getElementById('pgr-cur').addEventListener('click', () => {
-    document.getElementById('pgrfld').value = String(App.currentPage);
-  });
-  document.getElementById('pgr-all').addEventListener('click', () => {
-    const fld = document.getElementById('pgrfld');
-    const total = App.totalPages;
-    fld.value = total > 0 ? '1-' + total : '';
-    fld.dispatchEvent(new Event('input',  { bubbles: true }));
-    fld.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  document.getElementById('pgrConfirm').addEventListener('click', () => {
-    _executeSave(document.getElementById('pgrfld').value);
-  });
-  document.getElementById('pgrCancel').addEventListener('click', () => {
-    document.getElementById('pgrov').classList.remove('on');
-  });
-  document.getElementById('pgrfld').addEventListener('keydown', e => {
-    if (e.key === 'Enter')  _executeSave(document.getElementById('pgrfld').value);
-    if (e.key === 'Escape') document.getElementById('pgrov').classList.remove('on');
-  });
-
-  /* --- テキスト入力 --- */
-  document.getElementById('txConfirm').addEventListener('click', () => confirmTx());
-  document.getElementById('txCancel') .addEventListener('click', () => cancelTx());
-  document.getElementById('txfld').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.ctrlKey) confirmTx();
-    if (e.key === 'Escape') cancelTx();
-  });
-
-  /* --- 選択削除 --- */
-  document.getElementById('selbtn').addEventListener('click', () => {
-    if (_activeSelSubWin) { _activeSelSubWin._swDeleteSelected(); }
-    else { App.deleteSelected(); }
-  });
-
-  /* --- 計算機ボタン (data属性でディスパッチ) --- */
-  document.getElementById('cbtns').addEventListener('click', e => {
-    const btn = e.target.closest('[data-cnum],[data-cop],[data-cfn]');
-    if (!btn) return;
-    if (btn.dataset.cnum !== undefined) calcNum(btn.dataset.cnum);
-    else if (btn.dataset.cop  !== undefined) calcOp(btn.dataset.cop);
-    else if (btn.dataset.cfn  !== undefined) calcFn(btn.dataset.cfn);
-  });
-
-  /* --- Ctrl+P 印刷ショートカット無効化 --- */
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); }
-  });
-
-  /* --- グローバルクリック: ピッカー & 太さパネルを閉じる --- */
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.pkw'))
-      closeAllPickers();
-    if (!e.target.closest('#szp') && !e.target.closest('.sz-val'))
-      document.getElementById('szp').classList.remove('on');
-  });
-})();
-
+  document.getElementById('sz-v').addE
 /* ============================================================
    [V0.35] iPad Split View / Slide Over 対応
    visualViewport resize 監視 → Canvas再レンダ・位置再クランプ
