@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.54';
+const APP_VERSION = 'V0.55';
 let   _fileHandle = null;
 
 
@@ -1071,18 +1071,16 @@ function schedSave() {
         subWinStates: _snapSubWins(), // [V0.49] サブ窓状態を保存
         ts:           Date.now()
       };
-      // [V0.54] 4キーを1トランザクションで確実に書く
-      // 以前は個別IDB.setを4回await → iOS終了時に途中で止まり一部キーが未書き込みになっていた
-      try {
-        const _prevResume = await IDB.get('resume:last');
-        if (_isValidSaved(_prevResume)) await IDB.set('resume:prv', _prevResume);
-      } catch(_) {}
+      // [V0.55] setMultiを最優先で実行（resume:prv退避のawaitで遅延させない）
+      // 旧: IDB.get('resume:last') の await が iOS停止タイミングとかぶり setMulti 未到達になっていた
       await IDB.setMulti([
         [_KEY_LAST,                    data], // [V0.35] インスタンス別キー
         ['f:' + safeKey(App.fileName), data], // ファイル名別キー
         ['resume:last',                data], // [V0.50] 安定キー
         ['resume:fname',               App.fileName], // [V0.51] フォールバック
       ]);
+      // resume:prvはsetMulti完了後にベストエフォートで退避（メイン保存には影響しない）
+      IDB.set('resume:prv', data).catch(() => {});
       // [V0.52] 保存成功ログ（デバッグ・問題追跡用）
       const strokeCount = Object.values(cleanStrokes).reduce((n,a) => n + a.length, 0);
       console.info('[自動保存] 完了 file=' + App.fileName +
@@ -1100,10 +1098,18 @@ function schedSave() {
 function _immediSave() {
   if (!App.pdfDoc || !App.origBuf) return;
   const clean = _pruneEraserStrokes(App.strokes);
+  const ts    = Date.now();
+  // [V0.55] localStorage同期バックアップ（setItemは同期 → iOS JS停止直前でも確実に書かれる）
+  // IDB非同期がiOS強制停止で完了しない場合の最後の砦
+  try {
+    localStorage.setItem('mv_lsbk', JSON.stringify({
+      file: App.fileName, page: App.currentPage, strokes: clean, ts
+    }));
+  } catch(e) {} // QuotaExceededError は無視（ストローク削減で自然に解消）
   const data  = {
     buf: null, docId: DocMgr.currentId, file: App.fileName,
     strokes: clean, page: App.currentPage, scale: App.scale,
-    panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts: Date.now()
+    panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts
   };
   IDB.setMulti([
     [_KEY_LAST,                    data],
@@ -1148,6 +1154,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && App.pdfDoc && App.origBuf) {
     clearTimeout(_autoSaveTimer); // [V0.49] 保留中のdebounceをキャンセルして即時保存
     const clean = _pruneEraserStrokes(App.strokes);
+    const ts    = Date.now();
     const data  = {
       buf:          null,           // [V0.53] buf省略で軽量化→iOS終了前のtx完了率向上
       // バイナリは resume:buf:{fname} に独立保存済み（loadPDF時）
@@ -1159,8 +1166,10 @@ document.addEventListener('visibilitychange', () => {
       panX:         App.panX,
       panY:         App.panY,
       subWinStates: _snapSubWins(),
-      ts:           Date.now()
+      ts
     };
+    // [V0.55] localStorage同期バックアップ（IDB非同期完了前にiOS停止しても strokes保持）
+    try { localStorage.setItem('mv_lsbk', JSON.stringify({ file: App.fileName, page: App.currentPage, strokes: clean, ts })); } catch(e) {}
     // [V0.52] 4キーを1トランザクションで確実に書く
     // 別々のトランザクションはiOS Safari終了時に途中abortされデータ消失の原因だった
     IDB.setMulti([
@@ -1180,6 +1189,7 @@ window.addEventListener('pagehide', () => {
   if (!App.pdfDoc || !App.origBuf) return;
   clearTimeout(_autoSaveTimer);
   const clean = _pruneEraserStrokes(App.strokes);
+  const ts    = Date.now();
   const data  = {
     buf:          null,           // [V0.53] buf省略で軽量化→iOS終了前のtx完了率向上
     docId:        DocMgr.currentId,
@@ -1190,8 +1200,10 @@ window.addEventListener('pagehide', () => {
     panX:         App.panX,
     panY:         App.panY,
     subWinStates: _snapSubWins(),
-    ts:           Date.now()
+    ts
   };
+  // [V0.55] localStorage同期バックアップ（IDB非同期完了前にiOS停止しても strokes保持）
+  try { localStorage.setItem('mv_lsbk', JSON.stringify({ file: App.fileName, page: App.currentPage, strokes: clean, ts })); } catch(e) {}
   // [V0.52] 1トランザクションで確実に書く
   IDB.setMulti([
     ['f:' + safeKey(App.fileName), data],
@@ -1205,11 +1217,14 @@ window.addEventListener('pagehide', () => {
 document.addEventListener('freeze', () => {
   if (!App.pdfDoc || !App.origBuf) return;
   const clean = _pruneEraserStrokes(App.strokes);
+  const ts    = Date.now();
   const data  = {
     buf: null, docId: DocMgr.currentId, strokes: clean, // [V0.53] buf省略で軽量化
     file: App.fileName, page: App.currentPage, scale: App.scale,
-    panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts: Date.now()
+    panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts
   };
+  // [V0.55] localStorage同期バックアップ
+  try { localStorage.setItem('mv_lsbk', JSON.stringify({ file: App.fileName, page: App.currentPage, strokes: clean, ts })); } catch(e) {}
   IDB.setMulti([
     ['f:' + safeKey(App.fileName), data],
     [_KEY_LAST, data], ['resume:last', data], ['resume:fname', App.fileName]
@@ -2751,6 +2766,9 @@ const App = (() => {
 
 /* 起動時復元 */
 (async () => {
+  // [V0.55] IDB接続を事前確立（緊急保存ハンドラでのawait即解決のため）
+  IDB.open().catch(() => {});
+
   // 安全ガード: 何があっても 6秒後には loading を強制解除 (ボタン操作ブロック防止)
   const _safetyTimer = setTimeout(() => {
     showLoading(false);
@@ -2828,6 +2846,19 @@ const App = (() => {
     } catch(_) {}
   }
   if (!saved?.buf) { clearTimeout(_safetyTimer); showHome(); return; }
+
+  // [V0.55] localStorage同期バックアップがIDBより新しければ strokes/page を補完
+  // iOS Safari強制停止でIDB書き込み未完了だった場合に最後の描画状態を復元できる
+  try {
+    const _lsbk = JSON.parse(localStorage.getItem('mv_lsbk') || 'null');
+    if (_lsbk && typeof _lsbk.file === 'string' && _lsbk.file === saved.file
+        && typeof _lsbk.ts === 'number' && _lsbk.ts > (saved.ts || 0)
+        && _lsbk.strokes && typeof _lsbk.strokes === 'object') {
+      saved = { ...saved, strokes: _lsbk.strokes, page: _lsbk.page || saved.page };
+      console.info('[起動] localStorage補完: file=' + _lsbk.file
+        + ' lsbk.ts=' + _lsbk.ts + ' idb.ts=' + (saved.ts || 0));
+    }
+  } catch(e) {}
 
   showLoading(true);
   try {
