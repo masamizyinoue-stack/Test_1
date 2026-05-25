@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.53';
+const APP_VERSION = 'V0.54';
 let   _fileHandle = null;
 
 
@@ -1071,16 +1071,18 @@ function schedSave() {
         subWinStates: _snapSubWins(), // [V0.49] サブ窓状態を保存
         ts:           Date.now()
       };
-      await IDB.set(_KEY_LAST, data); // [V0.35] インスタンス別キー → 別ウインドウと競合しない
-      await IDB.set('f:' + safeKey(App.fileName), data);
-      // [V0.50] 安定キー保存（Safari再起動後もインスタンスIDに依存しない復元用）
-      // 書き込み前に現世代を前世代へ退避 → 破損時フォールバックに使用
+      // [V0.54] 4キーを1トランザクションで確実に書く
+      // 以前は個別IDB.setを4回await → iOS終了時に途中で止まり一部キーが未書き込みになっていた
       try {
         const _prevResume = await IDB.get('resume:last');
         if (_isValidSaved(_prevResume)) await IDB.set('resume:prv', _prevResume);
       } catch(_) {}
-      await IDB.set('resume:last', data);
-      await IDB.set('resume:fname', App.fileName); // [V0.51] 最終フォールバック用ファイル名
+      await IDB.setMulti([
+        [_KEY_LAST,                    data], // [V0.35] インスタンス別キー
+        ['f:' + safeKey(App.fileName), data], // ファイル名別キー
+        ['resume:last',                data], // [V0.50] 安定キー
+        ['resume:fname',               App.fileName], // [V0.51] フォールバック
+      ]);
       // [V0.52] 保存成功ログ（デバッグ・問題追跡用）
       const strokeCount = Object.values(cleanStrokes).reduce((n,a) => n + a.length, 0);
       console.info('[自動保存] 完了 file=' + App.fileName +
@@ -1090,6 +1092,26 @@ function schedSave() {
     } catch(e) { console.error('[自動保存] 失敗:', e); }
     finally { _idbSaving = false; } // [V0.49] 成否に関わらず必ず解放
   }, SAVE_DELAY);
+}
+
+// [V0.54] 描画終了(endDraw)直後の即時保存
+// schedSave の1200ms debounce では「描いてすぐ閉じる」ケースに間に合わない
+// この関数はfire-and-forget（await不要）で呼ぶ
+function _immediSave() {
+  if (!App.pdfDoc || !App.origBuf) return;
+  const clean = _pruneEraserStrokes(App.strokes);
+  const data  = {
+    buf: null, docId: DocMgr.currentId, file: App.fileName,
+    strokes: clean, page: App.currentPage, scale: App.scale,
+    panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts: Date.now()
+  };
+  IDB.setMulti([
+    [_KEY_LAST,                    data],
+    ['f:' + safeKey(App.fileName), data],
+    ['resume:last',                data],
+    ['resume:fname',               App.fileName],
+  ]).then(() => console.info('[即時保存] 完了 ts=' + data.ts))
+    .catch(e => console.warn('[即時保存] 失敗:', e));
 }
 
 // [V0.38] PDF自動保存（_fileHandle がある時のみ・30秒無操作後）
@@ -2360,7 +2382,7 @@ const App = (() => {
       ovlCtx.clearRect(0, 0, ovlCvs.width, ovlCvs.height);
       redraw(); drawSelOv();
       subWindows.forEach(sw => sw.update(strokes, curPage));
-      schedSave(); return;
+      _immediSave(); schedSave(); return; // [V0.54] 即時保存 + debounce保存
     }
     if (currentTool === 'eraser') drawSelOv();
     if (!curStroke) return;
@@ -2374,7 +2396,7 @@ const App = (() => {
     strokes[curPage].push({ ...s, points: s.points ? [...s.points] : undefined });
     curStroke = null; redraw();
     subWindows.forEach(sw => sw.update(strokes, curPage));
-    schedSave();
+    _immediSave(); schedSave(); // [V0.54] 即時保存 + debounce保存
   }
 
   /* ---- 選択 ---- */
