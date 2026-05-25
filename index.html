@@ -775,7 +775,7 @@ let _subCreating = false; // [V0.48] 連続サブ窓生成ガード
 
 /* [V0.48] バージョン一元管理定数
    ★ 次回更新時はここだけ変更すれば title・ヘッダー・ドロップゾーン・console が全て追従 */
-const APP_VERSION = 'V0.52';
+const APP_VERSION = 'V0.53';
 let   _fileHandle = null;
 
 
@@ -931,6 +931,9 @@ const DocMgr = (() => {
       await _setList((await _getList()).filter(e => e.id !== id));
       if (_docId === id) _docId = null;
     },
+
+    /** [V0.53] 起動時復元後にdocIdを外部からセット（restoreで使用） */
+    setId(id) { if (id) _docId = id; },
 
     /** closeFile時にIDをリセット */
     reset() { _docId = null; }
@@ -1124,7 +1127,8 @@ document.addEventListener('visibilitychange', () => {
     clearTimeout(_autoSaveTimer); // [V0.49] 保留中のdebounceをキャンセルして即時保存
     const clean = _pruneEraserStrokes(App.strokes);
     const data  = {
-      buf:          App.origBuf,    // [V0.51] バイナリ込み → 自己完結復元
+      buf:          null,           // [V0.53] buf省略で軽量化→iOS終了前のtx完了率向上
+      // バイナリは resume:buf:{fname} に独立保存済み（loadPDF時）
       docId:        DocMgr.currentId,
       strokes:      clean,
       file:         App.fileName,
@@ -1155,7 +1159,7 @@ window.addEventListener('pagehide', () => {
   clearTimeout(_autoSaveTimer);
   const clean = _pruneEraserStrokes(App.strokes);
   const data  = {
-    buf:          App.origBuf,    // [V0.51] バイナリ込み
+    buf:          null,           // [V0.53] buf省略で軽量化→iOS終了前のtx完了率向上
     docId:        DocMgr.currentId,
     strokes:      clean,
     file:         App.fileName,
@@ -1180,7 +1184,7 @@ document.addEventListener('freeze', () => {
   if (!App.pdfDoc || !App.origBuf) return;
   const clean = _pruneEraserStrokes(App.strokes);
   const data  = {
-    buf: App.origBuf, docId: DocMgr.currentId, strokes: clean,
+    buf: null, docId: DocMgr.currentId, strokes: clean, // [V0.53] buf省略で軽量化
     file: App.fileName, page: App.currentPage, scale: App.scale,
     panX: App.panX, panY: App.panY, subWinStates: _snapSubWins(), ts: Date.now()
   };
@@ -2575,6 +2579,9 @@ const App = (() => {
       }
       // [V0.39] DocumentManagerに登録・更新（バックグラウンドで実行）
       DocMgr.open(file.name, origBuf, strokes, 1).catch(() => {});
+      // [V0.53] バイナリを独立キーに保存（緊急保存buf:nullの場合の補完用）
+      // doc:{id} と独立して参照できるため、DocMgr失敗時のフォールバックにもなる
+      IDB.set('resume:buf:' + safeKey(file.name), origBuf).catch(() => {});
       _postLoadFn?.(); // シートタブへ同期 (シートマネージャーが登録)
     } catch(e) { showToast('読み込みに失敗しました'); console.error(e); }
     showLoading(false);
@@ -2649,6 +2656,7 @@ const App = (() => {
     totalPages = pdfDoc.numPages;
     document.getElementById('tpn').textContent = totalPages;
     strokes    = _pruneEraserStrokes(saved.strokes || {});
+    if (saved.docId) DocMgr.setId(saved.docId); // [V0.53] 再起動後もdocIdを引き継ぐ
     curPage    = saved.page || 1; scale = saved.scale || 1;
     renderScale = 1; cssExtraZoom = 1;
     document.getElementById('dz').style.display = 'none';
@@ -2786,6 +2794,14 @@ const App = (() => {
       if (!doc) doc = await DocMgr.findByName(saved.file).catch(() => null);
       if (doc?.originalPdfBytes) {
         saved = { ...saved, buf: new Uint8Array(doc.originalPdfBytes) };
+      }
+      // [V0.53] それでもbufなし → resume:buf:{fname} (loadPDF時に独立保存) を試みる
+      if (!saved.buf) {
+        const rbuf = await IDB.get('resume:buf:' + safeKey(saved.file)).catch(() => null);
+        if (rbuf) {
+          saved = { ...saved, buf: rbuf instanceof Uint8Array ? rbuf : new Uint8Array(rbuf) };
+          console.info('[起動] resume:buf フォールバックからバイナリ補完');
+        }
       }
     } catch(_) {}
   }
