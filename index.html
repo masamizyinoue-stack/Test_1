@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v1</title>
+<title>M_Viewer v2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -181,7 +181,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">v1</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">v2</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -255,7 +255,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v1</div>
+    <div class="dzm">M_Viewer v2</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -813,6 +813,7 @@ const DrawUtil=(() => {
   }
 
   function applyEraserAll(stroke,erPts,hitR){
+    /* ②確認: hitR = size*2/3 (doc単位). cursor radius = size*2*sc/3 (canvas px). scale後に一致 */
     if(stroke.type==='text')return[stroke];
     if((stroke.type==='pen'||stroke.type==='hl')&&stroke.points?.length)return applyEraser(stroke,erPts,hitR);
     const bb=Utils.strokeBBox(stroke);if(!bb)return[stroke];
@@ -1160,9 +1161,10 @@ class SubWin{
     if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
     this._drawSelOv();
     if(this.selectedIdx.length>0){
-      App._activeSelSubWin=this;
+      App.setActiveSelSubWin(this); /* ⑤修正: 内部変数を正しく更新 */
       document.getElementById('selbtn').style.display='block';
       this._positionSelBtn();
+      Logger.debug('[SubWin._finishSel] selected='+this.selectedIdx.length);
     }
   }
   _drawSelPreview(){
@@ -1211,7 +1213,7 @@ class SubWin{
     this.selectedIdx=[];this.selPath=[];
     if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
     document.getElementById('selbtn').style.display='none';
-    if(App._activeSelSubWin===this)App._activeSelSubWin=null;
+    if(App.activeSelSubWin===this)App.setActiveSelSubWin(null); /* ⑤修正 */
   }
   deleteSelected(){
     if(!this.selectedIdx.length)return;
@@ -1219,7 +1221,7 @@ class SubWin{
     this.selectedIdx=[];this._annDirty=true;
     if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
     document.getElementById('selbtn').style.display='none';
-    if(App._activeSelSubWin===this)App._activeSelSubWin=null;
+    if(App.activeSelSubWin===this)App.setActiveSelSubWin(null); /* ⑤修正 */
     this.render();EventBus.emit('stroke:added');
   }
   update(strokes,pageNum){
@@ -1306,9 +1308,12 @@ const App=(() => {
   function _cancelInertia(){cancelAnimationFrame(rafId);rafId=null;}
 
   /* --- 座標変換 --- */
+  /* 座標変換集約点: client → doc座標 (メイン窓) */
   function _getDocPos(src){
     const r=caEl.getBoundingClientRect();
-    return{x:(src.clientX-r.left-panX)/scale,y:(src.clientY-r.top-panY)/scale};
+    const pos={x:(src.clientX-r.left-panX)/scale,y:(src.clientY-r.top-panY)/scale};
+    Logger.debug('[_getDocPos] clientX='+src.clientX.toFixed(1)+' → docX='+pos.x.toFixed(2)+' scale='+scale.toFixed(3)+' panX='+panX.toFixed(1));
+    return pos;
   }
   function _isOnCanvas(src){
     const r=caEl.getBoundingClientRect();
@@ -1334,6 +1339,7 @@ const App=(() => {
   /* --- redraw (アノテーション再描画) --- */
   function redraw(){
     if(!Logger.flags.redraw)return;
+    Logger.debug('[redraw] page='+curPage+' renderScale='+renderScale.toFixed(3)+' cssEZ='+cssExtraZoom.toFixed(3)+' strokes='+(strokes[curPage]||[]).length);
     annCtx.clearRect(0,0,annCvs.width,annCvs.height);
     if(Logger.flags.annotationDraw)DrawUtil.drawAnnotations(annCtx,strokes[curPage]||[],renderScale);
     if(Logger.flags.overlay)_drawSelOv();
@@ -1343,6 +1349,7 @@ const App=(() => {
   async function renderPage(num){
     if(!Logger.flags.pdfRender)return;
     if(!pdfDoc)return;
+    Logger.debug('[renderPage] page='+num+' scale='+scale.toFixed(3)+' dpr='+(window.devicePixelRatio||1).toFixed(2)+' panX='+panX.toFixed(1)+' panY='+panY.toFixed(1));
     const ver=++renderVer;
     let page=_pageCache.get(num);
     if(!page){page=await pdfDoc.getPage(num);_pageCache.set(num,page);}
@@ -1422,6 +1429,7 @@ const App=(() => {
     selectedIdx=[];selPath=[];
     ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
     document.getElementById('selbtn').style.display='none';
+    _activeSelSubWin=null; /* ⑤修正: サブ窓選択クリア */
   }
 
   /* --- タッチハンドラ --- */
@@ -1572,7 +1580,10 @@ const App=(() => {
         else if(!_subCreating){
           _subCreating=true;setTimeout(()=>{_subCreating=false;},400);
           const cr=caEl.getBoundingClientRect();
-          const sx=cr.left+panX+r.x1*scale,sy=cr.top+panY+r.y1*scale;
+          /* ⑦修正: タイトルバー30px分上にオフセット → bodyがリージョン上端と揃う */
+          const sx=cr.left+panX+r.x1*scale;
+          const sy=cr.top+panY+r.y1*scale-30;
+          Logger.debug('[SubWin create] sx='+sx.toFixed(1)+' sy='+sy.toFixed(1)+' scale='+scale.toFixed(3)+' panX='+panX.toFixed(1)+' panY='+panY.toFixed(1));
           new SubWin(pdfDoc,strokes,curPage,r,sx,sy,scale);
         }
       }
@@ -1632,8 +1643,9 @@ const App=(() => {
     else if(tool==='pen')_strokeColor=_penColors.pen;
     _strokeSize=_toolSizes[tool==='shape'?_activeShape:tool]||3;
     _updateToolUI();
+    EventBus.emit('tool:changed',{tool}); /* ①修正: スウォッチ同期 */
   }
-  function setShape(shape){_activeShape=shape;_strokeSize=_toolSizes[shape]||2;_updateToolUI();}
+  function setShape(shape){_activeShape=shape;_strokeSize=_toolSizes[shape]||2;_updateToolUI();EventBus.emit('tool:changed',{tool:'shape'});}
   function setColor(c){
     _strokeColor=c;
     if(_activeTool==='hl')_penColors.hl=c;else _penColors.pen=c;
@@ -1642,7 +1654,9 @@ const App=(() => {
     _strokeSize=sz;
     const k=_activeTool==='shape'?_activeShape:_activeTool;
     _toolSizes[k]=sz;
-    document.getElementById('sz-v').textContent=sz;
+    _updateToolUI();             /* ①修正: sz-v同期 */
+    EventBus.emit('tool:changed',{tool:_activeTool}); /* ①修正: スウォッチ同期 */
+    Logger.debug('[setSize] tool='+k+' size='+sz);
   }
   function _updateToolUI(){
     ['pen','hl','eraser','text','select','sub'].forEach(t=>{
@@ -1683,6 +1697,13 @@ const App=(() => {
 
   async function closeFile(){
     if(pdfDoc&&!confirm('閉じますか？（保存済みデータは残ります）'))return;
+    /* ⑥修正: 明示的クローズ時は resume キーを削除 → 次回自動復元しない */
+    const _closingFile=fileName;
+    IDBStore.enqueue([
+      ['resume:last',null],['resume:fname',null],['resume:prv',null],
+      ['last:'+AutoSave.instId,null]
+    ]);
+    Logger.info('[closeFile] resume keys cleared, file='+_closingFile);
     pdfDoc=null;origBuf=null;fileName='';curPage=1;totalPages=0;strokes={};_docId=null;
     [pdfCvs,annCvs,ovlCvs].forEach(c=>{c.width=1;c.height=1;});
     cwEl.style.display='none';
@@ -1768,6 +1789,7 @@ const App=(() => {
         const pdfPage=await pdfDoc.getPage(pg);
         const vp1=pdfPage.getViewport({scale:1});
         const sc=width/vp1.width;
+        Logger.debug('[exportPDF] pg='+pg+' sc='+sc.toFixed(4)+' pdfW='+width.toFixed(1)+' vp1W='+vp1.width.toFixed(1));
         const pgStrokes=strokes[pg]||[];
         for(const s of pgStrokes){
           if(s.type==='pen'||s.type==='hl'){
@@ -1780,13 +1802,29 @@ const App=(() => {
             }
           }else if(s.type==='text'){
             const c=_hexToRgb(s.color);
+            /* ⑧修正: テキストy座標 PDF下基準 */
+            Logger.debug('[exportPDF text] x='+(s.x*sc).toFixed(1)+' y='+(height-s.y*sc).toFixed(1)+' size='+(s.size*6*sc).toFixed(1));
             page.drawText(s.text||'',{x:s.x*sc,y:height-s.y*sc,size:s.size*6*sc,color:rgb(c.r/255,c.g/255,c.b/255)});
           }else if(['rect','circle','line','arrow'].includes(s.type)){
             const c=_hexToRgb(s.color);const lw=s.size*sc/3;
-            if(s.type==='rect'){page.drawRectangle({x:Math.min(s.x1,s.x2)*sc,y:height-Math.max(s.y1,s.y2)*sc,width:Math.abs(s.x2-s.x1)*sc,height:Math.abs(s.y2-s.y1)*sc,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}
-            else if(s.type==='line'||s.type==='arrow'){
+            if(s.type==='rect'){
+              /* ⑧修正: PDF y軸=下が0。Rectのy指定は左下角 */
+              page.drawRectangle({x:Math.min(s.x1,s.x2)*sc,y:height-Math.max(s.y1,s.y2)*sc,width:Math.abs(s.x2-s.x1)*sc,height:Math.abs(s.y2-s.y1)*sc,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});
+            }else if(s.type==='circle'){
+              /* ⑧修正: circle(楕円)をPDFに出力 */
+              const cx=(Math.min(s.x1,s.x2)+(Math.abs(s.x2-s.x1)/2))*sc;
+              const cy=height-(Math.min(s.y1,s.y2)+(Math.abs(s.y2-s.y1)/2))*sc;
+              const rx=Math.abs(s.x2-s.x1)/2*sc,ry=Math.abs(s.y2-s.y1)/2*sc;
+              try{page.drawEllipse({x:cx,y:cy,xScale:rx,yScale:ry,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}catch(_){}
+            }else if(s.type==='line'||s.type==='arrow'){
               page.drawLine({start:{x:s.x1*sc,y:height-s.y1*sc},end:{x:s.x2*sc,y:height-s.y2*sc},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
-              if(s.type==='arrow'){const hl=Math.max(lw*4,12*sc),ang=Math.atan2(-(s.y2-s.y1),(s.x2-s.x1));const x2=s.x2*sc,y2=height-s.y2*sc;page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang-Math.PI/6),y:y2+hl*Math.sin(ang-Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang+Math.PI/6),y:y2+hl*Math.sin(ang+Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});}
+              if(s.type==='arrow'){
+                /* ⑧修正: PDFはy軸上向き。arrowhead y成分は - (引き算) が正しい */
+                const hl=Math.max(lw*4,12*sc),ang=Math.atan2(-(s.y2-s.y1),(s.x2-s.x1));
+                const x2=s.x2*sc,y2=height-s.y2*sc;
+                page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang-Math.PI/6),y:y2-hl*Math.sin(ang-Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+                page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang+Math.PI/6),y:y2-hl*Math.sin(ang+Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+              }
             }
           }
         }
@@ -1811,7 +1849,7 @@ const App=(() => {
       const zip=new JSZip();
       zip.file(fileName,origBuf);
       zip.file('strokes.json',JSON.stringify(strokes));
-      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v1',ts:Date.now()}));
+      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v2',ts:Date.now()}));
       const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);
       a.download=(fileName.replace(/\.pdf$/i,'')||'backup')+'_backup.zip';
@@ -1897,7 +1935,10 @@ const App=(() => {
     get panX(){return panX;},
     get panY(){return panY;},
     get docId(){return _docId;},
-    _activeSelSubWin:null,
+    get textX(){return _txX;},           /* ③修正: テキスト座標外部公開 */
+    get textY(){return _txY;},
+    get activeSelSubWin(){return _activeSelSubWin;}, /* ⑤修正: サブ窓選択参照 */
+    setActiveSelSubWin(sw){_activeSelSubWin=sw;},    /* ⑤修正: サブ窓選択セッタ */
     _textAt,
     _showHome,_hideHome,
     setFileHandle(fh){_fileHandle=fh;},
@@ -2019,6 +2060,8 @@ function _initToolbar(){
   document.getElementById('pgn').addEventListener('change',e=>App.gotoPage(parseInt(e.target.value)||1,true));
 
   /* ツール */
+  /* ①修正: ツール切替時に即座にスウォッチ色・サイズUI更新 */
+  EventBus.on('tool:changed',()=>{_updateSwatches();});
   ['pen','hl','eraser','text','sub'].forEach(t=>{
     document.getElementById('t-'+t)?.addEventListener('click',()=>{App.setTool(t);closePickers();});
   });
@@ -2108,18 +2151,18 @@ function _initToolbar(){
   document.getElementById('txCancel').addEventListener('click',()=>document.getElementById('txov').classList.remove('on'));
   document.getElementById('txfld').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))_confirmText();});
   function _confirmText(){
+    /* ③修正: App.textX/textY (内部 _txX/_txY のgetter) を直接使用
+       旧実装: App._textAt._lastX → _textAt wrapper が内部closure関数を迂回していたため座標(0,0)固定バグ */
     const txt=document.getElementById('txfld').value.trim();
     document.getElementById('txov').classList.remove('on');
     if(!txt||!App.pdfDoc)return;
+    const tx=App.textX,ty=App.textY;
     if(!App.strokes[App.currentPage])App.strokes[App.currentPage]=[];
-    App.strokes[App.currentPage].push({type:'text',x:App._textAt._lastX||0,y:App._textAt._lastY||0,text:txt,color:App.strokeColor,size:App.strokeSize});
+    App.strokes[App.currentPage].push({type:'text',x:tx,y:ty,text:txt,color:App.strokeColor,size:App.strokeSize});
+    Logger.debug('[confirmText] x='+tx.toFixed(2)+' y='+ty.toFixed(2)+' size='+App.strokeSize+' color='+App.strokeColor);
     App.redraw();SubWinManager.updateAll(App.strokes,App.currentPage);
     EventBus.emit('stroke:added');
   }
-  /* テキスト座標をグローバルへ保存 */
-  const _origTextAt=App._textAt;
-  App._textAt=function(x,y){App._textAt._lastX=x;App._textAt._lastY=y;_origTextAt(x,y);};
-  App._textAt._lastX=0;App._textAt._lastY=0;
 
   /* ドラッグ&ドロップ */
   const caEl=document.getElementById('ca');
@@ -2157,7 +2200,19 @@ function _initCalculator(){
   const decEl=document.getElementById('cdec');
 
   function _disp(){exprEl.textContent=cExpr;valEl.textContent=cVal;}
-  function _eval(){try{let r=Function('"use strict";return ('+cExpr+')')();const d=+decEl.value;cVal=isFinite(r)?parseFloat(r.toFixed(d)).toString():'エラー';}catch{cVal='エラー';}}
+  /* ④修正: =押下時のみ確定eval。中間入力時はエラー表示しない */
+  function _eval(final=false){
+    if(!cExpr){cVal='0';return;}
+    try{
+      const r=Function('"use strict";return ('+cExpr+')')();
+      const d=+decEl.value;
+      if(isFinite(r))cVal=parseFloat(r.toFixed(d)).toString();
+      else if(final)cVal='エラー';
+    }catch(e){
+      if(final)cVal='エラー'; /* =押下時のみエラー表示 */
+      /* 中間入力中は cVal を変えない → 最後の有効値を保持 */
+    }
+  }
 
   document.getElementById('calcbtn').addEventListener('click',()=>{document.getElementById('calc').classList.toggle('on');});
   document.getElementById('cclose').addEventListener('click',()=>document.getElementById('calc').classList.remove('on'));
@@ -2175,13 +2230,13 @@ function _initCalculator(){
         else if(fn==='sqrt'){cExpr='Math.sqrt('+cExpr+')';}
         else if(fn==='sq'){cExpr='('+cExpr+')**2';}
         else if(fn==='='){
-          _eval();
+          _eval(true); /* ④修正: final=true で確定計算 */
           const hi=document.createElement('div');hi.className='chi';hi.textContent=cExpr+' = '+cVal;histEl.appendChild(hi);histEl.scrollTop=histEl.scrollHeight;
           const addToExpr=document.createElement('div');addToExpr.className='chi';addToExpr.style.display='none';histEl.appendChild(addToExpr);
           cExpr='';
         }
       }
-      if(fn!=='='&&fn!=='C')_eval();
+      if(fn!=='='&&fn!=='C')_eval(false); /* ④修正: 中間入力は非確定eval */
       _disp();
     });
   });
@@ -2261,3 +2316,4 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
 </script>
 </body>
 </html>
+            
