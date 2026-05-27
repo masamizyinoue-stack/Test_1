@@ -2,1131 +2,2262 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>PDF図面注釈 v1</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>M_Viewer v1</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#1a1a2e;--surface:#16213e;--surface2:#0f3460;
-  --accent:#e94560;--accent2:#533483;
-  --text:#eaeaea;--text2:#a0a0b0;
-  --tool-h:56px;--tab-h:36px;--sidebar-w:220px;
-}
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
-#app{display:flex;flex-direction:column;width:100%;height:100%;position:relative}
-#toolbar{display:flex;align-items:center;gap:4px;height:var(--tool-h);background:var(--surface);padding:0 8px;border-bottom:1px solid #333;flex-shrink:0;z-index:100;overflow-x:auto;scrollbar-width:none}
-#toolbar::-webkit-scrollbar{display:none}
-.tb-group{display:flex;align-items:center;gap:2px;flex-shrink:0}
-.tb-sep{width:1px;height:32px;background:#333;margin:0 4px;flex-shrink:0}
-.tb-btn{display:flex;align-items:center;justify-content:center;min-width:40px;height:40px;border-radius:8px;border:none;background:transparent;color:var(--text);font-size:18px;cursor:pointer;transition:background .15s;flex-shrink:0;padding:0 6px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.tb-btn:active{background:var(--surface2)}
-.tb-btn.active{background:var(--accent);color:#fff}
-.tb-btn.disabled{opacity:.35;pointer-events:none}
-#color-dot{width:24px;height:24px;border-radius:50%;border:2px solid #555;cursor:pointer;flex-shrink:0}
-#color-input{position:absolute;opacity:0;width:0;height:0}
-#size-slider{width:70px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
-#opacity-slider{width:60px;accent-color:var(--accent2);cursor:pointer;flex-shrink:0}
-#tab-bar{display:flex;align-items:center;height:var(--tab-h);background:var(--bg);border-bottom:1px solid #222;overflow-x:auto;flex-shrink:0;scrollbar-width:none}
-#tab-bar::-webkit-scrollbar{display:none}
-#tab-list{display:flex;height:100%}
-.tab-item{display:flex;align-items:center;gap:6px;padding:0 12px;height:100%;border-right:1px solid #222;font-size:12px;white-space:nowrap;cursor:pointer;min-width:120px;max-width:200px;flex-shrink:0;transition:background .15s}
-.tab-item.active{background:var(--surface);color:var(--text)}
-.tab-item:not(.active){color:var(--text2)}
-.tab-name{overflow:hidden;text-overflow:ellipsis;flex:1}
-.tab-close{font-size:14px;color:var(--text2);padding:2px;border-radius:3px}
-#tab-add{padding:0 14px;color:var(--text2);font-size:20px;cursor:pointer;flex-shrink:0;line-height:var(--tab-h)}
-#workspace{display:flex;flex:1;overflow:hidden;position:relative}
-#main-pane{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column}
-#canvas-scroll{flex:1;overflow:auto;position:relative;background:#2a2a2a;scrollbar-width:thin;scrollbar-color:#444 transparent}
-#canvas-scroll::-webkit-scrollbar{width:8px;height:8px}
-#canvas-scroll::-webkit-scrollbar-thumb{background:#444;border-radius:4px}
-#canvas-wrap{position:relative;display:inline-block;min-width:100%;min-height:100%}
-#canvas-wrap canvas{position:absolute;top:0;left:0}
-#pdf-canvas{z-index:1}
-#annot-canvas{z-index:2}
-#draw-canvas{z-index:3}
-#ui-canvas{z-index:4;touch-action:none}
-#page-nav{display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--surface);border-top:1px solid #222;font-size:12px;flex-shrink:0}
-#page-info{color:var(--text2)}
-#zoom-info{color:var(--text2);min-width:50px;text-align:center}
-#sidebar{width:var(--sidebar-w);background:var(--surface);border-left:1px solid #222;display:flex;flex-direction:column;overflow:hidden;transition:width .2s;flex-shrink:0}
-#sidebar.hidden{width:0;border:none}
-#sidebar-tabs{display:flex;border-bottom:1px solid #222;flex-shrink:0}
-.stab{flex:1;text-align:center;padding:8px 0;font-size:12px;cursor:pointer;color:var(--text2)}
-.stab.active{color:var(--accent);border-bottom:2px solid var(--accent)}
-#sidebar-content{flex:1;overflow-y:auto;padding:8px;scrollbar-width:thin}
-.thumb-item{width:100%;aspect-ratio:1/1.414;background:#333;border-radius:4px;margin-bottom:8px;cursor:pointer;position:relative;overflow:hidden;border:2px solid transparent;transition:border-color .15s}
-.thumb-item.active{border-color:var(--accent)}
-.thumb-item canvas{width:100%;height:100%;object-fit:contain;display:block}
-.thumb-num{position:absolute;bottom:2px;right:4px;font-size:10px;color:#fff;background:rgba(0,0,0,.6);padding:1px 4px;border-radius:3px}
-.recent-item{padding:8px;border-radius:6px;cursor:pointer;margin-bottom:4px;border:1px solid #333;font-size:12px;transition:background .15s}
-.recent-item:active{background:var(--surface2)}
-.recent-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
-.recent-date{font-size:10px;color:var(--text2);margin-top:2px}
-#sub-pane{width:0;border-left:2px solid var(--accent2);overflow:hidden;transition:width .2s;display:flex;flex-direction:column;background:var(--bg);flex-shrink:0}
-#sub-pane.visible{width:45%;min-width:280px}
-#sub-header{display:flex;align-items:center;padding:4px 8px;background:var(--surface);border-bottom:1px solid #222;gap:6px;flex-shrink:0}
-#sub-title{flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#sub-scroll{flex:1;overflow:auto;background:#2a2a2a}
-#sub-wrap{position:relative;display:inline-block}
-#sub-wrap canvas{position:absolute;top:0;left:0}
-#sub-pdf-canvas{z-index:1}
-#sub-annot-canvas{z-index:2}
-#sub-page-info{font-size:11px;color:var(--text2);white-space:nowrap}
-#drop-overlay{position:fixed;inset:0;background:rgba(233,69,96,.15);border:3px dashed var(--accent);z-index:9999;display:none;align-items:center;justify-content:center;font-size:24px;color:var(--accent);pointer-events:none}
-#drop-overlay.show{display:flex}
-#loading{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px}
-#loading.show{display:flex}
-.spinner{width:40px;height:40px;border:3px solid #333;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-#loading-msg{color:var(--text);font-size:14px}
-#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(20,20,40,.95);color:var(--text);padding:10px 20px;border-radius:20px;font-size:13px;z-index:9997;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid #333}
-#toast.show{opacity:1}
-#color-popup{position:fixed;background:var(--surface);border:1px solid #333;border-radius:10px;padding:10px;z-index:500;display:none;grid-template-columns:repeat(6,30px);gap:6px;box-shadow:0 4px 20px rgba(0,0,0,.6)}
-#color-popup.show{display:grid}
-.cp-color{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s}
-.cp-color.selected{border-color:#fff;transform:scale(1.2)}
-#text-overlay{position:fixed;z-index:600;display:none;background:rgba(0,0,0,.85);padding:4px 6px;border-radius:6px;border:1px solid var(--accent)}
-#text-overlay.show{display:block}
-#text-input{background:transparent;border:none;color:var(--text);font-size:16px;outline:none;resize:none;min-width:150px;min-height:32px;line-height:1.4}
-#ver-badge{font-size:10px;color:var(--text2);opacity:.4;flex-shrink:0;padding:0 6px;margin-left:auto}
+:root{--bg:#1e2228;--pan:#262c34;--pan2:#2e363f;--brd:#4a5a6a;--acc:#f07800;--tx:#fff;--tx2:#c8d8e4;--red:#c02020}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:column;height:100vh;height:100dvh;user-select:none;-webkit-user-select:none}
+#hdr{flex-shrink:0;background:var(--pan);border-bottom:2px solid var(--acc);overflow:hidden}
+.hr{height:38px;display:flex;align-items:center;gap:5px;padding:0 7px;overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:hidden}
+.hr:first-child{border-bottom:1px solid var(--brd)}
+.hr::-webkit-scrollbar{display:none}
+.logo{font-size:12px;font-weight:800;color:var(--acc);padding-right:6px;border-right:2px solid var(--brd);white-space:nowrap;flex-shrink:0}
+.vs{width:2px;height:24px;background:var(--brd);flex-shrink:0;margin:0 3px}
+.sp{flex:1}
+.btn{height:32px;padding:0 9px;border:1.5px solid var(--brd);background:var(--pan2);color:var(--tx);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:4px;-webkit-user-select:none;transition:background .1s}
+.btn:active{background:var(--brd)}
+.btn.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.rd{background:var(--red);border-color:var(--red);color:#fff}
+.pgni{width:32px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);border-radius:5px;font-size:12px;padding:2px 0;flex-shrink:0}
+.pgni:focus{outline:none;border-color:var(--acc)}
+.pgtot{font-size:11px;color:var(--tx2);white-space:nowrap;flex-shrink:0}
+.zlbl{font-size:12px;font-weight:700;color:var(--acc);min-width:38px;text-align:center;flex-shrink:0}
+#fnlbl{font-size:11px;color:#fff;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.csw{width:26px;height:26px;border-radius:50%;border:3px solid transparent;cursor:pointer;flex-shrink:0;transition:transform .1s}
+.csw.on{border-color:#fff;transform:scale(1.25)}
+.szlbl{font-size:11px;color:var(--tx2);flex-shrink:0}
+.sz-val{font-size:13px;font-weight:700;color:var(--acc);min-width:22px;text-align:center;flex-shrink:0;cursor:pointer;padding:2px 6px;border:1.5px solid var(--brd);border-radius:5px;background:var(--pan2)}
+.pkw{position:relative;flex-shrink:0}
+.pkp{position:fixed;background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;padding:5px;z-index:300;box-shadow:0 4px 20px #0008;display:none;flex-direction:column;gap:3px;min-width:120px}
+.pkp.on{display:flex}
+.pkp button{height:38px;padding:0 12px;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;text-align:left}
+.pkp button:active,.pkp button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+#szp{display:none;position:fixed;z-index:350;background:var(--pan);border:1.5px solid var(--brd);border-radius:11px;padding:12px 14px;box-shadow:0 4px 20px #0008;width:250px}
+#szp.on{display:block}
+#szp-title{font-size:12px;color:var(--tx2);font-weight:700;margin-bottom:9px;display:block}
+.szp-row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+#sz-rng{-webkit-appearance:none;flex:1;height:8px;background:var(--brd);border-radius:4px;cursor:pointer}
+#sz-rng::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid #fff}
+#sz-n{width:42px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);border-radius:5px;font-size:13px;font-weight:700;padding:4px}
+#sz-n:focus{outline:none;border-color:var(--acc)}
+#szp-prev{height:42px;background:var(--pan2);border-radius:7px;margin-bottom:9px;display:flex;align-items:center;justify-content:center}
+.szp-btns{display:flex;gap:7px}
+.szp-ok{flex:1;height:38px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+.szp-cancel{height:38px;padding:0 12px;background:var(--pan2);color:var(--tx2);border:1.5px solid var(--brd);border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+#ca{flex:1;overflow:hidden;position:relative;min-height:0;touch-action:none;background:#444;overscroll-behavior:none}
+#cw{position:absolute;top:0;left:0;transform-origin:0 0;background:#fff}
+#pdfCvs{display:block}
+#annCvs,#ovlCvs{position:absolute;top:0;left:0}
+#ovlCvs{pointer-events:none}
+#dz{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;background:var(--bg)}
+.dzi{font-size:48px;opacity:.4}
+.dzm{font-size:16px;color:var(--tx);font-weight:700}
+.dzs{font-size:11px;color:var(--tx2);text-align:center;padding:0 18px;line-height:1.8}
+.dzb{background:var(--acc);color:#fff;border:none;padding:13px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer}
+#home{position:absolute;inset:0;z-index:10;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.home-hdr{display:flex;align-items:center;justify-content:space-between;padding:20px 18px 12px;flex-shrink:0;border-bottom:1px solid var(--brd)}
+.home-title{font-size:18px;font-weight:700;color:var(--tx)}
+.home-open-btn{background:var(--acc);color:#fff;border:none;padding:10px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.home-open-btn:active{opacity:.8}
+.home-section{font-size:11px;font-weight:700;color:var(--tx2);padding:14px 18px 6px;flex-shrink:0;text-transform:uppercase;letter-spacing:.05em}
+#home-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:6px 18px 20px;align-content:start}
+.home-card{background:var(--pan);border:1.5px solid var(--brd);border-radius:10px;padding:12px 10px 8px;cursor:pointer;position:relative;display:flex;flex-direction:column;gap:4px;-webkit-user-select:none;user-select:none;touch-action:manipulation}
+.home-card:active{border-color:var(--acc);background:var(--pan2)}
+.home-card-icon{font-size:26px;line-height:1;margin-bottom:2px}
+.home-card-name{font-size:11px;font-weight:700;color:var(--tx);word-break:break-all;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
+.home-card-date{font-size:10px;color:var(--tx2);margin-top:auto;padding-top:4px}
+.home-card-del{position:absolute;top:5px;right:5px;background:transparent;border:none;color:var(--tx2);font-size:14px;cursor:pointer;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.home-card-del:active{background:var(--red);color:#fff}
+#home-empty{display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:14px;padding:60px 20px}
+.home-empty-icon{font-size:52px;opacity:.25}
+.home-empty-msg{font-size:13px;color:var(--tx2);text-align:center;line-height:1.8}
+.home-drop-hint{font-size:11px;color:var(--tx2);text-align:center;padding:10px 18px;border:1.5px dashed var(--brd);border-radius:10px;margin:0 18px 18px;flex-shrink:0}
+#selbtn{display:none;position:fixed;z-index:150;background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005}
+@keyframes swn-appear{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+.swn{position:fixed;z-index:200;background:var(--pan);border:2.5px solid var(--acc);border-radius:11px;box-shadow:0 6px 28px #000b;display:flex;flex-direction:column;min-width:170px;min-height:170px;overflow:hidden;touch-action:none}
+.swn-appearing{animation:swn-appear .15s ease-out both}
+@keyframes swn-stripe{to{background-position:22px 22px}}
+.swn-loading .swn-body::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:10;background:repeating-linear-gradient(-45deg,transparent 0 8px,rgba(255,255,255,.06) 8px 16px);background-size:22px 22px;background-position:0 0;animation:swn-stripe .7s linear infinite}
+.swn-tb{height:30px;background:var(--pan2);display:flex;align-items:center;justify-content:space-between;padding:0 8px;cursor:grab;flex-shrink:0;border-bottom:1.5px solid var(--brd)}
+.swn-tb span{font-size:11px;font-weight:800;color:var(--acc)}
+.swn-close{background:transparent;border:none;color:var(--tx2);font-size:16px;cursor:pointer;padding:2px 5px;border-radius:4px}
+.swn-body{flex:1;overflow:hidden;position:relative;background:#fff}
+.swn-cvs{position:absolute;top:0;left:0;transform-origin:0 0}
+.swn-zl{position:absolute;bottom:3px;left:5px;font-size:10px;color:var(--acc);pointer-events:none;font-weight:800;text-shadow:0 0 4px #000,0 0 4px #000}
+.swn-rz{position:absolute;bottom:0;right:0;width:22px;height:22px;cursor:se-resize;background:linear-gradient(135deg,transparent 50%,var(--acc) 50%);border-radius:0 0 8px 0}
+.swn-rz-sw{position:absolute;bottom:0;left:0;width:22px;height:22px;cursor:sw-resize;background:linear-gradient(225deg,transparent 50%,var(--acc) 50%);border-radius:0 0 0 8px}
+.swn-rz-nw{position:absolute;top:30px;left:0;width:22px;height:22px;cursor:nw-resize;background:linear-gradient(315deg,transparent 50%,var(--acc) 50%);border-radius:8px 0 0 0}
+#pgrov{display:none;position:fixed;inset:0;z-index:500;background:#0009;align-items:center;justify-content:center}
+#pgrov.on{display:flex}
+#pgrpop{background:var(--pan);border:1.5px solid var(--brd);border-radius:13px;padding:16px;width:300px;display:flex;flex-direction:column;gap:9px}
+#pgrpop h3{font-size:13px;color:var(--tx2)}
+#pgrfld{background:var(--bg);border:1.5px solid var(--brd);border-radius:7px;color:var(--tx);font-size:15px;padding:8px;font-family:inherit;user-select:text;-webkit-user-select:text}
+#pgrfld:focus{outline:none;border-color:var(--acc)}
+.pgr-qrow{display:flex;gap:6px}
+.pgr-q{flex:1;height:32px;border-radius:6px;border:1.5px solid var(--brd);background:var(--pan2);color:var(--tx2);font-size:11px;cursor:pointer;font-weight:600}
+.pgr-q:active{background:var(--brd)}
+#bk-confirm-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);align-items:center;justify-content:center}
+#bk-confirm-overlay.open{display:flex}
+#bk-confirm-box{background:var(--pan);border:1.5px solid var(--brd);border-radius:14px;padding:22px 20px 18px;max-width:340px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.6)}
+#bk-confirm-box .bk-icon{font-size:28px;margin-bottom:8px}
+#bk-confirm-box .bk-title{font-size:14px;font-weight:800;color:var(--tx);margin-bottom:6px}
+#bk-confirm-box .bk-sub{font-size:12px;color:var(--tx2);margin-bottom:18px;line-height:1.5}
+#bk-confirm-box .bk-warn{color:#ffaa44;font-size:12px;font-weight:700;margin-bottom:14px}
+#bk-confirm-box .bk-btns{display:flex;flex-direction:column;gap:8px}
+#bk-confirm-box .bk-btns button{width:100%;height:38px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--brd);background:var(--pan2);color:var(--tx)}
+#bk-confirm-box .bk-btns .bk-do-backup{background:var(--acc);border-color:var(--acc);color:#fff}
+#bk-confirm-box .bk-btns .bk-cancel{color:var(--tx2)}
+#tabbar{flex-shrink:0;display:flex;align-items:stretch;min-height:30px;background:var(--pan2);border-bottom:1.5px solid var(--brd);overflow-x:auto;-webkit-overflow-scrolling:touch}
+#tabbar::-webkit-scrollbar{display:none}
+.shtab{display:flex;align-items:center;gap:4px;padding:0 6px 0 10px;min-width:72px;max-width:152px;background:var(--pan2);color:var(--tx2);border-right:1px solid var(--brd);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;user-select:none;-webkit-user-select:none;transition:background .1s}
+.shtab:hover{background:var(--brd);color:var(--tx)}
+.shtab.active{background:var(--bg);color:var(--tx);box-shadow:inset 0 -2px 0 var(--acc)}
+.shtab-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.shtab-x{flex-shrink:0;background:none;border:none;color:var(--tx2);cursor:pointer;font-size:12px;padding:1px 3px;border-radius:3px;line-height:1}
+.shtab-x:hover{background:var(--red);color:#fff}
+.shtab-add{padding:0 13px;background:none;border:none;color:var(--tx2);font-size:20px;cursor:pointer;flex-shrink:0;align-self:center;margin-left:auto}
+.shtab-add:hover{color:var(--acc)}
+#calc{display:none;position:fixed;z-index:400;background:var(--pan);border:1.5px solid var(--brd);border-radius:13px;width:290px;box-shadow:0 8px 36px #000a;bottom:20px;right:16px}
+#calc.on{display:block}
+#ctb{padding:6px 12px 4px;display:flex;align-items:center;justify-content:space-between;cursor:grab;border-bottom:1px solid var(--brd)}
+#ctb span{font-size:13px;font-weight:700;color:var(--tx2)}
+#cclose{background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);font-size:12px;cursor:pointer;padding:3px 10px;border-radius:5px;font-weight:700}
+#cclose:active{background:var(--acc);color:#fff}
+#chist{max-height:66px;overflow-y:auto;padding:2px 10px;border-bottom:1px solid var(--brd)}
+.chi{font-size:11px;color:var(--tx2);text-align:right;padding:2px 0}
+#cdsp{padding:5px 12px;text-align:right;border-bottom:1px solid var(--brd)}
+#cexpr{font-size:11px;color:var(--tx2);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cval{font-size:26px;font-weight:700;color:var(--tx)}
+#cdecrow{display:flex;align-items:center;gap:5px;padding:3px 10px;border-bottom:1px solid var(--brd)}
+#cdecrow label{font-size:11px;color:var(--tx2)}
+#cdec{width:34px;text-align:center;background:var(--pan2);border:1px solid var(--brd);color:var(--tx);border-radius:4px;font-size:12px;padding:2px}
+#cbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px}
+.cb{height:50px;border-radius:9px;font-size:22px;font-weight:700;cursor:pointer;-webkit-user-select:none;transition:opacity .1s;border:2px solid}
+.cb:active{opacity:.6}
+.cbn{background:var(--pan2);color:var(--tx);border-color:#4a5a6a}
+.cbo{background:#243040;color:#ffa040;border-color:#3a5070}
+.cbeq{background:var(--acc);color:#fff;border-color:#c06000}
+.cbf{background:#1e2530;color:var(--tx2);font-size:16px;border-color:#3a4a58}
+.cbw{grid-column:span 2}
+.cbrs{grid-row:span 2}
+#txov{display:none;position:fixed;inset:0;z-index:500;background:#0009;align-items:center;justify-content:center}
+#txov.on{display:flex}
+#txpop{background:var(--pan);border:1.5px solid var(--brd);border-radius:13px;padding:16px;width:300px;display:flex;flex-direction:column;gap:9px}
+#txpop h3{font-size:13px;color:var(--tx2)}
+#txfld{background:var(--bg);border:1.5px solid var(--brd);border-radius:7px;color:var(--tx);font-size:16px;padding:9px;resize:vertical;min-height:60px;font-family:inherit;user-select:text;-webkit-user-select:text}
+#txfld:focus{outline:none;border-color:var(--acc)}
+.txbtns{display:flex;gap:7px;justify-content:flex-end}
+.txb{padding:9px 16px;border-radius:7px;border:none;cursor:pointer;font-size:14px;font-weight:700}
+#loading{display:none;position:fixed;inset:0;z-index:600;background:#000a;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#loading.on{display:flex}
+.spin{width:34px;height:34px;border:3px solid var(--brd);border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;padding:8px 16px;font-size:13px;color:var(--tx);opacity:0;pointer-events:none;transition:opacity .3s;z-index:999;white-space:nowrap}
+#toast.on{opacity:1}
+@media(pointer:coarse){.hr{height:46px;gap:6px;padding:0 9px;padding-left:max(9px,env(safe-area-inset-left));padding-right:max(9px,env(safe-area-inset-right));overflow-y:hidden}.btn{height:38px;padding:0 11px;font-size:12px;border-radius:9px}.csw{width:32px;height:32px;border-width:3px}.vs{height:28px;margin:0 4px}.pgni{width:38px;font-size:13px;height:32px;padding:3px 0}.pgtot{font-size:12px}.zlbl{font-size:13px;min-width:40px}#fnlbl{font-size:12px;max-width:180px}.pkp button{height:42px;font-size:12px}}
+@media(pointer:coarse) and (orientation:landscape){.hr{height:42px;gap:5px;padding:0 8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}.btn{height:35px;padding:0 10px;font-size:12px;border-radius:8px}.csw{width:30px;height:30px}.vs{height:26px;margin:0 3px}.pgni{height:30px;font-size:12px}}
+@media(pointer:coarse) and (max-width:600px){.hr{height:40px;gap:4px;padding:0 6px;padding-left:max(6px,env(safe-area-inset-left));padding-right:max(6px,env(safe-area-inset-right))}.btn{height:34px;padding:0 8px;font-size:11px;border-radius:8px}.csw{width:28px;height:28px}.vs{height:22px;margin:0 2px}.logo{font-size:11px;padding-right:4px}#fnlbl{max-width:80px;font-size:10px}.pgni{width:32px;height:28px;font-size:12px}}
+@media(pointer:coarse) and (max-width:430px){.hr{height:36px;gap:3px}.btn{height:28px;padding:0 5px;font-size:10px;border-radius:7px}.csw{width:22px;height:22px}.logo{display:none}#fnlbl{max-width:60px}}
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="toolbar">
-    <div class="tb-group">
-      <button class="tb-btn" id="btn-open" title="PDF開く">📂</button>
-      <button class="tb-btn" id="btn-save-pdf" title="注釈付きPDF出力">📄</button>
-      <button class="tb-btn" id="btn-backup" title="バックアップZIP">💾</button>
-      <button class="tb-btn" id="btn-restore" title="ZIPから復元">♻️</button>
-    </div>
-    <div class="tb-sep"></div>
-    <div class="tb-group">
-      <button class="tb-btn disabled" id="btn-undo" title="Undo (取消)">↩️</button>
-      <button class="tb-btn disabled" id="btn-redo" title="Redo (やり直し)">↪️</button>
-    </div>
-    <div class="tb-sep"></div>
-    <div class="tb-group">
-      <button class="tb-btn active" id="tool-pen" title="ペン">✏️</button>
-      <button class="tb-btn" id="tool-highlight" title="蛍光ペン">🖊️</button>
-      <button class="tb-btn" id="tool-eraser" title="消しゴム">🧹</button>
-      <button class="tb-btn" id="tool-line" title="直線">╱</button>
-      <button class="tb-btn" id="tool-rect" title="矩形">▭</button>
-      <button class="tb-btn" id="tool-circle" title="円">○</button>
-      <button class="tb-btn" id="tool-text" title="テキスト">T</button>
-    </div>
-    <div class="tb-sep"></div>
-    <div class="tb-group">
-      <div id="color-dot" title="色選択"></div>
-      <input type="color" id="color-input" value="#e94560">
-      <input type="range" id="size-slider" min="1" max="40" value="3" title="サイズ">
-      <input type="range" id="opacity-slider" min="10" max="100" value="100" title="不透明度">
-    </div>
-    <div class="tb-sep"></div>
-    <div class="tb-group">
-      <button class="tb-btn" id="btn-sidebar" title="サイドバー">📋</button>
-      <button class="tb-btn" id="btn-subwin" title="サブ窓 Split View">⊟</button>
-    </div>
-    <span id="ver-badge">v1</span>
-    <input type="file" id="file-input" accept=".pdf" style="display:none">
-    <input type="file" id="restore-input" accept=".zip" style="display:none">
-  </div>
-
-  <div id="tab-bar">
-    <div id="tab-list"></div>
-    <div id="tab-add" title="新しいPDFを開く">＋</div>
-  </div>
-
-  <div id="workspace">
-    <div id="main-pane">
-      <div id="canvas-scroll">
-        <div id="canvas-wrap">
-          <canvas id="pdf-canvas"></canvas>
-          <canvas id="annot-canvas"></canvas>
-          <canvas id="draw-canvas"></canvas>
-          <canvas id="ui-canvas"></canvas>
-        </div>
-      </div>
-      <div id="page-nav">
-        <button class="tb-btn" id="btn-prev" style="min-width:36px;height:36px;font-size:14px">◀</button>
-        <span id="page-info">- / -</span>
-        <button class="tb-btn" id="btn-next" style="min-width:36px;height:36px;font-size:14px">▶</button>
-        <div style="flex:1"></div>
-        <button class="tb-btn" id="btn-zoom-out" style="font-size:14px">🔍−</button>
-        <span id="zoom-info">100%</span>
-        <button class="tb-btn" id="btn-zoom-in" style="font-size:14px">🔍+</button>
-        <button class="tb-btn" id="btn-zoom-fit" title="フィット">⊡</button>
-      </div>
-    </div>
-
-    <div id="sub-pane">
-      <div id="sub-header">
-        <span id="sub-title">サブ窓</span>
-        <button class="tb-btn" id="sub-btn-prev" style="min-width:28px;height:28px;font-size:13px">◀</button>
-        <span id="sub-page-info">-/-</span>
-        <button class="tb-btn" id="sub-btn-next" style="min-width:28px;height:28px;font-size:13px">▶</button>
-        <button class="tb-btn" id="sub-btn-close" style="min-width:28px;height:28px;font-size:13px">✕</button>
-      </div>
-      <div id="sub-scroll">
-        <div id="sub-wrap">
-          <canvas id="sub-pdf-canvas"></canvas>
-          <canvas id="sub-annot-canvas"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <div id="sidebar">
-      <div id="sidebar-tabs">
-        <div class="stab active" data-tab="thumbs">サムネ</div>
-        <div class="stab" data-tab="recent">履歴</div>
-      </div>
-      <div id="sidebar-content"></div>
+<div id="bk-confirm-overlay">
+  <div id="bk-confirm-box">
+    <div class="bk-icon" id="bk-icon">⚠️</div>
+    <div class="bk-title" id="bk-title">バックアップを作成しますか？</div>
+    <div class="bk-warn" id="bk-warn"></div>
+    <div class="bk-sub" id="bk-sub"></div>
+    <div class="bk-btns">
+      <button class="bk-do-backup" id="bk-do-backup">💾 バックアップして閉じる</button>
+      <button class="bk-do-close" id="bk-do-close">閉じる（バックアップしない）</button>
+      <button class="bk-cancel" id="bk-cancel">キャンセル</button>
     </div>
   </div>
 </div>
-
-<div id="drop-overlay">📄 PDFをここにドロップ</div>
-<div id="loading"><div class="spinner"></div><div id="loading-msg">読み込み中...</div></div>
+<div id="hdr">
+  <div class="hr">
+    <span class="logo">M_Viewer <span style="font-size:10px">v1</span></span>
+    <input type="file" id="fileInput" accept="application/pdf" style="display:none">
+    <span id="fnlbl">ファイル未選択</span>
+    <div class="vs"></div>
+    <button class="btn" id="btn-undo">↩ 戻す</button>
+    <button class="btn on" id="btn-save">📤 PDF出力</button>
+    <button class="btn" id="btn-backup" title="ZIP バックアップ">💾 バックアップ</button>
+    <button class="btn" id="btn-restore" title="ZIP から復元">📂 復元</button>
+    <input type="file" id="restoreInput" accept=".zip" style="display:none">
+    <button class="btn" id="calcbtn">🧮 計算機</button>
+    <div class="sp"></div>
+    <button class="btn" id="btn-home">⌂ ホーム</button>
+    <button class="btn rd" id="btn-close">✕ 閉じる</button>
+  </div>
+  <div class="hr">
+    <button class="btn" id="btn-prev">◀</button>
+    <input id="pgn" class="pgni" type="number" min="1" value="1">
+    <span class="pgtot">/<span id="tpn">0</span></span>
+    <button class="btn" id="btn-next">▶</button>
+    <span id="zlbl" class="zlbl">--</span>
+    <button class="btn" id="btn-fit">全体</button>
+    <div style="width:30px;flex-shrink:0"></div>
+    <button class="btn on" id="t-pen">✏️ ペン</button>
+    <button class="btn" id="t-hl">蛍光ペン</button>
+    <div class="pkw">
+      <button class="btn" id="t-shape">図形▾</button>
+      <div class="pkp" id="shapepop">
+        <button data-shape="arrow">→ 矢印</button>
+        <button data-shape="rect">□ 四角</button>
+        <button data-shape="circle">○ 円</button>
+        <button data-shape="line">/ 直線</button>
+      </div>
+    </div>
+    <button class="btn" id="t-text">文字</button>
+    <button class="btn" id="t-eraser">消しゴム</button>
+    <div class="pkw">
+      <button class="btn" id="t-select">選択▾</button>
+      <div class="pkp" id="selpop">
+        <button id="sel-rect" class="on" data-selmode="rect">□ 矩形</button>
+        <button id="sel-lasso" data-selmode="lasso">〇 なげなわ</button>
+      </div>
+    </div>
+    <button class="btn" id="t-sub">サブ窓</button>
+    <div class="vs"></div>
+    <div class="csw on" id="sw0" style="background:#cc2020" data-c="#cc2020"></div>
+    <div class="csw" id="sw1" style="background:#1a1a1a;border:2px solid #888" data-c="#1a1a1a"></div>
+    <div class="csw" id="sw2" style="background:#1a55cc" data-c="#1a55cc"></div>
+    <div class="csw" id="sw3" style="background:#108030" data-c="#108030"></div>
+    <div class="vs"></div>
+    <span class="szlbl">太さ</span>
+    <span id="sz-v" class="sz-val">3</span>
+  </div>
+</div>
+<div id="tabbar"></div>
+<div id="szp">
+  <span id="szp-title">ペンの太さ</span>
+  <div class="szp-row">
+    <input type="range" id="sz-rng" min="1" max="40" value="3">
+    <input type="number" id="sz-n" min="1" max="40" value="3">
+  </div>
+  <div id="szp-prev"><canvas id="szp-cvs" width="210" height="40"></canvas></div>
+  <div class="szp-btns">
+    <button class="szp-cancel" id="szp-cancel">キャンセル</button>
+    <button class="szp-ok" id="szp-ok">✓ 決定</button>
+  </div>
+</div>
+<div id="ca">
+  <div id="cw" style="display:none">
+    <canvas id="pdfCvs"></canvas>
+    <canvas id="annCvs"></canvas>
+    <canvas id="ovlCvs"></canvas>
+  </div>
+  <div id="dz">
+    <div class="dzi">📄</div>
+    <div class="dzm">M_Viewer v1</div>
+    <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
+    <button class="dzb" id="dz-open">📂 PDFを開く</button>
+  </div>
+  <div id="home">
+    <div class="home-hdr">
+      <div class="home-title">📐 M_Viewer</div>
+      <button class="home-open-btn" id="home-open">📂 PDFを開く</button>
+    </div>
+    <div class="home-section">最近開いた図面</div>
+    <div id="home-list"></div>
+    <div id="home-empty"><div class="home-empty-icon">📂</div><div class="home-empty-msg">図面をドラッグ＆ドロップするか<br>「PDFを開く」で追加してください</div></div>
+    <div class="home-drop-hint">📄 PDFをここにドロップして開く</div>
+  </div>
+</div>
+<button id="selbtn">🗑 削除</button>
+<div id="calc">
+  <div id="ctb"><span>🧮 計算機</span><button id="cclose">✕ 閉じる</button></div>
+  <div id="chist"></div>
+  <div id="cdsp"><div id="cexpr"></div><div id="cval">0</div></div>
+  <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="1">桁</div>
+  <div id="cbtns">
+    <button class="cb cbf" data-cfn="C">C</button>
+    <button class="cb cbf" data-cfn="sqrt">√</button>
+    <button class="cb cbf" data-cfn="sq">x²</button>
+    <button class="cb cbo" data-cop="/">÷</button>
+    <button class="cb cbf" data-cfn="⌫">⌫</button>
+    <button class="cb cbf" data-cfn="±">±</button>
+    <button class="cb cbf" data-cfn="%">%</button>
+    <button class="cb cbo" data-cop="*">×</button>
+    <button class="cb cbn" data-cnum="7">7</button>
+    <button class="cb cbn" data-cnum="8">8</button>
+    <button class="cb cbn" data-cnum="9">9</button>
+    <button class="cb cbo" data-cop="-">−</button>
+    <button class="cb cbn" data-cnum="4">4</button>
+    <button class="cb cbn" data-cnum="5">5</button>
+    <button class="cb cbn" data-cnum="6">6</button>
+    <button class="cb cbo" data-cop="+">＋</button>
+    <button class="cb cbn" data-cnum="1">1</button>
+    <button class="cb cbn" data-cnum="2">2</button>
+    <button class="cb cbn" data-cnum="3">3</button>
+    <button class="cb cbeq cbrs" data-cfn="=">=</button>
+    <button class="cb cbn cbw" data-cnum="0">0</button>
+    <button class="cb cbn" data-cnum=".">.</button>
+  </div>
+</div>
+<div id="pgrov">
+  <div id="pgrpop">
+    <h3>📤 PDF出力 — ページ指定</h3>
+    <div class="pgr-qrow">
+      <button class="pgr-q" id="pgr-cur">現在のページ</button>
+      <button class="pgr-q" id="pgr-all">全ページ</button>
+    </div>
+    <input id="pgrfld" type="text" placeholder="例: 1, 1-5, 1,3,5-8">
+    <div class="txbtns">
+      <button class="txb" id="pgrCancel" style="background:var(--pan2);color:var(--tx2)">キャンセル</button>
+      <button class="txb" id="pgrConfirm" style="background:var(--acc);color:#fff">📤 出力</button>
+    </div>
+  </div>
+</div>
+<div id="txov">
+  <div id="txpop">
+    <h3>テキスト入力 (Ctrl+Enter で確定)</h3>
+    <textarea id="txfld" placeholder="テキストを入力…"></textarea>
+    <div class="txbtns">
+      <button class="txb" id="txCancel" style="background:var(--pan2);color:var(--tx2)">キャンセル</button>
+      <button class="txb" id="txConfirm" style="background:var(--acc);color:#fff">確定</button>
+    </div>
+  </div>
+</div>
+<div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
 <div id="toast"></div>
-<div id="color-popup"></div>
-<div id="text-overlay"><textarea id="text-input" rows="2" placeholder="テキストを入力… (Escで閉じる)"></textarea></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 'use strict';
-// ================================================================
-// APP NAMESPACE
-// ================================================================
-const APP = Object.create(null);
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// ================================================================
-// EVENTBUS
-// ================================================================
-APP.EventBus = (()=>{
+/* ============================================================
+   定数
+   ============================================================ */
+const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
+const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
+const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
+const SW_FILLS=['rgba(240,120,0,.12)','rgba(0,160,255,.12)','rgba(0,200,80,.12)','rgba(255,80,160,.12)','rgba(200,200,0,.12)'];
+const PEN_COLORS=[{id:'sw0',c:'#cc2020'},{id:'sw1',c:'#1a1a1a'},{id:'sw2',c:'#1a55cc'},{id:'sw3',c:'#108030'}];
+const HL_COLORS=[{id:'sw0',c:'#ffd700'},{id:'sw1',c:'#50c040'},{id:'sw2',c:'#ff69b4'},{id:'sw3',c:'#40d4e8'}];
+const TOOL_DEFAULT_SIZES={pen:3,hl:3,eraser:20,text:3,arrow:2,rect:2,circle:2,line:2};
+
+/* ============================================================
+   Module: Logger
+   責務: 構造化ログ / 性能計測 / 機能フラグ
+   ============================================================ */
+const Logger=(() => {
+  let _debug=true;
+  const _flags=new Map();
+  const _lvl={debug:0,info:1,warn:2,error:3};
+  let _min=0;
+  function _log(lv,...a){
+    if(_lvl[lv]<_min)return;
+    const ts=performance.now().toFixed(1);
+    console[lv](`[${ts}ms]`,...a);
+  }
+  return {
+    debug:(...a)=>_debug&&_log('debug',...a),
+    info:(...a)=>_log('info',...a),
+    warn:(...a)=>_log('warn',...a),
+    error:(...a)=>_log('error',...a),
+    perf(label,fn){const t=performance.now();const r=fn();_debug&&console.debug(`[PERF]${label}:${(performance.now()-t).toFixed(1)}ms`);return r;},
+    setLevel(l){_min=_lvl[l]??0;},
+    setDebug(v){_debug=v;},
+    /* 機能フラグ: DBG互換 */
+    flags:{
+      subWindowUpdate:true,redraw:true,pdfRender:true,raf:true,
+      wheelZoom:true,touchMove:true,annotationDraw:true,overlay:true
+    },
+    off(k){this.flags[k]=false;console.log(`%c[DBG]"${k}"STOPPED`,'color:red;font-weight:bold');},
+    on(k){this.flags[k]=true;console.log(`%c[DBG]"${k}"ON`,'color:green;font-weight:bold');},
+    reset(){Object.keys(this.flags).forEach(k=>this.flags[k]=true);console.log('[DBG]ALL ON');},
+    status(){console.table(this.flags);}
+  };
+})();
+window.DBG=Logger; // 後方互換
+
+/* ============================================================
+   Module: EventBus
+   責務: モジュール間疎結合通信
+   ============================================================ */
+const EventBus=(() => {
   const _m=new Map();
-  return {
-    on(ev,fn){if(!_m.has(ev))_m.set(ev,[]);_m.get(ev).push(fn)},
-    off(ev,fn){if(_m.has(ev))_m.set(ev,_m.get(ev).filter(f=>f!==fn))},
-    emit(ev,d){if(!_m.has(ev))return;for(const f of _m.get(ev)){try{f(d)}catch(e){console.error('[EB]',ev,e)}}},
-    once(ev,fn){const w=(d)=>{fn(d);this.off(ev,w)};this.on(ev,w)}
-  };
+  function on(ev,fn){if(!_m.has(ev))_m.set(ev,new Set());_m.get(ev).add(fn);return()=>off(ev,fn);}
+  function off(ev,fn){_m.get(ev)?.delete(fn);}
+  function once(ev,fn){const w=(d)=>{fn(d);off(ev,w);};return on(ev,w);}
+  function emit(ev,data){const s=_m.get(ev);if(!s?.size)return;for(const fn of s){try{fn(data);}catch(e){Logger.error(`[EventBus]${ev}:`,e);}}}
+  return{on,off,once,emit};
 })();
 
-// ================================================================
-// UTILS
-// ================================================================
-APP.Utils = (()=>{
-  let _tt=null;
-  return {
-    uid:()=>`${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-    clone:(o)=>JSON.parse(JSON.stringify(o)),
-    dateStr:(d=new Date())=>`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
-    toast(msg,dur=2500){
-      const el=document.getElementById('toast');
-      el.textContent=msg;el.classList.add('show');
-      clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),dur);
-    },
-    loading(show,msg='処理中...'){
-      document.getElementById('loading-msg').textContent=msg;
-      document.getElementById('loading').classList.toggle('show',show);
-    },
-    debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}},
-    rafThrottle(fn){let p=false;return(...a)=>{if(p)return;p=true;requestAnimationFrame(()=>{fn(...a);p=false})}},
-    hexToRgba(hex,a=1){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`}
-  };
-})();
-
-// ================================================================
-// STATE
-// ================================================================
-APP.State = (()=>{
-  let _s={
-    tool:'pen',color:'#e94560',size:3,opacity:1.0,
-    activeTabId:null,tabs:[],
-    sidebarOpen:true,sidebarTab:'thumbs',
-    subWinOpen:false,
-    recentFiles:[]
-  };
-  const notify=(keys)=>APP.EventBus.emit('state:changed',{keys,state:get()});
-  function get(){return Object.freeze(APP.Utils.clone(_s))}
-  function set(patch){
-    const ch=[];
-    for(const[k,v]of Object.entries(patch)){
-      if(JSON.stringify(_s[k])!==JSON.stringify(v)){_s[k]=v;ch.push(k)}
+/* ============================================================
+   Module: Utils
+   責務: throttle/debounce/geometry
+   ============================================================ */
+const Utils=(() => {
+  function throttle(fn,ms){let last=0,tid=null;return(...a)=>{const now=Date.now();const rem=ms-(now-last);if(rem<=0){clearTimeout(tid);last=now;fn(...a);}else{clearTimeout(tid);tid=setTimeout(()=>{last=Date.now();fn(...a);},rem);}};  }
+  function debounce(fn,ms){let tid=null;return(...a)=>{clearTimeout(tid);tid=setTimeout(()=>fn(...a),ms);};}
+  function safeKey(s){return s.replace(/[^a-zA-Z0-9._-]/g,'_').substring(0,100);}
+  /* 点からセグメントへの最短距離 */
+  function distPtSeg(px,py,ax,ay,bx,by){
+    const dx=bx-ax,dy=by-ay,len2=dx*dx+dy*dy;
+    if(len2===0)return Math.hypot(px-ax,py-ay);
+    const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/len2));
+    return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
+  }
+  function ptInPoly(px,py,poly){
+    let inside=false;
+    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+      const[xi,yi]=poly[i],[xj,yj]=poly[j];
+      if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))inside=!inside;
     }
-    if(ch.length)notify(ch);
+    return inside;
   }
-  function addTab(data){
-    const t={id:APP.Utils.uid(),name:'untitled',pdfId:null,pageIndex:0,zoom:1.0,...data};
-    _s.tabs=[..._s.tabs,t];_s.activeTabId=t.id;
-    notify(['tabs','activeTabId']);return t.id;
+  function strokeBBox(s){
+    if(!s||s.type==='eraser')return null;
+    if(s.points){const xs=s.points.map(p=>p[0]),ys=s.points.map(p=>p[1]);return{x1:Math.min(...xs),y1:Math.min(...ys),x2:Math.max(...xs),y2:Math.max(...ys)};}
+    if(s.type==='text')return{x1:s.x-2,y1:s.y-s.size*8,x2:s.x+s.size*4*(s.text?.length||1),y2:s.y+4};
+    return{x1:Math.min(s.x1,s.x2),y1:Math.min(s.y1,s.y2),x2:Math.max(s.x1,s.x2),y2:Math.max(s.y1,s.y2)};
   }
-  function removeTab(id){
-    _s.tabs=_s.tabs.filter(t=>t.id!==id);
-    if(_s.activeTabId===id)_s.activeTabId=_s.tabs.length?_s.tabs[_s.tabs.length-1].id:null;
-    notify(['tabs','activeTabId']);
+  function isPalmContact(t){
+    if(!t)return false;
+    if(t.touchType==='stylus'||t.pointerType==='pen')return false;
+    const rx=t.radiusX||t.width/2||0,ry=t.radiusY||t.height/2||0;
+    if(!rx&&!ry)return false;
+    return rx>25||ry>25;
   }
-  function updateTab(id,patch){
-    _s.tabs=_s.tabs.map(t=>t.id===id?{...t,...patch}:t);notify(['tabs']);
+  function pruneEraserStrokes(strks){
+    const r={};
+    for(const[pg,arr]of Object.entries(strks||{})){
+      const f=(arr||[]).filter(s=>s.type!=='eraser');
+      if(f.length)r[pg]=f;
+    }
+    return r;
   }
-  function getTab(id){return _s.tabs.find(t=>t.id===(id||_s.activeTabId))||null}
-  function getActive(){return getTab(_s.activeTabId)}
-  function addRecent(info){
-    _s.recentFiles=[{...info,date:new Date().toISOString()},..._s.recentFiles.filter(r=>r.id!==info.id)].slice(0,20);
-    notify(['recentFiles']);
+  function cloneStrokes(strks){
+    return typeof structuredClone==='function'?structuredClone(strks):JSON.parse(JSON.stringify(strks));
   }
-  return{get,set,addTab,removeTab,updateTab,getTab,getActive,addRecent};
+  return{throttle,debounce,safeKey,distPtSeg,ptInPoly,strokeBBox,isPalmContact,pruneEraserStrokes,cloneStrokes};
 })();
 
-// ================================================================
-// STORAGE (IndexedDB + Journal)
-// ================================================================
-APP.Storage = (()=>{
-  const DB='FABAnnot_v1',VER=1;
-  const ST={pdfs:'pdfs',annots:'annots',journal:'journal',meta:'meta'};
+/* ============================================================
+   Module: IDBStore
+   責務: IndexedDB 保存キュー + ジャーナル + transaction.oncomplete保証
+   設計: 保存キューに積んで _flush() が1トランザクションで一括書き込み
+         同キーは最新値が勝つ（マージ）
+         ジャーナル: journal:pending → 書込 → journal:done
+         クラッシュ回復: 起動時に journal:pending 残存を検出 → resume:prv を試みる
+   ============================================================ */
+const IDBStore=(() => {
+  const DB_NAME='MViewerV2',DB_VER=1,ST='d';
   let _db=null;
-  let _pending=new Map(),_saving=false;
+  const _queue=[];  // Array<Map<key,value>>
+  let _flushing=false;
+  let _pendingSave=false;
+  let _isSaving=false; // 後方互換
 
-  const txDone=(tx)=>new Promise((ok,ng)=>{tx.oncomplete=ok;tx.onerror=()=>ng(tx.error);tx.onabort=()=>ng(new Error('aborted'))});
-  const iGet=(store,key)=>new Promise((ok,ng)=>{const r=_db.transaction(store,'readonly').objectStore(store).get(key);r.onsuccess=()=>ok(r.result||null);r.onerror=()=>ng(r.error)});
-  const iGetAll=(store)=>new Promise((ok,ng)=>{const r=_db.transaction(store,'readonly').objectStore(store).getAll();r.onsuccess=()=>ok(r.result||[]);r.onerror=()=>ng(r.error)});
-  const iPut=(store,obj)=>{const tx=_db.transaction(store,'readwrite');tx.objectStore(store).put(obj);return txDone(tx)};
-
-  async function init(){
-    return new Promise((ok,ng)=>{
-      const req=indexedDB.open(DB,VER);
-      req.onupgradeneeded=(e)=>{
-        const db=e.target.result;
-        if(!db.objectStoreNames.contains(ST.pdfs))db.createObjectStore(ST.pdfs,{keyPath:'id'});
-        if(!db.objectStoreNames.contains(ST.annots))db.createObjectStore(ST.annots,{keyPath:'key'});
-        if(!db.objectStoreNames.contains(ST.journal))db.createObjectStore(ST.journal,{keyPath:'id',autoIncrement:true});
-        if(!db.objectStoreNames.contains(ST.meta))db.createObjectStore(ST.meta,{keyPath:'key'});
-      };
-      req.onsuccess=(e)=>{_db=e.target.result;ok()};
-      req.onerror=(e)=>ng(e.target.error);
+  async function _open(){
+    if(_db)return _db;
+    return _db=await new Promise((res,rej)=>{
+      const req=indexedDB.open(DB_NAME,DB_VER);
+      req.onupgradeneeded=e=>e.target.result.createObjectStore(ST);
+      req.onsuccess=e=>res(e.target.result);
+      req.onerror=e=>rej(e.target.error);
     });
   }
 
-  async function savePDF(id,name,buffer,pageCount){
-    await iPut(ST.pdfs,{id,name,buffer,pageCount,savedAt:Date.now()});
-    const meta=await iGet(ST.meta,'recent')||{key:'recent',list:[]};
-    meta.list=[{id,name,pageCount,date:new Date().toISOString()},...meta.list.filter(r=>r.id!==id)].slice(0,20);
-    await iPut(ST.meta,meta);
-  }
-  async function loadPDF(id){return iGet(ST.pdfs,id)}
-  async function listPDFs(){const m=await iGet(ST.meta,'recent');return m?m.list:[]}
-
-  function queueSave(pdfId,page,strokes){
-    const k=`${pdfId}_${page}`;
-    _pending.set(k,{pdfId,page,strokes:APP.Utils.clone(strokes)});
-    _flush();
+  async function _doWrite(pairs){
+    const db=await _open();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(ST,'readwrite');
+      const st=tx.objectStore(ST);
+      for(const[k,v]of pairs){
+        if(v===null||v===undefined)st.delete(k);
+        else st.put(v,k);
+      }
+      tx.oncomplete=res;
+      tx.onerror=e=>rej(e.target.error);
+      tx.onabort=()=>rej(new Error('IDB tx aborted'));
+    });
   }
 
   async function _flush(){
-    if(_saving||!_pending.size)return;
-    _saving=true;
-    while(_pending.size){
-      const entries=[..._pending.entries()];_pending.clear();
-      for(const[key,{pdfId,page,strokes}]of entries){
-        try{
-          const jid=await _jWrite('save',{key});
-          await iPut(ST.annots,{key,pdfId,pageIndex:page,strokes,savedAt:Date.now()});
-          await _jDone(jid);
-          APP.EventBus.emit('storage:saved',{pdfId,page});
-        }catch(e){console.error('[Storage]',e);APP.EventBus.emit('storage:error',e)}
-      }
+    if(_flushing||_queue.length===0)return;
+    _flushing=true;
+    /* マージ: 同キーは最後の値が勝つ */
+    const merged=new Map();
+    for(const batch of _queue)for(const[k,v]of batch)merged.set(k,v);
+    _queue.length=0;
+    try{
+      await _doWrite([...merged]);
+      Logger.debug('[IDB] flushed',merged.size,'keys');
+    }catch(e){
+      Logger.warn('[IDB] flush failed, requeue',e);
+      _queue.unshift(merged); /* 失敗時は先頭に戻す */
     }
-    _saving=false;
+    _flushing=false;
+    if(_queue.length>0)setTimeout(_flush,30);
   }
 
-  async function _jWrite(op,data){
-    return new Promise((ok,ng)=>{
-      const tx=_db.transaction(ST.journal,'readwrite');
-      const req=tx.objectStore(ST.journal).add({op,data,t:Date.now(),done:false});
-      req.onsuccess=()=>ok(req.result);req.onerror=()=>ng(req.error);
-    });
-  }
-  async function _jDone(id){
-    const tx=_db.transaction(ST.journal,'readwrite');
-    const st=tx.objectStore(ST.journal);
-    await new Promise(ok=>{const r=st.get(id);r.onsuccess=()=>{if(r.result){r.result.done=true;r.result.doneAt=Date.now();st.put(r.result)}ok()}});
-    await txDone(tx);
+  /* 非同期キュー書き込み（通常の自動保存） */
+  function enqueue(pairs){
+    _queue.push(new Map(pairs));
+    setTimeout(_flush,0);
   }
 
-  async function loadAnnots(pdfId,page){
-    const r=await iGet(ST.annots,`${pdfId}_${page}`);return r?r.strokes:[];
-  }
-  async function loadAllAnnots(pdfId){
-    const all=await iGetAll(ST.annots);
-    const res={};
-    for(const r of all)if(r.pdfId===pdfId)res[r.pageIndex]=r.strokes;
-    return res;
+  /* 同期的に即書き込み（pagehide/visibilitychange用） */
+  async function saveNow(pairs){
+    try{await _doWrite(pairs);}
+    catch(e){Logger.warn('[IDB] saveNow failed',e);}
   }
 
-  async function backup(){
-    const zip=new JSZip();
-    const pdfs=await iGetAll(ST.pdfs);
-    const annots=await iGetAll(ST.annots);
-    for(const p of pdfs)zip.file(`pdfs/${p.id}.pdf`,p.buffer);
-    zip.file('annots.json',JSON.stringify(annots));
-    zip.file('meta.json',JSON.stringify({pdfs:pdfs.map(p=>({id:p.id,name:p.name,pageCount:p.pageCount,savedAt:p.savedAt})),at:new Date().toISOString()}));
-    return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+  async function get(key){
+    try{
+      const db=await _open();
+      return await new Promise(res=>{
+        const q=db.transaction(ST,'readonly').objectStore(ST).get(key);
+        q.onsuccess=e=>res(e.target.result??null);
+        q.onerror=()=>res(null);
+      });
+    }catch{return null;}
   }
 
-  async function restore(buf){
-    const zip=await JSZip.loadAsync(buf);
-    const mf=zip.file('meta.json');if(!mf)throw new Error('meta.json missing');
-    const meta=JSON.parse(await mf.async('string'));
-    const af=zip.file('annots.json');
-    const annots=af?JSON.parse(await af.async('string')):[];
-    for(const info of meta.pdfs){
-      const pf=zip.file(`pdfs/${info.id}.pdf`);
-      if(pf)await iPut(ST.pdfs,{...info,buffer:await pf.async('arraybuffer')});
-    }
-    for(const a of annots)await iPut(ST.annots,a);
-    await iPut(ST.meta,{key:'recent',list:meta.pdfs.map(p=>({...p,date:new Date(p.savedAt).toISOString()}))});
-  }
+  /* 起動時にDB接続をウォームアップ */
+  function warmup(){_open().catch(()=>{});}
 
-  async function checkJournal(){
-    const all=await iGetAll(ST.journal);
-    const incomplete=all.filter(j=>!j.done);
-    if(incomplete.length)APP.EventBus.emit('storage:journal-incomplete',{count:incomplete.length});
-    if(all.length>40){
-      const tx=_db.transaction(ST.journal,'readwrite');
-      const st=tx.objectStore(ST.journal);
-      const done=all.filter(j=>j.done).slice(0,-20);
-      for(const j of done)st.delete(j.id);
-      await txDone(tx);
-    }
-  }
-
-  return{init,savePDF,loadPDF,listPDFs,loadAnnots,loadAllAnnots,queueSave,backup,restore,checkJournal};
+  return{enqueue,saveNow,get,warmup,
+    get isSaving(){return _flushing;},
+    get pendingSave(){return _queue.length>0;}
+  };
 })();
 
-// ================================================================
-// HISTORY
-// ================================================================
-APP.History = (()=>{
-  const _s=new Map();const MAX=50;
-  const key=(a,b)=>`${a}_${b}`;
-  const ensure=(a,b)=>{const k=key(a,b);if(!_s.has(k))_s.set(k,{u:[],r:[]});return _s.get(k)};
-  function push(pid,pg,strokes){const s=ensure(pid,pg);s.u.push(APP.Utils.clone(strokes));if(s.u.length>MAX)s.u.shift();s.r=[];APP.EventBus.emit('history:changed',{pid,pg})}
-  function undo(pid,pg,cur){const s=ensure(pid,pg);if(!s.u.length)return null;s.r.push(APP.Utils.clone(cur));const p=s.u.pop();APP.EventBus.emit('history:changed',{pid,pg});return p}
-  function redo(pid,pg,cur){const s=ensure(pid,pg);if(!s.r.length)return null;s.u.push(APP.Utils.clone(cur));const n=s.r.pop();APP.EventBus.emit('history:changed',{pid,pg});return n}
-  function canU(pid,pg){return((_s.get(key(pid,pg))||{u:[]}).u.length>0)}
-  function canR(pid,pg){return((_s.get(key(pid,pg))||{r:[]}).r.length>0)}
-  return{push,undo,redo,canUndo:canU,canRedo:canR};
+/* ============================================================
+   Module: AutoSave
+   責務: 保存ライフサイクル管理
+   設計:
+     schedSave()    → 1200ms debounce
+     immediateSave()→ 即時（endDraw後）
+     emergencySave()→ pagehide/visibilitychange/blur/freeze
+   ============================================================ */
+const AutoSave=(() => {
+  let _timer=null;
+  let _bkDirty=false;
+  const INST_ID=(() => {
+    const KEY='mv_iid2';
+    let id=sessionStorage.getItem(KEY);
+    if(!id){id=Date.now().toString(36)+Math.random().toString(36).slice(2,7);sessionStorage.setItem(KEY,id);}
+    return id;
+  })();
+  const K_LAST='last:'+INST_ID;
+  const K_BK_LAT='bk:lat:'+INST_ID;
+
+  function _buildData(getState){
+    const s=getState();
+    if(!s.pdfDoc||!s.origBuf)return null;
+    const clean=Utils.pruneEraserStrokes(s.strokes);
+    return{
+      buf:null,docId:s.docId,file:s.fileName,
+      strokes:Utils.cloneStrokes(clean),
+      page:s.currentPage,scale:s.scale,panX:s.panX,panY:s.panY,
+      subWinStates:s.subWinStates,ts:Date.now()
+    };
+  }
+
+  function _lsBackup(data){
+    try{localStorage.setItem('mv_lsbk2',JSON.stringify({file:data.file,page:data.page,strokes:data.strokes,ts:data.ts}));}catch(_){}
+  }
+
+  function _saveKeys(data){
+    return[
+      [K_LAST,data],
+      ['f:'+Utils.safeKey(data.file),data],
+      ['resume:last',data],
+      ['resume:fname',data.file]
+    ];
+  }
+
+  function schedSave(getState){
+    _bkDirty=true;
+    clearTimeout(_timer);
+    _timer=setTimeout(async()=>{
+      const data=_buildData(getState);
+      if(!data)return;
+      Logger.info('[AutoSave] sched start ts='+data.ts);
+      IDBStore.enqueue(_saveKeys(data));
+      IDBStore.enqueue([['resume:prv',data]]);
+      /* 検証: resume:last を読み返してts確認 */
+      setTimeout(async()=>{
+        const v=await IDBStore.get('resume:last').catch(()=>null);
+        if(!v||v.ts<data.ts){
+          Logger.warn('[AutoSave] verify failed → re-enqueue');
+          IDBStore.enqueue(_saveKeys(data));
+        }else{
+          Logger.info('[AutoSave] verify OK ts='+data.ts);
+        }
+      },2000);
+    },SAVE_DELAY);
+  }
+
+  function immediateSave(getState){
+    const data=_buildData(getState);
+    if(!data)return;
+    _lsBackup(data);
+    Logger.info('[AutoSave] immediate ts='+data.ts);
+    IDBStore.enqueue(_saveKeys(data));
+  }
+
+  function emergencySave(getState){
+    const data=_buildData(getState);
+    if(!data)return;
+    _lsBackup(data);
+    Logger.info('[AutoSave] emergency ts='+data.ts);
+    IDBStore.saveNow(_saveKeys(data)).catch(()=>{});
+  }
+
+  function isValid(s){
+    if(!s||typeof s!=='object')return false;
+    if(typeof s.file!=='string'||!s.file)return false;
+    if(typeof s.ts==='number'&&Date.now()-s.ts>30*24*60*60*1000)return false;
+    return true;
+  }
+
+  function markDirty(){_bkDirty=true;}
+  function clearDirty(){_bkDirty=false;}
+  function isDirty(){return _bkDirty;}
+
+  return{schedSave,immediateSave,emergencySave,isValid,markDirty,clearDirty,isDirty,
+    get instId(){return INST_ID;}};
 })();
 
-// ================================================================
-// PDF ENGINE
-// ================================================================
-APP.PDF = (()=>{
-  const _docs=new Map(),_tasks=new Map();
-  if(typeof pdfjsLib!=='undefined'){
-    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+/* 60秒周期バックグラウンド保存 */
+setInterval(()=>EventBus.emit('autosave:periodic'),60000);
+
+/* ============================================================
+   Module: DocMgr
+   責務: ドキュメント一覧管理（IDB doclist / doc:{id}）
+   ============================================================ */
+const DocMgr=(() => {
+  let _docId=null;
+  function _newId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+  async function _getList(){return(await IDBStore.get('doclist'))||[];}
+  async function _setList(list){IDBStore.enqueue([['doclist',list]]);}
+
+  async function open(name,pdfBytes,strokes,currentPage){
+    try{
+      const list=await _getList();
+      let entry=list.find(e=>e.name===name);
+      const now=Date.now();
+      if(!entry){
+        entry={id:_newId(),name,createdAt:now,updatedAt:now,pages:0,byteSize:pdfBytes?.byteLength||0};
+        list.unshift(entry);
+      }else{entry.updatedAt=now;entry.byteSize=pdfBytes?.byteLength||entry.byteSize;}
+      _docId=entry.id;
+      await _setList(list);
+      IDBStore.enqueue([['doc:'+_docId,{
+        id:_docId,name,createdAt:entry.createdAt,updatedAt:now,
+        originalPdfBytes:pdfBytes?pdfBytes.slice(0):null,
+        strokes:strokes||{},currentPage:currentPage||1
+      }]]);
+    }catch(e){Logger.warn('[DocMgr.open]',e);}
+    return _docId;
   }
-  async function load(id,buf){
-    if(_docs.has(id))return _docs.get(id);
-    const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf.slice(0)),enableXfa:false}).promise;
-    _docs.set(id,doc);return doc;
+
+  async function updateStrokes(strokes,currentPage){
+    if(!_docId)return;
+    try{
+      const doc=await IDBStore.get('doc:'+_docId);
+      if(!doc)return;
+      doc.strokes=strokes;doc.currentPage=currentPage||doc.currentPage;doc.updatedAt=Date.now();
+      IDBStore.enqueue([['doc:'+_docId,doc]]);
+      const list=await _getList();
+      const entry=list.find(e=>e.id===_docId);
+      if(entry){entry.updatedAt=doc.updatedAt;_setList(list);}
+    }catch(e){Logger.warn('[DocMgr.updateStrokes]',e);}
   }
-  function getDoc(id){return _docs.get(id)||null}
-  function count(id){const d=_docs.get(id);return d?d.numPages:0}
-  async function getPage(id,pg){const d=_docs.get(id);if(!d)throw new Error('not loaded');return d.getPage(pg+1)}
-  async function render(id,pg,canvas,scale=1.5){
-    const tk=`${id}_${pg}`;
-    if(_tasks.has(tk)){try{_tasks.get(tk).cancel()}catch(e){}; _tasks.delete(tk)}
-    const page=await getPage(id,pg);
-    const vp=page.getViewport({scale});
-    canvas.width=Math.floor(vp.width);canvas.height=Math.floor(vp.height);
-    const ctx=canvas.getContext('2d');
-    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
-    const task=page.render({canvasContext:ctx,viewport:vp});
-    _tasks.set(tk,task);
-    try{await task.promise;_tasks.delete(tk)}
-    catch(e){if(e.name!=='RenderingCancelledException')throw e}
-    return{w:canvas.width,h:canvas.height};
+
+  async function findByName(name){
+    const list=await _getList();
+    const entry=list.find(e=>e.name===name);
+    if(!entry)return null;
+    return IDBStore.get('doc:'+entry.id);
   }
-  async function getSize(id,pg){const p=await getPage(id,pg);const v=p.getViewport({scale:1});return{w:v.width,h:v.height}}
-  async function renderThumb(id,pg,canvas,tw=180){
-    const sz=await getSize(id,pg);
-    return render(id,pg,canvas,tw/sz.w);
+
+  async function list(){
+    const list=await _getList();
+    return[...list].sort((a,b)=>b.updatedAt-a.updatedAt);
   }
-  function unload(id){const d=_docs.get(id);if(d){d.destroy();_docs.delete(id)}}
-  return{load,getDoc,count,render,getSize,renderThumb,unload};
+  async function get(id){return IDBStore.get('doc:'+id);}
+  async function remove(id){
+    IDBStore.enqueue([['doc:'+id,null]]);
+    const list=await _getList();
+    await _setList(list.filter(e=>e.id!==id));
+    if(_docId===id)_docId=null;
+  }
+  function setId(id){if(id)_docId=id;}
+  function reset(){_docId=null;}
+  return{open,updateStrokes,findByName,list,get,remove,setId,reset,get currentId(){return _docId;}};
 })();
 
-// ================================================================
-// RENDER ENGINE
-// ================================================================
-APP.Render = (()=>{
-  let _L={pdf:null,annot:null,draw:null,ui:null};
-  let _strokes=[],_active=null,_dirty=true,_scheduled=false;
-
-  function init(layers){Object.assign(_L,layers)}
-
-  function setStrokes(s){_strokes=s||[];_dirty=true;_sched()}
-  function setActive(s){_active=s;_sched()}
-  function clearActive(){_active=null;_sched()}
-
-  function _sched(){if(_scheduled)return;_scheduled=true;requestAnimationFrame(_frame)}
-  function _frame(){
-    _scheduled=false;
-    if(_dirty){_drawAnnot();_dirty=false}
-    _drawDraw();
-  }
-
-  function _drawAnnot(){
-    const c=_L.annot;if(!c||!c.width)return;
-    const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);
-    for(const s of _strokes)drawStroke(ctx,s);
-  }
-  function _drawDraw(){
-    const c=_L.draw;if(!c||!c.width)return;
-    const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);
-    if(_active)drawStroke(ctx,_active);
-  }
-
-  function drawStroke(ctx,s){
-    if(!s)return;
+/* ============================================================
+   Module: DrawUtil
+   責務: ストローク描画アルゴリズム（Main + SubWin 共通）
+   ============================================================ */
+const DrawUtil=(() => {
+  function drawStroke(s,ctx,sc){
     ctx.save();
-    ctx.globalAlpha=s.opacity??1;
-    ctx.strokeStyle=s.color||'#e94560';
-    ctx.fillStyle=s.color||'#e94560';
-    ctx.lineWidth=s.size||2;
-    ctx.lineCap='round';ctx.lineJoin='round';
-    if(s.type==='pen'||s.type==='highlight'){
-      if(s.type==='highlight'){ctx.globalCompositeOperation='multiply';ctx.lineWidth=Math.max(s.size||12,8);ctx.globalAlpha=0.38}
-      const p=s.points||[];
-      if(p.length===0){ctx.restore();return}
-      if(p.length===1){ctx.beginPath();ctx.arc(p[0][0],p[0][1],(s.size||2)/2,0,Math.PI*2);ctx.fill();ctx.restore();return}
-      ctx.beginPath();ctx.moveTo(p[0][0],p[0][1]);
-      for(let i=1;i<p.length-1;i++){const mx=(p[i][0]+p[i+1][0])/2,my=(p[i][1]+p[i+1][1])/2;ctx.quadraticCurveTo(p[i][0],p[i][1],mx,my)}
-      ctx.lineTo(p[p.length-1][0],p[p.length-1][1]);ctx.stroke();
-    }else if(s.type==='line'){
-      const[x1,y1,x2,y2]=s.coords||[0,0,0,0];
-      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-    }else if(s.type==='rect'){
-      const[x,y,w,h]=s.coords||[0,0,0,0];
-      ctx.strokeRect(x,y,w,h);
-    }else if(s.type==='circle'){
-      const[cx,cy,rx,ry]=s.coords||[0,0,0,0];
-      ctx.beginPath();ctx.ellipse(cx,cy,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2);ctx.stroke();
+    const lw=s.size*sc/3;
+    if(s.type==='eraser'){
+      ctx.globalCompositeOperation='destination-out';
+      ctx.lineWidth=lw*4;ctx.lineCap='round';ctx.lineJoin='round';
+      ctx.beginPath();
+      s.points.forEach((p,i)=>i?ctx.lineTo(p[0]*sc,p[1]*sc):ctx.moveTo(p[0]*sc,p[1]*sc));
+      ctx.stroke();
+    }else if(s.type==='pen'||s.type==='hl'){
+      ctx.globalCompositeOperation='source-over';
+      ctx.globalAlpha=s.type==='hl'?0.38:1;
+      ctx.strokeStyle=s.color;
+      ctx.lineWidth=s.type==='hl'?Math.max(lw*4,5*sc/3):lw;
+      ctx.lineCap='round';ctx.lineJoin='round';
+      const pts=s.points;
+      if(pts&&pts.length){
+        ctx.beginPath();ctx.moveTo(pts[0][0]*sc,pts[0][1]*sc);
+        for(let i=1;i<pts.length-1;i++){
+          const mx=(pts[i][0]+pts[i+1][0])/2*sc,my=(pts[i][1]+pts[i+1][1])/2*sc;
+          ctx.quadraticCurveTo(pts[i][0]*sc,pts[i][1]*sc,mx,my);
+        }
+        if(pts.length>1)ctx.lineTo(pts[pts.length-1][0]*sc,pts[pts.length-1][1]*sc);
+        ctx.stroke();
+      }
     }else if(s.type==='text'){
-      ctx.font=`${s.size||16}px -apple-system,sans-serif`;
-      ctx.fillStyle=s.color;ctx.globalAlpha=s.opacity??1;
-      (s.text||'').split('\n').forEach((ln,i)=>ctx.fillText(ln,s.x||0,(s.y||0)+i*(s.size||16)*1.4));
+      ctx.fillStyle=s.color;
+      ctx.font=`bold ${Math.round(s.size*6*sc)}px 'Helvetica Neue',Arial,sans-serif`;
+      s.text.split('\n').forEach((line,i)=>ctx.fillText(line,s.x*sc,s.y*sc+i*s.size*7*sc));
+    }else{
+      ctx.strokeStyle=s.color;ctx.lineWidth=lw;ctx.lineCap='round';
+      const[x1,y1,x2,y2]=[s.x1*sc,s.y1*sc,s.x2*sc,s.y2*sc];
+      if(s.type==='rect'){ctx.strokeRect(x1,y1,x2-x1,y2-y1);}
+      else if(s.type==='circle'){const rx=(x2-x1)/2,ry=(y2-y1)/2;ctx.beginPath();ctx.ellipse(x1+rx,y1+ry,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2);ctx.stroke();}
+      else if(s.type==='line'){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
+      else if(s.type==='arrow'){
+        const hl=Math.max(lw*4,12*sc),ang=Math.atan2(y2-y1,x2-x1);
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(ang-Math.PI/6),y2-hl*Math.sin(ang-Math.PI/6));
+        ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(ang+Math.PI/6),y2-hl*Math.sin(ang+Math.PI/6));
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
 
-  function resize(w,h){
-    for(const c of Object.values(_L))if(c){c.width=w;c.height=h}
-    _dirty=true;_sched();
+  function drawAnnotations(ctx,strks,sc){
+    if(!strks?.length)return;
+    strks.forEach(s=>drawStroke(s,ctx,sc));
   }
 
-  function clearUI(){const c=_L.ui;if(c)c.getContext('2d').clearRect(0,0,c.width,c.height)}
-  function drawCursor(x,y,sz,col){
-    const c=_L.ui;if(!c)return;
-    const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);
-    ctx.beginPath();ctx.arc(x,y,Math.max(sz/2,4),0,Math.PI*2);
-    ctx.strokeStyle=col||'#fff';ctx.lineWidth=1.5;ctx.stroke();
+  function drawLivePen(ctx,s,sc){
+    ctx.save();
+    ctx.globalCompositeOperation='source-over';
+    ctx.globalAlpha=s.type==='hl'?0.38:1;
+    ctx.strokeStyle=s.color;
+    ctx.lineWidth=s.type==='hl'?Math.max(s.size*4,5)*sc/3:s.size*sc/3;
+    ctx.lineCap='round';ctx.lineJoin='round';
+    const pts=s.points;
+    if(pts.length>=3){
+      const pp=pts[pts.length-3],cp=pts[pts.length-2],cur=pts[pts.length-1];
+      const pmx=(pp[0]+cp[0])/2*sc,pmy=(pp[1]+cp[1])/2*sc;
+      const cmx=(cp[0]+cur[0])/2*sc,cmy=(cp[1]+cur[1])/2*sc;
+      ctx.beginPath();ctx.moveTo(pmx,pmy);ctx.quadraticCurveTo(cp[0]*sc,cp[1]*sc,cmx,cmy);ctx.stroke();
+    }else if(pts.length===2){
+      const p=pts[0],q=pts[1];ctx.beginPath();ctx.moveTo(p[0]*sc,p[1]*sc);ctx.lineTo(q[0]*sc,q[1]*sc);ctx.stroke();
+    }
+    ctx.restore();
   }
 
-  return{init,setStrokes,setActive,clearActive,resize,clearUI,drawCursor,drawStroke};
+  function drawEraserCursor(ctx,p,s,sc,invEZ){
+    ctx.save();
+    ctx.strokeStyle='#888';ctx.lineWidth=Math.max(1,1.5*invEZ);
+    ctx.setLineDash([4*invEZ,2*invEZ]);
+    ctx.beginPath();ctx.arc(p.x*sc,p.y*sc,s.size*2*sc/3,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
+  }
+
+  /* 消しゴム: ペン点からセグメントへの距離で部分削除 */
+  function _distPtSeg(px,py,ax,ay,bx,by){return Utils.distPtSeg(px,py,ax,ay,bx,by);}
+
+  function applyEraser(penStroke,erPts,hitR){
+    if(!penStroke.points?.length||erPts.length===0)return[penStroke];
+    const ptHits=(px,py)=>{
+      if(Math.hypot(px-erPts[0][0],py-erPts[0][1])<hitR)return true;
+      for(let i=1;i<erPts.length;i++){
+        if(_distPtSeg(px,py,erPts[i-1][0],erPts[i-1][1],erPts[i][0],erPts[i][1])<hitR)return true;
+      }
+      return false;
+    };
+    const kept=penStroke.points.map(pp=>ptHits(pp[0],pp[1])?null:pp);
+    for(let j=1;j<kept.length;j++){
+      if(kept[j-1]===null||kept[j]===null)continue;
+      const[ax,ay]=kept[j-1],[bx,by]=kept[j];
+      if(ptHits((ax+bx)/2,(ay+by)/2)){kept[j-1]=null;kept[j]=null;continue;}
+      if(Math.hypot(bx-ax,by-ay)>hitR*2){
+        if(ptHits(ax*.75+bx*.25,ay*.75+by*.25)||ptHits(ax*.25+bx*.75,ay*.25+by*.75)){kept[j-1]=null;kept[j]=null;}
+      }
+    }
+    const result=[];let seg=[];
+    for(const p of kept){
+      if(p!==null){seg.push(p);}
+      else{if(seg.length>=2)result.push({...penStroke,points:[...seg]});seg=[];}
+    }
+    if(seg.length>=2)result.push({...penStroke,points:[...seg]});
+    return result;
+  }
+
+  function applyEraserAll(stroke,erPts,hitR){
+    if(stroke.type==='text')return[stroke];
+    if((stroke.type==='pen'||stroke.type==='hl')&&stroke.points?.length)return applyEraser(stroke,erPts,hitR);
+    const bb=Utils.strokeBBox(stroke);if(!bb)return[stroke];
+    for(let i=0;i<erPts.length;i++){
+      const[ex,ey]=erPts[i];
+      if(ex>=bb.x1-hitR&&ex<=bb.x2+hitR&&ey>=bb.y1-hitR&&ey<=bb.y2+hitR)return[];
+      if(i>0){
+        const cx=(bb.x1+bb.x2)/2,cy=(bb.y1+bb.y2)/2;
+        const reach=hitR+Math.hypot(bb.x2-bb.x1,bb.y2-bb.y1)/2;
+        if(_distPtSeg(cx,cy,erPts[i-1][0],erPts[i-1][1],ex,ey)<reach)return[];
+      }
+    }
+    return[stroke];
+  }
+
+  /* PDF回転補正 */
+  function rotateCanvas(src,jsPage,pw,ph,rs){
+    const rot=jsPage.rotate||0;if(!rot)return src;
+    const dc=document.createElement('canvas');
+    dc.width=Math.round(pw*rs);dc.height=Math.round(ph*rs);
+    const ctx=dc.getContext('2d');
+    if(rot===90){ctx.translate(0,ph*rs);ctx.rotate(-Math.PI/2);}
+    else if(rot===180){ctx.translate(pw*rs,ph*rs);ctx.rotate(Math.PI);}
+    else if(rot===270){ctx.translate(pw*rs,0);ctx.rotate(Math.PI/2);}
+    ctx.drawImage(src,0,0);return dc;
+  }
+
+  return{drawStroke,drawAnnotations,drawLivePen,drawEraserCursor,applyEraser,applyEraserAll,rotateCanvas};
 })();
 
-// ================================================================
-// TOOLS
-// ================================================================
-APP.Tools = (()=>{
-  let _drawing=false,_cur=null,_start=null;
-  let _pid=null,_pg=0,_strokes=[],_rscale=1.5;
+/* ============================================================
+   Module: SubWinManager
+   責務: サブ窓ライフサイクル + グローバルイベント1本化
+   設計: document に touchmove/touchend/mousemove/mouseup を1本ずつ
+         アクティブなサブ窓の onMove/onEnd コールバックに委譲
+   ============================================================ */
+const SubWinManager=(() => {
+  const _wins=[];
+  let _zBase=200;
+  /* グローバルシングルトン: ドラッグ/リサイズ中のコールバック */
+  const _active={onMove:null,onEnd:null};
 
-  function coords(e,c){
-    const r=c.getBoundingClientRect();
-    return[(e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height)];
+  /* document に1本だけイベントを登録（初期化時に1回だけ実行） */
+  document.addEventListener('touchmove',e=>{
+    if(_active.onMove){if(e.cancelable)e.preventDefault();_active.onMove(e);}
+  },{passive:false});
+  document.addEventListener('touchend',e=>{if(_active.onEnd)_active.onEnd(e);},{passive:true});
+  document.addEventListener('mousemove',e=>{if(_active.onMove)_active.onMove(e);},{passive:true});
+  document.addEventListener('mouseup',e=>{if(_active.onEnd)_active.onEnd(e);},{passive:true});
+
+  function setActive(onMove,onEnd){_active.onMove=onMove;_active.onEnd=onEnd;}
+  function clearActive(){_active.onMove=null;_active.onEnd=null;}
+  function nextZ(){return++_zBase;}
+  function add(sw){_wins.push(sw);}
+  function remove(sw){const i=_wins.indexOf(sw);if(i>=0)_wins.splice(i,1);}
+  function getAll(){return[..._wins];}
+  function count(){return _wins.length;}
+  function updateAll(strokes,pageNum){
+    if(!Logger.flags.subWindowUpdate)return;
+    _wins.forEach(sw=>sw.update(strokes,pageNum));
+  }
+  function closeAll(){[..._wins].forEach(sw=>sw.close());}
+  function snapAll(){
+    return _wins.map(sw=>({
+      pageNum:sw.pageNum,offX:sw.offX,offY:sw.offY,
+      innerScale:sw.innerScale,
+      winW:sw.el.clientWidth||sw.winW,winH:sw.el.clientHeight||sw.winH,
+      left:sw.el.style.left,top:sw.el.style.top,
+      rW:(sw.cvs.width||400)/sw.innerScale,rH:(sw.cvs.height||300)/sw.innerScale
+    }));
+  }
+  function freezeAll(){const st=snapAll();closeAll();return st;}
+  function thawAll(states,pdfDoc,strokes){
+    if(!states||!pdfDoc)return;
+    states.forEach(s=>{
+      if(_wins.length>=MAX_SUBWIN)return;
+      const region={x1:s.offX,y1:s.offY,x2:s.offX+(s.rW||200),y2:s.offY+(s.rH||200)};
+      const sx=parseFloat(s.left)||80,sy=parseFloat(s.top)||80;
+      const sw=new SubWin(pdfDoc,strokes,s.pageNum,region,sx,sy,s.innerScale);
+      if(s.winW&&s.winH){sw.winW=s.winW;sw.winH=s.winH;sw.el.style.width=s.winW+'px';sw.el.style.height=s.winH+'px';}
+    });
+  }
+  return{setActive,clearActive,nextZ,add,remove,getAll,count,updateAll,closeAll,snapAll,freezeAll,thawAll};
+})();
+
+/* ============================================================
+   Class: SubWin
+   責務: 1つのサブウィンドウの描画・入力・ドラッグ・リサイズ
+   ============================================================ */
+class SubWin{
+  constructor(pdfDoc,strokes,pageNum,region,screenX,screenY,initScale){
+    this.pdfDoc=pdfDoc;this.strokes=strokes;this.pageNum=pageNum;
+    this.innerScale=Math.max(.2,Math.min(8,initScale||1));
+    this.offX=region.x1;this.offY=region.y1;
+    const rW=region.x2-region.x1,rH=region.y2-region.y1;
+    this.winW=Math.max(180,Math.round(rW*this.innerScale)+4);
+    this.winH=Math.max(160,Math.round(rH*this.innerScale)+30);
+    this.sx=Math.max(4,Math.min(window.innerWidth-this.winW-10,screenX));
+    this.sy=Math.max(4,Math.min(window.innerHeight-this.winH-10,screenY));
+    this.pinch=null;this.panSt=null;this.curStroke=null;this.isDrawing=false;
+    this.lastX=0;this.lastY=0;this.selPath=[];this.selectedIdx=[];
+    this._renderVer=0;this._pdfCache=null;this._pdfCacheSc=0;this._pdfCachePg=0;
+    this._annCvs=null;this._annDirty=true;this._cleanups=[];this._drawRafId=null;
+    const idx=SubWinManager.count();
+    this.swColor=SW_COLORS[idx%MAX_SUBWIN];this.swFill=SW_FILLS[idx%MAX_SUBWIN];
+    this._build();
+    SubWinManager.add(this);
+    requestAnimationFrame(()=>this.render());
   }
 
-  function setCtx(pid,pg,strokes,rscale){
-    _pid=pid;_pg=pg;_strokes=strokes||[];_rscale=rscale||1.5;
-    APP.Render.setStrokes(_strokes);
+  _build(){
+    const el=document.createElement('div');
+    el.className='swn';
+    el.style.cssText=`left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${SubWinManager.nextZ()};border-color:${this.swColor}`;
+    const n=SubWinManager.count()+1;
+    el.innerHTML=`<div class="swn-tb"><span>🔍 サブ窓${n}</span><button class="swn-close">✕</button></div>
+<div class="swn-body"><canvas class="swn-cvs"></canvas><canvas class="swn-sel" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas><span class="swn-zl"></span></div>
+<div class="swn-rz"></div><div class="swn-rz-sw"></div><div class="swn-rz-nw"></div>`;
+    el.classList.add('swn-appearing','swn-loading');
+    this.el=el;
+    this.body=el.querySelector('.swn-body');
+    this.cvs=el.querySelector('.swn-cvs');
+    this.ctx=this.cvs.getContext('2d');
+    this.selCvs=el.querySelector('.swn-sel');
+    this.selCtx=this.selCvs.getContext('2d');
+    this.zlEl=el.querySelector('.swn-zl');
+    el.querySelector('.swn-close').addEventListener('pointerdown',e=>{e.stopPropagation();this.close();});
+    el.addEventListener('pointerdown',()=>{el.style.zIndex=SubWinManager.nextZ();},{capture:true,passive:true});
+    this._bindDrag(el.querySelector('.swn-tb'));
+    this._bindResize(el.querySelector('.swn-rz'),'se');
+    this._bindResize(el.querySelector('.swn-rz-sw'),'sw');
+    this._bindResize(el.querySelector('.swn-rz-nw'),'nw');
+    this._bindInput();
+    document.body.appendChild(el);
   }
-  function getStrokes(){return _strokes}
 
-  function onDown(e,c){
-    const st=APP.State.get();
-    if(st.tool==='select')return;
+  _bodyRect(){return this.body.getBoundingClientRect();}
+  _toDocPos(t){const r=this._bodyRect();return{x:(t.clientX-r.left)/this.innerScale+this.offX,y:(t.clientY-r.top)/this.innerScale+this.offY};}
+  _updateTransform(){
+    this.cvs.style.transform=`translate(${-this.offX*this.innerScale}px,${-this.offY*this.innerScale}px)`;
+    EventBus.emit('subwin:transform');
+  }
+
+  async render(){
+    if(!this.pdfDoc)return;
+    const ver=++this._renderVer;
+    const sc=this.innerScale;
+    const page=await this.pdfDoc.getPage(this.pageNum);
+    const vp=page.getViewport({scale:sc});
+    if(!this._pdfCache||this._pdfCacheSc!==sc||this._pdfCachePg!==this.pageNum){
+      const off=document.createElement('canvas');
+      off.width=vp.width;off.height=vp.height;
+      const c=off.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,vp.width,vp.height);
+      await page.render({canvasContext:c,viewport:vp}).promise;
+      this._pdfCache=off;this._pdfCacheSc=sc;this._pdfCachePg=this.pageNum;
+    }
+    if(this._annDirty||!this._annCvs||this._annCvs.width!==vp.width||this._annCvs.height!==vp.height){
+      if(!this._annCvs)this._annCvs=document.createElement('canvas');
+      this._annCvs.width=vp.width;this._annCvs.height=vp.height;
+      const ac=this._annCvs.getContext('2d');ac.clearRect(0,0,vp.width,vp.height);
+      DrawUtil.drawAnnotations(ac,this.strokes[this.pageNum]||[],sc);
+      this._annDirty=false;
+    }
+    if(ver!==this._renderVer)return;
+    this.cvs.width=vp.width;this.cvs.height=vp.height;
+    this.cvs.style.width=vp.width+'px';this.cvs.style.height=vp.height+'px';
+    this.ctx.clearRect(0,0,vp.width,vp.height);
+    this.ctx.drawImage(this._pdfCache,0,0);
+    this.ctx.drawImage(this._annCvs,0,0);
+    this._updateTransform();
+    this.zlEl.textContent=Math.round(sc*100)+'%';
+    this.el?.classList.remove('swn-loading');
+  }
+
+  _bindInput(){
+    const cv=this.cvs;
+    const isStylus=t=>(t.touchType==='stylus'||t.pointerType==='pen'||t.touchType==null);
+    cv.addEventListener('touchstart',e=>{
+      e.preventDefault();e.stopPropagation();
+      if(e.touches.length>=2){
+        const hasSt=Array.from(e.touches).some(t=>isStylus(t));
+        if(hasSt||this.isDrawing)return;
+        this.panSt=null;this._startPinch(e.touches);return;
+      }
+      const t=e.touches[0];
+      if(Utils.isPalmContact(t))return;
+      const needPen=['pen','hl'].includes(App.currentTool);
+      if((needPen&&!isStylus(t))||App.currentTool==='sub'){this._startPan(t);return;}
+      this._startDraw(t);
+    },{passive:false});
+    cv.addEventListener('touchmove',e=>{
+      e.preventDefault();e.stopPropagation();
+      if(e.touches.length>=2&&this.pinch){this._movePinch(e.touches);return;}
+      if(this.panSt){this._movePan(e.touches[0]);return;}
+      if(this.isDrawing)this._moveDraw(e.touches[0]);
+    },{passive:false});
+    cv.addEventListener('touchend',e=>{
+      e.stopPropagation();
+      if(this.pinch&&e.touches.length<2){this._endPinch();return;}
+      if(this.panSt){this.panSt=null;return;}
+      if(this.isDrawing)this._endDraw();
+    });
+    cv.addEventListener('wheel',e=>{
+      e.preventDefault();e.stopPropagation();
+      const r=e.deltaY<0?1.15:.87;
+      const br=this._bodyRect(),bx=e.clientX-br.left,by=e.clientY-br.top;
+      const pdfX=bx/this.innerScale+this.offX,pdfY=by/this.innerScale+this.offY;
+      const ns=Math.max(.2,Math.min(8,this.innerScale*r));
+      this.offX=pdfX-bx/ns;this.offY=pdfY-by/ns;
+      this.innerScale=ns;this._pdfCache=null;this.render();
+    },{passive:false});
+  }
+
+  _pinchDist(t){const dx=t[1].clientX-t[0].clientX,dy=t[1].clientY-t[0].clientY;return Math.sqrt(dx*dx+dy*dy);}
+  _pinchMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
+  _startPinch(t){const m=this._pinchMid(t),br=this._bodyRect(),bx=m.x-br.left,by=m.y-br.top;this.pinch={d0:this._pinchDist(t),s0:this.innerScale,pdfX:bx/this.innerScale+this.offX,pdfY:by/this.innerScale+this.offY};}
+  _movePinch(t){const p=this.pinch,r=this._pinchDist(t)/p.d0,m=this._pinchMid(t),br=this._bodyRect();p.lastMx=m.x-br.left;p.lastMy=m.y-br.top;p.target=Math.max(.2,Math.min(8,p.s0*r));const tx=p.lastMx-p.pdfX*p.target,ty=p.lastMy-p.pdfY*p.target,cssR=p.target/p.s0;this.cvs.style.transformOrigin='0 0';this.cvs.style.transform=`translate(${tx}px,${ty}px) scale(${cssR})`;this.zlEl.textContent=Math.round(p.target*100)+'%';}
+  _endPinch(){if(!this.pinch)return;const p=this.pinch;this.pinch=null;this.innerScale=p.target;if(p.lastMx!==undefined){this.offX=p.pdfX-p.lastMx/p.target;this.offY=p.pdfY-p.lastMy/p.target;}this.cvs.style.transform='';this._pdfCache=null;this.render();}
+  _startPan(t){this.panSt={x0:t.clientX,y0:t.clientY,ox0:this.offX,oy0:this.offY};}
+  _movePan(t){if(!this.panSt)return;this.offX=this.panSt.ox0-(t.clientX-this.panSt.x0)/this.innerScale;this.offY=this.panSt.oy0-(t.clientY-this.panSt.y0)/this.innerScale;this._updateTransform();}
+
+  _startDraw(t){
+    const p=this._toDocPos(t);
+    if(App.currentTool==='text'){App._textAt(p.x,p.y);return;}
+    if(App.currentTool==='select'){
+      if(this.selectedIdx.length>0){
+        const bb=this._selBBox();
+        if(bb&&p.x>=bb.x1-10&&p.x<=bb.x2+10&&p.y>=bb.y1-10&&p.y<=bb.y2+10){this.isDrawing=true;this.lastX=p.x;this.lastY=p.y;return;}
+        this._clearSel();
+      }
+      this.selPath=[{x:p.x,y:p.y}];this.isDrawing=true;return;
+    }
+    this.isDrawing=true;this.lastX=p.x;this.lastY=p.y;
+    const tool=App.currentTool==='shape'?App.currentShape:App.currentTool;
+    this.curStroke=['pen','hl','eraser'].includes(tool)
+      ?{type:tool,points:[[p.x,p.y]],color:App.strokeColor,size:App.strokeSize}
+      :{type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:App.strokeColor,size:App.strokeSize};
+  }
+  _moveDraw(t){
+    if(App.currentTool==='select'&&this.isDrawing){
+      const p=this._toDocPos(t);
+      if(this.selectedIdx.length>0&&!this.selPath.length){this._moveSel(p.x-this.lastX,p.y-this.lastY);this.lastX=p.x;this.lastY=p.y;this.render();this._drawSelOv();return;}
+      this.selPath.push({x:p.x,y:p.y});this._drawSelPreview();return;
+    }
+    if(!this.curStroke)return;
+    const p=this._toDocPos(t),s=this.curStroke,sc=this.innerScale;
+    if(['pen','hl'].includes(s.type)){s.points.push([p.x,p.y]);DrawUtil.drawLivePen(this.ctx,s,sc);this.lastX=p.x;this.lastY=p.y;}
+    else if(s.type==='eraser'){
+      s.points.push([p.x,p.y]);this.lastX=p.x;this.lastY=p.y;
+      const br=this._bodyRect();
+      this.selCvs.width=Math.round(br.width);this.selCvs.height=Math.round(br.height);
+      this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
+      DrawUtil.drawEraserCursor(this.selCtx,{x:(p.x-this.offX),y:(p.y-this.offY)},s,sc,1);
+    }else{
+      s.x2=p.x;s.y2=p.y;
+      cancelAnimationFrame(this._drawRafId);
+      this._drawRafId=requestAnimationFrame(()=>this.render());
+    }
+  }
+  _endDraw(){
+    if(App.currentTool==='select'&&this.isDrawing){
+      this.isDrawing=false;
+      if(this.selectedIdx.length>0&&!this.selPath.length){this.render();this._drawSelOv();EventBus.emit('stroke:added');return;}
+      this._finishSel();return;
+    }
+    if(!this.isDrawing||!this.curStroke){this.isDrawing=false;return;}
+    this.isDrawing=false;
+    if(!this.strokes[this.pageNum])this.strokes[this.pageNum]=[];
+    const s=this.curStroke;
+    if(s.type==='eraser'){
+      const r=(s.size||20)*2/3;
+      this.strokes[this.pageNum]=this.strokes[this.pageNum].flatMap(st=>DrawUtil.applyEraserAll(st,s.points||[],r));
+    }else{
+      if(this.strokes[this.pageNum].length>=MAX_STROKES_PER_PAGE)this.strokes[this.pageNum].shift();
+      this.strokes[this.pageNum].push({...s,points:s.points?[...s.points]:undefined});
+    }
+    this.curStroke=null;this._annDirty=true;
+    if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
+    this.render();EventBus.emit('stroke:added');
+  }
+
+  _bindDrag(handle){
+    let dragging=false,ox=0,oy=0,ex=0,ey=0;
+    const onStart=e=>{
+      if(e.target.closest('.swn-close'))return;
+      dragging=true;const s=e.touches?e.touches[0]:e;ox=s.clientX;oy=s.clientY;
+      const r=this.el.getBoundingClientRect();ex=r.left;ey=r.top;e.preventDefault();
+      SubWinManager.setActive(onMove,onEnd);
+    };
+    const onMove=e=>{
+      if(!dragging)return;const s=e.touches?e.touches[0]:e;
+      const vw=window.innerWidth,ew=this.el.offsetWidth||200;
+      const newL=Math.max(0,Math.min(vw-ew,ex+s.clientX-ox));
+      const newT=Math.max(0,Math.min(window.innerHeight-30,ey+s.clientY-oy));
+      this.el.style.left=newL+'px';this.el.style.top=newT+'px';
+    };
+    const onEnd=()=>{dragging=false;SubWinManager.clearActive();};
+    handle.addEventListener('touchstart',onStart,{passive:false});
+    handle.addEventListener('mousedown',onStart);
+    this._cleanups.push(()=>{if(dragging){dragging=false;SubWinManager.clearActive();}});
+  }
+
+  _bindResize(handle,corner){
+    let dragging=false,ox=0,oy=0,w0=0,h0=0,lx0=0,ty0=0,initSc=1;
+    const onStart=e=>{
+      dragging=true;const s=e.touches?e.touches[0]:e;ox=s.clientX;oy=s.clientY;
+      const r=this.el.getBoundingClientRect();w0=r.width;h0=r.height;lx0=r.left;ty0=r.top;
+      initSc=this.innerScale;e.stopPropagation();e.preventDefault();
+      SubWinManager.setActive(onMove,onEnd);
+    };
+    const onMove=e=>{
+      if(!dragging)return;const s=e.touches?e.touches[0]:e;
+      const dx=s.clientX-ox,dy=s.clientY-oy;let nW=w0,nH=h0;
+      if(corner==='se'){nW=Math.max(180,w0+dx);nH=Math.max(160,h0+dy);}
+      else if(corner==='sw'){nW=Math.max(180,w0-dx);nH=Math.max(160,h0+dy);this.el.style.left=(lx0+w0-nW)+'px';}
+      else if(corner==='nw'){nW=Math.max(180,w0-dx);nH=Math.max(160,h0-dy);this.el.style.left=(lx0+w0-nW)+'px';this.el.style.top=(ty0+h0-nH)+'px';}
+      const k=Math.max(.1,(nW-4)/Math.max(1,w0-4));
+      this.winW=nW;this.winH=nH;this.el.style.width=nW+'px';this.el.style.height=nH+'px';
+      this.innerScale=Math.max(.2,Math.min(8,initSc*k));
+      this._pdfCache=null;clearTimeout(this._resizeTimer);
+      this._resizeTimer=setTimeout(()=>this.render(),60);
+    };
+    const onEnd=()=>{dragging=false;SubWinManager.clearActive();};
+    handle.addEventListener('touchstart',onStart,{passive:false});
+    handle.addEventListener('mousedown',onStart);
+  }
+
+  _selBBox(){
+    const arr=this.strokes[this.pageNum]||[];
+    const bbs=this.selectedIdx.map(i=>Utils.strokeBBox(arr[i])).filter(Boolean);
+    if(!bbs.length)return null;
+    return{x1:Math.min(...bbs.map(b=>b.x1)),y1:Math.min(...bbs.map(b=>b.y1)),x2:Math.max(...bbs.map(b=>b.x2)),y2:Math.max(...bbs.map(b=>b.y2))};
+  }
+  _finishSel(){
+    const arr=this.strokes[this.pageNum]||[];
+    if(App.selMode==='lasso'&&this.selPath.length>=3){
+      const poly=this.selPath.map(p=>[p.x,p.y]);
+      this.selectedIdx=arr.reduce((a,s,i)=>{const bb=Utils.strokeBBox(s);if(!bb)return a;if(Utils.ptInPoly((bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2,poly))a.push(i);return a;},[]);
+    }else if(this.selPath.length>=2){
+      const xs=this.selPath.map(p=>p.x),ys=this.selPath.map(p=>p.y);
+      const rx1=Math.min(...xs),ry1=Math.min(...ys),rx2=Math.max(...xs),ry2=Math.max(...ys);
+      this.selectedIdx=arr.reduce((a,s,i)=>{const bb=Utils.strokeBBox(s);if(!bb)return a;if(!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2))a.push(i);return a;},[]);
+    }
+    this.selPath=[];
+    if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
+    this._drawSelOv();
+    if(this.selectedIdx.length>0){
+      App._activeSelSubWin=this;
+      document.getElementById('selbtn').style.display='block';
+      this._positionSelBtn();
+    }
+  }
+  _drawSelPreview(){
+    if(!this.selPath.length)return;
+    const br=this._bodyRect();
+    this.selCvs.width=Math.round(br.width);this.selCvs.height=Math.round(br.height);
+    this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
+    this.selCtx.save();
+    this.selCtx.strokeStyle='#4488ff';this.selCtx.lineWidth=2;this.selCtx.setLineDash([6,4]);
+    const sc=this.innerScale;
+    if(App.selMode==='lasso'){
+      this.selCtx.beginPath();
+      this.selPath.forEach((p,i)=>{const bx=(p.x-this.offX)*sc,by=(p.y-this.offY)*sc;i?this.selCtx.lineTo(bx,by):this.selCtx.moveTo(bx,by);});
+      this.selCtx.stroke();
+    }else{
+      const p0=this.selPath[0],p1=this.selPath[this.selPath.length-1];
+      this.selCtx.strokeRect((Math.min(p0.x,p1.x)-this.offX)*sc,(Math.min(p0.y,p1.y)-this.offY)*sc,Math.abs(p1.x-p0.x)*sc,Math.abs(p1.y-p0.y)*sc);
+    }
+    this.selCtx.restore();
+  }
+  _drawSelOv(){
+    const br=this._bodyRect();
+    this.selCvs.width=Math.round(br.width);this.selCvs.height=Math.round(br.height);
+    this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
+    if(!this.selectedIdx.length)return;
+    const arr=this.strokes[this.pageNum]||[],sc=this.innerScale;
+    this.selCtx.save();this.selCtx.strokeStyle='#4488ff';this.selCtx.lineWidth=2;this.selCtx.setLineDash([6,3]);
+    this.selectedIdx.forEach(i=>{
+      const bb=Utils.strokeBBox(arr[i]);if(!bb)return;
+      this.selCtx.strokeRect((bb.x1-this.offX)*sc-4,(bb.y1-this.offY)*sc-4,(bb.x2-bb.x1)*sc+8,(bb.y2-bb.y1)*sc+8);
+    });
+    this.selCtx.restore();
+    this._positionSelBtn();
+  }
+  _positionSelBtn(){
+    const bb=this._selBBox();if(!bb)return;
+    const br=this._bodyRect(),sc=this.innerScale,btn=document.getElementById('selbtn');
+    btn.style.left=Math.max(0,br.left+(bb.x1-this.offX)*sc-4)+'px';
+    btn.style.top=Math.max(0,br.top+(bb.y2-this.offY)*sc+6)+'px';
+  }
+  _moveSel(dx,dy){
+    const arr=this.strokes[this.pageNum]||[];
+    this.selectedIdx.forEach(i=>{const s=arr[i];if(!s)return;if(s.points)s.points=s.points.map(p=>[p[0]+dx,p[1]+dy]);if(s.x1!==undefined){s.x1+=dx;s.y1+=dy;s.x2+=dx;s.y2+=dy;}if(s.type==='text'){s.x+=dx;s.y+=dy;}});
+  }
+  _clearSel(){
+    this.selectedIdx=[];this.selPath=[];
+    if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
+    document.getElementById('selbtn').style.display='none';
+    if(App._activeSelSubWin===this)App._activeSelSubWin=null;
+  }
+  deleteSelected(){
+    if(!this.selectedIdx.length)return;
+    this.strokes[this.pageNum]=(this.strokes[this.pageNum]||[]).filter((_,i)=>!this.selectedIdx.includes(i));
+    this.selectedIdx=[];this._annDirty=true;
+    if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
+    document.getElementById('selbtn').style.display='none';
+    if(App._activeSelSubWin===this)App._activeSelSubWin=null;
+    this.render();EventBus.emit('stroke:added');
+  }
+  update(strokes,pageNum){
+    if(!Logger.flags.subWindowUpdate)return;
+    this.strokes=strokes;this._annDirty=true;
+    if(pageNum!==undefined&&pageNum!==this.pageNum){this.pageNum=pageNum;this._pdfCache=null;}
+    this.render();
+  }
+  close(){
+    this._cleanups.forEach(fn=>fn());this._cleanups=[];
+    document.body.removeChild(this.el);
+    SubWinManager.remove(this);
+    this.pdfDoc=null;this.strokes=null;
+    EventBus.emit('subwin:transform');
+  }
+}
+
+/* ============================================================
+   Module: App (メインコントローラー)
+   責務: PDF描画・座標変換・入力ハンドリング・ツール管理・タブ連携
+   ============================================================ */
+const App=(() => {
+  /* DOM */
+  const caEl=document.getElementById('ca');
+  const cwEl=document.getElementById('cw');
+  const pdfCvs=document.getElementById('pdfCvs');
+  const annCvs=document.getElementById('annCvs');
+  const ovlCvs=document.getElementById('ovlCvs');
+  const pdfCtx=pdfCvs.getContext('2d');
+  const annCtx=annCvs.getContext('2d');
+  const ovlCtx=ovlCvs.getContext('2d');
+
+  /* 状態 */
+  let pdfDoc=null,origBuf=null,fileName='';
+  let curPage=1,totalPages=0,scale=1;
+  let strokes={};
+  let renderScale=1,cssExtraZoom=1;
+  let curStroke=null,isDrawing=false,lastX=0,lastY=0;
+  let pinch=null,panSt=null;
+  let selectedIdx=[],selPath=[];
+  let subRect=null;
+  let renderVer=0;
+  let panX=16,panY=16;
+  let velHist=[],rafId=null;
+  let _wheelTimer=null,_offscr=null;
+  let _pdfLoadingLock=false;
+  let _subCreating=false;
+  let _fileHandle=null;
+  let _postLoadFn=null;
+  let _docId=null;
+  let _txX=0,_txY=0;
+
+  /* ツール状態 */
+  let _activeTool='pen',_activeShape='arrow',_selMode='rect';
+  let _strokeColor='#cc2020',_strokeSize=3;
+  const _toolSizes={...TOOL_DEFAULT_SIZES};
+  const _penColors={pen:'#cc2020',hl:'#ffd700'};
+
+  /* 選択コンテキスト */
+  let _activeSelSubWin=null;
+
+  /* ページキャッシュ */
+  const _pageCache=new Map();
+
+  /* --- Transform --- */
+  function _updateTransform(){
+    cwEl.style.transformOrigin='0 0';
+    cwEl.style.transform=Math.abs(cssExtraZoom-1)>0.0005
+      ?`translate(${panX}px,${panY}px) scale(${cssExtraZoom})`
+      :`translate(${panX}px,${panY}px)`;
+  }
+  function _visualW(){return(parseFloat(pdfCvs.style.width)||pdfCvs.width)*cssExtraZoom;}
+  function _visualH(){return(parseFloat(pdfCvs.style.height)||pdfCvs.height)*cssExtraZoom;}
+  function _clampPan(){
+    const m=60,aW=caEl.clientWidth||1,aH=caEl.clientHeight||1;
+    panX=Math.max(-(_visualW()-m),Math.min(aW-m,panX));
+    panY=Math.max(-(_visualH()-m),Math.min(aH-m,panY));
+  }
+  function _centerCanvas(){
+    const aW=caEl.clientWidth||1,aH=caEl.clientHeight||1;
+    panX=Math.max(16,(aW-_visualW())/2);panY=Math.max(16,(aH-_visualH())/2);
+    _updateTransform();
+  }
+  function _cancelInertia(){cancelAnimationFrame(rafId);rafId=null;}
+
+  /* --- 座標変換 --- */
+  function _getDocPos(src){
+    const r=caEl.getBoundingClientRect();
+    return{x:(src.clientX-r.left-panX)/scale,y:(src.clientY-r.top-panY)/scale};
+  }
+  function _isOnCanvas(src){
+    const r=caEl.getBoundingClientRect();
+    const rx=src.clientX-r.left-panX,ry=src.clientY-r.top-panY;
+    return rx>=-20&&rx<=_visualW()+20&&ry>=-20&&ry<=_visualH()+20;
+  }
+
+  /* --- サブ窓オーバーレイ --- */
+  function _drawSubOverlays(){
+    if(!pdfDoc||!SubWinManager.count())return;
+    const sc=renderScale,invEZ=1/cssExtraZoom;
+    SubWinManager.getAll().forEach(sw=>{
+      const br=sw.body.getBoundingClientRect();if(!br.width||!br.height)return;
+      const rX1=sw.offX*sc,rY1=sw.offY*sc;
+      const rW=(br.width/sw.innerScale)*sc,rH=(br.height/sw.innerScale)*sc;
+      ovlCtx.save();
+      ovlCtx.fillStyle=sw.swFill||'rgba(240,120,0,.12)';ovlCtx.fillRect(rX1,rY1,rW,rH);
+      ovlCtx.strokeStyle=sw.swColor||'#f07800';ovlCtx.lineWidth=2*invEZ;ovlCtx.setLineDash([8*invEZ,4*invEZ]);
+      ovlCtx.strokeRect(rX1,rY1,rW,rH);ovlCtx.restore();
+    });
+  }
+
+  /* --- redraw (アノテーション再描画) --- */
+  function redraw(){
+    if(!Logger.flags.redraw)return;
+    annCtx.clearRect(0,0,annCvs.width,annCvs.height);
+    if(Logger.flags.annotationDraw)DrawUtil.drawAnnotations(annCtx,strokes[curPage]||[],renderScale);
+    if(Logger.flags.overlay)_drawSelOv();
+  }
+
+  /* --- renderPage --- */
+  async function renderPage(num){
+    if(!Logger.flags.pdfRender)return;
+    if(!pdfDoc)return;
+    const ver=++renderVer;
+    let page=_pageCache.get(num);
+    if(!page){page=await pdfDoc.getPage(num);_pageCache.set(num,page);}
+    const vp1=page.getViewport({scale:1});
+    const maxDim=Math.max(vp1.width,vp1.height);
+    renderScale=Math.min(scale,MAX_CANVAS/maxDim);
+    cssExtraZoom=scale/renderScale;
+    const vp=page.getViewport({scale:renderScale});
+    const dpr=Math.min(window.devicePixelRatio||1,PDF_MAX_DPR);
+    const hiRS=Math.min(renderScale*dpr,(4096-4)/maxDim);
+    const hiVP=page.getViewport({scale:hiRS});
+    if(!_offscr||_offscr.width!==hiVP.width||_offscr.height!==hiVP.height){
+      _offscr=document.createElement('canvas');_offscr.width=hiVP.width;_offscr.height=hiVP.height;
+    }
+    const offCtx=_offscr.getContext('2d');
+    offCtx.fillStyle='#fff';offCtx.fillRect(0,0,hiVP.width,hiVP.height);
+    await page.render({canvasContext:offCtx,viewport:hiVP}).promise;
+    if(ver!==renderVer)return;
+    pdfCvs.width=hiVP.width;pdfCvs.height=hiVP.height;
+    pdfCvs.style.width=vp.width+'px';pdfCvs.style.height=vp.height+'px';
+    [annCvs,ovlCvs].forEach(c=>{c.width=vp.width;c.height=vp.height;});
+    pdfCtx.drawImage(_offscr,0,0);
+    redraw();_clearSel();_clampPan();
+    requestAnimationFrame(()=>{_clampPan();_updateTransform();});
+    document.getElementById('pgn').value=num;
+    document.getElementById('zlbl').textContent=Math.round(scale*100)+'%';
+  }
+
+  /* --- 選択 --- */
+  function _selBBox(){
+    const arr=strokes[curPage]||[];
+    const bbs=selectedIdx.map(i=>Utils.strokeBBox(arr[i])).filter(Boolean);
+    if(!bbs.length)return null;
+    return{x1:Math.min(...bbs.map(b=>b.x1)),y1:Math.min(...bbs.map(b=>b.y1)),x2:Math.max(...bbs.map(b=>b.x2)),y2:Math.max(...bbs.map(b=>b.y2))};
+  }
+  function _finishSel(){
+    const arr=strokes[curPage]||[];
+    if(_selMode==='rect'&&selPath.length>=2){
+      const xs=selPath.map(p=>p.x),ys=selPath.map(p=>p.y);
+      const rx1=Math.min(...xs),ry1=Math.min(...ys),rx2=Math.max(...xs),ry2=Math.max(...ys);
+      selectedIdx=arr.reduce((a,s,i)=>{const bb=Utils.strokeBBox(s);if(!bb)return a;if(!(bb.x2<rx1||bb.x1>rx2||bb.y2<ry1||bb.y1>ry2))a.push(i);return a;},[]);
+    }else if(_selMode==='lasso'&&selPath.length>=3){
+      const poly=selPath.map(p=>[p.x,p.y]);
+      selectedIdx=arr.reduce((a,s,i)=>{const bb=Utils.strokeBBox(s);if(!bb)return a;if(Utils.ptInPoly((bb.x1+bb.x2)/2,(bb.y1+bb.y2)/2,poly))a.push(i);return a;},[]);
+    }
+    selPath=[];ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
+    _drawSelOv();
+    document.getElementById('selbtn').style.display=selectedIdx.length?'block':'none';
+  }
+  function _drawSelPreview(){
+    ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();if(!selPath.length)return;
+    const sc=renderScale,invEZ=1/cssExtraZoom;
+    ovlCtx.save();ovlCtx.strokeStyle='#4488ff';ovlCtx.lineWidth=2*invEZ;ovlCtx.setLineDash([6*invEZ,4*invEZ]);
+    if(_selMode==='rect'){
+      const p0=selPath[0],p1=selPath[selPath.length-1];
+      ovlCtx.strokeRect(Math.min(p0.x,p1.x)*sc,Math.min(p0.y,p1.y)*sc,Math.abs(p1.x-p0.x)*sc,Math.abs(p1.y-p0.y)*sc);
+    }else{
+      ovlCtx.beginPath();selPath.forEach((p,i)=>i?ovlCtx.lineTo(p.x*sc,p.y*sc):ovlCtx.moveTo(p.x*sc,p.y*sc));ovlCtx.stroke();
+    }
+    ovlCtx.restore();
+  }
+  function _drawSelOv(){
+    ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
+    if(!selectedIdx.length)return;
+    const arr=strokes[curPage]||[],sc=renderScale,invEZ=1/cssExtraZoom;
+    ovlCtx.save();ovlCtx.strokeStyle='#4488ff';ovlCtx.lineWidth=2*invEZ;ovlCtx.setLineDash([6*invEZ,3*invEZ]);
+    selectedIdx.forEach(i=>{const bb=Utils.strokeBBox(arr[i]);if(!bb)return;ovlCtx.strokeRect(bb.x1*sc-4*invEZ,bb.y1*sc-4*invEZ,(bb.x2-bb.x1)*sc+8*invEZ,(bb.y2-bb.y1)*sc+8*invEZ);});
+    ovlCtx.restore();
+    const bb=_selBBox();
+    if(bb){const wr=cwEl.getBoundingClientRect(),btn=document.getElementById('selbtn');btn.style.left=Math.max(0,wr.left+bb.x1*scale-4)+'px';btn.style.top=Math.max(0,wr.top+bb.y2*scale+6)+'px';}
+  }
+  function _moveSel(dx,dy){
+    const arr=strokes[curPage]||[];
+    selectedIdx.forEach(i=>{const s=arr[i];if(!s)return;if(s.points)s.points=s.points.map(p=>[p[0]+dx,p[1]+dy]);if(s.x1!==undefined){s.x1+=dx;s.y1+=dy;s.x2+=dx;s.y2+=dy;}if(s.type==='text'){s.x+=dx;s.y+=dy;}});
+  }
+  function _clearSel(){
+    selectedIdx=[];selPath=[];
+    ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
+    document.getElementById('selbtn').style.display='none';
+  }
+
+  /* --- タッチハンドラ --- */
+  caEl.addEventListener('touchstart',e=>{
+    if(!pdfDoc)return;e.preventDefault();_cancelInertia();
+    if(e.touches.length>=2){
+      const hasSt=Array.from(e.touches).some(t=>t.touchType==='stylus');
+      if(hasSt||isDrawing)return;
+      isDrawing=false;curStroke=null;panSt=null;_startPinch(e.touches);return;
+    }
+    const t=e.touches[0];
+    if(Utils.isPalmContact(t))return;
+    if(!_isOnCanvas(t)){_startPan(t);return;}
+    const needPen=['pen','hl'].includes(_activeTool);
+    if(needPen&&t.touchType!=='stylus'){_startPan(t);return;}
+    _startDraw(e);
+  },{passive:false});
+  caEl.addEventListener('touchmove',e=>{
     e.preventDefault();
-    try{c.setPointerCapture(e.pointerId)}catch(ex){}
-    _drawing=true;
-    const[x,y]=coords(e,c);_start=[x,y];
-    const base={id:APP.Utils.uid(),type:st.tool,color:st.color,size:st.size,opacity:st.opacity};
-    if(st.tool==='pen'||st.tool==='highlight'){_cur={...base,points:[[x,y]]}}
-    else if(['line','rect','circle'].includes(st.tool)){_cur={...base,coords:[x,y,x,y]}}
-    else if(st.tool==='eraser'){_drawing=true;_cur={...base};_erase(x,y);return}
-    else if(st.tool==='text'){_drawing=false;APP.EventBus.emit('tools:text',{x,y,canvas:c});return}
-    APP.Render.setActive(_cur);
+    if(!Logger.flags.touchMove)return;
+    if(e.touches.length>=2&&pinch){_movePinch(e.touches);return;}
+    const t=e.touches[0];
+    if(panSt){_movePan(t);return;}
+    if(isDrawing)_moveDraw(e);
+  },{passive:false});
+  caEl.addEventListener('touchend',e=>{
+    if(pinch&&e.touches.length<2){_endPinch();return;}
+    if(panSt){_endPan(e.changedTouches[0]);return;}
+    if(isDrawing)_endDraw(e);
+  });
+  caEl.addEventListener('mousedown',e=>{if(pdfDoc){_cancelInertia();_startDraw(e);}});
+  caEl.addEventListener('mousemove',e=>{if(isDrawing)_moveDraw(e);else if(panSt)_movePan(e);});
+  caEl.addEventListener('mouseup',e=>{if(isDrawing)_endDraw(e);else if(panSt)_endPan(e);});
+  caEl.addEventListener('wheel',e=>{
+    if(!Logger.flags.wheelZoom){e.preventDefault();return;}
+    if(!pdfDoc)return;e.preventDefault();
+    const r=e.deltaY<0?1.15:.87;
+    const cr=caEl.getBoundingClientRect();
+    const vx=e.clientX-cr.left,vy=e.clientY-cr.top;
+    const pdfX=(vx-panX)/scale,pdfY=(vy-panY)/scale;
+    scale=Math.max(.2,Math.min(MAX_SCALE,scale*r));
+    panX=vx-pdfX*scale;panY=vy-pdfY*scale;_clampPan();
+    const pEZ=scale/renderScale;
+    cwEl.style.transformOrigin='0 0';cwEl.style.transform=`translate(${panX}px,${panY}px) scale(${pEZ})`;
+    document.getElementById('zlbl').textContent=Math.round(scale*100)+'%';
+    clearTimeout(_wheelTimer);_wheelTimer=setTimeout(()=>renderPage(curPage),150);
+  },{passive:false});
+
+  /* --- ピンチ --- */
+  function _pinchDist(t){const dx=t[1].clientX-t[0].clientX,dy=t[1].clientY-t[0].clientY;return Math.sqrt(dx*dx+dy*dy);}
+  function _pinchMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
+  function _startPinch(t){const m=_pinchMid(t),cr=caEl.getBoundingClientRect(),bx=m.x-cr.left,by=m.y-cr.top;pinch={d0:_pinchDist(t),s0:scale,target:scale,pdfX:(bx-panX)/scale,pdfY:(by-panY)/scale};}
+  function _movePinch(t){
+    const p=pinch,r=_pinchDist(t)/p.d0,m=_pinchMid(t),cr=caEl.getBoundingClientRect();
+    const M1x=m.x-cr.left,M1y=m.y-cr.top;
+    p.target=Math.max(.2,Math.min(MAX_SCALE,p.s0*r));
+    panX=M1x-p.pdfX*p.target;panY=M1y-p.pdfY*p.target;
+    const pEZ=p.target/renderScale;
+    cwEl.style.transformOrigin='0 0';cwEl.style.transform=`translate(${panX}px,${panY}px) scale(${pEZ})`;
+    document.getElementById('zlbl').textContent=Math.round(p.target*100)+'%';
   }
+  function _endPinch(){if(!pinch)return;scale=pinch.target;pinch=null;renderPage(curPage);}
 
-  function onMove(e,c){
-    if(!_drawing||!_cur)return;
-    e.preventDefault();
-    const[x,y]=coords(e,c);
-    const st=APP.State.get();
-    if(st.tool==='pen'||st.tool==='highlight'){_cur.points.push([x,y])}
-    else if(['line','rect','circle'].includes(st.tool)){_cur.coords=[_start[0],_start[1],x,y]}
-    else if(st.tool==='eraser'){_erase(x,y);APP.Render.setStrokes(_strokes);return}
-    APP.Render.setActive(_cur);
-    APP.Render.drawCursor(x,y,st.size,st.color);
+  /* --- パン + 慣性 --- */
+  function _startPan(t){panSt={x0:t.clientX,y0:t.clientY,px0:panX,py0:panY};velHist=[];}
+  function _movePan(t){
+    if(!panSt)return;
+    velHist.push({x:t.clientX,y:t.clientY,tm:Date.now()});if(velHist.length>6)velHist.shift();
+    panX=panSt.px0+(t.clientX-panSt.x0);panY=panSt.py0+(t.clientY-panSt.y0);
+    _clampPan();_updateTransform();
   }
-
-  function onUp(e,c){
-    if(!_drawing)return;_drawing=false;
-    if(!_cur)return;
-    const st=APP.State.get();
-    if(st.tool!=='eraser'&&_valid(_cur)){
-      APP.History.push(_pid,_pg,_strokes);
-      _strokes=[..._strokes,_cur];
-      APP.Render.setStrokes(_strokes);
-      APP.Storage.queueSave(_pid,_pg,_strokes);
-    }
-    _cur=null;APP.Render.clearActive();APP.Render.clearUI();
-  }
-
-  function _valid(s){
-    if(!s)return false;
-    if(s.type==='pen'||s.type==='highlight')return s.points&&s.points.length>=1;
-    if(s.type==='line'){const[x1,y1,x2,y2]=s.coords;return Math.hypot(x2-x1,y2-y1)>2}
-    if(s.type==='rect'){const[x1,y1,x2,y2]=s.coords;return Math.abs(x2-x1)>2&&Math.abs(y2-y1)>2}
-    if(s.type==='circle'){const[cx,cy,rx,ry]=s.coords;return Math.abs(rx)>2||Math.abs(ry)>2}
-    return true;
-  }
-
-  function _erase(x,y){
-    const R=APP.State.get().size*3;
-    const before=_strokes.length;
-    _strokes=_strokes.filter(s=>{
-      if(s.type==='pen'||s.type==='highlight')return!s.points.some(([px,py])=>Math.hypot(px-x,py-y)<R);
-      return true;
-    });
-    if(_strokes.length!==before){APP.Render.setStrokes(_strokes);APP.Storage.queueSave(_pid,_pg,_strokes)}
-  }
-
-  function addText(x,y,text){
-    if(!text.trim())return;
-    const st=APP.State.get();
-    APP.History.push(_pid,_pg,_strokes);
-    const s={id:APP.Utils.uid(),type:'text',color:st.color,size:Math.max(st.size*3,14),opacity:st.opacity,x,y,text};
-    _strokes=[..._strokes,s];
-    APP.Render.setStrokes(_strokes);
-    APP.Storage.queueSave(_pid,_pg,_strokes);
-  }
-
-  function undo(){
-    const p=APP.History.undo(_pid,_pg,_strokes);
-    if(p!==null){_strokes=p;APP.Render.setStrokes(_strokes);APP.Storage.queueSave(_pid,_pg,_strokes)}
-    return p!==null;
-  }
-  function redo(){
-    const n=APP.History.redo(_pid,_pg,_strokes);
-    if(n!==null){_strokes=n;APP.Render.setStrokes(_strokes);APP.Storage.queueSave(_pid,_pg,_strokes)}
-    return n!==null;
-  }
-
-  return{setCtx,getStrokes,onDown,onMove,onUp,addText,undo,redo};
-})();
-
-// ================================================================
-// PDF OUTPUT (ZIP of page images)
-// ================================================================
-APP.PDFOutput = (()=>{
-  async function exportZip(pid){
-    APP.Utils.loading(true,'注釈付き画像を生成中...');
-    try{
-      const rec=await APP.Storage.loadPDF(pid);
-      if(!rec)throw new Error('PDF not found');
-      const n=APP.PDF.count(pid);
-      const allAnnots=await APP.Storage.loadAllAnnots(pid);
-      const zip=new JSZip();
-      const offPdf=document.createElement('canvas');
-      for(let i=0;i<n;i++){
-        const dims=await APP.PDF.render(pid,i,offPdf,2.0);
-        const offA=document.createElement('canvas');
-        offA.width=dims.w;offA.height=dims.h;
-        const ctx=offA.getContext('2d');
-        for(const s of(allAnnots[i]||[]))APP.Render.drawStroke(ctx,s);
-        const merged=document.createElement('canvas');
-        merged.width=dims.w;merged.height=dims.h;
-        const mc=merged.getContext('2d');
-        mc.drawImage(offPdf,0,0);mc.drawImage(offA,0,0);
-        const b64=merged.toDataURL('image/jpeg',0.92).split(',')[1];
-        zip.file(`page_${String(i+1).padStart(3,'0')}.jpg`,b64,{base64:true});
-      }
-      const blob=await zip.generateAsync({type:'blob'});
-      _dl(blob,`${rec.name}_注釈付き.zip`);
-      APP.Utils.toast('ZIPを保存しました');
-    }catch(e){APP.Utils.toast('出力エラー: '+e.message);console.error(e)}
-    finally{APP.Utils.loading(false)}
-  }
-  function _dl(blob,name){
-    const u=URL.createObjectURL(blob);const a=document.createElement('a');
-    a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),5000);
-  }
-  return{exportZip};
-})();
-
-// ================================================================
-// SUB WINDOW
-// ================================================================
-APP.Sub = (()=>{
-  let _pid=null,_pg=0,_vis=false;
-  const pane=()=>document.getElementById('sub-pane');
-  const pdfC=()=>document.getElementById('sub-pdf-canvas');
-  const annotC=()=>document.getElementById('sub-annot-canvas');
-  const wrap=()=>document.getElementById('sub-wrap');
-  const info=()=>document.getElementById('sub-page-info');
-  const title=()=>document.getElementById('sub-title');
-
-  function show(pid,pg){_pid=pid;_pg=pg;_vis=true;pane().classList.add('visible');_render()}
-  function hide(){_vis=false;pane().classList.remove('visible')}
-  function isVis(){return _vis}
-  function go(d){if(!_pid)return;_pg=Math.max(0,Math.min(APP.PDF.count(_pid)-1,_pg+d));_render()}
-
-  async function _render(){
-    if(!_vis||!_pid)return;
-    try{
-      const scroll=document.getElementById('sub-scroll');
-      const pw=scroll.clientWidth||300;
-      const sz=await APP.PDF.getSize(_pid,_pg);
-      const sc=pw/sz.w;
-      const dims=await APP.PDF.render(_pid,_pg,pdfC(),sc);
-      annotC().width=dims.w;annotC().height=dims.h;
-      wrap().style.width=dims.w+'px';wrap().style.height=dims.h+'px';
-      const strokes=await APP.Storage.loadAnnots(_pid,_pg);
-      const ctx=annotC().getContext('2d');
-      ctx.clearRect(0,0,dims.w,dims.h);
-      for(const s of strokes)APP.Render.drawStroke(ctx,s);
-      const rec=await APP.Storage.loadPDF(_pid);
-      title().textContent=rec?rec.name:'PDF';
-      info().textContent=`${_pg+1}/${APP.PDF.count(_pid)}`;
-    }catch(e){console.error('[Sub]',e)}
-  }
-
-  APP.EventBus.on('storage:saved',({pdfId,page})=>{if(_vis&&_pid===pdfId&&_pg===page)_render()});
-
-  return{show,hide,isVis,go};
-})();
-
-// ================================================================
-// UI MANAGER
-// ================================================================
-APP.UI = (()=>{
-  let _pid=null,_pg=0,_zoom=1.0,_rscale=1.5;
-  let _pinchDist=0;
-
-  const PALETTE=['#e94560','#ff6b35','#f7c59f','#ffe66d','#4ecdc4','#1a535c',
-                 '#a8e6cf','#c9f0ff','#ff6b6b','#fff','#888','#000'];
-
-  function init(){
-    _bindFile();_bindTools();_bindNav();_bindColor();_bindSidebar();_bindSub();
-    _bindDrop();_bindPointer();_bindText();_buildPalette();
-    APP.EventBus.on('state:changed',_onState);
-    APP.EventBus.on('history:changed',_updateHist);
-    APP.EventBus.on('storage:journal-incomplete',({count})=>{
-      APP.Utils.toast(`⚠ 未完了の保存 ${count}件。復元を確認してください。`,5000);
-    });
-    // initial color dot
-    document.getElementById('color-dot').style.background=APP.State.get().color;
-  }
-
-  // ── File ──
-  function _bindFile(){
-    document.getElementById('btn-open').addEventListener('click',()=>document.getElementById('file-input').click());
-    document.getElementById('file-input').addEventListener('change',async(e)=>{
-      const f=e.target.files[0];if(f)await _open(f);e.target.value='';
-    });
-    document.getElementById('btn-save-pdf').addEventListener('click',async()=>{
-      if(!_pid){APP.Utils.toast('PDFを開いてください');return}
-      await APP.PDFOutput.exportZip(_pid);
-    });
-    document.getElementById('btn-backup').addEventListener('click',async()=>{
-      APP.Utils.loading(true,'バックアップ中...');
-      try{
-        const blob=await APP.Storage.backup();
-        const a=document.createElement('a');
-        a.href=URL.createObjectURL(blob);
-        a.download=`FAB_${new Date().toISOString().slice(0,10)}.zip`;a.click();
-        setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-        APP.Utils.toast('バックアップ完了');
-      }catch(e){APP.Utils.toast('バックアップ失敗: '+e.message)}
-      finally{APP.Utils.loading(false)}
-    });
-    document.getElementById('btn-restore').addEventListener('click',()=>document.getElementById('restore-input').click());
-    document.getElementById('restore-input').addEventListener('change',async(e)=>{
-      const f=e.target.files[0];if(!f)return;
-      if(!confirm('データを上書き復元しますか？'))return;
-      APP.Utils.loading(true,'復元中...');
-      try{
-        await APP.Storage.restore(await f.arrayBuffer());
-        APP.Utils.toast('復元完了。ページを再読み込みしてください。',4000);
-      }catch(e){APP.Utils.toast('復元失敗: '+e.message)}
-      finally{APP.Utils.loading(false);e.target.value=''}
-    });
-  }
-
-  async function _open(file){
-    APP.Utils.loading(true,'PDF読込中...');
-    try{
-      const buf=await file.arrayBuffer();
-      const pid=APP.Utils.uid();
-      const name=file.name.replace(/\.pdf$/i,'');
-      const doc=await APP.PDF.load(pid,buf);
-      await APP.Storage.savePDF(pid,name,buf,doc.numPages);
-      const tid=APP.State.addTab({name,pdfId:pid,pageIndex:0,zoom:1.0});
-      APP.State.addRecent({id:pid,name,pageCount:doc.numPages});
-      await _switch(tid);
-      APP.Utils.toast(`${name} を開きました（${doc.numPages}P）`);
-    }catch(e){APP.Utils.toast('読込エラー: '+e.message);console.error(e)}
-    finally{APP.Utils.loading(false)}
-  }
-
-  // ── Tabs ──
-  async function _switch(tid){
-    APP.State.set({activeTabId:tid});
-    const tab=APP.State.getTab(tid);if(!tab)return;
-    _pid=tab.pdfId;_pg=tab.pageIndex;_zoom=tab.zoom||1.0;
-    await _renderPage();_renderTabs();_renderSidebar();
-  }
-
-  function _renderTabs(){
-    const st=APP.State.get();
-    const list=document.getElementById('tab-list');list.innerHTML='';
-    for(const t of st.tabs){
-      const el=document.createElement('div');
-      el.className='tab-item'+(t.id===st.activeTabId?' active':'');
-      el.innerHTML=`<span class="tab-name">${t.name}</span><span class="tab-close">✕</span>`;
-      el.addEventListener('click',async(e)=>{
-        if(e.target.classList.contains('tab-close')){
-          APP.State.removeTab(t.id);_renderTabs();
-          const nid=APP.State.get().activeTabId;
-          if(nid)await _switch(nid);else _clear();
-        }else await _switch(t.id);
-      });
-      list.appendChild(el);
-    }
-  }
-  document.getElementById('tab-add').addEventListener('click',()=>document.getElementById('btn-open').click());
-
-  // ── Page render ──
-  async function _renderPage(){
-    if(!_pid)return;
-    const scroll=document.getElementById('canvas-scroll');
-    const pdfC=document.getElementById('pdf-canvas');
-    const annotC=document.getElementById('annot-canvas');
-    const drawC=document.getElementById('draw-canvas');
-    const uiC=document.getElementById('ui-canvas');
-    const wrap=document.getElementById('canvas-wrap');
-    APP.Utils.loading(true,'描画中...');
-    try{
-      const sz=await APP.PDF.getSize(_pid,_pg);
-      const dpr=window.devicePixelRatio||2;
-      const fitW=(scroll.clientWidth-20)/sz.w;
-      _rscale=fitW*_zoom*dpr;
-      const dims=await APP.PDF.render(_pid,_pg,pdfC,_rscale);
-      const cssW=dims.w/dpr;const cssH=dims.h/dpr;
-      [annotC,drawC,uiC].forEach(c=>{c.width=dims.w;c.height=dims.h});
-      wrap.style.width=cssW+'px';wrap.style.height=cssH+'px';
-      [pdfC,annotC,drawC,uiC].forEach(c=>{c.style.width=cssW+'px';c.style.height=cssH+'px'});
-      APP.Render.init({pdf:pdfC,annot:annotC,draw:drawC,ui:uiC});
-      const strokes=await APP.Storage.loadAnnots(_pid,_pg);
-      APP.Tools.setCtx(_pid,_pg,strokes,_rscale);
-      const n=APP.PDF.count(_pid);
-      document.getElementById('page-info').textContent=`${_pg+1} / ${n}`;
-      document.getElementById('zoom-info').textContent=Math.round(_zoom*100)+'%';
-      APP.State.updateTab(APP.State.get().activeTabId,{pageIndex:_pg,zoom:_zoom});
-      _updateHist();
-      // サムネ更新
-      document.querySelectorAll('.thumb-item').forEach(el=>{
-        el.classList.toggle('active',parseInt(el.dataset.page)===_pg);
-      });
-    }finally{APP.Utils.loading(false)}
-  }
-
-  function _clear(){
-    ['pdf-canvas','annot-canvas','draw-canvas','ui-canvas'].forEach(id=>{
-      const c=document.getElementById(id);if(c){c.width=1;c.height=1}
-    });
-    document.getElementById('page-info').textContent='- / -';
-    document.getElementById('zoom-info').textContent='-';
-  }
-
-  // ── Pointer events ──
-  function _bindPointer(){
-    const c=document.getElementById('ui-canvas');
-    c.addEventListener('pointerdown',(e)=>{APP.Tools.onDown(e,c)},{passive:false});
-    c.addEventListener('pointermove',APP.Utils.rafThrottle((e)=>{APP.Tools.onMove(e,c)}),{passive:false});
-    c.addEventListener('pointerup',(e)=>APP.Tools.onUp(e,c));
-    c.addEventListener('pointercancel',(e)=>APP.Tools.onUp(e,c));
-
-    // Pinch zoom
-    let t1=null,t2=null;
-    c.addEventListener('touchstart',(e)=>{
-      if(e.touches.length===2){
-        t1=e.touches[0];t2=e.touches[1];
-        _pinchDist=Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
-      }
-    },{passive:true});
-    c.addEventListener('touchmove',APP.Utils.rafThrottle((e)=>{
-      if(e.touches.length===2){
-        const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-        if(_pinchDist>0){_zoom=Math.max(0.2,Math.min(10,_zoom*(d/_pinchDist)));document.getElementById('zoom-info').textContent=Math.round(_zoom*100)+'%'}
-        _pinchDist=d;
-      }
-    }),{passive:true});
-    c.addEventListener('touchend',async(e)=>{
-      if(e.touches.length<2&&_pinchDist>0){_pinchDist=0;await _renderPage()}
-    },{passive:true});
-  }
-
-  // ── Tools ──
-  const TOOL_IDS=['tool-pen','tool-highlight','tool-eraser','tool-line','tool-rect','tool-circle','tool-text'];
-  const TOOL_MAP={'tool-pen':'pen','tool-highlight':'highlight','tool-eraser':'eraser','tool-line':'line','tool-rect':'rect','tool-circle':'circle','tool-text':'text'};
-
-  function _bindTools(){
-    for(const id of TOOL_IDS){
-      document.getElementById(id).addEventListener('click',()=>{
-        APP.State.set({tool:TOOL_MAP[id]});_updateToolBtns();
-      });
-    }
-    document.getElementById('btn-undo').addEventListener('click',()=>{APP.Tools.undo();_updateHist()});
-    document.getElementById('btn-redo').addEventListener('click',()=>{APP.Tools.redo();_updateHist()});
-  }
-  function _updateToolBtns(){
-    const t=APP.State.get().tool;
-    for(const id of TOOL_IDS)document.getElementById(id).classList.toggle('active',TOOL_MAP[id]===t);
-  }
-  function _updateHist(){
-    document.getElementById('btn-undo').classList.toggle('disabled',!_pid||!APP.History.canUndo(_pid,_pg));
-    document.getElementById('btn-redo').classList.toggle('disabled',!_pid||!APP.History.canRedo(_pid,_pg));
-  }
-
-  // ── Navigation ──
-  function _bindNav(){
-    document.getElementById('btn-prev').addEventListener('click',async()=>{if(_pg>0){_pg--;await _renderPage()}});
-    document.getElementById('btn-next').addEventListener('click',async()=>{const n=_pid?APP.PDF.count(_pid):0;if(_pg<n-1){_pg++;await _renderPage()}});
-    document.getElementById('btn-zoom-in').addEventListener('click',async()=>{_zoom=Math.min(10,_zoom*1.25);await _renderPage()});
-    document.getElementById('btn-zoom-out').addEventListener('click',async()=>{_zoom=Math.max(0.2,_zoom/1.25);await _renderPage()});
-    document.getElementById('btn-zoom-fit').addEventListener('click',async()=>{_zoom=1.0;await _renderPage()});
-  }
-
-  // ── Color ──
-  function _bindColor(){
-    const dot=document.getElementById('color-dot');
-    const inp=document.getElementById('color-input');
-    inp.value=APP.State.get().color;
-    dot.addEventListener('click',_showPalette);
-    inp.addEventListener('input',(e)=>{APP.State.set({color:e.target.value});dot.style.background=e.target.value});
-    document.getElementById('size-slider').addEventListener('input',(e)=>{APP.State.set({size:parseFloat(e.target.value)})});
-    document.getElementById('opacity-slider').addEventListener('input',(e)=>{APP.State.set({opacity:parseFloat(e.target.value)/100})});
-  }
-  function _buildPalette(){
-    const pop=document.getElementById('color-popup');
-    for(const hex of PALETTE){
-      const d=document.createElement('div');d.className='cp-color';d.style.background=hex;
-      d.addEventListener('click',()=>{
-        APP.State.set({color:hex});
-        document.getElementById('color-dot').style.background=hex;
-        document.getElementById('color-input').value=hex;
-        pop.classList.remove('show');
-        pop.querySelectorAll('.cp-color').forEach(x=>x.classList.remove('selected'));
-        d.classList.add('selected');
-      });
-      pop.appendChild(d);
-    }
-    document.addEventListener('pointerdown',(e)=>{
-      if(!document.getElementById('color-popup').contains(e.target)&&e.target.id!=='color-dot')
-        document.getElementById('color-popup').classList.remove('show');
-    });
-  }
-  function _showPalette(){
-    const pop=document.getElementById('color-popup');
-    const r=document.getElementById('color-dot').getBoundingClientRect();
-    pop.style.left=r.left+'px';pop.style.top=(r.bottom+6)+'px';
-    pop.classList.toggle('show');
-  }
-
-  // ── Text ──
-  function _bindText(){
-    APP.EventBus.on('tools:text',({x,y,canvas})=>{
-      const r=canvas.getBoundingClientRect();
-      const sx=x*(r.width/canvas.width)+r.left;
-      const sy=y*(r.height/canvas.height)+r.top;
-      const ov=document.getElementById('text-overlay');
-      const inp=document.getElementById('text-input');
-      ov.style.left=Math.min(sx,window.innerWidth-200)+'px';
-      ov.style.top=Math.min(sy,window.innerHeight-80)+'px';
-      ov.classList.add('show');inp.value='';inp.focus();
-      const done=()=>{
-        const txt=inp.value;
-        ov.classList.remove('show');
-        if(txt.trim())APP.Tools.addText(x,y,txt);
-        inp.removeEventListener('blur',done);
-        inp.removeEventListener('keydown',onKey);
+  function _endPan(t){
+    if(!panSt)return;panSt=null;
+    if(velHist.length>=2){
+      const n=velHist[velHist.length-1],f=velHist[0],dt=Math.max(1,n.tm-f.tm);
+      let vx=(n.x-f.x)/dt*14,vy=(n.y-f.y)/dt*14;
+      const step=()=>{
+        if(!Logger.flags.raf)return;
+        if(Math.abs(vx)<.4&&Math.abs(vy)<.4)return;
+        panX+=vx;panY+=vy;_clampPan();_updateTransform();
+        vx*=.9;vy*=.9;rafId=requestAnimationFrame(step);
       };
-      const onKey=(e)=>{if(e.key==='Escape'){inp.value='';done()}};
-      inp.addEventListener('blur',done);inp.addEventListener('keydown',onKey);
-    });
+      rafId=requestAnimationFrame(step);
+    }
   }
 
-  // ── Sidebar ──
-  function _bindSidebar(){
-    document.getElementById('btn-sidebar').addEventListener('click',()=>{
-      document.getElementById('sidebar').classList.toggle('hidden');
-    });
-    document.querySelectorAll('.stab').forEach(t=>{
-      t.addEventListener('click',()=>{
-        document.querySelectorAll('.stab').forEach(x=>x.classList.remove('active'));
-        t.classList.add('active');
-        APP.State.set({sidebarTab:t.dataset.tab});
-        _renderSidebar();
-      });
-    });
-  }
-
-  async function _renderSidebar(){
-    const st=APP.State.get();
-    if(st.sidebarTab==='thumbs')await _renderThumbs();
-    else await _renderRecent();
-  }
-
-  const _thumbObs=new IntersectionObserver(async(entries)=>{
-    for(const en of entries){
-      if(!en.isIntersecting)continue;
-      const el=en.target;const c=el.querySelector('canvas');
-      const pg=parseInt(el.dataset.page);
-      const pid=document.getElementById('sidebar-content').dataset.pid;
-      if(pid&&!el.dataset.rendered){
-        el.dataset.rendered='1';
-        try{await APP.PDF.renderThumb(pid,pg,c,180)}catch(e){}
-        _thumbObs.unobserve(el);
+  /* --- 描画 --- */
+  function _startDraw(e){
+    const t=e.touches?e.touches[0]:e;
+    const p=_getDocPos(t);
+    if(_activeTool==='text'){_textAt(p.x,p.y);return;}
+    if(_activeTool==='select'){
+      if(selectedIdx.length>0){
+        const bb=_selBBox();
+        if(bb&&p.x>=bb.x1-10/scale&&p.x<=bb.x2+10/scale&&p.y>=bb.y1-10/scale&&p.y<=bb.y2+10/scale){isDrawing=true;lastX=p.x;lastY=p.y;return;}
+        else _clearSel();
       }
+      selPath=[{x:p.x,y:p.y}];isDrawing=true;return;
     }
-  },{threshold:0.1});
-
-  async function _renderThumbs(){
-    const content=document.getElementById('sidebar-content');
-    if(!_pid){content.innerHTML='<div style="padding:12px;color:var(--text2);font-size:12px">PDFを開いてください</div>';return}
-    if(content.dataset.pid===_pid){
-      content.querySelectorAll('.thumb-item').forEach(el=>{
-        el.classList.toggle('active',parseInt(el.dataset.page)===_pg);
-      });return;
+    if(_activeTool==='sub'){
+      subRect={x1:p.x,y1:p.y,x2:p.x,y2:p.y};isDrawing=true;return;
     }
-    content.innerHTML='';content.dataset.pid=_pid;
-    const n=APP.PDF.count(_pid);
-    for(let i=0;i<n;i++){
-      const item=document.createElement('div');
-      item.className='thumb-item'+(i===_pg?' active':'');
-      item.dataset.page=i;
-      const tc=document.createElement('canvas');
-      item.appendChild(tc);
-      const num=document.createElement('div');num.className='thumb-num';num.textContent=i+1;
-      item.appendChild(num);
-      item.addEventListener('click',async()=>{_pg=i;await _renderPage()});
-      content.appendChild(item);
-      _thumbObs.observe(item);
+    isDrawing=true;lastX=p.x;lastY=p.y;
+    const tool=_activeTool==='shape'?_activeShape:_activeTool;
+    curStroke=['pen','hl','eraser'].includes(tool)
+      ?{type:tool,points:[[p.x,p.y]],color:_strokeColor,size:_strokeSize}
+      :{type:tool,x1:p.x,y1:p.y,x2:p.x,y2:p.y,color:_strokeColor,size:_strokeSize};
+  }
+  function _moveDraw(e){
+    const t=e.touches?e.touches[0]:e;
+    const p=_getDocPos(t);
+    const sc=renderScale,invEZ=1/cssExtraZoom;
+    if(_activeTool==='select'){
+      if(selectedIdx.length>0&&!selPath.length){_moveSel(p.x-lastX,p.y-lastY);lastX=p.x;lastY=p.y;redraw();_drawSelOv();return;}
+      selPath.push({x:p.x,y:p.y});_drawSelPreview();return;
+    }
+    if(_activeTool==='sub'&&subRect){
+      subRect.x2=p.x;subRect.y2=p.y;
+      ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
+      ovlCtx.save();ovlCtx.strokeStyle='#f07800';ovlCtx.lineWidth=2*invEZ;ovlCtx.setLineDash([8*invEZ,4*invEZ]);
+      ovlCtx.strokeRect(subRect.x1*sc,subRect.y1*sc,(subRect.x2-subRect.x1)*sc,(subRect.y2-subRect.y1)*sc);
+      ovlCtx.fillStyle='rgba(240,120,0,.08)';ovlCtx.fillRect(subRect.x1*sc,subRect.y1*sc,(subRect.x2-subRect.x1)*sc,(subRect.y2-subRect.y1)*sc);
+      ovlCtx.restore();return;
+    }
+    if(!curStroke)return;
+    const s=curStroke;
+    if(['pen','hl'].includes(s.type)){s.points.push([p.x,p.y]);DrawUtil.drawLivePen(annCtx,s,sc);lastX=p.x;lastY=p.y;}
+    else if(s.type==='eraser'){
+      s.points.push([p.x,p.y]);lastX=p.x;lastY=p.y;
+      ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
+      DrawUtil.drawEraserCursor(ovlCtx,p,s,sc,invEZ);
+    }else{
+      s.x2=p.x;s.y2=p.y;
+      ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
+      DrawUtil.drawStroke(s,ovlCtx,sc);
     }
   }
-
-  async function _renderRecent(){
-    const content=document.getElementById('sidebar-content');
-    content.innerHTML='';content.dataset.pid='';
-    const list=await APP.Storage.listPDFs();
-    if(!list.length){content.innerHTML='<div style="padding:12px;color:var(--text2);font-size:12px">履歴なし</div>';return}
-    for(const rec of list){
-      const item=document.createElement('div');item.className='recent-item';
-      item.innerHTML=`<div class="recent-name">${rec.name}</div><div class="recent-date">${APP.Utils.dateStr(new Date(rec.date))} | ${rec.pageCount||'?'}P</div>`;
-      item.addEventListener('click',async()=>{
-        APP.Utils.loading(true,'PDF読込中...');
-        try{
-          const pdfRec=await APP.Storage.loadPDF(rec.id);
-          if(!pdfRec){APP.Utils.toast('データが見つかりません');return}
-          if(!APP.PDF.getDoc(rec.id))await APP.PDF.load(rec.id,pdfRec.buffer);
-          const tid=APP.State.addTab({name:rec.name,pdfId:rec.id,pageIndex:0});
-          await _switch(tid);
-        }catch(e){APP.Utils.toast('開けませんでした: '+e.message)}
-        finally{APP.Utils.loading(false)}
-      });
-      content.appendChild(item);
+  function _endDraw(e){
+    isDrawing=false;
+    if(_activeTool==='select'){
+      if(selectedIdx.length>0&&!selPath.length){_drawSelOv();EventBus.emit('stroke:added');return;}
+      _finishSel();return;
     }
+    if(_activeTool==='sub'&&subRect){
+      const r={x1:Math.min(subRect.x1,subRect.x2),y1:Math.min(subRect.y1,subRect.y2),x2:Math.max(subRect.x1,subRect.x2),y2:Math.max(subRect.y1,subRect.y2)};
+      if((r.x2-r.x1)>10/scale&&(r.y2-r.y1)>10/scale){
+        if(SubWinManager.count()>=MAX_SUBWIN){showToast(`サブ窓は最大${MAX_SUBWIN}つです`);}
+        else if(!_subCreating){
+          _subCreating=true;setTimeout(()=>{_subCreating=false;},400);
+          const cr=caEl.getBoundingClientRect();
+          const sx=cr.left+panX+r.x1*scale,sy=cr.top+panY+r.y1*scale;
+          new SubWin(pdfDoc,strokes,curPage,r,sx,sy,scale);
+        }
+      }
+      subRect=null;ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
+      setTool('pen');return;
+    }
+    if(curStroke?.type==='eraser'){
+      const er=curStroke,r=(er.size||20)*2/3;
+      strokes[curPage]=(strokes[curPage]||[]).flatMap(s=>DrawUtil.applyEraserAll(s,er.points||[],r));
+      curStroke=null;ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
+      redraw();_drawSelOv();SubWinManager.updateAll(strokes,curPage);
+      EventBus.emit('stroke:added');return;
+    }
+    if(!curStroke)return;
+    if(!strokes[curPage])strokes[curPage]=[];
+    if(strokes[curPage].length>=MAX_STROKES_PER_PAGE){strokes[curPage].shift();showToast('⚠️ ストローク上限に達しました');}
+    strokes[curPage].push({...curStroke,points:curStroke.points?[...curStroke.points]:undefined});
+    curStroke=null;redraw();SubWinManager.updateAll(strokes,curPage);
+    EventBus.emit('stroke:added');
   }
 
-  // ── Sub window ──
-  function _bindSub(){
-    document.getElementById('btn-subwin').addEventListener('click',()=>{
-      if(APP.Sub.isVis()){APP.Sub.hide()}
-      else{if(!_pid){APP.Utils.toast('PDFを開いてください');return}APP.Sub.show(_pid,_pg)}
+  function _textAt(x,y){_txX=x;_txY=y;document.getElementById('txfld').value='';document.getElementById('txov').classList.add('on');}
+
+  /* --- ページ操作 --- */
+  async function gotoPage(d,abs=false){
+    if(!pdfDoc)return;
+    const n=abs?Math.max(1,Math.min(totalPages,d)):curPage+d;
+    if(n<1||n>totalPages)return;
+    curPage=n;await renderPage(n);
+    SubWinManager.updateAll(strokes,n);EventBus.emit('stroke:added');
+  }
+  async function fit(){
+    if(!pdfDoc)return;
+    const page=await pdfDoc.getPage(curPage);
+    const vp=page.getViewport({scale:1});
+    const aW=caEl.clientWidth||1,aH=caEl.clientHeight||1;
+    scale=Math.max(.2,Math.min((aW-32)/vp.width,(aH-32)/vp.height));
+    await renderPage(curPage);_centerCanvas();
+  }
+  function undo(){
+    const a=strokes[curPage];
+    if(!a||!a.length){showToast('操作がありません');return;}
+    a.pop();redraw();SubWinManager.updateAll(strokes,curPage);EventBus.emit('stroke:added');
+  }
+  function deleteSelected(){
+    if(_activeSelSubWin){_activeSelSubWin.deleteSelected();return;}
+    if(!selectedIdx.length)return;
+    strokes[curPage]=(strokes[curPage]||[]).filter((_,i)=>!selectedIdx.includes(i));
+    _clearSel();redraw();SubWinManager.updateAll(strokes,curPage);EventBus.emit('stroke:added');
+  }
+
+  /* --- ツール設定 --- */
+  function setTool(tool){
+    _activeTool=tool;
+    if(tool==='shape')_strokeColor=_penColors.pen;
+    else if(tool==='hl')_strokeColor=_penColors.hl;
+    else if(tool==='pen')_strokeColor=_penColors.pen;
+    _strokeSize=_toolSizes[tool==='shape'?_activeShape:tool]||3;
+    _updateToolUI();
+  }
+  function setShape(shape){_activeShape=shape;_strokeSize=_toolSizes[shape]||2;_updateToolUI();}
+  function setColor(c){
+    _strokeColor=c;
+    if(_activeTool==='hl')_penColors.hl=c;else _penColors.pen=c;
+  }
+  function setSize(sz){
+    _strokeSize=sz;
+    const k=_activeTool==='shape'?_activeShape:_activeTool;
+    _toolSizes[k]=sz;
+    document.getElementById('sz-v').textContent=sz;
+  }
+  function _updateToolUI(){
+    ['pen','hl','eraser','text','select','sub'].forEach(t=>{
+      const btn=document.getElementById('t-'+t);if(btn)btn.classList.toggle('on',_activeTool===t);
     });
-    document.getElementById('sub-btn-close').addEventListener('click',()=>APP.Sub.hide());
-    document.getElementById('sub-btn-prev').addEventListener('click',()=>APP.Sub.go(-1));
-    document.getElementById('sub-btn-next').addEventListener('click',()=>APP.Sub.go(1));
+    document.getElementById('t-shape')?.classList.toggle('on',_activeTool==='shape');
+    document.getElementById('sz-v').textContent=_strokeSize;
   }
 
-  // ── Drag & Drop ──
-  function _bindDrop(){
-    const ov=document.getElementById('drop-overlay');
-    document.body.addEventListener('dragover',(e)=>{e.preventDefault();ov.classList.add('show')});
-    document.body.addEventListener('dragleave',(e)=>{if(!e.relatedTarget)ov.classList.remove('show')});
-    document.body.addEventListener('drop',async(e)=>{
-      e.preventDefault();ov.classList.remove('show');
-      const f=e.dataTransfer.files[0];
-      if(f&&f.type==='application/pdf')await _open(f);
-      else APP.Utils.toast('PDFファイルをドロップしてください');
-    });
-  }
-
-  // ── State ──
-  function _onState({keys,state}){
-    if(keys.includes('tool'))_updateToolBtns();
-    if(keys.includes('color'))document.getElementById('color-dot').style.background=state.color;
-    if(keys.includes('tabs')||keys.includes('activeTabId'))_renderTabs();
-  }
-
-  return{init};
-})();
-
-// ================================================================
-// BOOT
-// ================================================================
-APP.Boot=(()=>{
-  async function start(){
+  /* --- PDF読込 --- */
+  async function loadPDF(file,buf){
+    if(_pdfLoadingLock){Logger.warn('[App] loadPDF: 読込中のため無視');return;}
+    _pdfLoadingLock=true;showLoading(true);
     try{
-      APP.Utils.loading(true,'起動中...');
-      await APP.Storage.init();
-      await APP.Storage.checkJournal();
-      APP.UI.init();
-      document.addEventListener('visibilitychange',()=>{
-        if(document.visibilityState==='visible')APP.EventBus.emit('app:foreground');
-      });
-      window.addEventListener('pagehide',()=>APP.EventBus.emit('app:unload'));
-      APP.Utils.loading(false);
-      APP.Utils.toast('PDF図面注釈アプリ v1 起動完了',2000);
-    }catch(e){
-      APP.Utils.loading(false);
-      console.error('[Boot]',e);
-      document.body.insertAdjacentHTML('beforeend',
-        `<div style="position:fixed;inset:0;background:#100;color:#e94560;display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;font-size:16px;text-align:center">起動エラー: ${e.message}</div>`);
-    }
+      origBuf=buf||await file.arrayBuffer();
+      fileName=file.name;
+      document.getElementById('fnlbl').textContent=fileName;
+      pdfDoc=await pdfjsLib.getDocument({data:origBuf.slice(0)}).promise;
+      totalPages=pdfDoc.numPages;
+      document.getElementById('tpn').textContent=totalPages;
+      curPage=1;panX=16;panY=16;scale=1;renderScale=1;cssExtraZoom=1;
+      _pageCache.clear();SubWinManager.closeAll();
+      document.getElementById('dz').style.display='none';
+      _hideHome();cwEl.style.display='block';
+      /* 書き込みデータ復元: IDB → 新規 */
+      const saved=await IDBStore.get('f:'+Utils.safeKey(file.name));
+      strokes=Utils.pruneEraserStrokes(saved?.strokes||{});
+      await renderPage(1);await fit();
+      if(saved?.strokes&&Object.keys(saved.strokes).length>0)showToast('📝 書き込みデータを復元しました');
+      /* DocMgr登録 */
+      _docId=await DocMgr.open(file.name,origBuf,strokes,1);
+      IDBStore.enqueue([['resume:buf:'+Utils.safeKey(file.name),origBuf]]);
+      _postLoadFn?.();
+      EventBus.emit('stroke:added');
+    }catch(e){showToast('読み込みに失敗しました');Logger.error(e);}
+    showLoading(false);_pdfLoadingLock=false;
   }
-  return{start};
+
+  async function closeFile(){
+    if(pdfDoc&&!confirm('閉じますか？（保存済みデータは残ります）'))return;
+    pdfDoc=null;origBuf=null;fileName='';curPage=1;totalPages=0;strokes={};_docId=null;
+    [pdfCvs,annCvs,ovlCvs].forEach(c=>{c.width=1;c.height=1;});
+    cwEl.style.display='none';
+    _showHome();
+    document.getElementById('fnlbl').textContent='ファイル未選択';
+    document.getElementById('tpn').textContent='0';
+    document.getElementById('zlbl').textContent='--';
+    SubWinManager.closeAll();_fileHandle=null;renderScale=1;cssExtraZoom=1;
+    DocMgr.reset();
+  }
+
+  /* --- 起動時復元 --- */
+  async function restore(saved){
+    origBuf=saved.buf;fileName=saved.file;
+    document.getElementById('fnlbl').textContent=fileName;
+    pdfDoc=await pdfjsLib.getDocument({data:saved.buf.slice(0)}).promise;
+    totalPages=pdfDoc.numPages;
+    document.getElementById('tpn').textContent=totalPages;
+    strokes=Utils.pruneEraserStrokes(saved.strokes||{});
+    if(saved.docId){_docId=saved.docId;DocMgr.setId(saved.docId);}
+    curPage=saved.page||1;scale=saved.scale||1;renderScale=1;cssExtraZoom=1;
+    document.getElementById('dz').style.display='none';
+    cwEl.style.display='block';
+    await renderPage(curPage);
+    if(saved.panX!=null&&saved.panY!=null){panX=saved.panX;panY=saved.panY;_clampPan();_updateTransform();}
+    else _centerCanvas();
+    if(saved.subWinStates?.length)SubWinManager.thawAll(saved.subWinStates,pdfDoc,strokes);
+  }
+
+  /* --- ホーム画面 --- */
+  function _showHome(){
+    document.getElementById('home').style.display='flex';
+    document.getElementById('dz').style.display='none';
+    _renderHomeList();
+  }
+  function _hideHome(){document.getElementById('home').style.display='none';}
+  function showHome(){if(!pdfDoc)_showHome();}
+
+  async function _renderHomeList(){
+    const listEl=document.getElementById('home-list');
+    const emptyEl=document.getElementById('home-empty');
+    listEl.innerHTML='';
+    const docs=await DocMgr.list();
+    if(!docs.length){emptyEl.style.display='flex';listEl.style.display='none';return;}
+    emptyEl.style.display='none';listEl.style.display='grid';
+    docs.forEach(doc=>{
+      const card=document.createElement('div');card.className='home-card';
+      const dt=new Date(doc.updatedAt).toLocaleDateString('ja-JP');
+      card.innerHTML=`<div class="home-card-icon">📄</div><div class="home-card-name">${doc.name}</div><div class="home-card-date">${dt}</div><button class="home-card-del" title="削除">✕</button>`;
+      card.addEventListener('click',async e=>{
+        if(e.target.classList.contains('home-card-del'))return;
+        const fullDoc=await DocMgr.get(doc.id);
+        if(!fullDoc?.originalPdfBytes){showToast('PDFデータが見つかりません');return;}
+        const f=new File([fullDoc.originalPdfBytes],doc.name,{type:'application/pdf'});
+        _hideHome();await loadPDF(f,fullDoc.originalPdfBytes);
+        if(fullDoc.strokes)strokes=Utils.pruneEraserStrokes(fullDoc.strokes);
+        if(fullDoc.currentPage)await gotoPage(fullDoc.currentPage,true);
+        redraw();
+      });
+      card.querySelector('.home-card-del').addEventListener('click',async e=>{
+        e.stopPropagation();
+        if(!confirm(`「${doc.name}」の書き込みデータを削除しますか？`))return;
+        await DocMgr.remove(doc.id);_renderHomeList();
+      });
+      listEl.appendChild(card);
+    });
+  }
+
+  /* --- PDF出力 --- */
+  async function exportPDF(pageNums){
+    if(!pdfDoc||!origBuf){showToast('PDFが開かれていません');return;}
+    showLoading(true);
+    try{
+      const {PDFDocument,rgb,LineCapStyle}=PDFLib;
+      const srcDoc=await PDFDocument.load(origBuf);
+      const outDoc=await PDFDocument.create();
+      for(const pg of pageNums){
+        if(pg<1||pg>totalPages)continue;
+        const[copiedPage]=await outDoc.copyPages(srcDoc,[pg-1]);
+        outDoc.addPage(copiedPage);
+        const page=copiedPage;
+        const{width,height}=page.getSize();
+        const pdfPage=await pdfDoc.getPage(pg);
+        const vp1=pdfPage.getViewport({scale:1});
+        const sc=width/vp1.width;
+        const pgStrokes=strokes[pg]||[];
+        for(const s of pgStrokes){
+          if(s.type==='pen'||s.type==='hl'){
+            if(!s.points?.length)continue;
+            const alpha=s.type==='hl'?.38:1;
+            const c=_hexToRgb(s.color);
+            const lw=s.size*sc/3;
+            for(let i=1;i<s.points.length;i++){
+              page.drawLine({start:{x:s.points[i-1][0]*sc,y:height-s.points[i-1][1]*sc},end:{x:s.points[i][0]*sc,y:height-s.points[i][1]*sc},thickness:s.type==='hl'?Math.max(lw*4,5*sc/3):lw,color:rgb(c.r/255,c.g/255,c.b/255),opacity:alpha,lineCap:LineCapStyle.Round});
+            }
+          }else if(s.type==='text'){
+            const c=_hexToRgb(s.color);
+            page.drawText(s.text||'',{x:s.x*sc,y:height-s.y*sc,size:s.size*6*sc,color:rgb(c.r/255,c.g/255,c.b/255)});
+          }else if(['rect','circle','line','arrow'].includes(s.type)){
+            const c=_hexToRgb(s.color);const lw=s.size*sc/3;
+            if(s.type==='rect'){page.drawRectangle({x:Math.min(s.x1,s.x2)*sc,y:height-Math.max(s.y1,s.y2)*sc,width:Math.abs(s.x2-s.x1)*sc,height:Math.abs(s.y2-s.y1)*sc,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}
+            else if(s.type==='line'||s.type==='arrow'){
+              page.drawLine({start:{x:s.x1*sc,y:height-s.y1*sc},end:{x:s.x2*sc,y:height-s.y2*sc},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+              if(s.type==='arrow'){const hl=Math.max(lw*4,12*sc),ang=Math.atan2(-(s.y2-s.y1),(s.x2-s.x1));const x2=s.x2*sc,y2=height-s.y2*sc;page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang-Math.PI/6),y:y2+hl*Math.sin(ang-Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang+Math.PI/6),y:y2+hl*Math.sin(ang+Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});}
+            }
+          }
+        }
+      }
+      const bytes=await outDoc.save();
+      const blob=new Blob([bytes],{type:'application/pdf'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download=(fileName.replace(/\.pdf$/i,'')||'output')+'_注釈付.pdf';
+      a.click();URL.revokeObjectURL(a.href);
+      showToast('📤 PDF出力完了');
+    }catch(e){showToast('PDF出力に失敗しました');Logger.error(e);}
+    showLoading(false);
+  }
+
+  function _hexToRgb(hex){const r=parseInt(hex.slice(1,3),16)||0,g=parseInt(hex.slice(3,5),16)||0,b=parseInt(hex.slice(5,7),16)||0;return{r,g,b};}
+
+  /* --- バックアップ / 復元 --- */
+  async function downloadBackup(){
+    if(!pdfDoc||!origBuf){showToast('PDFが開かれていません');return;}
+    showLoading(true);
+    try{
+      const zip=new JSZip();
+      zip.file(fileName,origBuf);
+      zip.file('strokes.json',JSON.stringify(strokes));
+      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v1',ts:Date.now()}));
+      const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download=(fileName.replace(/\.pdf$/i,'')||'backup')+'_backup.zip';
+      a.click();URL.revokeObjectURL(a.href);
+      AutoSave.clearDirty();showToast('💾 バックアップ完了');
+    }catch(e){showToast('バックアップに失敗しました');Logger.error(e);}
+    showLoading(false);
+  }
+
+  async function restoreFromZip(file){
+    showLoading(true);
+    try{
+      const zip=await JSZip.loadAsync(await file.arrayBuffer());
+      let pdfFile=null,strokesData=null,meta=null;
+      zip.forEach((path,f)=>{if(path.endsWith('.pdf'))pdfFile=f;if(path==='strokes.json')strokesData=f;if(path==='meta.json')meta=f;});
+      if(!pdfFile){showToast('ZIP内にPDFが見つかりません');showLoading(false);return;}
+      const pdfBuf=await pdfFile.async('arraybuffer');
+      const fn=pdfFile.name;
+      const metaData=meta?JSON.parse(await meta.async('string')):null;
+      const strkData=strokesData?JSON.parse(await strokesData.async('string')):{};
+      const f=new File([pdfBuf],metaData?.fileName||fn,{type:'application/pdf'});
+      await loadPDF(f,pdfBuf);
+      strokes=Utils.pruneEraserStrokes(strkData);
+      if(metaData?.curPage)await gotoPage(metaData.curPage,true);
+      if(metaData?.scale){scale=metaData.scale;await renderPage(curPage);}
+      redraw();showToast('📂 復元完了');
+    }catch(e){showToast('復元に失敗しました');Logger.error(e);}
+    showLoading(false);
+  }
+
+  /* --- タブ状態保存/復元 --- */
+  function saveState(){return{pdfDoc,origBuf,fileName,curPage,totalPages,scale,renderScale,cssExtraZoom,panX,panY,strokes,docId:_docId};}
+  async function loadState(sh){
+    pdfDoc=sh.pdfDoc;origBuf=sh.origBuf;fileName=sh.fileName||'';curPage=sh.curPage||1;
+    totalPages=sh.totalPages||0;scale=sh.scale||1;renderScale=sh.renderScale||1;cssExtraZoom=sh.cssExtraZoom||1;
+    panX=sh.panX??16;panY=sh.panY??16;strokes=sh.strokes||{};_docId=sh.docId||null;
+    _pageCache.clear();selectedIdx=[];selPath=[];
+    document.getElementById('fnlbl').textContent=fileName||'ファイル未選択';
+    document.getElementById('tpn').textContent=totalPages||'0';
+    document.getElementById('pgn').value=curPage;
+    if(pdfDoc){document.getElementById('dz').style.display='none';cwEl.style.display='block';await renderPage(curPage);}
+    else{_showHome();cwEl.style.display='none';document.getElementById('zlbl').textContent='--';[pdfCvs,annCvs,ovlCvs].forEach(c=>{c.width=1;c.height=1;});}
+  }
+
+  /* --- 自動保存ゲッター --- */
+  function _getState(){
+    return{pdfDoc,origBuf,fileName,currentPage:curPage,scale,panX,panY,strokes,docId:_docId,subWinStates:SubWinManager.snapAll()};
+  }
+
+  /* EventBus経由で保存トリガー */
+  EventBus.on('stroke:added',()=>{AutoSave.immediateSave(_getState);AutoSave.schedSave(_getState);DocMgr.updateStrokes(Utils.pruneEraserStrokes(strokes),curPage).catch(()=>{});});
+  EventBus.on('autosave:periodic',()=>{if(pdfDoc)AutoSave.schedSave(_getState);});
+
+  /* ライフサイクルイベント */
+  ['visibilitychange','pagehide','freeze'].forEach(ev=>{
+    const target=ev==='visibilitychange'?document:window;
+    target.addEventListener(ev,()=>{
+      if((ev==='visibilitychange'&&document.visibilityState!=='hidden')||(!pdfDoc))return;
+      Logger.info('[AutoSave]',ev,'発火');
+      AutoSave.emergencySave(_getState);
+    });
+  });
+  window.addEventListener('blur',()=>{if(pdfDoc)AutoSave.immediateSave(_getState);});
+  window.addEventListener('beforeunload',()=>{if(pdfDoc)AutoSave.emergencySave(_getState);});
+
+  return{
+    gotoPage,fit,undo,deleteSelected,closeFile,redraw,loadPDF,
+    saveState,loadState,restore,showHome,downloadBackup,restoreFromZip,exportPDF,
+    setTool,setShape,setColor,setSize,
+    get currentTool(){return _activeTool;},
+    get currentShape(){return _activeShape;},
+    get selMode(){return _selMode;},
+    set selMode(v){_selMode=v;},
+    get strokeColor(){return _strokeColor;},
+    get strokeSize(){return _strokeSize;},
+    get pdfDoc(){return pdfDoc;},
+    get origBuf(){return origBuf;},
+    get fileName(){return fileName;},
+    get strokes(){return strokes;},
+    get currentPage(){return curPage;},
+    get totalPages(){return totalPages;},
+    get scale(){return scale;},
+    get panX(){return panX;},
+    get panY(){return panY;},
+    get docId(){return _docId;},
+    _activeSelSubWin:null,
+    _textAt,
+    _showHome,_hideHome,
+    setFileHandle(fh){_fileHandle=fh;},
+    setPostLoad(fn){_postLoadFn=fn;}
+  };
 })();
 
-window.addEventListener('DOMContentLoaded',()=>APP.Boot.start());
+/* ============================================================
+   タブ管理 (SheetManager)
+   ============================================================ */
+const MAX_SHEETS=8;
+let _sheets=[],_sheetIdx=0,_sheetSeq=0;
+function _emptySheet(){return{id:++_sheetSeq,pdfDoc:null,origBuf:null,fileName:'(新規)',curPage:1,totalPages:0,scale:1,renderScale:1,cssExtraZoom:1,panX:16,panY:16,strokes:{},subWinStates:[],docId:null};}
+_sheets.push(_emptySheet());
+
+function _sheetSync(){if(!_sheets[_sheetIdx])return;Object.assign(_sheets[_sheetIdx],App.saveState());_renderTabBar();}
+function _renderTabBar(){
+  const bar=document.getElementById('tabbar');if(!bar)return;
+  bar.innerHTML='';
+  _sheets.forEach((sh,i)=>{
+    const div=document.createElement('div');div.className='shtab'+(i===_sheetIdx?' active':'');
+    const raw=sh.fileName==='(新規)'?'(新規)':sh.fileName.replace(/\.pdf$/i,'');
+    const label=raw.length>16?raw.slice(0,15)+'…':raw;
+    div.innerHTML=`<span class="shtab-nm" title="${sh.fileName}">📄 ${label}</span><button class="shtab-x" title="閉じる">✕</button>`;
+    div.addEventListener('click',e=>{if(!e.target.classList.contains('shtab-x'))switchToSheet(i);});
+    div.querySelector('.shtab-x').addEventListener('click',async e=>{
+      e.stopPropagation();const sh2=_sheets[i];
+      if(!sh2?.pdfDoc){closeSheetAt(i);return;}
+      const result=await _confirmClose(sh2.fileName);
+      if(result==='cancel')return;
+      if(result==='backup'){if(i!==_sheetIdx)await switchToSheet(i);await _backupThenClose(()=>closeSheetAt(i));return;}
+      closeSheetAt(i);
+    });
+    bar.appendChild(div);
+  });
+  const add=document.createElement('button');add.className='shtab-add';add.title='新タブ';add.textContent='＋';
+  add.addEventListener('click',()=>addSheet());bar.appendChild(add);
+}
+async function switchToSheet(idx){
+  if(idx===_sheetIdx||idx<0||idx>=_sheets.length){_renderTabBar();return;}
+  showLoading(true);
+  _sheets[_sheetIdx].subWinStates=SubWinManager.freezeAll();
+  Object.assign(_sheets[_sheetIdx],App.saveState());
+  _sheetIdx=idx;const sh=_sheets[_sheetIdx];
+  await App.loadState(sh);
+  SubWinManager.thawAll(sh.subWinStates,sh.pdfDoc,App.strokes);
+  _renderTabBar();showLoading(false);
+}
+async function addSheet(){
+  if(_sheets.length>=MAX_SHEETS){showToast(`タブは最大${MAX_SHEETS}つです`);return;}
+  _sheets[_sheetIdx].subWinStates=SubWinManager.freezeAll();
+  Object.assign(_sheets[_sheetIdx],App.saveState());
+  SubWinManager.thawAll(_sheets[_sheetIdx].subWinStates,_sheets[_sheetIdx].pdfDoc,App.strokes);
+  const sh=_emptySheet();_sheets.push(sh);_sheetIdx=_sheets.length-1;
+  await App.loadState(sh);_renderTabBar();
+  document.getElementById('fileInput').click();
+}
+async function closeSheetAt(idx){
+  showLoading(true);
+  if(idx===_sheetIdx)_sheets[_sheetIdx].subWinStates=SubWinManager.freezeAll();
+  if(_sheets[idx].pdfDoc){try{_sheets[idx].pdfDoc.destroy();}catch(_){}_sheets[idx].pdfDoc=null;}
+  if(_sheets.length===1){_sheets[0]=_emptySheet();_sheetIdx=0;await App.loadState(_sheets[0]);}
+  else{
+    _sheets.splice(idx,1);
+    if(_sheetIdx>=_sheets.length)_sheetIdx=_sheets.length-1;
+    else if(idx<_sheetIdx)_sheetIdx--;
+    await App.loadState(_sheets[_sheetIdx]);
+    SubWinManager.thawAll(_sheets[_sheetIdx].subWinStates||[],_sheets[_sheetIdx].pdfDoc,App.strokes);
+  }
+  _renderTabBar();showLoading(false);
+}
+App.setPostLoad(()=>{_sheetSync();});
+
+/* ============================================================
+   バックアップ確認ダイアログ
+   ============================================================ */
+let _confirmPending=false;
+function _confirmClose(fname,closeLbl='閉じる（バックアップしない）'){
+  return new Promise(res=>{
+    if(_confirmPending){res('cancel');return;}_confirmPending=true;
+    const ov=document.getElementById('bk-confirm-overlay');
+    document.getElementById('bk-title').textContent='バックアップを作成しますか？';
+    document.getElementById('bk-warn').textContent=AutoSave.isDirty()?'⚠️ 未バックアップの変更があります':'';
+    document.getElementById('bk-sub').textContent=`「${fname}」を閉じます`;
+    document.getElementById('bk-do-close').textContent=closeLbl;
+    ov.classList.add('open');
+    const cleanup=r=>{ov.classList.remove('open');_confirmPending=false;res(r);};
+    document.getElementById('bk-do-backup').onclick=()=>cleanup('backup');
+    document.getElementById('bk-do-close').onclick=()=>cleanup('close');
+    document.getElementById('bk-cancel').onclick=()=>cleanup('cancel');
+  });
+}
+async function _backupThenClose(closeFn){await App.downloadBackup();await closeFn();}
+
+/* ============================================================
+   UI: ツールバーバインド
+   ============================================================ */
+function _initToolbar(){
+  /* ファイル操作 */
+  document.getElementById('fileInput').addEventListener('change',async e=>{
+    const f=e.target.files[0];if(!f){e.target.value='';return;}
+    if(App.pdfDoc){const r=await _confirmClose(App.fileName,'読み込む（バックアップしない）');if(r==='cancel'){e.target.value='';return;}if(r==='backup'){await _backupThenClose(async()=>await App.loadPDF(f));e.target.value='';return;}}
+    await App.loadPDF(f);e.target.value='';
+  });
+  document.getElementById('dz-open').addEventListener('click',()=>openFile());
+  document.getElementById('home-open').addEventListener('click',()=>openFile());
+  document.getElementById('btn-close').addEventListener('click',()=>App.closeFile());
+  document.getElementById('btn-home').addEventListener('click',()=>App.showHome());
+  document.getElementById('btn-undo').addEventListener('click',()=>App.undo());
+  document.getElementById('btn-save').addEventListener('click',()=>{document.getElementById('pgrov').classList.add('on');document.getElementById('pgrfld').value='';});
+  document.getElementById('btn-backup').addEventListener('click',()=>App.downloadBackup());
+  document.getElementById('btn-restore').addEventListener('click',()=>document.getElementById('restoreInput').click());
+  document.getElementById('restoreInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f){e.target.value='';return;}await App.restoreFromZip(f);e.target.value='';});
+
+  /* ページ操作 */
+  document.getElementById('btn-prev').addEventListener('click',()=>App.gotoPage(-1));
+  document.getElementById('btn-next').addEventListener('click',()=>App.gotoPage(1));
+  document.getElementById('btn-fit').addEventListener('click',()=>App.fit());
+  document.getElementById('pgn').addEventListener('change',e=>App.gotoPage(parseInt(e.target.value)||1,true));
+
+  /* ツール */
+  ['pen','hl','eraser','text','sub'].forEach(t=>{
+    document.getElementById('t-'+t)?.addEventListener('click',()=>{App.setTool(t);closePickers();});
+  });
+  /* 図形ドロップダウン */
+  document.getElementById('t-shape').addEventListener('click',e=>{
+    const pop=document.getElementById('shapepop');pop.classList.toggle('on');
+    if(pop.classList.contains('on')){const r=e.currentTarget.getBoundingClientRect();pop.style.left=r.left+'px';pop.style.top=(r.bottom+2)+'px';}
+    e.stopPropagation();
+  });
+  document.querySelectorAll('#shapepop button[data-shape]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const sh=btn.dataset.shape;App.setTool('shape');App.setShape(sh);
+      document.querySelectorAll('#shapepop button').forEach(b=>b.classList.toggle('on',b.dataset.shape===sh));
+      document.getElementById('shapepop').classList.remove('on');
+    });
+  });
+  /* 選択ドロップダウン */
+  document.getElementById('t-select').addEventListener('click',e=>{
+    const pop=document.getElementById('selpop');pop.classList.toggle('on');
+    if(pop.classList.contains('on')){const r=e.currentTarget.getBoundingClientRect();pop.style.left=r.left+'px';pop.style.top=(r.bottom+2)+'px';}
+    App.setTool('select');e.stopPropagation();
+  });
+  document.querySelectorAll('#selpop button[data-selmode]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      App.selMode=btn.dataset.selmode;
+      document.querySelectorAll('#selpop button').forEach(b=>b.classList.toggle('on',b.dataset.selmode===App.selMode));
+      document.getElementById('selpop').classList.remove('on');
+    });
+  });
+
+  /* カラースウォッチ */
+  const PEN_C=[{id:'sw0',c:'#cc2020'},{id:'sw1',c:'#1a1a1a'},{id:'sw2',c:'#1a55cc'},{id:'sw3',c:'#108030'}];
+  const HL_C=[{id:'sw0',c:'#ffd700'},{id:'sw1',c:'#50c040'},{id:'sw2',c:'#ff69b4'},{id:'sw3',c:'#40d4e8'}];
+  function _updateSwatches(){
+    const colors=App.currentTool==='hl'?HL_C:PEN_C;
+    colors.forEach(({id,c})=>{
+      const el=document.getElementById(id);if(!el)return;
+      el.style.background=c;el.dataset.c=c;
+      el.classList.toggle('on',c===App.strokeColor);
+    });
+  }
+  document.querySelectorAll('.csw').forEach(sw=>{
+    sw.addEventListener('click',()=>{
+      App.setColor(sw.dataset.c);
+      document.querySelectorAll('.csw').forEach(s=>s.classList.toggle('on',s.dataset.c===sw.dataset.c));
+    });
+  });
+  EventBus.on('stroke:added',()=>{_updateSwatches();});
+
+  /* 太さパネル */
+  document.getElementById('sz-v').addEventListener('click',e=>{
+    const p=document.getElementById('szp');
+    if(p.classList.contains('on')){p.classList.remove('on');return;}
+    p.classList.add('on');
+    const r=e.target.getBoundingClientRect();p.style.left=Math.min(r.left,window.innerWidth-260)+'px';p.style.top=(r.bottom+4)+'px';
+    const cur=App.strokeSize;document.getElementById('sz-rng').value=cur;document.getElementById('sz-n').value=cur;_prevSize(cur);
+  });
+  document.getElementById('sz-rng').addEventListener('input',e=>{const v=+e.target.value;document.getElementById('sz-n').value=v;_prevSize(v);});
+  document.getElementById('sz-n').addEventListener('input',e=>{const v=Math.max(1,Math.min(40,+e.target.value));document.getElementById('sz-rng').value=v;_prevSize(v);});
+  document.getElementById('szp-ok').addEventListener('click',()=>{App.setSize(+document.getElementById('sz-n').value);document.getElementById('szp').classList.remove('on');});
+  document.getElementById('szp-cancel').addEventListener('click',()=>document.getElementById('szp').classList.remove('on'));
+  function _prevSize(v){
+    const cvs=document.getElementById('szp-cvs'),ctx=cvs.getContext('2d');
+    ctx.clearRect(0,0,cvs.width,cvs.height);
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,cvs.width,cvs.height);
+    ctx.beginPath();ctx.arc(cvs.width/2,cvs.height/2,Math.min(v*1.5,18),0,Math.PI*2);
+    ctx.fillStyle=App.strokeColor||'#cc2020';ctx.fill();
+  }
+
+  /* 選択削除 */
+  document.getElementById('selbtn').addEventListener('click',()=>App.deleteSelected());
+
+  /* PDF出力ダイアログ */
+  document.getElementById('pgr-cur').addEventListener('click',()=>document.getElementById('pgrfld').value=String(App.currentPage));
+  document.getElementById('pgr-all').addEventListener('click',()=>document.getElementById('pgrfld').value='1-'+App.totalPages);
+  document.getElementById('pgrCancel').addEventListener('click',()=>document.getElementById('pgrov').classList.remove('on'));
+  document.getElementById('pgrConfirm').addEventListener('click',()=>{
+    const fld=document.getElementById('pgrfld').value.trim();
+    const pages=_parsePageRange(fld,App.totalPages);
+    document.getElementById('pgrov').classList.remove('on');
+    if(pages.length)App.exportPDF(pages);
+    else showToast('ページ指定が無効です');
+  });
+
+  /* テキスト入力 */
+  document.getElementById('txConfirm').addEventListener('click',_confirmText);
+  document.getElementById('txCancel').addEventListener('click',()=>document.getElementById('txov').classList.remove('on'));
+  document.getElementById('txfld').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))_confirmText();});
+  function _confirmText(){
+    const txt=document.getElementById('txfld').value.trim();
+    document.getElementById('txov').classList.remove('on');
+    if(!txt||!App.pdfDoc)return;
+    if(!App.strokes[App.currentPage])App.strokes[App.currentPage]=[];
+    App.strokes[App.currentPage].push({type:'text',x:App._textAt._lastX||0,y:App._textAt._lastY||0,text:txt,color:App.strokeColor,size:App.strokeSize});
+    App.redraw();SubWinManager.updateAll(App.strokes,App.currentPage);
+    EventBus.emit('stroke:added');
+  }
+  /* テキスト座標をグローバルへ保存 */
+  const _origTextAt=App._textAt;
+  App._textAt=function(x,y){App._textAt._lastX=x;App._textAt._lastY=y;_origTextAt(x,y);};
+  App._textAt._lastX=0;App._textAt._lastY=0;
+
+  /* ドラッグ&ドロップ */
+  const caEl=document.getElementById('ca');
+  caEl.addEventListener('dragover',e=>e.preventDefault());
+  caEl.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)App.loadPDF(f);});
+  const homeEl=document.getElementById('home');
+  homeEl.addEventListener('dragover',e=>e.preventDefault());
+  homeEl.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f){App._hideHome();App.loadPDF(f);}});
+
+  /* ピッカー外クリックで閉じる */
+  document.addEventListener('click',()=>closePickers());
+}
+
+function closePickers(){['shapepop','selpop','szp'].forEach(id=>{document.getElementById(id)?.classList.remove('on');});}
+function openFile(){document.getElementById('fileInput').click();}
+
+function _parsePageRange(str,total){
+  const pages=new Set();
+  str.split(',').forEach(s=>{
+    s=s.trim();
+    if(s.includes('-')){const[a,b]=s.split('-').map(Number);for(let i=Math.max(1,a);i<=Math.min(total,b);i++)pages.add(i);}
+    else{const n=parseInt(s);if(n>=1&&n<=total)pages.add(n);}
+  });
+  return[...pages].sort((a,b)=>a-b);
+}
+
+/* ============================================================
+   UI: 計算機
+   ============================================================ */
+function _initCalculator(){
+  let cExpr='',cVal='0',cDec=1;
+  const histEl=document.getElementById('chist');
+  const exprEl=document.getElementById('cexpr');
+  const valEl=document.getElementById('cval');
+  const decEl=document.getElementById('cdec');
+
+  function _disp(){exprEl.textContent=cExpr;valEl.textContent=cVal;}
+  function _eval(){try{let r=Function('"use strict";return ('+cExpr+')')();const d=+decEl.value;cVal=isFinite(r)?parseFloat(r.toFixed(d)).toString():'エラー';}catch{cVal='エラー';}}
+
+  document.getElementById('calcbtn').addEventListener('click',()=>{document.getElementById('calc').classList.toggle('on');});
+  document.getElementById('cclose').addEventListener('click',()=>document.getElementById('calc').classList.remove('on'));
+
+  document.querySelectorAll('.cb').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const num=btn.dataset.cnum,op=btn.dataset.cop,fn=btn.dataset.cfn;
+      if(num!==undefined){cExpr+=num;}
+      else if(op){cExpr+=op;}
+      else if(fn){
+        if(fn==='C'){cExpr='';cVal='0';}
+        else if(fn==='⌫'){cExpr=cExpr.slice(0,-1);if(!cExpr)cVal='0';}
+        else if(fn==='±'){if(cVal.startsWith('-'))cVal=cVal.slice(1);else cVal='-'+cVal;cExpr=cVal;}
+        else if(fn==='%'){cExpr+='/100';}
+        else if(fn==='sqrt'){cExpr='Math.sqrt('+cExpr+')';}
+        else if(fn==='sq'){cExpr='('+cExpr+')**2';}
+        else if(fn==='='){
+          _eval();
+          const hi=document.createElement('div');hi.className='chi';hi.textContent=cExpr+' = '+cVal;histEl.appendChild(hi);histEl.scrollTop=histEl.scrollHeight;
+          const addToExpr=document.createElement('div');addToExpr.className='chi';addToExpr.style.display='none';histEl.appendChild(addToExpr);
+          cExpr='';
+        }
+      }
+      if(fn!=='='&&fn!=='C')_eval();
+      _disp();
+    });
+  });
+
+  /* 計算機ドラッグ */
+  const ctb=document.getElementById('ctb');
+  let cdrag=false,cdx=0,cdy=0;
+  ctb.addEventListener('mousedown',e=>{cdrag=true;const r=document.getElementById('calc').getBoundingClientRect();cdx=e.clientX-r.left;cdy=e.clientY-r.top;});
+  document.addEventListener('mousemove',e=>{if(!cdrag)return;const calc=document.getElementById('calc');calc.style.left=(e.clientX-cdx)+'px';calc.style.top=(e.clientY-cdy)+'px';calc.style.right='auto';calc.style.bottom='auto';});
+  document.addEventListener('mouseup',()=>{cdrag=false;});
+}
+
+/* ============================================================
+   共通 UI ヘルパー
+   ============================================================ */
+let _toastTimer=null;
+function showToast(msg,dur=2200){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');
+  clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>el.classList.remove('on'),dur);
+}
+function showLoading(v){document.getElementById('loading').classList.toggle('on',v);}
+
+/* ============================================================
+   起動時復元
+   ============================================================ */
+(async()=>{
+  IDBStore.warmup();
+  _renderTabBar();
+  _initToolbar();
+  _initCalculator();
+
+  /* 安全タイムアウト: 6秒後に強制解除 */
+  const _safety=setTimeout(()=>{showLoading(false);App._showHome();Logger.warn('[起動] restore タイムアウト');},6000);
+
+  let saved=null;
+  try{
+    const INST_ID=AutoSave.instId;
+    saved=await IDBStore.get('last:'+INST_ID);
+    if(!AutoSave.isValid(saved)){
+      saved=await IDBStore.get('resume:last').catch(()=>null);
+      if(!AutoSave.isValid(saved)){saved=await IDBStore.get('resume:prv').catch(()=>null);}
+    }
+    if(!AutoSave.isValid(saved)){
+      const fname=await IDBStore.get('resume:fname').catch(()=>null);
+      if(fname&&typeof fname==='string'){const fd=await IDBStore.get('f:'+Utils.safeKey(fname)).catch(()=>null);if(AutoSave.isValid(fd))saved=fd;}
+    }
+  }catch(e){Logger.error('[起動] IDB読み込み失敗:',e);}
+
+  /* バイナリ補完 */
+  if(saved&&!saved.buf&&saved.file){
+    try{
+      let doc=null;
+      if(saved.docId)doc=await IDBStore.get('doc:'+saved.docId).catch(()=>null);
+      if(!doc?.originalPdfBytes){doc=await DocMgr.findByName(saved.file).catch(()=>null);}
+      if(doc?.originalPdfBytes)saved={...saved,buf:new Uint8Array(doc.originalPdfBytes)};
+      if(!saved.buf){const rb=await IDBStore.get('resume:buf:'+Utils.safeKey(saved.file)).catch(()=>null);if(rb)saved={...saved,buf:rb instanceof Uint8Array?rb:new Uint8Array(rb)};}
+    }catch(_){}
+  }
+
+  /* localStorage同期バックアップ補完 */
+  if(saved?.buf){
+    try{
+      const lsbk=JSON.parse(localStorage.getItem('mv_lsbk2')||'null');
+      if(lsbk&&lsbk.file===saved.file&&typeof lsbk.ts==='number'&&lsbk.ts>(saved.ts||0)&&lsbk.strokes){saved={...saved,strokes:lsbk.strokes,page:lsbk.page||saved.page};Logger.info('[起動] localStorage補完 ts='+lsbk.ts);}
+    }catch(_){}
+  }
+
+  if(!saved?.buf){clearTimeout(_safety);App._showHome();return;}
+
+  showLoading(true);
+  try{
+    await Promise.race([App.restore(saved),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))]);
+    _sheetSync();showToast('前回の状態を復元しました');
+  }catch(e){Logger.error('[起動] restore 失敗:',e);App._showHome();}
+  finally{clearTimeout(_safety);showLoading(false);}
+})();
 </script>
 </body>
 </html>
