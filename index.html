@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v4</title>
+<title>M_Viewer v6</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -181,7 +181,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">v4</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">v6</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -189,6 +189,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <button class="btn on" id="btn-save">📤 PDF出力</button>
     <button class="btn" id="btn-backup" title="ZIP バックアップ">💾 バックアップ</button>
     <button class="btn" id="btn-restore" title="ZIP から復元">📂 復元</button>
+    <button class="btn" id="btn-forget-dir" title="前回の保存先を忘れる（次回から初期フォルダに戻す）" style="font-size:10px;padding:3px 7px;opacity:0.7">⊘</button>
     <input type="file" id="restoreInput" accept=".zip" style="display:none">
     <button class="btn" id="calcbtn">🧮 計算機</button>
     <div class="sp"></div>
@@ -255,7 +256,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v4</div>
+    <div class="dzm">M_Viewer v6</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -437,7 +438,14 @@ const Utils=(() => {
   function cloneStrokes(strks){
     return typeof structuredClone==='function'?structuredClone(strks):JSON.parse(JSON.stringify(strks));
   }
-  return{throttle,debounce,safeKey,distPtSeg,ptInPoly,strokeBBox,isPalmContact,pruneEraserStrokes,cloneStrokes};
+  /* PDF座標変換ヘルパー (v6新規) */
+  /* PDF user space → canvas pixel: t = viewport.transform = [a,b,c,d,e,f] */
+  function pdfToCanvas(px,py,t){return{x:t[0]*px+t[2]*py+t[4],y:t[1]*px+t[3]*py+t[5]};}
+  /* canvas pixel → PDF user space (inverse) */
+  function canvasToPdf(cx,cy,t){const det=t[0]*t[3]-t[1]*t[2];return{x:(t[3]*(cx-t[4])-t[2]*(cy-t[5]))/det,y:(t[0]*(cy-t[5])-t[1]*(cx-t[4]))/det};}
+  /* viewport.transform からスケール係数を取得 */
+  function getVPScale(t){return Math.sqrt(Math.abs(t[0]*t[3]-t[1]*t[2]));}
+  return{throttle,debounce,safeKey,distPtSeg,ptInPoly,strokeBBox,isPalmContact,pruneEraserStrokes,cloneStrokes,pdfToCanvas,canvasToPdf,getVPScale};
 })();
 
 /* ============================================================
@@ -529,6 +537,113 @@ const IDBStore=(() => {
     get isSaving(){return _flushing;},
     get pendingSave(){return _queue.length>0;}
   };
+})();
+
+/* ============================================================
+   Module: FileSaveMgr
+   責務: ファイル保存・開くダイアログ管理
+   設計: File System Access API が利用可能な環境では
+         showSaveFilePicker / showOpenFilePicker を優先使用し
+         前回使用ファイルハンドルを IndexedDB に保持して
+         次回 startIn に指定することで「前回フォルダ」を再現する。
+         未対応ブラウザ(iPad Safari等)は <a>クリック/<input>に自動フォールバック。
+         エラー時も終了せず必ずフォールバックで完了する。
+   ============================================================ */
+const FileSaveMgr=(() => {
+  const HANDLE_KEY='filesave:lastHandle';
+  /* API 可否を起動時1回だけ判定 */
+  const CAN_SAVE=typeof window!=='undefined'&&typeof window.showSaveFilePicker==='function';
+  const CAN_OPEN=typeof window!=='undefined'&&typeof window.showOpenFilePicker==='function';
+  Logger.info('[FileSaveMgr] init | showSaveFilePicker='+CAN_SAVE+' showOpenFilePicker='+CAN_OPEN);
+
+  let _memHandle=null; /* セッション内キャッシュ */
+
+  /* IDB から前回ハンドルを取得（セッション内は _memHandle を優先） */
+  async function _getHandle(){
+    if(_memHandle)return _memHandle;
+    try{
+      const h=await IDBStore.get(HANDLE_KEY);
+      if(h){_memHandle=h;Logger.debug('[FileSaveMgr] handle loaded from IDB');}
+    }catch(e){Logger.warn('[FileSaveMgr] IDB handle load failed',e);}
+    return _memHandle;
+  }
+
+  /* ハンドルをセッション内キャッシュ + IDB に保存 */
+  function _storeHandle(h){
+    if(!h)return;
+    _memHandle=h;
+    try{
+      IDBStore.enqueue([[HANDLE_KEY,h]]);
+      Logger.debug('[FileSaveMgr] handle stored in IDB');
+    }catch(e){Logger.warn('[FileSaveMgr] IDB handle enqueue failed (in-memory only)',e);}
+  }
+
+  /* --- 公開 API --- */
+
+  /* 前回の保存先を忘れる */
+  function forgetLastDir(){
+    _memHandle=null;
+    IDBStore.enqueue([[HANDLE_KEY,null]]);
+    Logger.info('[FileSaveMgr] lastHandle cleared');
+  }
+
+  /* Blob 保存
+     returns: 'saved' | 'cancelled'
+     優先: showSaveFilePicker → 失敗時 <a> ダウンロードにフォールバック */
+  async function saveBlob(blob,suggestedName,mimeType,extDesc){
+    const h=await _getHandle();
+    const startIn=h||'downloads';
+    if(CAN_SAVE){
+      try{
+        Logger.info('[FileSaveMgr] showSaveFilePicker | startIn='+(h?'lastHandle':'downloads'));
+        const ext=suggestedName.split('.').pop().toLowerCase();
+        const fh=await window.showSaveFilePicker({
+          suggestedName,startIn,
+          types:[{description:extDesc||suggestedName,accept:{[mimeType]:['.'+ext]}}]
+        });
+        const wr=await fh.createWritable();
+        await wr.write(blob);await wr.close();
+        _storeHandle(fh);
+        Logger.info('[FileSaveMgr] File System Access API 保存成功 | handle 保存済み');
+        return 'saved';
+      }catch(e){
+        if(e.name==='AbortError'){Logger.debug('[FileSaveMgr] ユーザーキャンセル');return 'cancelled';}
+        Logger.warn('[FileSaveMgr] showSaveFilePicker 失敗 → <a> フォールバック:',e.message);
+      }
+    }else{
+      Logger.info('[FileSaveMgr] File System Access API 未対応 → <a> フォールバック');
+    }
+    /* フォールバック: <a> クリック方式 */
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=suggestedName;a.click();URL.revokeObjectURL(a.href);
+    Logger.info('[FileSaveMgr] <a> フォールバック完了');
+    return 'saved';
+  }
+
+  /* ファイルを開く
+     returns: File | null(ユーザーキャンセル) | 'fallback'(<input>を使うべき)
+     優先: showOpenFilePicker → 未対応/'fallback'シグナルを返し caller が <input> 起動 */
+  async function openFile(acceptTypes){
+    const h=await _getHandle();
+    const startIn=h||'downloads';
+    if(CAN_OPEN){
+      try{
+        Logger.info('[FileSaveMgr] showOpenFilePicker | startIn='+(h?'lastHandle':'downloads'));
+        const [fh]=await window.showOpenFilePicker({startIn,types:acceptTypes,multiple:false});
+        _storeHandle(fh);
+        Logger.info('[FileSaveMgr] showOpenFilePicker 成功 | handle 保存済み');
+        return await fh.getFile();
+      }catch(e){
+        if(e.name==='AbortError'){Logger.debug('[FileSaveMgr] ユーザーキャンセル');return null;}
+        Logger.warn('[FileSaveMgr] showOpenFilePicker 失敗 → <input> フォールバック:',e.message);
+        return 'fallback';
+      }
+    }
+    Logger.info('[FileSaveMgr] showOpenFilePicker 未対応 → <input> フォールバック');
+    return 'fallback';
+  }
+
+  return{saveBlob,openFile,forgetLastDir};
 })();
 
 /* ============================================================
@@ -703,14 +818,19 @@ const DocMgr=(() => {
    責務: ストローク描画アルゴリズム（Main + SubWin 共通）
    ============================================================ */
 const DrawUtil=(() => {
-  function drawStroke(s,ctx,sc){
+  /* v6: 全描画関数が transform (viewport.transform) を受け取り PDF座標→canvas座標変換を行う。
+     sc (renderScale / innerScale) は transform から自動導出。
+     これにより回転PDFでも位置ズレが発生しない。 */
+  function drawStroke(s,ctx,transform){
     ctx.save();
+    const sc=Utils.getVPScale(transform);
     const lw=s.size*sc/3;
+    const pt=(px,py)=>Utils.pdfToCanvas(px,py,transform);
     if(s.type==='eraser'){
       ctx.globalCompositeOperation='destination-out';
       ctx.lineWidth=lw*4;ctx.lineCap='round';ctx.lineJoin='round';
       ctx.beginPath();
-      s.points.forEach((p,i)=>i?ctx.lineTo(p[0]*sc,p[1]*sc):ctx.moveTo(p[0]*sc,p[1]*sc));
+      s.points.forEach((p,i)=>{const c=pt(p[0],p[1]);i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y);});
       ctx.stroke();
     }else if(s.type==='pen'||s.type==='hl'){
       ctx.globalCompositeOperation='source-over';
@@ -720,65 +840,75 @@ const DrawUtil=(() => {
       ctx.lineCap='round';ctx.lineJoin='round';
       const pts=s.points;
       if(pts&&pts.length){
-        ctx.beginPath();ctx.moveTo(pts[0][0]*sc,pts[0][1]*sc);
+        const c0=pt(pts[0][0],pts[0][1]);
+        ctx.beginPath();ctx.moveTo(c0.x,c0.y);
         for(let i=1;i<pts.length-1;i++){
-          const mx=(pts[i][0]+pts[i+1][0])/2*sc,my=(pts[i][1]+pts[i+1][1])/2*sc;
-          ctx.quadraticCurveTo(pts[i][0]*sc,pts[i][1]*sc,mx,my);
+          const ci=pt(pts[i][0],pts[i][1]),cn=pt(pts[i+1][0],pts[i+1][1]);
+          ctx.quadraticCurveTo(ci.x,ci.y,(ci.x+cn.x)/2,(ci.y+cn.y)/2);
         }
-        if(pts.length>1)ctx.lineTo(pts[pts.length-1][0]*sc,pts[pts.length-1][1]*sc);
+        if(pts.length>1){const cl=pt(pts[pts.length-1][0],pts[pts.length-1][1]);ctx.lineTo(cl.x,cl.y);}
         ctx.stroke();
       }
     }else if(s.type==='text'){
       ctx.fillStyle=s.color;
       ctx.font=`bold ${Math.round(s.size*6*sc)}px 'Helvetica Neue',Arial,sans-serif`;
-      s.text.split('\n').forEach((line,i)=>ctx.fillText(line,s.x*sc,s.y*sc+i*s.size*7*sc));
+      const c=pt(s.x,s.y);
+      s.text.split('\n').forEach((line,i)=>ctx.fillText(line,c.x,c.y+i*s.size*7*sc));
     }else{
       ctx.strokeStyle=s.color;ctx.lineWidth=lw;ctx.lineCap='round';
-      const[x1,y1,x2,y2]=[s.x1*sc,s.y1*sc,s.x2*sc,s.y2*sc];
-      if(s.type==='rect'){ctx.strokeRect(x1,y1,x2-x1,y2-y1);}
-      else if(s.type==='circle'){const rx=(x2-x1)/2,ry=(y2-y1)/2;ctx.beginPath();ctx.ellipse(x1+rx,y1+ry,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2);ctx.stroke();}
-      else if(s.type==='line'){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();}
+      const c1=pt(s.x1,s.y1),c2=pt(s.x2,s.y2);
+      if(s.type==='rect'){ctx.strokeRect(Math.min(c1.x,c2.x),Math.min(c1.y,c2.y),Math.abs(c2.x-c1.x),Math.abs(c2.y-c1.y));}
+      else if(s.type==='circle'){const rx=Math.abs(c2.x-c1.x)/2,ry=Math.abs(c2.y-c1.y)/2;ctx.beginPath();ctx.ellipse((c1.x+c2.x)/2,(c1.y+c2.y)/2,rx,ry,0,0,Math.PI*2);ctx.stroke();}
+      else if(s.type==='line'){ctx.beginPath();ctx.moveTo(c1.x,c1.y);ctx.lineTo(c2.x,c2.y);ctx.stroke();}
       else if(s.type==='arrow'){
-        const hl=Math.max(lw*4,12*sc),ang=Math.atan2(y2-y1,x2-x1);
-        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+        const hl=Math.max(lw*4,12*sc),ang=Math.atan2(c2.y-c1.y,c2.x-c1.x);
+        ctx.beginPath();ctx.moveTo(c1.x,c1.y);ctx.lineTo(c2.x,c2.y);ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(ang-Math.PI/6),y2-hl*Math.sin(ang-Math.PI/6));
-        ctx.moveTo(x2,y2);ctx.lineTo(x2-hl*Math.cos(ang+Math.PI/6),y2-hl*Math.sin(ang+Math.PI/6));
+        ctx.moveTo(c2.x,c2.y);ctx.lineTo(c2.x-hl*Math.cos(ang-Math.PI/6),c2.y-hl*Math.sin(ang-Math.PI/6));
+        ctx.moveTo(c2.x,c2.y);ctx.lineTo(c2.x-hl*Math.cos(ang+Math.PI/6),c2.y-hl*Math.sin(ang+Math.PI/6));
         ctx.stroke();
       }
     }
     ctx.restore();
   }
 
-  function drawAnnotations(ctx,strks,sc){
+  function drawAnnotations(ctx,strks,transform){
     if(!strks?.length)return;
-    strks.forEach(s=>drawStroke(s,ctx,sc));
+    strks.forEach(s=>drawStroke(s,ctx,transform));
   }
 
-  function drawLivePen(ctx,s,sc){
+  function drawLivePen(ctx,s,transform){
     ctx.save();
+    const sc=Utils.getVPScale(transform);
     ctx.globalCompositeOperation='source-over';
     ctx.globalAlpha=s.type==='hl'?0.38:1;
     ctx.strokeStyle=s.color;
     ctx.lineWidth=s.type==='hl'?Math.max(s.size*4,5)*sc/3:s.size*sc/3;
     ctx.lineCap='round';ctx.lineJoin='round';
     const pts=s.points;
+    const pt=(px,py)=>Utils.pdfToCanvas(px,py,transform);
     if(pts.length>=3){
-      const pp=pts[pts.length-3],cp=pts[pts.length-2],cur=pts[pts.length-1];
-      const pmx=(pp[0]+cp[0])/2*sc,pmy=(pp[1]+cp[1])/2*sc;
-      const cmx=(cp[0]+cur[0])/2*sc,cmy=(cp[1]+cur[1])/2*sc;
-      ctx.beginPath();ctx.moveTo(pmx,pmy);ctx.quadraticCurveTo(cp[0]*sc,cp[1]*sc,cmx,cmy);ctx.stroke();
+      const cPP=pt(pts[pts.length-3][0],pts[pts.length-3][1]);
+      const cCP=pt(pts[pts.length-2][0],pts[pts.length-2][1]);
+      const cCur=pt(pts[pts.length-1][0],pts[pts.length-1][1]);
+      const pmx=(cPP.x+cCP.x)/2,pmy=(cPP.y+cCP.y)/2;
+      const cmx=(cCP.x+cCur.x)/2,cmy=(cCP.y+cCur.y)/2;
+      ctx.beginPath();ctx.moveTo(pmx,pmy);ctx.quadraticCurveTo(cCP.x,cCP.y,cmx,cmy);ctx.stroke();
     }else if(pts.length===2){
-      const p=pts[0],q=pts[1];ctx.beginPath();ctx.moveTo(p[0]*sc,p[1]*sc);ctx.lineTo(q[0]*sc,q[1]*sc);ctx.stroke();
+      const c0=pt(pts[0][0],pts[0][1]),c1=pt(pts[1][0],pts[1][1]);
+      ctx.beginPath();ctx.moveTo(c0.x,c0.y);ctx.lineTo(c1.x,c1.y);ctx.stroke();
     }
     ctx.restore();
   }
 
-  function drawEraserCursor(ctx,p,s,sc,invEZ){
+  /* drawEraserCursor: p は PDF座標。transform でcanvas座標に変換してarcを描く。 */
+  function drawEraserCursor(ctx,p,s,transform,invEZ){
+    const sc=Utils.getVPScale(transform);
+    const{x:cx,y:cy}=Utils.pdfToCanvas(p.x,p.y,transform);
     ctx.save();
     ctx.strokeStyle='#888';ctx.lineWidth=Math.max(1,1.5*invEZ);
     ctx.setLineDash([4*invEZ,2*invEZ]);
-    ctx.beginPath();ctx.arc(p.x*sc,p.y*sc,s.size*2*sc/3,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,s.size*2*sc/3,0,Math.PI*2);ctx.stroke();
     ctx.restore();
   }
 
@@ -979,7 +1109,24 @@ class SubWin{
   }
 
   _bodyRect(){return this.body.getBoundingClientRect();}
-  _toDocPos(t){const r=this._bodyRect();return{x:(t.clientX-r.left)/this.innerScale+this.offX,y:(t.clientY-r.top)/this.innerScale+this.offY};}
+  /* v6: body pixel → PDF user space 座標
+     canvas pixel = body pixel + offX/Y*innerScale (CSS translate の逆)
+     PDF座標 = canvasToPdf(canvasPx, vp.transform) */
+  _toPdfPos(t){
+    if(!this._vp)return{x:0,y:0};
+    const r=this._bodyRect();
+    const cx=(t.clientX-r.left)+this.offX*this.innerScale;
+    const cy=(t.clientY-r.top )+this.offY*this.innerScale;
+    const p=Utils.canvasToPdf(cx,cy,this._vp.transform);
+    Logger.debug('[SW._toPdfPos] body=('+((t.clientX-r.left).toFixed(1))+','+((t.clientY-r.top).toFixed(1))+') → pdf=('+p.x.toFixed(2)+','+p.y.toFixed(2)+')');
+    return p;
+  }
+  /* v6: PDF座標 → body pixel (selCtx描画用) */
+  _pdfToBodyPx(p){
+    if(!this._vp)return{x:0,y:0};
+    const c=Utils.pdfToCanvas(p.x,p.y,this._vp.transform);
+    return{x:c.x-this.offX*this.innerScale, y:c.y-this.offY*this.innerScale};
+  }
   _updateTransform(){
     this.cvs.style.transform=`translate(${-this.offX*this.innerScale}px,${-this.offY*this.innerScale}px)`;
     EventBus.emit('subwin:transform');
@@ -991,6 +1138,7 @@ class SubWin{
     const sc=this.innerScale;
     const page=await this.pdfDoc.getPage(this.pageNum);
     const vp=page.getViewport({scale:sc});
+    this._vp=vp; /* v6: PDF座標変換用 */
     if(!this._pdfCache||this._pdfCacheSc!==sc||this._pdfCachePg!==this.pageNum){
       const off=document.createElement('canvas');
       off.width=vp.width;off.height=vp.height;
@@ -1002,7 +1150,7 @@ class SubWin{
       if(!this._annCvs)this._annCvs=document.createElement('canvas');
       this._annCvs.width=vp.width;this._annCvs.height=vp.height;
       const ac=this._annCvs.getContext('2d');ac.clearRect(0,0,vp.width,vp.height);
-      DrawUtil.drawAnnotations(ac,this.strokes[this.pageNum]||[],sc);
+      DrawUtil.drawAnnotations(ac,this.strokes[this.pageNum]||[],vp.transform);
       this._annDirty=false;
     }
     if(ver!==this._renderVer)return;
@@ -1064,7 +1212,7 @@ class SubWin{
   _movePan(t){if(!this.panSt)return;this.offX=this.panSt.ox0-(t.clientX-this.panSt.x0)/this.innerScale;this.offY=this.panSt.oy0-(t.clientY-this.panSt.y0)/this.innerScale;this._updateTransform();}
 
   _startDraw(t){
-    const p=this._toDocPos(t);
+    const p=this._toPdfPos(t);
     if(App.currentTool==='text'){App._textAt(p.x,p.y);return;}
     if(App.currentTool==='select'){
       if(this.selectedIdx.length>0){
@@ -1082,19 +1230,23 @@ class SubWin{
   }
   _moveDraw(t){
     if(App.currentTool==='select'&&this.isDrawing){
-      const p=this._toDocPos(t);
+      const p=this._toPdfPos(t);
       if(this.selectedIdx.length>0&&!this.selPath.length){this._moveSel(p.x-this.lastX,p.y-this.lastY);this.lastX=p.x;this.lastY=p.y;this.render();this._drawSelOv();return;}
       this.selPath.push({x:p.x,y:p.y});this._drawSelPreview();return;
     }
     if(!this.curStroke)return;
-    const p=this._toDocPos(t),s=this.curStroke,sc=this.innerScale;
-    if(['pen','hl'].includes(s.type)){s.points.push([p.x,p.y]);DrawUtil.drawLivePen(this.ctx,s,sc);this.lastX=p.x;this.lastY=p.y;}
+    const p=this._toPdfPos(t),s=this.curStroke,sc=this.innerScale;
+    if(['pen','hl'].includes(s.type)){s.points.push([p.x,p.y]);if(this._vp)DrawUtil.drawLivePen(this.ctx,s,this._vp.transform);this.lastX=p.x;this.lastY=p.y;}
     else if(s.type==='eraser'){
       s.points.push([p.x,p.y]);this.lastX=p.x;this.lastY=p.y;
       const br=this._bodyRect();
       this.selCvs.width=Math.round(br.width);this.selCvs.height=Math.round(br.height);
       this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
-      DrawUtil.drawEraserCursor(this.selCtx,{x:(p.x-this.offX),y:(p.y-this.offY)},s,sc,1);
+      /* v6: PDF座標→body pixel変換してから円弧を描く */
+      const eb=this._pdfToBodyPx(p);const ewR=s.size*2*sc/3;
+      this.selCtx.save();this.selCtx.strokeStyle='#888';this.selCtx.lineWidth=1.5;this.selCtx.setLineDash([4,2]);
+      this.selCtx.beginPath();this.selCtx.arc(eb.x,eb.y,ewR,0,Math.PI*2);this.selCtx.stroke();
+      this.selCtx.restore();
     }else{
       s.x2=p.x;s.y2=p.y;
       cancelAnimationFrame(this._drawRafId);
@@ -1205,11 +1357,12 @@ class SubWin{
     const sc=this.innerScale;
     if(App.selMode==='lasso'){
       this.selCtx.beginPath();
-      this.selPath.forEach((p,i)=>{const bx=(p.x-this.offX)*sc,by=(p.y-this.offY)*sc;i?this.selCtx.lineTo(bx,by):this.selCtx.moveTo(bx,by);});
+      this.selPath.forEach((p,i)=>{const b=this._pdfToBodyPx(p);i?this.selCtx.lineTo(b.x,b.y):this.selCtx.moveTo(b.x,b.y);});
       this.selCtx.stroke();
     }else{
       const p0=this.selPath[0],p1=this.selPath[this.selPath.length-1];
-      this.selCtx.strokeRect((Math.min(p0.x,p1.x)-this.offX)*sc,(Math.min(p0.y,p1.y)-this.offY)*sc,Math.abs(p1.x-p0.x)*sc,Math.abs(p1.y-p0.y)*sc);
+      const b0=this._pdfToBodyPx(p0),b1=this._pdfToBodyPx(p1);
+      this.selCtx.strokeRect(Math.min(b0.x,b1.x),Math.min(b0.y,b1.y),Math.abs(b1.x-b0.x),Math.abs(b1.y-b0.y));
     }
     this.selCtx.restore();
   }
@@ -1222,7 +1375,9 @@ class SubWin{
     this.selCtx.save();this.selCtx.strokeStyle='#4488ff';this.selCtx.lineWidth=2;this.selCtx.setLineDash([6,3]);
     this.selectedIdx.forEach(i=>{
       const bb=Utils.strokeBBox(arr[i]);if(!bb)return;
-      this.selCtx.strokeRect((bb.x1-this.offX)*sc-4,(bb.y1-this.offY)*sc-4,(bb.x2-bb.x1)*sc+8,(bb.y2-bb.y1)*sc+8);
+      const b1=this._pdfToBodyPx({x:bb.x1,y:bb.y1}),b2=this._pdfToBodyPx({x:bb.x2,y:bb.y2});
+      const minX=Math.min(b1.x,b2.x),minY=Math.min(b1.y,b2.y),maxX=Math.max(b1.x,b2.x),maxY=Math.max(b1.y,b2.y);
+      this.selCtx.strokeRect(minX-4,minY-4,maxX-minX+8,maxY-minY+8);
     });
     this.selCtx.restore();
     this._positionSelBtn();
@@ -1231,10 +1386,12 @@ class SubWin{
     const bb=this._selBBox();if(!bb)return;
     /* 削除ボタン: _bodyRect() + (doc座標-offX/Y)×innerScale で viewport座標を算出し
        _placeSelBtn に委譲。サブ窓の transform/innerScale の影響を受けない */
-    const br=this._bodyRect(),sc=this.innerScale;
+    const br=this._bodyRect();
+    if(!this._vp)return;
+    const b1=this._pdfToBodyPx({x:bb.x1,y:bb.y1}),b2=this._pdfToBodyPx({x:bb.x2,y:bb.y2});
     _placeSelBtn({
-      x1:br.left+(bb.x1-this.offX)*sc, y1:br.top+(bb.y1-this.offY)*sc,
-      x2:br.left+(bb.x2-this.offX)*sc, y2:br.top+(bb.y2-this.offY)*sc
+      x1:br.left+Math.min(b1.x,b2.x), y1:br.top+Math.min(b1.y,b2.y),
+      x2:br.left+Math.max(b1.x,b2.x), y2:br.top+Math.max(b1.y,b2.y)
     });
   }
   _moveSel(dx,dy){
@@ -1299,6 +1456,7 @@ const App=(() => {
   let panX=16,panY=16;
   let velHist=[],rafId=null;
   let _wheelTimer=null,_offscr=null;
+  let _currentVP=null; /* v6: 現在ページのviewport (PDF座標変換基盤) */
   let _pdfLoadingLock=false;
   let _subCreating=false;
   let _fileHandle=null;
@@ -1340,12 +1498,17 @@ const App=(() => {
   function _cancelInertia(){cancelAnimationFrame(rafId);rafId=null;}
 
   /* --- 座標変換 --- */
-  /* 座標変換集約点: client → doc座標 (メイン窓) */
-  function _getDocPos(src){
+  /* v6: client座標 → PDF user space座標 (メイン窓)
+     viewport.transform の逆変換を使用。手書きの回転補正は不要。
+     canvasPx = (clientX - caLeft - panX) / cssExtraZoom → canvasToPdf(canvasPx, vp.transform) */
+  function _getPdfPos(src){
+    if(!_currentVP)return{x:0,y:0};
     const r=caEl.getBoundingClientRect();
-    const pos={x:(src.clientX-r.left-panX)/scale,y:(src.clientY-r.top-panY)/scale};
-    Logger.debug('[_getDocPos] clientX='+src.clientX.toFixed(1)+' → docX='+pos.x.toFixed(2)+' scale='+scale.toFixed(3)+' panX='+panX.toFixed(1));
-    return pos;
+    const cx=(src.clientX-r.left-panX)/cssExtraZoom;
+    const cy=(src.clientY-r.top -panY)/cssExtraZoom;
+    const p=Utils.canvasToPdf(cx,cy,_currentVP.transform);
+    Logger.debug('[_getPdfPos] client=('+src.clientX.toFixed(1)+','+src.clientY.toFixed(1)+') → pdf=('+p.x.toFixed(2)+','+p.y.toFixed(2)+') vt=['+_currentVP.transform.slice(0,4).map(v=>v.toFixed(3)).join(',')+']');
+    return p;
   }
   function _isOnCanvas(src){
     const r=caEl.getBoundingClientRect();
@@ -1373,7 +1536,7 @@ const App=(() => {
     if(!Logger.flags.redraw)return;
     Logger.debug('[redraw] page='+curPage+' renderScale='+renderScale.toFixed(3)+' cssEZ='+cssExtraZoom.toFixed(3)+' strokes='+(strokes[curPage]||[]).length);
     annCtx.clearRect(0,0,annCvs.width,annCvs.height);
-    if(Logger.flags.annotationDraw)DrawUtil.drawAnnotations(annCtx,strokes[curPage]||[],renderScale);
+    if(Logger.flags.annotationDraw&&_currentVP)DrawUtil.drawAnnotations(annCtx,strokes[curPage]||[],_currentVP.transform);
     if(Logger.flags.overlay)_drawSelOv();
   }
 
@@ -1390,6 +1553,7 @@ const App=(() => {
     renderScale=Math.min(scale,MAX_CANVAS/maxDim);
     cssExtraZoom=scale/renderScale;
     const vp=page.getViewport({scale:renderScale});
+    _currentVP=vp; /* v6: PDF座標変換用に保存 */
     const dpr=Math.min(window.devicePixelRatio||1,PDF_MAX_DPR);
     const hiRS=Math.min(renderScale*dpr,(4096-4)/maxDim);
     const hiVP=page.getViewport({scale:hiRS});
@@ -1432,32 +1596,43 @@ const App=(() => {
     document.getElementById('selbtn').style.display=selectedIdx.length?'block':'none';
   }
   function _drawSelPreview(){
-    ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();if(!selPath.length)return;
-    const sc=renderScale,invEZ=1/cssExtraZoom;
+    ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();if(!selPath.length||!_currentVP)return;
+    const invEZ=1/cssExtraZoom;
     ovlCtx.save();ovlCtx.strokeStyle='#4488ff';ovlCtx.lineWidth=2*invEZ;ovlCtx.setLineDash([6*invEZ,4*invEZ]);
     if(_selMode==='rect'){
       const p0=selPath[0],p1=selPath[selPath.length-1];
-      ovlCtx.strokeRect(Math.min(p0.x,p1.x)*sc,Math.min(p0.y,p1.y)*sc,Math.abs(p1.x-p0.x)*sc,Math.abs(p1.y-p0.y)*sc);
+      const c0=Utils.pdfToCanvas(p0.x,p0.y,_currentVP.transform),c1=Utils.pdfToCanvas(p1.x,p1.y,_currentVP.transform);
+      ovlCtx.strokeRect(Math.min(c0.x,c1.x),Math.min(c0.y,c1.y),Math.abs(c1.x-c0.x),Math.abs(c1.y-c0.y));
     }else{
-      ovlCtx.beginPath();selPath.forEach((p,i)=>i?ovlCtx.lineTo(p.x*sc,p.y*sc):ovlCtx.moveTo(p.x*sc,p.y*sc));ovlCtx.stroke();
+      ovlCtx.beginPath();
+      selPath.forEach((p,i)=>{const{x,y}=Utils.pdfToCanvas(p.x,p.y,_currentVP.transform);i?ovlCtx.lineTo(x,y):ovlCtx.moveTo(x,y);});
+      ovlCtx.stroke();
     }
     ovlCtx.restore();
   }
   function _drawSelOv(){
     ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
-    if(!selectedIdx.length)return;
-    const arr=strokes[curPage]||[],sc=renderScale,invEZ=1/cssExtraZoom;
+    if(!selectedIdx.length||!_currentVP)return;
+    const arr=strokes[curPage]||[],invEZ=1/cssExtraZoom;
     ovlCtx.save();ovlCtx.strokeStyle='#4488ff';ovlCtx.lineWidth=2*invEZ;ovlCtx.setLineDash([6*invEZ,3*invEZ]);
-    selectedIdx.forEach(i=>{const bb=Utils.strokeBBox(arr[i]);if(!bb)return;ovlCtx.strokeRect(bb.x1*sc-4*invEZ,bb.y1*sc-4*invEZ,(bb.x2-bb.x1)*sc+8*invEZ,(bb.y2-bb.y1)*sc+8*invEZ);});
+    selectedIdx.forEach(i=>{
+      const bb=Utils.strokeBBox(arr[i]);if(!bb)return;
+      const c1=Utils.pdfToCanvas(bb.x1,bb.y1,_currentVP.transform),c2=Utils.pdfToCanvas(bb.x2,bb.y2,_currentVP.transform);
+      const minX=Math.min(c1.x,c2.x),minY=Math.min(c1.y,c2.y),maxX=Math.max(c1.x,c2.x),maxY=Math.max(c1.y,c2.y);
+      ovlCtx.strokeRect(minX-4*invEZ,minY-4*invEZ,maxX-minX+8*invEZ,maxY-minY+8*invEZ);
+    });
     ovlCtx.restore();
     const bb=_selBBox();
-    if(bb){
-      /* 削除ボタン: cwEl の BoundingRect + doc座標×scale で viewport座標を算出し
-         _placeSelBtn に委譲。transform(cssExtraZoom)の影響を受けない */
-      const wr=cwEl.getBoundingClientRect();
+    if(bb&&_currentVP){
+      /* 削除ボタン: PDF座標 → canvas pixel → screen座標 → _placeSelBtn
+         caRect.left + panX + canvasPx * cssExtraZoom = screen座標 */
+      const caRect=caEl.getBoundingClientRect();
+      const c1=Utils.pdfToCanvas(bb.x1,bb.y1,_currentVP.transform),c2=Utils.pdfToCanvas(bb.x2,bb.y2,_currentVP.transform);
       _placeSelBtn({
-        x1:wr.left+bb.x1*scale, y1:wr.top+bb.y1*scale,
-        x2:wr.left+bb.x2*scale, y2:wr.top+bb.y2*scale
+        x1:caRect.left+panX+Math.min(c1.x,c2.x)*cssExtraZoom,
+        y1:caRect.top +panY+Math.min(c1.y,c2.y)*cssExtraZoom,
+        x2:caRect.left+panX+Math.max(c1.x,c2.x)*cssExtraZoom,
+        y2:caRect.top +panY+Math.max(c1.y,c2.y)*cssExtraZoom
       });
     }
   }
@@ -1559,7 +1734,7 @@ const App=(() => {
   /* --- 描画 --- */
   function _startDraw(e){
     const t=e.touches?e.touches[0]:e;
-    const p=_getDocPos(t);
+    const p=_getPdfPos(t);
     if(_activeTool==='text'){_textAt(p.x,p.y);return;}
     if(_activeTool==='select'){
       if(selectedIdx.length>0){
@@ -1580,7 +1755,7 @@ const App=(() => {
   }
   function _moveDraw(e){
     const t=e.touches?e.touches[0]:e;
-    const p=_getDocPos(t);
+    const p=_getPdfPos(t);
     const sc=renderScale,invEZ=1/cssExtraZoom;
     if(_activeTool==='select'){
       if(selectedIdx.length>0&&!selPath.length){_moveSel(p.x-lastX,p.y-lastY);lastX=p.x;lastY=p.y;redraw();_drawSelOv();return;}
@@ -1590,21 +1765,20 @@ const App=(() => {
       subRect.x2=p.x;subRect.y2=p.y;
       ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
       ovlCtx.save();ovlCtx.strokeStyle='#f07800';ovlCtx.lineWidth=2*invEZ;ovlCtx.setLineDash([8*invEZ,4*invEZ]);
-      ovlCtx.strokeRect(subRect.x1*sc,subRect.y1*sc,(subRect.x2-subRect.x1)*sc,(subRect.y2-subRect.y1)*sc);
-      ovlCtx.fillStyle='rgba(240,120,0,.08)';ovlCtx.fillRect(subRect.x1*sc,subRect.y1*sc,(subRect.x2-subRect.x1)*sc,(subRect.y2-subRect.y1)*sc);
+      if(_currentVP){const cs1=Utils.pdfToCanvas(subRect.x1,subRect.y1,_currentVP.transform),cs2=Utils.pdfToCanvas(subRect.x2,subRect.y2,_currentVP.transform);const srX=Math.min(cs1.x,cs2.x),srY=Math.min(cs1.y,cs2.y),srW=Math.abs(cs2.x-cs1.x),srH=Math.abs(cs2.y-cs1.y);ovlCtx.strokeRect(srX,srY,srW,srH);ovlCtx.fillStyle='rgba(240,120,0,.08)';ovlCtx.fillRect(srX,srY,srW,srH);}
       ovlCtx.restore();return;
     }
     if(!curStroke)return;
     const s=curStroke;
-    if(['pen','hl'].includes(s.type)){s.points.push([p.x,p.y]);DrawUtil.drawLivePen(annCtx,s,sc);lastX=p.x;lastY=p.y;}
+    if(['pen','hl'].includes(s.type)){s.points.push([p.x,p.y]);if(_currentVP)DrawUtil.drawLivePen(annCtx,s,_currentVP.transform);lastX=p.x;lastY=p.y;}
     else if(s.type==='eraser'){
       s.points.push([p.x,p.y]);lastX=p.x;lastY=p.y;
       ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
-      DrawUtil.drawEraserCursor(ovlCtx,p,s,sc,invEZ);
+      if(_currentVP)DrawUtil.drawEraserCursor(ovlCtx,p,s,_currentVP.transform,invEZ);
     }else{
       s.x2=p.x;s.y2=p.y;
       ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
-      DrawUtil.drawStroke(s,ovlCtx,sc);
+      if(_currentVP)DrawUtil.drawStroke(s,ovlCtx,_currentVP.transform);
     }
   }
   function _endDraw(e){
@@ -1620,11 +1794,18 @@ const App=(() => {
         else if(!_subCreating){
           _subCreating=true;setTimeout(()=>{_subCreating=false;},400);
           const cr=caEl.getBoundingClientRect();
-          /* ⑦修正: タイトルバー30px分上にオフセット → bodyがリージョン上端と揃う */
-          const sx=cr.left+panX+r.x1*scale;
-          const sy=cr.top+panY+r.y1*scale-30;
-          Logger.debug('[SubWin create] sx='+sx.toFixed(1)+' sy='+sy.toFixed(1)+' scale='+scale.toFixed(3)+' panX='+panX.toFixed(1)+' panY='+panY.toFixed(1));
-          new SubWin(pdfDoc,strokes,curPage,r,sx,sy,scale);
+          /* v6: r はPDF座標。SubWin は doc座標(canvas pixel at scale=1)を使うため変換。
+             PDF上端(y-up最大値)→ canvas pixel → /renderScale = doc coord */
+          const rs=renderScale,vt=_currentVP?.transform||[rs,0,0,-rs,0,1];
+          const rXmin=Math.min(r.x1,r.x2),rXmax=Math.max(r.x1,r.x2);
+          const rYmin=Math.min(r.y1,r.y2),rYmax=Math.max(r.y1,r.y2);
+          const tlc=Utils.pdfToCanvas(rXmin,rYmax,vt); // 画面上の左上 (canvas px)
+          const brc=Utils.pdfToCanvas(rXmax,rYmin,vt); // 画面上の右下 (canvas px)
+          const docRegion={x1:Math.min(tlc.x,brc.x)/rs,y1:Math.min(tlc.y,brc.y)/rs,x2:Math.max(tlc.x,brc.x)/rs,y2:Math.max(tlc.y,brc.y)/rs};
+          const sx=cr.left+panX+Math.min(tlc.x,brc.x)*cssExtraZoom;
+          const sy=cr.top +panY+Math.min(tlc.y,brc.y)*cssExtraZoom-30;
+          Logger.debug('[SubWin create v6] sx='+sx.toFixed(1)+' sy='+sy.toFixed(1)+' docRegion='+JSON.stringify(docRegion));
+          new SubWin(pdfDoc,strokes,curPage,docRegion,sx,sy,scale);
         }
       }
       subRect=null;ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
@@ -1827,45 +2008,42 @@ const App=(() => {
         const page=copiedPage;
         const{width,height}=page.getSize();
         const pdfPage=await pdfDoc.getPage(pg);
-        /* ⑧修正: rotation:0 で未回転の寸法を取得。回転付きgetViewport だと vp.width が MediaBox と異なる */
-        const rot=(pdfPage.rotate||0)%360;
+        /* v6: ストロークはPDF user space (y-up)で保存済み。pdf-libもy-up座標を使うため直接スケールするだけ。
+           rotation補正・docToPdf変換は不要。 */
         const vp0=pdfPage.getViewport({scale:1,rotation:0});
-        const sc=width/vp0.width;
-        Logger.debug('[exportPDF] pg='+pg+' rot='+rot+' sc='+sc.toFixed(4)+' pdfW='+width.toFixed(1)+' vp0W='+vp0.width.toFixed(1));
-        /* ⑧修正: 回転対応座標変換。doc座標(top-left origin,y-down)→PDF座標(bottom-left origin,y-up) */
-        function docToPdf(dx,dy){switch(rot){case 90:return{x:(vp0.width-dy)*sc,y:(vp0.height-dx)*sc};case 180:return{x:(vp0.width-dx)*sc,y:dy*sc};case 270:return{x:dy*sc,y:dx*sc};default:return{x:dx*sc,y:(vp0.height-dy)*sc};}}
+        const sc=width/vp0.width; /* ほぼ1.0 */
+        Logger.debug('[exportPDF v6] pg='+pg+' sc='+sc.toFixed(4)+' pdfW='+width.toFixed(1)+' vp0W='+vp0.width.toFixed(1));
         const pgStrokes=strokes[pg]||[];
         for(const s of pgStrokes){
           if(s.type==='pen'||s.type==='hl'){
             if(!s.points?.length)continue;
             const alpha=s.type==='hl'?.38:1;
-            const c=_hexToRgb(s.color);
-            const lw=s.size*sc/3;
+            const c=_hexToRgb(s.color);const lw=s.size*sc/3;
             for(let i=1;i<s.points.length;i++){
-              const pt0=docToPdf(s.points[i-1][0],s.points[i-1][1]),pt1=docToPdf(s.points[i][0],s.points[i][1]);
-              page.drawLine({start:pt0,end:pt1,thickness:s.type==='hl'?Math.max(lw*4,5*sc/3):lw,color:rgb(c.r/255,c.g/255,c.b/255),opacity:alpha,lineCap:LineCapStyle.Round});
+              const p0={x:s.points[i-1][0]*sc,y:s.points[i-1][1]*sc},p1={x:s.points[i][0]*sc,y:s.points[i][1]*sc};
+              Logger.debug('[exportPDF pen] from=('+p0.x.toFixed(1)+','+p0.y.toFixed(1)+')');
+              page.drawLine({start:p0,end:p1,thickness:s.type==='hl'?Math.max(lw*4,5*sc/3):lw,color:rgb(c.r/255,c.g/255,c.b/255),opacity:alpha,lineCap:LineCapStyle.Round});
             }
           }else if(s.type==='text'){
             const c=_hexToRgb(s.color);
-            /* ⑧修正: テキストy座標 PDF下基準 */
-            const tp=docToPdf(s.x,s.y);
+            const tp={x:s.x*sc,y:s.y*sc};
             Logger.debug('[exportPDF text] x='+tp.x.toFixed(1)+' y='+tp.y.toFixed(1)+' size='+(s.size*6*sc).toFixed(1));
             page.drawText(s.text||'',{x:tp.x,y:tp.y,size:s.size*6*sc,color:rgb(c.r/255,c.g/255,c.b/255)});
           }else if(['rect','circle','line','arrow'].includes(s.type)){
             const c=_hexToRgb(s.color);const lw=s.size*sc/3;
             if(s.type==='rect'){
-              /* ⑧修正: 2角をdocToPdfで変換し、min/maxで正しいbounding boxを算出 */
-              const ra=docToPdf(Math.min(s.x1,s.x2),Math.min(s.y1,s.y2)),rb=docToPdf(Math.max(s.x1,s.x2),Math.max(s.y1,s.y2));
-              page.drawRectangle({x:Math.min(ra.x,rb.x),y:Math.min(ra.y,rb.y),width:Math.abs(rb.x-ra.x),height:Math.abs(rb.y-ra.y),borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});
+              const x1=Math.min(s.x1,s.x2)*sc,y1=Math.min(s.y1,s.y2)*sc;
+              const x2=Math.max(s.x1,s.x2)*sc,y2=Math.max(s.y1,s.y2)*sc;
+              Logger.debug('[exportPDF rect] ('+x1.toFixed(1)+','+y1.toFixed(1)+')-('+x2.toFixed(1)+','+y2.toFixed(1)+')');
+              page.drawRectangle({x:x1,y:y1,width:x2-x1,height:y2-y1,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});
             }else if(s.type==='circle'){
-              /* ⑧修正: circle(楕円)をdocToPdfで回転対応させてPDFに出力 */
-              const erx=Math.abs(s.x2-s.x1)/2*sc,ery=Math.abs(s.y2-s.y1)/2*sc;
-              const ec=docToPdf((s.x1+s.x2)/2,(s.y1+s.y2)/2);
-              const exScale=(rot===90||rot===270)?ery:erx,eyScale=(rot===90||rot===270)?erx:ery;
-              try{page.drawEllipse({x:ec.x,y:ec.y,xScale:exScale,yScale:eyScale,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}catch(_){}
+              const cx=(s.x1+s.x2)/2*sc,cy=(s.y1+s.y2)/2*sc;
+              const rx=Math.abs(s.x2-s.x1)/2*sc,ry=Math.abs(s.y2-s.y1)/2*sc;
+              Logger.debug('[exportPDF ellipse] center=('+cx.toFixed(1)+','+cy.toFixed(1)+')');
+              try{page.drawEllipse({x:cx,y:cy,xScale:rx,yScale:ry,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}catch(_){}
             }else if(s.type==='line'||s.type==='arrow'){
-              /* ⑧修正: docToPdfで変換後、PDF座標系での角度からarrowheadを算出 */
-              const lp1=docToPdf(s.x1,s.y1),lp2=docToPdf(s.x2,s.y2);
+              const lp1={x:s.x1*sc,y:s.y1*sc},lp2={x:s.x2*sc,y:s.y2*sc};
+              Logger.debug('[exportPDF line/arrow] from=('+lp1.x.toFixed(1)+','+lp1.y.toFixed(1)+')');
               page.drawLine({start:lp1,end:lp2,thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
               if(s.type==='arrow'){
                 const hl=Math.max(lw*4,12*sc),ang=Math.atan2(lp2.y-lp1.y,lp2.x-lp1.x);
@@ -1878,9 +2056,8 @@ const App=(() => {
       }
       const bytes=await outDoc.save();
       const blob=new Blob([bytes],{type:'application/pdf'});
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-      a.download=(fileName.replace(/\.pdf$/i,'')||'output')+'_注釈付.pdf';
-      a.click();URL.revokeObjectURL(a.href);
+      const pdfName=(fileName.replace(/\.pdf$/i,'')||'output')+'_注釈付.pdf';
+      await FileSaveMgr.saveBlob(blob,pdfName,'application/pdf','PDF (注釈付き)');
       showToast('📤 PDF出力完了');
     }catch(e){showToast('PDF出力に失敗しました');Logger.error(e);}
     showLoading(false);
@@ -1896,12 +2073,11 @@ const App=(() => {
       const zip=new JSZip();
       zip.file(fileName,origBuf);
       zip.file('strokes.json',JSON.stringify(strokes));
-      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v4',ts:Date.now()}));
+      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v6',ts:Date.now()}));
       const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-      a.download=(fileName.replace(/\.pdf$/i,'')||'backup')+'_backup.zip';
-      a.click();URL.revokeObjectURL(a.href);
-      AutoSave.clearDirty();showToast('💾 バックアップ完了');
+      const bkName=(fileName.replace(/\.pdf$/i,'')||'backup')+'_backup.zip';
+      const bkResult=await FileSaveMgr.saveBlob(blob,bkName,'application/zip','ZIP バックアップ');
+      if(bkResult==='saved'){AutoSave.clearDirty();showToast('💾 バックアップ完了');}
     }catch(e){showToast('バックアップに失敗しました');Logger.error(e);}
     showLoading(false);
   }
@@ -2097,8 +2273,21 @@ function _initToolbar(){
   document.getElementById('btn-undo').addEventListener('click',()=>App.undo());
   document.getElementById('btn-save').addEventListener('click',()=>{document.getElementById('pgrov').classList.add('on');document.getElementById('pgrfld').value='';});
   document.getElementById('btn-backup').addEventListener('click',()=>App.downloadBackup());
-  document.getElementById('btn-restore').addEventListener('click',()=>document.getElementById('restoreInput').click());
+  /* 復元: File System Access API 対応時は showOpenFilePicker で前回フォルダを開く */
+  document.getElementById('btn-restore').addEventListener('click',async ()=>{
+    const result=await FileSaveMgr.openFile(
+      [{description:'ZIP バックアップ',accept:{'application/zip':['.zip']}}]
+    );
+    if(result==='fallback'){document.getElementById('restoreInput').click();}
+    else if(result instanceof File){await App.restoreFromZip(result);}
+    /* null = ユーザーキャンセル → 何もしない */
+  });
+  /* フォールバック用 <input>（File System Access API 未対応環境） */
   document.getElementById('restoreInput').addEventListener('change',async e=>{const f=e.target.files[0];if(!f){e.target.value='';return;}await App.restoreFromZip(f);e.target.value='';});
+  /* 前回の保存先を忘れる */
+  document.getElementById('btn-forget-dir').addEventListener('click',()=>{
+    FileSaveMgr.forgetLastDir();showToast('📁 保存先の記憶をクリアしました');
+  });
 
   /* ページ操作 */
   document.getElementById('btn-prev').addEventListener('click',()=>App.gotoPage(-1));
@@ -2366,4 +2555,3 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
 </script>
 </body>
 </html>
-            
