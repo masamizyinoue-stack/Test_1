@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v2</title>
+<title>M_Viewer v4</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -181,7 +181,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">v2</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">v4</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -255,7 +255,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v2</div>
+    <div class="dzm">M_Viewer v4</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -845,6 +845,34 @@ const DrawUtil=(() => {
 })();
 
 /* ============================================================
+   削除ボタン viewport-safe 配置 共通関数
+   vp: 選択範囲の viewport 座標 {x1,y1,x2,y2}
+       (getBoundingClientRect + 内部スケール計算済みの値)
+   設計: 「doc座標 → viewport座標 → ボタン配置座標」の最終段。
+         transform/zoom/pan の影響を受けない。
+         メイン窓・サブ窓共通で使用する。
+   ============================================================ */
+function _placeSelBtn(vp){
+  const btn=document.getElementById('selbtn');
+  if(!btn)return;
+  const margin=10;
+  /* display:none 時は offsetWidth=0 になるためフォールバック値を使用 */
+  const bW=btn.offsetWidth||80, bH=btn.offsetHeight||36;
+  const vW=window.innerWidth, vH=window.innerHeight;
+  /* X: 選択左端を基準。右端 / 左端を viewport 内にクランプ */
+  let bX=vp.x1;
+  bX=Math.min(bX, vW-bW-margin);
+  bX=Math.max(margin, bX);
+  /* Y: 選択範囲の下側を基本。画面下端を超えるなら選択上側へ移動。
+        それでも画面上端を超えるなら margin に固定 */
+  let bY=vp.y2+margin;
+  if(bY+bH > vH-margin){ bY=vp.y1-bH-margin; }
+  if(bY < margin){ bY=margin; }
+  btn.style.left=Math.round(bX)+'px';
+  btn.style.top =Math.round(bY)+'px';
+}
+
+/* ============================================================
    Module: SubWinManager
    責務: サブ窓ライフサイクル + グローバルイベント1本化
    設計: document に touchmove/touchend/mousemove/mouseup を1本ずつ
@@ -1201,9 +1229,13 @@ class SubWin{
   }
   _positionSelBtn(){
     const bb=this._selBBox();if(!bb)return;
-    const br=this._bodyRect(),sc=this.innerScale,btn=document.getElementById('selbtn');
-    btn.style.left=Math.max(0,br.left+(bb.x1-this.offX)*sc-4)+'px';
-    btn.style.top=Math.max(0,br.top+(bb.y2-this.offY)*sc+6)+'px';
+    /* 削除ボタン: _bodyRect() + (doc座標-offX/Y)×innerScale で viewport座標を算出し
+       _placeSelBtn に委譲。サブ窓の transform/innerScale の影響を受けない */
+    const br=this._bodyRect(),sc=this.innerScale;
+    _placeSelBtn({
+      x1:br.left+(bb.x1-this.offX)*sc, y1:br.top+(bb.y1-this.offY)*sc,
+      x2:br.left+(bb.x2-this.offX)*sc, y2:br.top+(bb.y2-this.offY)*sc
+    });
   }
   _moveSel(dx,dy){
     const arr=this.strokes[this.pageNum]||[];
@@ -1419,7 +1451,15 @@ const App=(() => {
     selectedIdx.forEach(i=>{const bb=Utils.strokeBBox(arr[i]);if(!bb)return;ovlCtx.strokeRect(bb.x1*sc-4*invEZ,bb.y1*sc-4*invEZ,(bb.x2-bb.x1)*sc+8*invEZ,(bb.y2-bb.y1)*sc+8*invEZ);});
     ovlCtx.restore();
     const bb=_selBBox();
-    if(bb){const wr=cwEl.getBoundingClientRect(),btn=document.getElementById('selbtn');btn.style.left=Math.max(0,wr.left+bb.x1*scale-4)+'px';btn.style.top=Math.max(0,wr.top+bb.y2*scale+6)+'px';}
+    if(bb){
+      /* 削除ボタン: cwEl の BoundingRect + doc座標×scale で viewport座標を算出し
+         _placeSelBtn に委譲。transform(cssExtraZoom)の影響を受けない */
+      const wr=cwEl.getBoundingClientRect();
+      _placeSelBtn({
+        x1:wr.left+bb.x1*scale, y1:wr.top+bb.y1*scale,
+        x2:wr.left+bb.x2*scale, y2:wr.top+bb.y2*scale
+      });
+    }
   }
   function _moveSel(dx,dy){
     const arr=strokes[curPage]||[];
@@ -1787,9 +1827,13 @@ const App=(() => {
         const page=copiedPage;
         const{width,height}=page.getSize();
         const pdfPage=await pdfDoc.getPage(pg);
-        const vp1=pdfPage.getViewport({scale:1});
-        const sc=width/vp1.width;
-        Logger.debug('[exportPDF] pg='+pg+' sc='+sc.toFixed(4)+' pdfW='+width.toFixed(1)+' vp1W='+vp1.width.toFixed(1));
+        /* ⑧修正: rotation:0 で未回転の寸法を取得。回転付きgetViewport だと vp.width が MediaBox と異なる */
+        const rot=(pdfPage.rotate||0)%360;
+        const vp0=pdfPage.getViewport({scale:1,rotation:0});
+        const sc=width/vp0.width;
+        Logger.debug('[exportPDF] pg='+pg+' rot='+rot+' sc='+sc.toFixed(4)+' pdfW='+width.toFixed(1)+' vp0W='+vp0.width.toFixed(1));
+        /* ⑧修正: 回転対応座標変換。doc座標(top-left origin,y-down)→PDF座標(bottom-left origin,y-up) */
+        function docToPdf(dx,dy){switch(rot){case 90:return{x:(vp0.width-dy)*sc,y:(vp0.height-dx)*sc};case 180:return{x:(vp0.width-dx)*sc,y:dy*sc};case 270:return{x:dy*sc,y:dx*sc};default:return{x:dx*sc,y:(vp0.height-dy)*sc};}}
         const pgStrokes=strokes[pg]||[];
         for(const s of pgStrokes){
           if(s.type==='pen'||s.type==='hl'){
@@ -1798,32 +1842,35 @@ const App=(() => {
             const c=_hexToRgb(s.color);
             const lw=s.size*sc/3;
             for(let i=1;i<s.points.length;i++){
-              page.drawLine({start:{x:s.points[i-1][0]*sc,y:height-s.points[i-1][1]*sc},end:{x:s.points[i][0]*sc,y:height-s.points[i][1]*sc},thickness:s.type==='hl'?Math.max(lw*4,5*sc/3):lw,color:rgb(c.r/255,c.g/255,c.b/255),opacity:alpha,lineCap:LineCapStyle.Round});
+              const pt0=docToPdf(s.points[i-1][0],s.points[i-1][1]),pt1=docToPdf(s.points[i][0],s.points[i][1]);
+              page.drawLine({start:pt0,end:pt1,thickness:s.type==='hl'?Math.max(lw*4,5*sc/3):lw,color:rgb(c.r/255,c.g/255,c.b/255),opacity:alpha,lineCap:LineCapStyle.Round});
             }
           }else if(s.type==='text'){
             const c=_hexToRgb(s.color);
             /* ⑧修正: テキストy座標 PDF下基準 */
-            Logger.debug('[exportPDF text] x='+(s.x*sc).toFixed(1)+' y='+(height-s.y*sc).toFixed(1)+' size='+(s.size*6*sc).toFixed(1));
-            page.drawText(s.text||'',{x:s.x*sc,y:height-s.y*sc,size:s.size*6*sc,color:rgb(c.r/255,c.g/255,c.b/255)});
+            const tp=docToPdf(s.x,s.y);
+            Logger.debug('[exportPDF text] x='+tp.x.toFixed(1)+' y='+tp.y.toFixed(1)+' size='+(s.size*6*sc).toFixed(1));
+            page.drawText(s.text||'',{x:tp.x,y:tp.y,size:s.size*6*sc,color:rgb(c.r/255,c.g/255,c.b/255)});
           }else if(['rect','circle','line','arrow'].includes(s.type)){
             const c=_hexToRgb(s.color);const lw=s.size*sc/3;
             if(s.type==='rect'){
-              /* ⑧修正: PDF y軸=下が0。Rectのy指定は左下角 */
-              page.drawRectangle({x:Math.min(s.x1,s.x2)*sc,y:height-Math.max(s.y1,s.y2)*sc,width:Math.abs(s.x2-s.x1)*sc,height:Math.abs(s.y2-s.y1)*sc,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});
+              /* ⑧修正: 2角をdocToPdfで変換し、min/maxで正しいbounding boxを算出 */
+              const ra=docToPdf(Math.min(s.x1,s.x2),Math.min(s.y1,s.y2)),rb=docToPdf(Math.max(s.x1,s.x2),Math.max(s.y1,s.y2));
+              page.drawRectangle({x:Math.min(ra.x,rb.x),y:Math.min(ra.y,rb.y),width:Math.abs(rb.x-ra.x),height:Math.abs(rb.y-ra.y),borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});
             }else if(s.type==='circle'){
-              /* ⑧修正: circle(楕円)をPDFに出力 */
-              const cx=(Math.min(s.x1,s.x2)+(Math.abs(s.x2-s.x1)/2))*sc;
-              const cy=height-(Math.min(s.y1,s.y2)+(Math.abs(s.y2-s.y1)/2))*sc;
-              const rx=Math.abs(s.x2-s.x1)/2*sc,ry=Math.abs(s.y2-s.y1)/2*sc;
-              try{page.drawEllipse({x:cx,y:cy,xScale:rx,yScale:ry,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}catch(_){}
+              /* ⑧修正: circle(楕円)をdocToPdfで回転対応させてPDFに出力 */
+              const erx=Math.abs(s.x2-s.x1)/2*sc,ery=Math.abs(s.y2-s.y1)/2*sc;
+              const ec=docToPdf((s.x1+s.x2)/2,(s.y1+s.y2)/2);
+              const exScale=(rot===90||rot===270)?ery:erx,eyScale=(rot===90||rot===270)?erx:ery;
+              try{page.drawEllipse({x:ec.x,y:ec.y,xScale:exScale,yScale:eyScale,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}catch(_){}
             }else if(s.type==='line'||s.type==='arrow'){
-              page.drawLine({start:{x:s.x1*sc,y:height-s.y1*sc},end:{x:s.x2*sc,y:height-s.y2*sc},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+              /* ⑧修正: docToPdfで変換後、PDF座標系での角度からarrowheadを算出 */
+              const lp1=docToPdf(s.x1,s.y1),lp2=docToPdf(s.x2,s.y2);
+              page.drawLine({start:lp1,end:lp2,thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
               if(s.type==='arrow'){
-                /* ⑧修正: PDFはy軸上向き。arrowhead y成分は - (引き算) が正しい */
-                const hl=Math.max(lw*4,12*sc),ang=Math.atan2(-(s.y2-s.y1),(s.x2-s.x1));
-                const x2=s.x2*sc,y2=height-s.y2*sc;
-                page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang-Math.PI/6),y:y2-hl*Math.sin(ang-Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
-                page.drawLine({start:{x:x2,y:y2},end:{x:x2-hl*Math.cos(ang+Math.PI/6),y:y2-hl*Math.sin(ang+Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+                const hl=Math.max(lw*4,12*sc),ang=Math.atan2(lp2.y-lp1.y,lp2.x-lp1.x);
+                page.drawLine({start:lp2,end:{x:lp2.x-hl*Math.cos(ang-Math.PI/6),y:lp2.y-hl*Math.sin(ang-Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+                page.drawLine({start:lp2,end:{x:lp2.x-hl*Math.cos(ang+Math.PI/6),y:lp2.y-hl*Math.sin(ang+Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
               }
             }
           }
@@ -1849,7 +1896,7 @@ const App=(() => {
       const zip=new JSZip();
       zip.file(fileName,origBuf);
       zip.file('strokes.json',JSON.stringify(strokes));
-      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v2',ts:Date.now()}));
+      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v4',ts:Date.now()}));
       const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
       const a=document.createElement('a');a.href=URL.createObjectURL(blob);
       a.download=(fileName.replace(/\.pdf$/i,'')||'backup')+'_backup.zip';
@@ -2119,9 +2166,12 @@ function _initToolbar(){
     const r=e.target.getBoundingClientRect();p.style.left=Math.min(r.left,window.innerWidth-260)+'px';p.style.top=(r.bottom+4)+'px';
     const cur=App.strokeSize;document.getElementById('sz-rng').value=cur;document.getElementById('sz-n').value=cur;_prevSize(cur);
   });
-  document.getElementById('sz-rng').addEventListener('input',e=>{const v=+e.target.value;document.getElementById('sz-n').value=v;_prevSize(v);});
-  document.getElementById('sz-n').addEventListener('input',e=>{const v=Math.max(1,Math.min(40,+e.target.value));document.getElementById('sz-rng').value=v;_prevSize(v);});
-  document.getElementById('szp-ok').addEventListener('click',()=>{App.setSize(+document.getElementById('sz-n').value);document.getElementById('szp').classList.remove('on');});
+  /* ①修正: iOS Safari では range が 'input' ではなく 'change' を発火する。両方ハンドルし setSize をリアルタイム呼び出す */
+  function _onSzSlider(e){const v=Math.max(1,Math.min(40,+e.target.value||1));document.getElementById('sz-n').value=v;_prevSize(v);App.setSize(v);}
+  document.getElementById('sz-rng').addEventListener('input',_onSzSlider);
+  document.getElementById('sz-rng').addEventListener('change',_onSzSlider);
+  document.getElementById('sz-n').addEventListener('input',e=>{const v=Math.max(1,Math.min(40,+e.target.value));document.getElementById('sz-rng').value=v;_prevSize(v);App.setSize(v);});
+  document.getElementById('szp-ok').addEventListener('click',()=>{document.getElementById('szp').classList.remove('on');});
   document.getElementById('szp-cancel').addEventListener('click',()=>document.getElementById('szp').classList.remove('on'));
   function _prevSize(v){
     const cvs=document.getElementById('szp-cvs'),ctx=cvs.getContext('2d');
