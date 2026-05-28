@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v7</title>
+<title>M_Viewer v8</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -181,7 +181,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">v7</span></span>
+    <span class="logo">M_Viewer <span style="font-size:10px">v8</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -256,7 +256,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v7</div>
+    <div class="dzm">M_Viewer v8</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -1457,6 +1457,7 @@ const App=(() => {
   let velHist=[],rafId=null;
   let _wheelTimer=null,_offscr=null;
   let _currentVP=null; /* v6: 現在ページのviewport (PDF座標変換基盤) */
+  let _exportInProgress=false; /* v8: PDF出力中フラグ (autosave競合防止) */
   let _pdfLoadingLock=false;
   let _subCreating=false;
   let _fileHandle=null;
@@ -1995,20 +1996,35 @@ const App=(() => {
 
   /* --- PDF出力 --- */
 
-  /* v7: PDF出力専用スムーズパス生成 (Catmull-Rom → cubic bezier変換)
-     画面描画側(quadraticCurveTo)と同等の曲線品質をPDFに出力する。
+  /* v8: PDF出力専用スムーズパス生成 (Catmull-Rom → cubic bezier変換)
+     改善点:
+       ① NaN/Inf 座標を除去 (クラッシュ防止)
+       ② 近接点フィルタ 0.3pt未満除去 (パス肥大化防止)
+       ③ Catmull-Rom (tension=0.5) → cubic bezier制御点
+       ④ 3dp精度でパス文字列サイズを抑制
      pts: [[x,y],...] PDF user space(y-up), sc: スケール係数
      戻り値: SVGパス文字列 (pdf-lib drawSvgPath用) または null */
   function _buildSmoothSvgPath(pts,sc){
     if(!pts||pts.length<2)return null;
-    const p=pts.map(pt=>({x:+(pt[0]*sc).toFixed(3),y:+(pt[1]*sc).toFixed(3)}));
-    /* 2点の場合は直線 */
-    if(p.length===2)return'M'+p[0].x+' '+p[0].y+' L'+p[1].x+' '+p[1].y;
-    let d='M'+p[0].x+' '+p[0].y+' ';
-    for(let i=0;i<p.length-1;i++){
-      /* 端点クランプ: Catmull-Rom が境界外を参照しないよう末端を複製 */
-      const p0=p[Math.max(0,i-1)],p1=p[i],p2=p[i+1],p3=p[Math.min(p.length-1,i+2)];
-      /* Catmull-Rom (tension=0.5) → cubic bezier 制御点 */
+    /* ① スケール変換 + NaN/Infチェック + 近接点フィルタ */
+    const MIN_D2=0.09; /* 0.3pt^2: これ以下の移動は重複とみなして除去 */
+    const raw=[];
+    for(const pt of pts){
+      const x=pt[0]*sc,y=pt[1]*sc;
+      if(!isFinite(x)||!isFinite(y))continue;
+      if(raw.length>0){
+        const prev=raw[raw.length-1];
+        const dx=x-prev.x,dy=y-prev.y;
+        if(dx*dx+dy*dy<MIN_D2)continue;
+      }
+      raw.push({x:+x.toFixed(3),y:+y.toFixed(3)});
+    }
+    if(raw.length<2)return null;
+    if(raw.length===2)return'M'+raw[0].x+' '+raw[0].y+' L'+raw[1].x+' '+raw[1].y;
+    /* ② Catmull-Rom → cubic bezier変換 */
+    let d='M'+raw[0].x+' '+raw[0].y+' ';
+    for(let i=0;i<raw.length-1;i++){
+      const p0=raw[Math.max(0,i-1)],p1=raw[i],p2=raw[i+1],p3=raw[Math.min(raw.length-1,i+2)];
       const cp1x=+(p1.x+(p2.x-p0.x)/6).toFixed(3),cp1y=+(p1.y+(p2.y-p0.y)/6).toFixed(3);
       const cp2x=+(p2.x-(p3.x-p1.x)/6).toFixed(3),cp2y=+(p2.y-(p3.y-p1.y)/6).toFixed(3);
       d+='C'+cp1x+' '+cp1y+' '+cp2x+' '+cp2y+' '+p2.x+' '+p2.y+' ';
@@ -2018,118 +2034,140 @@ const App=(() => {
 
   async function exportPDF(pageNums){
     if(!pdfDoc||!origBuf){showToast('PDFが開かれていません');return;}
-    /* v7: 二重実行防止フラグ */
+    /* v8: 二重実行防止 */
     if(exportPDF._busy){showToast('PDF出力中です');return;}
     exportPDF._busy=true;
+    /* v8: autosave競合防止 (export中は60秒タイマーを無効化) */
+    _exportInProgress=true;
     showLoading(true);
+    Logger.info('[PDF EXPORT START] pages='+JSON.stringify(pageNums)+' total='+pageNums.length);
     const failedPages=[];
     try{
       const{PDFDocument,rgb,LineCapStyle}=PDFLib;
-      /* v7: ignoreEncryption=true で暗号化PDFでも読み込み失敗しにくくする */
+      /* v7: ignoreEncryption=true で暗号化PDFでも失敗しにくくする */
       const srcDoc=await PDFDocument.load(origBuf,{ignoreEncryption:true});
       const outDoc=await PDFDocument.create();
       const total=pageNums.length;
       for(let pi=0;pi<total;pi++){
         const pg=pageNums[pi];
         if(pg<1||pg>totalPages)continue;
-        /* v7: 複数ページ時は進捗表示。毎ページ後にブラウザへ制御を返し
-               UIフリーズ・Safariウォッチドッグタイムアウトを防ぐ */
         if(total>2){showToast('\uD83D\uDCC4 出力中 '+(pi+1)+'/'+total+'ページ...');}
-        await new Promise(r=>setTimeout(r,0));
+        /* v8: 20ms yield → Safari GC機会を増やす + UIフリーズ防止 */
+        await new Promise(r=>setTimeout(r,20));
         try{
           const[copiedPage]=await outDoc.copyPages(srcDoc,[pg-1]);
           outDoc.addPage(copiedPage);
           const page=copiedPage;
-          const{width}=page.getSize();
+          const{width,height}=page.getSize();
           const pdfPage=await pdfDoc.getPage(pg);
-          /* v6: ストロークはPDF user space (y-up)で保存済み。直接スケールするだけ。
-             rotation補正・docToPdf変換は不要。 */
+          /* v6: ストロークはPDF user space (y-up)で保存済み。直接スケールするだけ。 */
           const vp0=pdfPage.getViewport({scale:1,rotation:0});
-          const sc=width/vp0.width; /* ほぼ1.0 */
-          Logger.debug('[exportPDF v7] pg='+pg+' sc='+sc.toFixed(4)+' w='+width.toFixed(1));
-          for(const s of (strokes[pg]||[])){
-            if(s.type==='pen'||s.type==='hl'){
-              if(!s.points?.length)continue;
-              const alpha=s.type==='hl'?.38:1;
-              const c=_hexToRgb(s.color);
-              const lw=s.type==='hl'?Math.max(s.size*sc*4/3,5*sc/3):s.size*sc/3;
-              /* v7: Catmull-Rom cubic bezierでスムーズなSVGパスを生成し
-                     drawSvgPath で出力 (Apple Pencil筆跡の自然化)
-                     失敗時は従来のdrawLine折れ線にフォールバック */
-              const svgPath=_buildSmoothSvgPath(s.points,sc);
-              if(svgPath){
+          const sc=width/vp0.width; /* 通常 ≈ 1.0 */
+          /* v8: ページ情報ログ (デバッグ用: 回転・サイズ・スケール) */
+          const rot=pdfPage.rotate??0;
+          Logger.info('[PAGE EXPORT START] pg='+pg+' rot='+rot+' w='+width.toFixed(1)+' h='+height.toFixed(1)+' sc='+sc.toFixed(4)+' vp0='+vp0.width.toFixed(1)+'x'+vp0.height.toFixed(1));
+          const pgStrokes=strokes[pg]||[];
+          let annOK=0,annFail=0;
+          for(const s of pgStrokes){
+            /* v8: 注釈単位で try-catch → 1注釈の失敗で他が消えない */
+            try{
+              if(s.type==='pen'||s.type==='hl'){
+                if(!s.points?.length)continue;
+                const alpha=s.type==='hl'?.38:1;
+                const c=_hexToRgb(s.color);
+                const lw=s.type==='hl'?Math.max(s.size*sc*4/3,5*sc/3):s.size*sc/3;
+                /* v8: NaN/Inf除去+近接点フィルタ済みCatmull-Rom bezierパス */
+                const svgPath=_buildSmoothSvgPath(s.points,sc);
+                if(!svgPath)continue;
                 try{
-                  /* borderColorのみ指定 → fill無し・stroke専用 */
+                  /* borderColorのみ → fill無し・stroke専用 */
                   page.drawSvgPath(svgPath,{
                     borderColor:rgb(c.r/255,c.g/255,c.b/255),
                     borderWidth:lw,
                     borderOpacity:alpha,
                     borderLineCap:LineCapStyle.Round,
                   });
+                  Logger.debug('[ANNOTATION EXPORT] pg='+pg+' type='+s.type+' pts='+s.points.length);
                 }catch(_svgE){
-                  /* drawSvgPath非対応環境用フォールバック: drawLine折れ線 */
-                  Logger.warn('[exportPDF] SVGpath fallback pg='+pg);
+                  /* v8: drawSvgPath失敗 → drawLine折れ線フォールバック */
+                  Logger.warn('[ANNOTATION EXPORT] SVGpath fallback pg='+pg+' err='+_svgE);
                   for(let i=1;i<s.points.length;i++){
+                    const px0=s.points[i-1][0],py0=s.points[i-1][1];
+                    const px1=s.points[i][0],py1=s.points[i][1];
+                    if(!isFinite(px0)||!isFinite(py0)||!isFinite(px1)||!isFinite(py1))continue;
                     page.drawLine({
-                      start:{x:s.points[i-1][0]*sc,y:s.points[i-1][1]*sc},
-                      end:{x:s.points[i][0]*sc,y:s.points[i][1]*sc},
+                      start:{x:px0*sc,y:py0*sc},end:{x:px1*sc,y:py1*sc},
                       thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255),
                       opacity:alpha,lineCap:LineCapStyle.Round,
                     });
                   }
                 }
-              }
-            }else if(s.type==='text'){
-              const c=_hexToRgb(s.color);
-              Logger.debug('[exportPDF text] x='+(s.x*sc).toFixed(1)+' y='+(s.y*sc).toFixed(1));
-              page.drawText(s.text||'',{x:s.x*sc,y:s.y*sc,size:s.size*6*sc,color:rgb(c.r/255,c.g/255,c.b/255)});
-            }else if(['rect','circle','line','arrow'].includes(s.type)){
-              const c=_hexToRgb(s.color);const lw=s.size*sc/3;
-              if(s.type==='rect'){
-                const x1=Math.min(s.x1,s.x2)*sc,y1=Math.min(s.y1,s.y2)*sc;
-                const x2=Math.max(s.x1,s.x2)*sc,y2=Math.max(s.y1,s.y2)*sc;
-                Logger.debug('[exportPDF rect] ('+x1.toFixed(1)+','+y1.toFixed(1)+')-('+x2.toFixed(1)+','+y2.toFixed(1)+')');
-                page.drawRectangle({x:x1,y:y1,width:x2-x1,height:y2-y1,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});
-              }else if(s.type==='circle'){
-                const cx=(s.x1+s.x2)/2*sc,cy=(s.y1+s.y2)/2*sc;
-                const rx=Math.abs(s.x2-s.x1)/2*sc,ry=Math.abs(s.y2-s.y1)/2*sc;
-                Logger.debug('[exportPDF ellipse] center=('+cx.toFixed(1)+','+cy.toFixed(1)+')');
-                try{page.drawEllipse({x:cx,y:cy,xScale:rx,yScale:ry,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}catch(_){}
-              }else if(s.type==='line'||s.type==='arrow'){
-                const lp1={x:s.x1*sc,y:s.y1*sc},lp2={x:s.x2*sc,y:s.y2*sc};
-                Logger.debug('[exportPDF line/arrow] from=('+lp1.x.toFixed(1)+','+lp1.y.toFixed(1)+')');
-                page.drawLine({start:lp1,end:lp2,thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
-                if(s.type==='arrow'){
-                  const hl=Math.max(lw*4,12*sc),ang=Math.atan2(lp2.y-lp1.y,lp2.x-lp1.x);
-                  page.drawLine({start:lp2,end:{x:lp2.x-hl*Math.cos(ang-Math.PI/6),y:lp2.y-hl*Math.sin(ang-Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
-                  page.drawLine({start:lp2,end:{x:lp2.x-hl*Math.cos(ang+Math.PI/6),y:lp2.y-hl*Math.sin(ang+Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+              }else if(s.type==='text'){
+                if(!s.text||!isFinite(s.x)||!isFinite(s.y))continue;
+                const c=_hexToRgb(s.color);
+                const sz=Math.max(1,s.size*6*sc);
+                Logger.debug('[ANNOTATION EXPORT] pg='+pg+' type=text x='+(s.x*sc).toFixed(1)+' y='+(s.y*sc).toFixed(1)+' sz='+sz.toFixed(1));
+                page.drawText(s.text,{x:s.x*sc,y:s.y*sc,size:sz,color:rgb(c.r/255,c.g/255,c.b/255)});
+              }else if(['rect','circle','line','arrow'].includes(s.type)){
+                /* v8: 座標NaNチェック */
+                if(!isFinite(s.x1)||!isFinite(s.y1)||!isFinite(s.x2)||!isFinite(s.y2))continue;
+                const c=_hexToRgb(s.color);const lw=s.size*sc/3;
+                if(s.type==='rect'){
+                  const x1=Math.min(s.x1,s.x2)*sc,y1=Math.min(s.y1,s.y2)*sc;
+                  const x2=Math.max(s.x1,s.x2)*sc,y2=Math.max(s.y1,s.y2)*sc;
+                  Logger.debug('[ANNOTATION EXPORT] pg='+pg+' type=rect ('+x1.toFixed(1)+','+y1.toFixed(1)+')-('+x2.toFixed(1)+','+y2.toFixed(1)+')');
+                  /* v8: ゼロサイズ矩形でpdf-libエラーを防ぐ */
+                  if(x2>x1&&y2>y1)page.drawRectangle({x:x1,y:y1,width:x2-x1,height:y2-y1,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});
+                }else if(s.type==='circle'){
+                  const cx=(s.x1+s.x2)/2*sc,cy=(s.y1+s.y2)/2*sc;
+                  const rx=Math.abs(s.x2-s.x1)/2*sc,ry=Math.abs(s.y2-s.y1)/2*sc;
+                  Logger.debug('[ANNOTATION EXPORT] pg='+pg+' type=circle cx='+cx.toFixed(1)+' cy='+cy.toFixed(1));
+                  /* v8: ゼロ半径でpdf-libエラーを防ぐ */
+                  if(rx>0&&ry>0)try{page.drawEllipse({x:cx,y:cy,xScale:rx,yScale:ry,borderColor:rgb(c.r/255,c.g/255,c.b/255),borderWidth:lw});}catch(_){}
+                }else if(s.type==='line'||s.type==='arrow'){
+                  const lp1={x:s.x1*sc,y:s.y1*sc},lp2={x:s.x2*sc,y:s.y2*sc};
+                  Logger.debug('[ANNOTATION EXPORT] pg='+pg+' type='+s.type);
+                  page.drawLine({start:lp1,end:lp2,thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+                  if(s.type==='arrow'){
+                    const hl=Math.max(lw*4,12*sc),ang=Math.atan2(lp2.y-lp1.y,lp2.x-lp1.x);
+                    page.drawLine({start:lp2,end:{x:lp2.x-hl*Math.cos(ang-Math.PI/6),y:lp2.y-hl*Math.sin(ang-Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+                    page.drawLine({start:lp2,end:{x:lp2.x-hl*Math.cos(ang+Math.PI/6),y:lp2.y-hl*Math.sin(ang+Math.PI/6)},thickness:lw,color:rgb(c.r/255,c.g/255,c.b/255)});
+                  }
                 }
               }
+              annOK++;
+            }catch(annErr){
+              annFail++;
+              Logger.error('[ANNOTATION EXPORT] pg='+pg+' type='+s.type+' err='+annErr);
             }
           }
+          Logger.info('[PAGE EXPORT START] pg='+pg+' annOK='+annOK+' annFail='+annFail);
         }catch(pageErr){
-          /* v7: ページ単位で失敗をキャッチ。1ページ失敗しても他ページは継続 */
+          /* v8: ページ単位失敗キャッチ。1ページ失敗しても他ページは継続 */
           failedPages.push(pg);
-          Logger.error('[exportPDF] page '+pg+' failed: '+pageErr);
+          Logger.error('[PDF EXPORT FAIL] page='+pg+' err='+pageErr+' stack='+(pageErr.stack||''));
         }
       }
-      /* v7: save前にブラウザへ制御を返す (Safari メモリ整理タイミング確保) */
-      await new Promise(r=>setTimeout(r,0));
+      /* v8: save前に20ms yield (Safari メモリ整理タイミング確保) */
+      await new Promise(r=>setTimeout(r,20));
       const bytes=await outDoc.save();
       const blob=new Blob([bytes],{type:'application/pdf'});
       const pdfName=(fileName.replace(/\.pdf$/i,'')||'output')+'_注釈付.pdf';
       await FileSaveMgr.saveBlob(blob,pdfName,'application/pdf','PDF (注釈付き)');
       if(failedPages.length>0){
+        Logger.warn('[PDF EXPORT SUCCESS] failedPages='+failedPages.join(','));
         showToast('\uD83D\uDCE4 PDF出力完了 (失敗ページ: '+failedPages.join(',')+')');
       }else{
+        Logger.info('[PDF EXPORT SUCCESS] total='+total);
         showToast('\uD83D\uDCE4 PDF出力完了');
       }
     }catch(e){
       showToast('PDF出力に失敗しました');
-      Logger.error('[exportPDF] fatal: '+e);
+      Logger.error('[PDF EXPORT FAIL] fatal err='+e+' stack='+(e.stack||''));
     }finally{
-      /* v7: finally で必ずフラグ解除・UI復帰 (例外発生時も確実に実行) */
+      /* v8: finally で必ずフラグ解除・UI復帰 */
       exportPDF._busy=false;
+      _exportInProgress=false;
       showLoading(false);
     }
   }
@@ -2144,7 +2182,7 @@ const App=(() => {
       const zip=new JSZip();
       zip.file(fileName,origBuf);
       zip.file('strokes.json',JSON.stringify(strokes));
-      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v7',ts:Date.now()}));
+      zip.file('meta.json',JSON.stringify({fileName,curPage,scale,panX,panY,version:'v8',ts:Date.now()}));
       const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
       const bkName=(fileName.replace(/\.pdf$/i,'')||'backup')+'_backup.zip';
       const bkResult=await FileSaveMgr.saveBlob(blob,bkName,'application/zip','ZIP バックアップ');
@@ -2195,7 +2233,8 @@ const App=(() => {
 
   /* EventBus経由で保存トリガー */
   EventBus.on('stroke:added',()=>{AutoSave.immediateSave(_getState);AutoSave.schedSave(_getState);DocMgr.updateStrokes(Utils.pruneEraserStrokes(strokes),curPage).catch(()=>{});});
-  EventBus.on('autosave:periodic',()=>{if(pdfDoc)AutoSave.schedSave(_getState);});
+  /* v8: PDF出力中はautosaveスキップ (メモリ競合防止) */
+  EventBus.on('autosave:periodic',()=>{if(pdfDoc&&!_exportInProgress)AutoSave.schedSave(_getState);});
 
   /* ライフサイクルイベント */
   ['visibilitychange','pagehide','freeze'].forEach(ev=>{
