@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v8</title>
+<title>M_Viewer v9</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -256,7 +256,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v8</div>
+    <div class="dzm">M_Viewer v9</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -2004,13 +2004,14 @@ const App=(() => {
        ④ 3dp精度でパス文字列サイズを抑制
      pts: [[x,y],...] PDF user space(y-up), sc: スケール係数
      戻り値: SVGパス文字列 (pdf-lib drawSvgPath用) または null */
-  function _buildSmoothSvgPath(pts,sc){
+  function _buildSmoothSvgPath(pts,sc,h){
     if(!pts||pts.length<2)return null;
     /* ① スケール変換 + NaN/Infチェック + 近接点フィルタ */
+    /* v9: drawSvgPath内部のscale(1,-1)を補正: y=h-pt[1]*sc */
     const MIN_D2=0.09; /* 0.3pt^2: これ以下の移動は重複とみなして除去 */
     const raw=[];
     for(const pt of pts){
-      const x=pt[0]*sc,y=pt[1]*sc;
+      const x=pt[0]*sc,y=h-pt[1]*sc;
       if(!isFinite(x)||!isFinite(y))continue;
       if(raw.length>0){
         const prev=raw[raw.length-1];
@@ -2077,11 +2078,12 @@ const App=(() => {
                 const c=_hexToRgb(s.color);
                 const lw=s.type==='hl'?Math.max(s.size*sc*4/3,5*sc/3):s.size*sc/3;
                 /* v8: NaN/Inf除去+近接点フィルタ済みCatmull-Rom bezierパス */
-                const svgPath=_buildSmoothSvgPath(s.points,sc);
+                const svgPath=_buildSmoothSvgPath(s.points,sc,height);/* v9 */
                 if(!svgPath)continue;
                 try{
                   /* borderColorのみ → fill無し・stroke専用 */
                   page.drawSvgPath(svgPath,{
+                    x:0,y:height,/* v9: drawSvgPath scale(1,-1)補正 */
                     borderColor:rgb(c.r/255,c.g/255,c.b/255),
                     borderWidth:lw,
                     borderOpacity:alpha,
