@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v14</title>
+<title>M_Viewer v15</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -184,7 +184,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo">M_Viewer <span style="font-size:10px">v8</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">v15</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -260,7 +260,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v14</div>
+    <div class="dzm">M_Viewer v15</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,9 +344,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
    新バージョン出力時のチェックリスト:
      1. APP_VER を更新
      2. ファイル名 M_Viewer_vN.html を更新
-   それ以外 (meta.json / console / title / dzm) は自動反映。
+   それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='14'; /* ← ★ バージョンアップ時はここだけ変える */ /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='15'; /* ← ★ バージョンアップ時はここだけ変える */ /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -2099,6 +2099,17 @@ const App=(() => {
           const sc=width/vp0.width; /* ≈ 1.0 (visual_width/visual_width) */
           Logger.info('[PAGE EXPORT START] pg='+pg+' rot='+rot+' w='+width.toFixed(1)+' h='+height.toFixed(1)+' sc='+sc.toFixed(4)+' vp0='+vp0.width.toFixed(1)+'x'+vp0.height.toFixed(1));
           const pgStrokes=strokes[pg]||[];
+          /* v15 診断ログ: export時のストローク状態 */
+          console.warn('%c[v15 DIAG] exportPDF page='+pg,'color:green;font-weight:bold',{
+            pg, pgType: typeof pg,
+            strokesAllKeys: Object.keys(strokes),
+            pgStrokesLen: pgStrokes.length,
+            pgStrokesTypes: pgStrokes.map(s=>s.type),
+            textStrokes: pgStrokes.filter(s=>s.type==='text').map(s=>({
+              x:s.x,y:s.y,text:s.text,size:s.size,
+              xOK:isFinite(s.x),yOK:isFinite(s.y),textOK:!!s.text
+            }))
+          });
           let annOK=0,annFail=0;
           for(const s of pgStrokes){
             /* v8: 注釈単位で try-catch → 1注釈の失敗で他が消えない */
@@ -2136,7 +2147,15 @@ const App=(() => {
                   }
                 }
               }else if(s.type==='text'){
-                if(!s.text||!isFinite(s.x)||!isFinite(s.y))continue;
+                /* v15 診断ログ: テキスト描画前チェック */
+                console.warn('%c[v15 DIAG] drawText attempt','color:orange',{
+                  text:s.text, x:s.x, y:s.y, size:s.size, sc,
+                  xSc:s.x*sc, ySc:s.y*sc, rot,
+                  hasText:!!s.text, xOK:isFinite(s.x), yOK:isFinite(s.y)
+                });
+                if(!s.text||!isFinite(s.x)||!isFinite(s.y)){
+                  console.warn('[v15 DIAG] drawText SKIPPED (invalid data)');continue;
+                }
                 const c=_hexToRgb(s.color);
                 const sz=Math.max(1,s.size*6*sc);
                 Logger.debug('[ANNOTATION EXPORT] pg='+pg+' type=text x='+(s.x*sc).toFixed(1)+' y='+(s.y*sc).toFixed(1)+' sz='+sz.toFixed(1));
@@ -2146,6 +2165,7 @@ const App=(() => {
                    水平テキストには rotate:degrees(+rot) が正解。
                    v13のdegrees(-rot)は符号逆で誤り。 */
                 page.drawText(s.text,{x:s.x*sc,y:s.y*sc,size:sz,color:rgb(c.r/255,c.g/255,c.b/255),rotate:degrees(rot)});
+                console.warn('[v15 DIAG] drawText SUCCESS text='+s.text.slice(0,20));
               }else if(['rect','circle','line','arrow'].includes(s.type)){
                 /* v8: 座標NaNチェック */
                 if(!isFinite(s.x1)||!isFinite(s.y1)||!isFinite(s.x2)||!isFinite(s.y2))continue;
@@ -2176,7 +2196,14 @@ const App=(() => {
               annOK++;
             }catch(annErr){
               annFail++;
-              Logger.error('[ANNOTATION EXPORT] pg='+pg+' type='+s.type+' err='+annErr);
+              /* v15 診断ログ: 例外詳細をconsoleとtoastに出力 */
+              console.error('%c[v15 DIAG] ANNOTATION EXPORT ERROR','color:red;font-weight:bold',{
+                pg, type:s.type, err:String(annErr), stack:annErr?.stack,
+                stroke: JSON.parse(JSON.stringify({...s,points:undefined}))
+              });
+              Logger.error('[ANNOTATION EXPORT] pg='+pg+' type='+s.type+' err='+annErr+' stack='+(annErr?.stack||''));
+              /* エラーをtoastで可視化 */
+              showToast('⚠️ 注釈エラー pg='+pg+' type='+s.type+': '+String(annErr).slice(0,60));
             }
           }
           Logger.info('[PAGE EXPORT START] pg='+pg+' annOK='+annOK+' annFail='+annFail);
@@ -2197,6 +2224,7 @@ const App=(() => {
         showToast('\uD83D\uDCE4 PDF出力完了 (失敗ページ: '+failedPages.join(',')+')');
       }else{
         Logger.info('[PDF EXPORT SUCCESS] total='+total);
+      console.warn('%c[v15 DIAG] PDF EXPORT COMPLETE','color:green;font-weight:bold',{total,failedPages});
         showToast('\uD83D\uDCE4 PDF出力完了');
       }
     }catch(e){
@@ -2569,8 +2597,21 @@ function _initToolbar(){
     if(!txt||!App.pdfDoc)return;
     const tx=App.textX,ty=App.textY;
     if(!App.strokes[App.currentPage])App.strokes[App.currentPage]=[];
-    App.strokes[App.currentPage].push({type:'text',x:tx,y:ty,text:txt,color:App.strokeColor,size:App.strokeSize});
-    Logger.debug('[confirmText] x='+tx.toFixed(2)+' y='+ty.toFixed(2)+' size='+App.strokeSize+' color='+App.strokeColor);
+    const _newStroke={type:'text',x:tx,y:ty,text:txt,color:App.strokeColor,size:App.strokeSize};
+    App.strokes[App.currentPage].push(_newStroke);
+    /* v15 診断ログ: テキスト確定時の全情報 */
+    const _pg=App.currentPage;
+    const _arr=App.strokes[_pg]||[];
+    console.warn('%c[v15 DIAG] _confirmText push','color:blue;font-weight:bold',{
+      page: _pg,
+      pageType: typeof _pg,
+      stroke: JSON.parse(JSON.stringify(_newStroke)),
+      strokesOnPage: _arr.length,
+      strokesKeys: Object.keys(App.strokes),
+      tx_isFinite: isFinite(tx),
+      ty_isFinite: isFinite(ty),
+      txt_len: txt.length
+    });
     App.redraw();SubWinManager.updateAll(App.strokes,App.currentPage);
     EventBus.emit('stroke:added');
   }
@@ -2678,6 +2719,9 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
   document.title='M_Viewer v'+APP_VER;
   const _dzmEl=document.querySelector('.dzm');
   if(_dzmEl)_dzmEl.textContent='M_Viewer v'+APP_VER;
+  /* v15: ヘッダー左上ロゴも APP_VER で自動更新 */
+  const _logoEl=document.getElementById('logo-ver');
+  if(_logoEl)_logoEl.innerHTML='M_Viewer <span style="font-size:10px">v'+APP_VER+'</span>';
   console.log('%c[M_Viewer] ver '+APP_VER+' 起動','color:#1a8a50;font-weight:bold;font-size:13px');
 
   IDBStore.warmup();
