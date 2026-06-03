@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v10</title>
+<title>M_Viewer v11</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -31,24 +31,27 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .csw{width:26px;height:26px;border-radius:50%;border:3px solid transparent;cursor:pointer;flex-shrink:0;transition:transform .1s}
 .csw.on{border-color:#fff;transform:scale(1.25)}
 .szlbl{font-size:11px;color:var(--tx2);flex-shrink:0}
-.sz-val{font-size:13px;font-weight:700;color:var(--acc);min-width:22px;text-align:center;flex-shrink:0;cursor:pointer;padding:2px 6px;border:1.5px solid var(--brd);border-radius:5px;background:var(--pan2)}
+.sz-val{font-size:13px;font-weight:700;color:var(--acc);min-width:22px;text-align:center;flex-shrink:0;cursor:pointer;padding:2px 6px;border:1.5px solid var(--brd);border-radius:5px;background:var(--pan2);touch-action:manipulation;-webkit-user-select:none;user-select:none}/* v11: touch-action */
 .pkw{position:relative;flex-shrink:0}
 .pkp{position:fixed;background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;padding:5px;z-index:300;box-shadow:0 4px 20px #0008;display:none;flex-direction:column;gap:3px;min-width:120px}
 .pkp.on{display:flex}
 .pkp button{height:38px;padding:0 12px;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;text-align:left}
 .pkp button:active,.pkp button.on{background:var(--acc);border-color:var(--acc);color:#fff}
-#szp{display:none;position:fixed;z-index:350;background:var(--pan);border:1.5px solid var(--brd);border-radius:11px;padding:12px 14px;box-shadow:0 4px 20px #0008;width:250px}
+/* v11: #szp バックドロップ (outside-tap close) */
+#szp-bd{display:none;position:fixed;inset:0;z-index:340;background:transparent;-webkit-tap-highlight-color:transparent}
+#szp-bd.on{display:block}
+#szp{display:none;position:fixed;z-index:350;background:var(--pan);border:1.5px solid var(--brd);border-radius:11px;padding:12px 14px;box-shadow:0 4px 20px #0008;width:250px;touch-action:manipulation}/* v11 */
 #szp.on{display:block}
 #szp-title{font-size:12px;color:var(--tx2);font-weight:700;margin-bottom:9px;display:block}
 .szp-row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
-#sz-rng{-webkit-appearance:none;flex:1;height:8px;background:var(--brd);border-radius:4px;cursor:pointer}
+#sz-rng{-webkit-appearance:none;flex:1;height:8px;background:var(--brd);border-radius:4px;cursor:pointer;touch-action:none}/* v11: スライダーはtouch-action:none */
 #sz-rng::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid #fff}
-#sz-n{width:42px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);border-radius:5px;font-size:13px;font-weight:700;padding:4px}
+#sz-n{width:48px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);border-radius:5px;font-size:13px;font-weight:700;padding:4px;touch-action:manipulation}/* v11 */
 #sz-n:focus{outline:none;border-color:var(--acc)}
 #szp-prev{height:42px;background:var(--pan2);border-radius:7px;margin-bottom:9px;display:flex;align-items:center;justify-content:center}
 .szp-btns{display:flex;gap:7px}
-.szp-ok{flex:1;height:38px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
-.szp-cancel{height:38px;padding:0 12px;background:var(--pan2);color:var(--tx2);border:1.5px solid var(--brd);border-radius:7px;font-size:13px;font-weight:700;cursor:pointer}
+.szp-ok{flex:1;height:44px;background:var(--acc);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation}/* v11: height拡大+touch-action */
+.szp-cancel{height:44px;padding:0 12px;background:var(--pan2);color:var(--tx2);border:1.5px solid var(--brd);border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation}/* v11: height拡大+touch-action */
 #ca{flex:1;overflow:hidden;position:relative;min-height:0;touch-action:none;background:#444;overscroll-behavior:none}
 #cw{position:absolute;top:0;left:0;transform-origin:0 0;background:#fff}
 #pdfCvs{display:block}
@@ -236,6 +239,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
 </div>
 <div id="tabbar"></div>
+<div id="szp-bd"></div><!-- v11: バックドロップ -->
 <div id="szp">
   <span id="szp-title">ペンの太さ</span>
   <div class="szp-row">
@@ -256,7 +260,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v10</div>
+    <div class="dzm">M_Viewer v11</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -2476,20 +2480,41 @@ function _initToolbar(){
   EventBus.on('stroke:added',()=>{_updateSwatches();});
 
   /* 太さパネル */
-  document.getElementById('sz-v').addEventListener('click',e=>{
+  /* v11: click → pointerdown で即時反応 (iOS Safari対応) */
+  document.getElementById('sz-v').addEventListener('pointerdown',e=>{
     const p=document.getElementById('szp');
-    if(p.classList.contains('on')){p.classList.remove('on');return;}
+    if(p.classList.contains('on')){_closeSzp();return;}
     p.classList.add('on');
-    const r=e.target.getBoundingClientRect();p.style.left=Math.min(r.left,window.innerWidth-260)+'px';p.style.top=(r.bottom+4)+'px';
+    document.getElementById('szp-bd').classList.add('on'); /* v11: バックドロップON */
+    const r=e.target.getBoundingClientRect();
+    /* v11: visualViewport対応 (Split View / キーボード表示時のズレ防止) */
+    const vvTop=(window.visualViewport?window.visualViewport.offsetTop:0);
+    p.style.left=Math.min(r.left,window.innerWidth-260)+'px';
+    p.style.top=(r.bottom+4-vvTop)+'px';
     const cur=App.strokeSize;document.getElementById('sz-rng').value=cur;document.getElementById('sz-n').value=cur;_prevSize(cur);
+    e.preventDefault(); /* v11: pointerdown後のclickを防止 */
   });
   /* ①修正: iOS Safari では range が 'input' ではなく 'change' を発火する。両方ハンドルし setSize をリアルタイム呼び出す */
+  /* v11: szp クローズ共通関数 */
+  function _closeSzp(){
+    document.getElementById('szp').classList.remove('on');
+    document.getElementById('szp-bd').classList.remove('on');
+  }
   function _onSzSlider(e){const v=Math.max(1,Math.min(40,+e.target.value||1));document.getElementById('sz-n').value=v;_prevSize(v);App.setSize(v);}
+  /* v11: szp内タッチのstopPropagation → caElへの漏れ防止 */
+  document.getElementById('szp').addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});
+  document.getElementById('szp').addEventListener('pointerdown',e=>{e.stopPropagation();},{capture:false});
   document.getElementById('sz-rng').addEventListener('input',_onSzSlider);
   document.getElementById('sz-rng').addEventListener('change',_onSzSlider);
   document.getElementById('sz-n').addEventListener('input',e=>{const v=Math.max(1,Math.min(40,+e.target.value));document.getElementById('sz-rng').value=v;_prevSize(v);App.setSize(v);});
-  document.getElementById('szp-ok').addEventListener('click',()=>{document.getElementById('szp').classList.remove('on');});
-  document.getElementById('szp-cancel').addEventListener('click',()=>document.getElementById('szp').classList.remove('on'));
+  /* v11: ok/cancel は click + touchend 両対応 */
+  function _szpOk(){_closeSzp();}
+  function _szpCancel(){_closeSzp();}
+  document.getElementById('szp-ok').addEventListener('click',_szpOk);
+  document.getElementById('szp-cancel').addEventListener('click',_szpCancel);
+  /* v11: touchend バックアップ (iOS Safari でclickが遅延する場合の保険) */
+  document.getElementById('szp-ok').addEventListener('touchend',e=>{e.preventDefault();_szpOk();});
+  document.getElementById('szp-cancel').addEventListener('touchend',e=>{e.preventDefault();_szpCancel();});
   function _prevSize(v){
     const cvs=document.getElementById('szp-cvs'),ctx=cvs.getContext('2d');
     ctx.clearRect(0,0,cvs.width,cvs.height);
@@ -2497,6 +2522,9 @@ function _initToolbar(){
     ctx.beginPath();ctx.arc(cvs.width/2,cvs.height/2,Math.min(v*1.5,18),0,Math.PI*2);
     ctx.fillStyle=App.strokeColor||'#cc2020';ctx.fill();
   }
+
+  /* v11: バックドロップタップでszpを閉じる */
+  document.getElementById('szp-bd').addEventListener('pointerdown',e=>{e.preventDefault();_closeSzp();});
 
   /* 選択削除 */
   document.getElementById('selbtn').addEventListener('click',()=>App.deleteSelected());
