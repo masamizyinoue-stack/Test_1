@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v9</title>
+<title>M_Viewer v10</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -256,7 +256,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v9</div>
+    <div class="dzm">M_Viewer v10</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -1450,6 +1450,7 @@ const App=(() => {
   let renderScale=1,cssExtraZoom=1;
   let curStroke=null,isDrawing=false,lastX=0,lastY=0;
   let pinch=null,panSt=null;
+  let _gestureRAF=null; /* v10: ジェスチャーRAFフラグ */
   let selectedIdx=[],selPath=[];
   let subRect=null;
   let renderVer=0;
@@ -1496,7 +1497,7 @@ const App=(() => {
     panX=Math.max(16,(aW-_visualW())/2);panY=Math.max(16,(aH-_visualH())/2);
     _updateTransform();
   }
-  function _cancelInertia(){cancelAnimationFrame(rafId);rafId=null;}
+  function _cancelInertia(){cancelAnimationFrame(rafId);rafId=null;if(_gestureRAF){cancelAnimationFrame(_gestureRAF);_gestureRAF=null;}/* v10 */}
 
   /* --- 座標変換 --- */
   /* v6: client座標 → PDF user space座標 (メイン窓)
@@ -1653,7 +1654,8 @@ const App=(() => {
     if(!pdfDoc)return;e.preventDefault();_cancelInertia();
     if(e.touches.length>=2){
       const hasSt=Array.from(e.touches).some(t=>t.touchType==='stylus');
-      if(hasSt||isDrawing)return;
+      if(hasSt)return; /* v10: Pencil含む場合のみ早期リターン */
+      /* v10: 描画中でも2本指→ピンチ開始 (Apple Pencil使用後の回復) */
       isDrawing=false;curStroke=null;panSt=null;_startPinch(e.touches);return;
     }
     const t=e.touches[0];
@@ -1697,17 +1699,30 @@ const App=(() => {
   /* --- ピンチ --- */
   function _pinchDist(t){const dx=t[1].clientX-t[0].clientX,dy=t[1].clientY-t[0].clientY;return Math.sqrt(dx*dx+dy*dy);}
   function _pinchMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
-  function _startPinch(t){const m=_pinchMid(t),cr=caEl.getBoundingClientRect(),bx=m.x-cr.left,by=m.y-cr.top;pinch={d0:_pinchDist(t),s0:scale,target:scale,pdfX:(bx-panX)/scale,pdfY:(by-panY)/scale};}
+  function _startPinch(t){const m=_pinchMid(t),cr=caEl.getBoundingClientRect(),bx=m.x-cr.left,by=m.y-cr.top;pinch={d0:_pinchDist(t),s0:scale,target:scale,pdfX:(bx-panX)/scale,pdfY:(by-panY)/scale,cr};/* v10: crキャッシュ */}
   function _movePinch(t){
-    const p=pinch,r=_pinchDist(t)/p.d0,m=_pinchMid(t),cr=caEl.getBoundingClientRect();
+    const p=pinch,r=_pinchDist(t)/p.d0,m=_pinchMid(t);
+    const cr=p.cr||(p.cr=caEl.getBoundingClientRect()); /* v10: rect キャッシュ */
     const M1x=m.x-cr.left,M1y=m.y-cr.top;
     p.target=Math.max(.2,Math.min(MAX_SCALE,p.s0*r));
     panX=M1x-p.pdfX*p.target;panY=M1y-p.pdfY*p.target;
-    const pEZ=p.target/renderScale;
-    cwEl.style.transformOrigin='0 0';cwEl.style.transform=`translate(${panX}px,${panY}px) scale(${pEZ})`;
-    document.getElementById('zlbl').textContent=Math.round(p.target*100)+'%';
+    p.lastMx=M1x;p.lastMy=M1y;
+    if(!_gestureRAF)_gestureRAF=requestAnimationFrame(_applyGestureTransform); /* v10: RAF throttle */
   }
-  function _endPinch(){if(!pinch)return;scale=pinch.target;pinch=null;renderPage(curPage);}
+  function _endPinch(){if(!pinch)return;scale=pinch.target;pinch=null;if(_gestureRAF){cancelAnimationFrame(_gestureRAF);_gestureRAF=null;}setTimeout(()=>renderPage(curPage),16);}/* v10: 16ms defer, gestureRAF解放 */
+
+  /* v10: ジェスチャーRAF コールバック — 1フレーム1回DOM更新 */
+  function _applyGestureTransform(){
+    _gestureRAF=null;
+    if(pinch){
+      const pEZ=pinch.target/renderScale;
+      cwEl.style.transformOrigin='0 0';
+      cwEl.style.transform=`translate(${panX}px,${panY}px) scale(${pEZ})`;
+      document.getElementById('zlbl').textContent=Math.round(pinch.target*100)+'%';
+    }else{
+      _updateTransform();
+    }
+  }
 
   /* --- パン + 慣性 --- */
   function _startPan(t){panSt={x0:t.clientX,y0:t.clientY,px0:panX,py0:panY};velHist=[];}
@@ -1715,7 +1730,8 @@ const App=(() => {
     if(!panSt)return;
     velHist.push({x:t.clientX,y:t.clientY,tm:Date.now()});if(velHist.length>6)velHist.shift();
     panX=panSt.px0+(t.clientX-panSt.x0);panY=panSt.py0+(t.clientY-panSt.y0);
-    _clampPan();_updateTransform();
+    _clampPan(); /* 値クランプのみ (DOM更新はRAF) */
+    if(!_gestureRAF)_gestureRAF=requestAnimationFrame(_applyGestureTransform); /* v10: RAF throttle */
   }
   function _endPan(t){
     if(!panSt)return;panSt=null;
