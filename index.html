@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v20</title>
+<title>M_Viewer v21</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -195,7 +195,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <input type="file" id="restoreInput" accept=".zip" style="display:none">
     <button class="btn" id="calcbtn">🧮 計算機</button>
     <div class="sp"></div>
-    <button class="btn" id="btn-home">⌂ ホーム</button>
+    <!-- v21: ホームボタン削除 -->
     <button class="btn rd" id="btn-close">✕ 閉じる</button>
   </div>
   <div class="hr">
@@ -250,7 +250,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v20</div>
+    <div class="dzm">M_Viewer v21</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -327,7 +327,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='20'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='21'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -1952,7 +1952,7 @@ const App=(() => {
     _renderHomeList();
   }
   function _hideHome(){document.getElementById('home').style.display='none';}
-  function showHome(){_showHome();} /* v20: !pdfDoc条件削除 → PDF開示中でもホーム表示可 */
+  /* v21: showHome公開関数削除 (btn-home廃止につき不要) */
 
   async function _renderHomeList(){
     const listEl=document.getElementById('home-list');
@@ -2230,7 +2230,7 @@ const App=(() => {
 
   return{
     gotoPage,fit,undo,deleteSelected,closeFile,redraw,loadPDF,
-    saveState,loadState,restore,showHome,downloadBackup,restoreFromZip,exportPDF,
+    saveState,loadState,restore,downloadBackup,restoreFromZip,exportPDF, /* v21: showHome削除 */
     setTool,setColor,setSize, /* v16: setShape削除 */
     get currentTool(){return _activeTool;}, /* v16: currentShape削除 */
     get selMode(){return _selMode;},
@@ -2357,7 +2357,7 @@ function _initToolbar(){
   document.getElementById('dz-open').addEventListener('click',()=>openFile());
   document.getElementById('home-open').addEventListener('click',()=>openFile());
   document.getElementById('btn-close').addEventListener('click',()=>App.closeFile());
-  document.getElementById('btn-home').addEventListener('click',()=>App.showHome());
+  /* v21: btn-homeイベントリスナー削除 */
   document.getElementById('btn-undo').addEventListener('click',()=>App.undo());
   document.getElementById('btn-save').addEventListener('click',()=>{document.getElementById('pgrov').classList.add('on');document.getElementById('pgrfld').value='';});
   document.getElementById('btn-backup').addEventListener('click',()=>App.downloadBackup());
