@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v22</title>
+<title>M_Viewer v23</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -127,7 +127,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .shtab-add:hover{color:var(--acc)}
 #calc{display:none;position:fixed;z-index:400;background:var(--pan);border:1.5px solid var(--brd);border-radius:13px;width:290px;box-shadow:0 8px 36px #000a;bottom:20px;right:16px}
 #calc.on{display:block}
-#ctb{padding:6px 12px 4px;display:flex;align-items:center;justify-content:space-between;cursor:grab;border-bottom:1px solid var(--brd)}
+#ctb{padding:6px 12px 4px;display:flex;align-items:center;justify-content:space-between;cursor:grab;border-bottom:1px solid var(--brd);touch-action:none;-webkit-user-select:none;user-select:none} /* v23: タッチドラッグ対応 */
 #ctb span{font-size:13px;font-weight:700;color:var(--tx2)}
 #cclose{background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);font-size:12px;cursor:pointer;padding:3px 10px;border-radius:5px;font-weight:700}
 #cclose:active{background:var(--acc);color:#fff}
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v22</div>
+    <div class="dzm">M_Viewer v23</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,7 +344,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='22'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='23'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -2586,7 +2586,7 @@ function _initCalculator(){
     histEl.appendChild(hi);histEl.scrollTop=histEl.scrollHeight;
   }
 
-  document.getElementById('calcbtn').addEventListener('click',()=>{document.getElementById('calc').classList.toggle('on');});
+  /* v23: calcbtnリスナーはドラッグコードに移動 */
   document.getElementById('cclose').addEventListener('click',()=>document.getElementById('calc').classList.remove('on'));
 
   document.querySelectorAll('.cb').forEach(btn=>{
@@ -2658,12 +2658,97 @@ function _initCalculator(){
     });
   });
 
-  /* 計算機ドラッグ */
-  const ctb=document.getElementById('ctb');
-  let cdrag=false,cdx=0,cdy=0;
-  ctb.addEventListener('mousedown',e=>{cdrag=true;const r=document.getElementById('calc').getBoundingClientRect();cdx=e.clientX-r.left;cdy=e.clientY-r.top;});
-  document.addEventListener('mousemove',e=>{if(!cdrag)return;const calc=document.getElementById('calc');calc.style.left=(e.clientX-cdx)+'px';calc.style.top=(e.clientY-cdy)+'px';calc.style.right='auto';calc.style.bottom='auto';});
-  document.addEventListener('mouseup',()=>{cdrag=false;});
+  /* v23: 計算機ドラッグ — pointer events統合 (指/Pencil/マウス共通)
+     位置保存: localStorage 'mv_calc_pos'
+     境界制御: タイトルバーが常に画面内
+     ダブルタップ: 初期位置へリセット */
+  const calcEl=document.getElementById('calc');
+  const ctbEl=document.getElementById('ctb');
+  const _CALC_POS_KEY='mv_calc_pos';
+
+  /* 位置クランプ: タイトルバーが常に画面内に収まるよう制限 */
+  function _clampCalc(x,y){
+    const vw=window.visualViewport?window.visualViewport.width:window.innerWidth;
+    const vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+    const w=calcEl.offsetWidth||290,tbH=ctbEl.offsetHeight||40;
+    return{x:Math.max(0,Math.min(vw-w,x)),y:Math.max(0,Math.min(vh-tbH,y))};
+  }
+
+  /* 位置を calc に適用 */
+  function _applyCalcPos(x,y){
+    calcEl.style.left=x+'px';calcEl.style.top=y+'px';
+    calcEl.style.right='auto';calcEl.style.bottom='auto';
+  }
+
+  /* 位置を localStorage に保存 */
+  function _saveCalcPos(x,y){
+    try{localStorage.setItem(_CALC_POS_KEY,JSON.stringify({x,y}));}catch(_){}
+  }
+
+  /* 保存された位置を復元 (open時に呼ぶ) */
+  function _restoreCalcPos(){
+    try{
+      const s=localStorage.getItem(_CALC_POS_KEY);
+      if(!s)return;
+      const{x,y}=JSON.parse(s);
+      if(isFinite(x)&&isFinite(y)){const c=_clampCalc(x,y);_applyCalcPos(c.x,c.y);}
+    }catch(_){}
+  }
+
+  /* 初期位置へリセット */
+  function _resetCalcPos(){
+    calcEl.style.left='';calcEl.style.top='';
+    calcEl.style.right='16px';calcEl.style.bottom='20px';
+    try{localStorage.removeItem(_CALC_POS_KEY);}catch(_){}
+  }
+
+  /* ドラッグ状態 */
+  let _cdx=0,_cdy=0,_cdragging=false;
+
+  /* pointerdown: ドラッグ開始 (ボタン上では無効) */
+  ctbEl.addEventListener('pointerdown',e=>{
+    if(e.target.tagName==='BUTTON')return; /* 閉じるボタンは除外 */
+    e.preventDefault();
+    ctbEl.setPointerCapture(e.pointerId); /* v23: pointer capture で離れても追従 */
+    const r=calcEl.getBoundingClientRect();
+    _cdx=e.clientX-r.left;_cdy=e.clientY-r.top;_cdragging=true;
+    calcEl.style.zIndex='450'; /* 最前面 */
+    ctbEl.style.cursor='grabbing';
+  });
+
+  /* pointermove: ドラッグ中 */
+  ctbEl.addEventListener('pointermove',e=>{
+    if(!_cdragging)return;
+    e.preventDefault();
+    const c=_clampCalc(e.clientX-_cdx,e.clientY-_cdy);
+    _applyCalcPos(c.x,c.y);
+  });
+
+  /* pointerup/cancel: ドラッグ終了 → 位置保存 */
+  function _endDragCalc(e){
+    if(!_cdragging)return;
+    _cdragging=false;ctbEl.style.cursor='grab';
+    const r=calcEl.getBoundingClientRect();
+    _saveCalcPos(r.left,r.top);
+  }
+  ctbEl.addEventListener('pointerup',_endDragCalc);
+  ctbEl.addEventListener('pointercancel',_endDragCalc);
+
+  /* ダブルクリック/ダブルタップ: 初期位置へリセット */
+  let _ctbTapTs=0;
+  ctbEl.addEventListener('pointerdown',e=>{
+    if(e.target.tagName==='BUTTON')return;
+    const now=Date.now();
+    if(now-_ctbTapTs<350){_resetCalcPos();}
+    _ctbTapTs=now;
+  });
+
+  /* calc open時に保存済み位置を復元 */
+  document.getElementById('calcbtn').addEventListener('click',()=>{
+    const wasHidden=!calcEl.classList.contains('on');
+    calcEl.classList.toggle('on');
+    if(wasHidden&&calcEl.classList.contains('on'))_restoreCalcPos();
+  });
 }
 
 /* ============================================================
