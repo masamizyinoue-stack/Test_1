@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v13</title>
+<title>M_Viewer v14</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -260,7 +260,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v13</div>
+    <div class="dzm">M_Viewer v14</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -346,7 +346,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm) は自動反映。
    ============================================================ */
-const APP_VER='13'; /* ← ★ バージョンアップ時はここだけ変える */ /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='14'; /* ← ★ バージョンアップ時はここだけ変える */ /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -2092,12 +2092,11 @@ const App=(() => {
           const pdfPage=await pdfDoc.getPage(pg);
           /* v6: ストロークはPDF user space (y-up)で保存済み。直接スケールするだけ。 */
           const vp0=pdfPage.getViewport({scale:1,rotation:0});
-          /* v13: rotをsc計算前に取得 (回転ページ正規化に必要) */
           const rot=pdfPage.rotate??0;
-          /* v13: /Rotate=90/270ではmediaBox width/heightが表示軸と入れ替わるため補正
-             sc = mediaBoxHeight / vp0.width で常に1.0になる (非回転: width/width=1.0)
-             誤: width/vp0.width → /Rotate=90時 595/842≈0.707 (座標が70%に縮小してしまう) */
-          const sc=(rot===90||rot===270)?height/vp0.width:width/vp0.width;
+          /* v14: sc修正 — pdf-lib getSize()はvisual size(rotation考慮済み)を返し
+             vp0.widthも同じvisual width。よって常に width/vp0.width≈1.0 が正解。
+             v13の(rot===90||270)?height/vp0.width は誤りで座標を0.707倍にしていた。 */
+          const sc=width/vp0.width; /* ≈ 1.0 (visual_width/visual_width) */
           Logger.info('[PAGE EXPORT START] pg='+pg+' rot='+rot+' w='+width.toFixed(1)+' h='+height.toFixed(1)+' sc='+sc.toFixed(4)+' vp0='+vp0.width.toFixed(1)+'x'+vp0.height.toFixed(1));
           const pgStrokes=strokes[pg]||[];
           let annOK=0,annFail=0;
@@ -2141,11 +2140,12 @@ const App=(() => {
                 const c=_hexToRgb(s.color);
                 const sz=Math.max(1,s.size*6*sc);
                 Logger.debug('[ANNOTATION EXPORT] pg='+pg+' type=text x='+(s.x*sc).toFixed(1)+' y='+(s.y*sc).toFixed(1)+' sz='+sz.toFixed(1));
-                /* v13: テキスト回転根本修正
-                   PDFビューアは /Rotate=N でページ全体をN°CCW表示する。
-                   テキストは文字向きを持つため、degrees(-rot) で事前逆回転して
-                   表示後に正立するよう補正する。pen/hlは向きがないため不要。 */
-                page.drawText(s.text,{x:s.x*sc,y:s.y*sc,size:sz,color:rgb(c.r/255,c.g/255,c.b/255),rotate:degrees(-rot)});
+                /* v14: テキスト回転補正 (符号修正)
+                   pdf.js transform解析: /Rotate=90 → [0,1,1,0,0,0]
+                   PDF y軸(0,1) → canvas右方向(1,0) なので
+                   水平テキストには rotate:degrees(+rot) が正解。
+                   v13のdegrees(-rot)は符号逆で誤り。 */
+                page.drawText(s.text,{x:s.x*sc,y:s.y*sc,size:sz,color:rgb(c.r/255,c.g/255,c.b/255),rotate:degrees(rot)});
               }else if(['rect','circle','line','arrow'].includes(s.type)){
                 /* v8: 座標NaNチェック */
                 if(!isFinite(s.x1)||!isFinite(s.y1)||!isFinite(s.x2)||!isFinite(s.y2))continue;
