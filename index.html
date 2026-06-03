@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v21</title>
+<title>M_Viewer v22</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -160,6 +160,14 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .spin{width:34px;height:34px;border:3px solid var(--brd);border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;padding:8px 16px;font-size:13px;color:var(--tx);opacity:0;pointer-events:none;transition:opacity .3s;z-index:999;white-space:nowrap}
+/* v22: バックアップリマインダー */
+#bkrem{display:none;position:fixed;bottom:24px;right:16px;z-index:800;max-width:300px;background:var(--pan);border:1.5px solid var(--acc);border-radius:12px;padding:14px 16px;box-shadow:0 4px 20px #0008;touch-action:manipulation}
+#bkrem.on{display:block}
+#bkrem-title{font-size:13px;font-weight:800;color:var(--acc);margin-bottom:6px}
+#bkrem-body{font-size:12px;color:var(--tx);line-height:1.6;margin-bottom:11px}
+#bkrem-btns{display:flex;gap:8px}
+#bkrem-now{flex:1;height:36px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}
+#bkrem-later{height:36px;padding:0 10px;background:var(--pan2);color:var(--tx2);border:1.5px solid var(--brd);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}
 #toast.on{opacity:1}
 @media(pointer:coarse){.hr{height:46px;gap:6px;padding:0 9px;padding-left:max(9px,env(safe-area-inset-left));padding-right:max(9px,env(safe-area-inset-right));overflow-y:hidden}.btn{height:38px;padding:0 11px;font-size:12px;border-radius:9px}.csw{width:32px;height:32px;border-width:3px}.vs{height:28px;margin:0 4px}.pgni{width:38px;font-size:13px;height:32px;padding:3px 0}.pgtot{font-size:12px}.zlbl{font-size:13px;min-width:40px}#fnlbl{font-size:12px;max-width:180px}.pkp button{height:42px;font-size:12px}}
 @media(pointer:coarse) and (orientation:landscape){.hr{height:42px;gap:5px;padding:0 8px;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}.btn{height:35px;padding:0 10px;font-size:12px;border-radius:8px}.csw{width:30px;height:30px}.vs{height:26px;margin:0 3px}.pgni{height:30px;font-size:12px}}
@@ -250,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v21</div>
+    <div class="dzm">M_Viewer v22</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -311,6 +319,15 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
 </div>
 <!-- v16: txov削除 -->
+<!-- v22: バックアップリマインダー -->
+<div id="bkrem">
+  <div id="bkrem-title">💾 バックアップを推奨します</div>
+  <div id="bkrem-body"></div>
+  <div id="bkrem-btns">
+    <button id="bkrem-now">今すぐバックアップ</button>
+    <button id="bkrem-later">後で通知</button>
+  </div>
+</div>
 <div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
 <div id="toast"></div>
 <script>
@@ -327,7 +344,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='21'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='22'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -2166,7 +2183,12 @@ const App=(() => {
       const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
       const bkName=(fileName.replace(/\.pdf$/i,'')||'backup')+'_backup.zip';
       const bkResult=await FileSaveMgr.saveBlob(blob,bkName,'application/zip','ZIP バックアップ');
-      if(bkResult==='saved'){AutoSave.clearDirty();showToast('💾 バックアップ完了');}
+      if(bkResult==='saved'){
+        AutoSave.clearDirty();showToast('💾 バックアップ完了');
+        /* v22: バックアップ成功時刻を記録 (localStorage) */
+        try{localStorage.setItem('mv_bk_ts',String(Date.now()));
+            localStorage.setItem('mv_bk_ver',APP_VER);}catch(_){}
+      }
     }catch(e){showToast('バックアップに失敗しました');Logger.error(e);}
     showLoading(false);
   }
@@ -2321,7 +2343,7 @@ async function closeSheetAt(idx){
   }
   _renderTabBar();showLoading(false);
 }
-App.setPostLoad(()=>{_sheetSync();});
+App.setPostLoad(()=>{_sheetSync();_checkBkReminder();}); /* v22: バックアップチェック */
 
 /* ============================================================
    バックアップ確認ダイアログ
@@ -2361,6 +2383,15 @@ function _initToolbar(){
   document.getElementById('btn-undo').addEventListener('click',()=>App.undo());
   document.getElementById('btn-save').addEventListener('click',()=>{document.getElementById('pgrov').classList.add('on');document.getElementById('pgrfld').value='';});
   document.getElementById('btn-backup').addEventListener('click',()=>App.downloadBackup());
+  /* v22: バックアップリマインダーボタン */
+  document.getElementById('bkrem-now').addEventListener('click',async()=>{
+    _hideBkReminder();await App.downloadBackup();
+  });
+  document.getElementById('bkrem-later').addEventListener('click',()=>{
+    _hideBkReminder();
+    /* 後で通知: 24時間スヌーズ */
+    try{localStorage.setItem(_BK_SNOOZE_KEY,String(Date.now()+_BK_INTERVAL));}catch(_){}
+  });
   /* 復元: File System Access API 対応時は showOpenFilePicker で前回フォルダを開く */
   document.getElementById('btn-restore').addEventListener('click',async ()=>{
     const result=await FileSaveMgr.openFile(
@@ -2634,6 +2665,46 @@ function _initCalculator(){
   document.addEventListener('mousemove',e=>{if(!cdrag)return;const calc=document.getElementById('calc');calc.style.left=(e.clientX-cdx)+'px';calc.style.top=(e.clientY-cdy)+'px';calc.style.right='auto';calc.style.bottom='auto';});
   document.addEventListener('mouseup',()=>{cdrag=false;});
 }
+
+/* ============================================================
+   v22: バックアップリマインダー
+   ============================================================ */
+const _BK_TS_KEY='mv_bk_ts',_BK_SNOOZE_KEY='mv_bk_snooze';
+const _BK_INTERVAL=24*60*60*1000; /* 24時間 */
+let _bkRemShown=false; /* セッション内重複表示防止 */
+
+function _checkBkReminder(){
+  /* PDF読込後に呼ぶ。1セッション1回・24h未経過ならスキップ */
+  if(_bkRemShown)return;
+  const now=Date.now();
+  /* スヌーズ中か確認 */
+  try{
+    const snooze=+localStorage.getItem(_BK_SNOOZE_KEY)||0;
+    if(snooze>now)return; /* スヌーズ期間中 */
+  }catch(_){}
+  /* 最終バックアップ確認 */
+  let lastTs=0;
+  try{lastTs=+localStorage.getItem(_BK_TS_KEY)||0;}catch(_){}
+  const elapsed=now-lastTs;
+  if(elapsed<_BK_INTERVAL)return; /* 24時間以内 → 通知不要 */
+  /* 2秒後に表示 (PDF読込直後の邪魔を防ぐ) */
+  setTimeout(()=>_showBkReminder(lastTs,elapsed),2000);
+}
+
+function _showBkReminder(lastTs,elapsed){
+  _bkRemShown=true;
+  const days=(elapsed/_BK_INTERVAL).toFixed(1);
+  const lastStr=lastTs
+    ?new Date(lastTs).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+    :'記録なし';
+  const bodyEl=document.getElementById('bkrem-body');
+  bodyEl.innerHTML=
+    '24時間以上バックアップが作成されていません。<br>大切なデータ保護のためバックアップを推奨します。<br><br>'+
+    '<span style="font-size:11px;color:var(--tx2)">最終バックアップ: '+lastStr+'<br>経過: '+days+'日 ／ ver.'+APP_VER+'</span>';
+  document.getElementById('bkrem').classList.add('on');
+}
+
+function _hideBkReminder(){document.getElementById('bkrem').classList.remove('on');}
 
 /* ============================================================
    共通 UI ヘルパー
