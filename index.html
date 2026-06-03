@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v18</title>
+<title>M_Viewer v19</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -250,7 +250,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v18</div>
+    <div class="dzm">M_Viewer v19</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -327,7 +327,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='18'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='19'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -2516,26 +2516,43 @@ function _parsePageRange(str,total){
    UI: 計算機
    ============================================================ */
 function _initCalculator(){
-  let cExpr='',cVal='0',cDec=1;
-  let _afterEq=false; /* v18: =後の連続計算フラグ */
+  /* v19: 状態機械型電卓エンジン
+     leftVal   : 左辺値 (演算子押下後に保存)
+     pendingOp : 保留中の演算子 (+/-/*)
+     curInput  : 現在入力中の数字文字列
+     _afterEq  : =押下直後フラグ (連続計算用)
+     _justOp   : 演算子押下直後フラグ (次の数字で入力リセット)
+     数字入力中は即時計算しない → iPhone/Windows電卓と同じ挙動 */
+  let leftVal='',pendingOp='',curInput='0';
+  let _afterEq=false,_justOp=false;
   const histEl=document.getElementById('chist');
   const exprEl=document.getElementById('cexpr');
   const valEl=document.getElementById('cval');
   const decEl=document.getElementById('cdec');
 
-  function _disp(){exprEl.textContent=cExpr;valEl.textContent=cVal;}
-  /* ④修正: =押下時のみ確定eval。中間入力時はエラー表示しない */
-  function _eval(final=false){
-    if(!cExpr){cVal='0';return;}
-    try{
-      const r=Function('"use strict";return ('+cExpr+')')();
-      const d=+decEl.value;
-      if(isFinite(r))cVal=parseFloat(r.toFixed(d)).toString();
-      else if(final)cVal='エラー';
-    }catch(e){
-      if(final)cVal='エラー'; /* =押下時のみエラー表示 */
-      /* 中間入力中は cVal を変えない → 最後の有効値を保持 */
-    }
+  /* 表示更新: 式欄に "左辺+演算子"、値欄に現在入力値 */
+  function _disp(){
+    exprEl.textContent=pendingOp?leftVal+pendingOp:'';
+    valEl.textContent=curInput;
+  }
+
+  /* 二項演算: 精度丸め付き */
+  function _calc(l,op,r){
+    const a=parseFloat(l||'0'),b=parseFloat(r||'0'),d=+decEl.value;
+    let res;
+    if(op==='+')res=a+b;
+    else if(op==='-')res=a-b;
+    else if(op==='*')res=a*b;
+    else if(op==='/')res=b!==0?a/b:NaN;
+    else return r; /* 演算子なし → そのまま */
+    return isFinite(res)?parseFloat(res.toFixed(d)).toString():'エラー';
+  }
+
+  /* 履歴追加 */
+  function _hist(expr,result){
+    const hi=document.createElement('div');hi.className='chi';
+    hi.textContent=expr+' = '+result;
+    histEl.appendChild(hi);histEl.scrollTop=histEl.scrollHeight;
   }
 
   document.getElementById('calcbtn').addEventListener('click',()=>{document.getElementById('calc').classList.toggle('on');});
@@ -2544,32 +2561,68 @@ function _initCalculator(){
   document.querySelectorAll('.cb').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const num=btn.dataset.cnum,op=btn.dataset.cop,fn=btn.dataset.cfn;
+
       if(num!==undefined){
-        /* v18: =後に数字 → 新規計算開始 (前の結果は破棄) */
-        if(_afterEq){cExpr='';_afterEq=false;}
-        cExpr+=num;
+        /* v19: 数字入力 — 演算子直後 or =直後なら入力リセット */
+        if(_afterEq||_justOp){
+          curInput=(num==='.')?'0.':num==='0'?'0':num;
+          _afterEq=false;_justOp=false;
+        }else{
+          if(num==='.'){
+            if(!curInput.includes('.'))curInput+='.';
+          }else{
+            curInput=(curInput==='0')?num:curInput+num;
+          }
+        }
+
       }else if(op){
-        /* v18: =後に演算子 → 前の結果を左辺として継続計算 */
-        if(_afterEq){cExpr=cVal;_afterEq=false;}
-        cExpr+=op;
+        /* v19: 演算子押下
+           保留演算があれば先に計算してチェーン継続 (例: 10+20+) */
+        if(pendingOp&&!_justOp){
+          const result=_calc(leftVal,pendingOp,curInput);
+          _hist(leftVal+pendingOp+curInput,result);
+          curInput=result;
+        }
+        leftVal=curInput;pendingOp=op;
+        _justOp=true;_afterEq=false;
+
       }else if(fn){
-        /* v18: =後に関数系 → 前の結果を式のベースに設定 */
-        if(_afterEq&&fn!=='C'&&fn!=='='){cExpr=cVal;_afterEq=false;}
-        if(fn==='C'){cExpr='';cVal='0';_afterEq=false;}
-        else if(fn==='⌫'){cExpr=cExpr.slice(0,-1);if(!cExpr)cVal='0';}
-        else if(fn==='±'){if(cVal.startsWith('-'))cVal=cVal.slice(1);else cVal='-'+cVal;cExpr=cVal;}
-        else if(fn==='%'){cExpr+='/100';}
-        else if(fn==='sqrt'){cExpr='Math.sqrt('+cExpr+')';}
-        else if(fn==='sq'){cExpr='('+cExpr+')**2';}
-        else if(fn==='='){
-          _eval(true); /* final=true で確定計算 */
-          const hi=document.createElement('div');hi.className='chi';hi.textContent=cExpr+' = '+cVal;histEl.appendChild(hi);histEl.scrollTop=histEl.scrollHeight;
-          const addToExpr=document.createElement('div');addToExpr.className='chi';addToExpr.style.display='none';histEl.appendChild(addToExpr);
-          cExpr='';
-          _afterEq=true; /* v18: 結果を保持して連続計算を許可 */
+        const d=+decEl.value;
+        const cur=parseFloat(curInput)||0;
+
+        if(fn==='C'){
+          /* AC: 全リセット */
+          leftVal='';pendingOp='';curInput='0';_afterEq=false;_justOp=false;
+
+        }else if(fn==='⌫'){
+          /* 数字入力中のみバックスペース有効 */
+          if(!_afterEq&&!_justOp)
+            curInput=curInput.length>1?curInput.slice(0,-1):'0';
+
+        }else if(fn==='±'){
+          curInput=curInput.startsWith('-')?curInput.slice(1):'-'+curInput;
+
+        }else if(fn==='%'){
+          curInput=parseFloat((cur/100).toFixed(d)).toString();
+
+        }else if(fn==='sqrt'){
+          const r=Math.sqrt(cur);
+          curInput=isFinite(r)?parseFloat(r.toFixed(d)).toString():'エラー';
+
+        }else if(fn==='sq'){
+          curInput=parseFloat((cur**2).toFixed(d)).toString();
+
+        }else if(fn==='='){
+          /* v19: = → 保留演算を実行して結果を保持 */
+          if(pendingOp&&leftVal!==''){
+            const result=_calc(leftVal,pendingOp,curInput);
+            _hist(leftVal+pendingOp+curInput,result);
+            curInput=result;
+            leftVal='';pendingOp='';
+          }
+          _afterEq=true;_justOp=false;
         }
       }
-      if(fn!=='='&&fn!=='C')_eval(false); /* 中間入力は非確定eval */
       _disp();
     });
   });
