@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v25</title>
+<title>M_Viewer v26</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -92,9 +92,9 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .swn-body{flex:1;overflow:hidden;position:relative;background:#fff}
 .swn-cvs{position:absolute;top:0;left:0;transform-origin:0 0}
 .swn-zl{position:absolute;bottom:3px;left:5px;font-size:10px;color:var(--acc);pointer-events:none;font-weight:800;text-shadow:0 0 4px #000,0 0 4px #000}
-.swn-rz{position:absolute;bottom:0;right:0;width:22px;height:22px;cursor:se-resize;background:linear-gradient(135deg,transparent 50%,var(--acc) 50%);border-radius:0 0 8px 0}
-.swn-rz-sw{position:absolute;bottom:0;left:0;width:22px;height:22px;cursor:sw-resize;background:linear-gradient(225deg,transparent 50%,var(--acc) 50%);border-radius:0 0 0 8px}
-.swn-rz-nw{position:absolute;top:30px;left:0;width:22px;height:22px;cursor:nw-resize;background:linear-gradient(315deg,transparent 50%,var(--acc) 50%);border-radius:8px 0 0 0}
+.swn-rz{position:absolute;bottom:0;right:0;width:36px;height:36px;cursor:se-resize;background:linear-gradient(135deg,transparent 50%,var(--acc) 50%);border-radius:0 0 8px 0;touch-action:none}/* v26: 36px・pointer対応 */
+.swn-rz-sw{position:absolute;bottom:0;left:0;width:36px;height:36px;cursor:sw-resize;background:linear-gradient(225deg,transparent 50%,var(--acc) 50%);border-radius:0 0 0 8px;touch-action:none}
+.swn-rz-nw{position:absolute;top:30px;left:0;width:36px;height:36px;cursor:nw-resize;background:linear-gradient(315deg,transparent 50%,var(--acc) 50%);border-radius:8px 0 0 0;touch-action:none}
 #pgrov{display:none;position:fixed;inset:0;z-index:500;background:#0009;align-items:center;justify-content:center}
 #pgrov.on{display:flex}
 #pgrpop{background:var(--pan);border:1.5px solid var(--brd);border-radius:13px;padding:16px;width:300px;display:flex;flex-direction:column;gap:9px}
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v25</div>
+    <div class="dzm">M_Viewer v26</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,7 +344,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='25'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='26'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -1273,49 +1273,58 @@ class SubWin{
   }
 
   _bindDrag(handle){
+    /* v26: pointer events + setPointerCapture でタイトルバードラッグ */
     let dragging=false,ox=0,oy=0,ex=0,ey=0;
     const onStart=e=>{
       if(e.target.closest('.swn-close'))return;
-      dragging=true;const s=e.touches?e.touches[0]:e;ox=s.clientX;oy=s.clientY;
+      dragging=true;ox=e.clientX;oy=e.clientY;
       const r=this.el.getBoundingClientRect();ex=r.left;ey=r.top;e.preventDefault();
-      SubWinManager.setActive(onMove,onEnd);
+      handle.setPointerCapture(e.pointerId); /* v26: 確実追従 */
     };
     const onMove=e=>{
-      if(!dragging)return;const s=e.touches?e.touches[0]:e;
+      if(!dragging)return;
       const vw=window.innerWidth,ew=this.el.offsetWidth||200;
-      const newL=Math.max(0,Math.min(vw-ew,ex+s.clientX-ox));
-      const newT=Math.max(0,Math.min(window.innerHeight-30,ey+s.clientY-oy));
+      const newL=Math.max(0,Math.min(vw-ew,ex+e.clientX-ox));
+      const newT=Math.max(0,Math.min(window.innerHeight-30,ey+e.clientY-oy));
       this.el.style.left=newL+'px';this.el.style.top=newT+'px';
     };
-    const onEnd=()=>{dragging=false;SubWinManager.clearActive();};
-    handle.addEventListener('touchstart',onStart,{passive:false});
-    handle.addEventListener('mousedown',onStart);
-    this._cleanups.push(()=>{if(dragging){dragging=false;SubWinManager.clearActive();}});
+    const onEnd=e=>{if(!dragging)return;dragging=false;};
+    handle.addEventListener('pointerdown',onStart);
+    handle.addEventListener('pointermove',onMove);
+    handle.addEventListener('pointerup',onEnd);
+    handle.addEventListener('pointercancel',onEnd);
+    this._cleanups.push(()=>{dragging=false;});
   }
 
   _bindResize(handle,corner){
+    /* v26: pointer events + setPointerCapture で確実に追従
+       touch/Pencil/mouse 全対応。setTimeout→RAFで描画も最適化 */
     let dragging=false,ox=0,oy=0,w0=0,h0=0,lx0=0,ty0=0,initSc=1;
+    this._resizeRAF=null;
     const onStart=e=>{
-      dragging=true;const s=e.touches?e.touches[0]:e;ox=s.clientX;oy=s.clientY;
+      dragging=true;ox=e.clientX;oy=e.clientY;
       const r=this.el.getBoundingClientRect();w0=r.width;h0=r.height;lx0=r.left;ty0=r.top;
       initSc=this.innerScale;e.stopPropagation();e.preventDefault();
-      SubWinManager.setActive(onMove,onEnd);
+      handle.setPointerCapture(e.pointerId); /* v26: 指が離れても追従 */
     };
     const onMove=e=>{
-      if(!dragging)return;const s=e.touches?e.touches[0]:e;
-      const dx=s.clientX-ox,dy=s.clientY-oy;let nW=w0,nH=h0;
+      if(!dragging)return;
+      const dx=e.clientX-ox,dy=e.clientY-oy;let nW=w0,nH=h0;
       if(corner==='se'){nW=Math.max(180,w0+dx);nH=Math.max(160,h0+dy);}
       else if(corner==='sw'){nW=Math.max(180,w0-dx);nH=Math.max(160,h0+dy);this.el.style.left=(lx0+w0-nW)+'px';}
       else if(corner==='nw'){nW=Math.max(180,w0-dx);nH=Math.max(160,h0-dy);this.el.style.left=(lx0+w0-nW)+'px';this.el.style.top=(ty0+h0-nH)+'px';}
       const k=Math.max(.1,(nW-4)/Math.max(1,w0-4));
       this.winW=nW;this.winH=nH;this.el.style.width=nW+'px';this.el.style.height=nH+'px';
       this.innerScale=Math.max(.2,Math.min(8,initSc*k));
-      this._pdfCache=null;clearTimeout(this._resizeTimer);
-      this._resizeTimer=setTimeout(()=>this.render(),60);
+      this._pdfCache=null;
+      /* v26: RAF でリサイズ描画 (60ms debounce → 即時RAF) */
+      if(!this._resizeRAF)this._resizeRAF=requestAnimationFrame(()=>{this._resizeRAF=null;this.render();});
     };
-    const onEnd=()=>{dragging=false;SubWinManager.clearActive();};
-    handle.addEventListener('touchstart',onStart,{passive:false});
-    handle.addEventListener('mousedown',onStart);
+    const onEnd=e=>{if(!dragging)return;dragging=false;};
+    handle.addEventListener('pointerdown',onStart);
+    handle.addEventListener('pointermove',onMove);
+    handle.addEventListener('pointerup',onEnd);
+    handle.addEventListener('pointercancel',onEnd);
   }
 
   _selBBox(){
@@ -1703,9 +1712,12 @@ const App=(() => {
   function _pinchMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
   function _startPinch(t){const m=_pinchMid(t),cr=caEl.getBoundingClientRect(),bx=m.x-cr.left,by=m.y-cr.top;cwEl.style.transformOrigin='0 0';/* v17: 先に確定 */pinch={d0:_pinchDist(t),s0:scale,target:scale,pdfX:(bx-panX)/scale,pdfY:(by-panY)/scale,cr};}
   function _movePinch(t){
-    const p=pinch,r=_pinchDist(t)/p.d0,m=_pinchMid(t);
+    const p=pinch,rawR=_pinchDist(t)/p.d0,m=_pinchMid(t);
     const cr=p.cr||(p.cr=caEl.getBoundingClientRect()); /* v10: rect キャッシュ */
     const M1x=m.x-cr.left,M1y=m.y-cr.top;
+    /* v26: 感度1.2倍 — 指の微小な動きでもズームが開始・追従する
+       r-1 = 指距離の変化率。これを1.2倍して指感度を向上。 */
+    const r=1+(rawR-1)*1.2;
     p.target=Math.max(.2,Math.min(MAX_SCALE,p.s0*r));
     panX=M1x-p.pdfX*p.target;panY=M1y-p.pdfY*p.target;
     p.lastMx=M1x;p.lastMy=M1y;
