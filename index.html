@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v36</title>
+<title>M_Viewer v37</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -277,7 +277,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v36</div>
+    <div class="dzm">M_Viewer v37</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -365,16 +365,16 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='36'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='37'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
    DPR=1 環境: 変化なし (min(1,2)=1 のまま) */
-/* v35: MAX_CANVAS を大幅拡大
-   cssExtraZoom=1.0を実現し、CSS scale拡大によるボヤけを排除。
-   renderScale上限は実質MAX_SCALE=8に支配される(数値的に届かない)。
-   hiRS の実質上限は別途 9600px でコントロール。 */
-const MAX_CANVAS=16384,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=2.0;
+/* v37: MAX_CANVAS を 3600 に戻す
+   16384 は style.width が巨大(800%で9500px)→GPU合成コスト増・不安定化
+   3600 は安定実績があり、cssExtraZoom=1.87(800%)程度で許容範囲
+   低倍率(100-200%)は PDF_MAX_DPR=2.0 で v28 より高品質を維持 */
+const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=2.0;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
 const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
 const SW_FILLS=['rgba(240,120,0,.12)','rgba(0,160,255,.12)','rgba(0,200,80,.12)','rgba(255,80,160,.12)','rgba(200,200,0,.12)'];
@@ -1581,8 +1581,8 @@ const App=(() => {
   }
 
   /* --- renderPage --- */
-  /* v36: 安定化のための状態変数 */
-  let _renderTask=null; /* 実行中のpdf.js RenderTask (キャンセル用) */
+  /* v37: _renderTask (キャンセル用) + 共有_offscr (メモリ安定) */
+  let _renderTask=null;
 
   async function renderPage(num){
     if(!Logger.flags.pdfRender)return;
@@ -1590,53 +1590,42 @@ const App=(() => {
     Logger.debug('[renderPage] page='+num+' scale='+scale.toFixed(3)+' dpr='+(window.devicePixelRatio||1).toFixed(2));
     const ver=++renderVer;
 
-    /* v36: 前回のRenderTaskを確実にキャンセル
-       キャンセルせずに複数の重いレンダリングが並走するのを防ぐ */
+    /* v37 [残]: 前回タスクキャンセル — 並走レンダリング防止 */
     if(_renderTask){try{_renderTask.cancel();}catch(_){}_renderTask=null;}
 
     let page=_pageCache.get(num);
     if(!page){page=await pdfDoc.getPage(num);_pageCache.set(num,page);}
     const vp1=page.getViewport({scale:1});
     const maxDim=Math.max(vp1.width,vp1.height);
+
+    /* v37 [v28に戻す]: MAX_CANVAS=3600 で cssExtraZoom を安全な範囲に制限
+       MAX_CANVAS=16384 は style.width が巨大になり GPU 合成コストが激増 */
     renderScale=Math.min(scale,MAX_CANVAS/maxDim);
     cssExtraZoom=scale/renderScale;
     const vp=page.getViewport({scale:renderScale});
     _currentVP=vp; /* v6: PDF座標変換用に保存 */
 
-    /* v36: canvas安全上限
-       iPad Safari の canvas 面積上限 ≈ 16,777,216px²
-       工学図面800% → 9528×6736 = 64MP → 上限超える場合あり
-       SAFE_PX²以内に制限: 4092×4092 = 16.7MP → 安全
-       → 面積ベース上限: sqrt(16MP) ≈ 4092px が基準 */
+    /* v37 [v28に戻す]: hiRS = min(rs×DPR, 4092/maxDim)
+       SAFE_AREA=16MP制限は400%以下で品質劣化(比率-18%)→廃止
+       per-render canvas も廃止: 毎回 ~16MP canvas 生成がメモリリークの原因 */
     const dpr=Math.min(window.devicePixelRatio||1,PDF_MAX_DPR);
-    const _hiRS_dpr=renderScale*dpr;
-    const _hiRS_nat=renderScale;
-    /* 面積制限: width×height ≤ 16,000,000px² (iPad Safari安全圏) */
-    const SAFE_AREA=16000000;
-    const hiRS_uncapped=_hiRS_dpr*maxDim<=4092?_hiRS_dpr:_hiRS_nat;
-    /* ページのアスペクト比を考慮した面積ベースのcap */
-    const vp1h=vp1.height;
-    const area_at_uncapped=hiRS_uncapped*vp1.width*hiRS_uncapped*vp1h;
-    const hiRS=area_at_uncapped<=SAFE_AREA
-      ?hiRS_uncapped
-      :Math.sqrt(SAFE_AREA/(vp1.width*vp1h));
+    const hiRS=Math.min(renderScale*dpr,(4092)/maxDim);
     const hiVP=page.getViewport({scale:hiRS});
 
-    /* v36: レンダリング毎に専用canvasを使用 (_offscr共有競合の解消)
-       同スケールで2回呼ばれた場合の同一canvas同時描画バグを修正 */
-    const off=document.createElement('canvas');
-    off.width=hiVP.width;off.height=hiVP.height;
-    const offCtx=off.getContext('2d');
-    offCtx.imageSmoothingEnabled=true;offCtx.imageSmoothingQuality='high';
+    /* v37 [v28]: 共有_offscr を再利用 (メモリリーク解消) */
+    if(!_offscr||_offscr.width!==hiVP.width||_offscr.height!==hiVP.height){
+      _offscr=document.createElement('canvas');_offscr.width=hiVP.width;_offscr.height=hiVP.height;
+    }
+    const offCtx=_offscr.getContext('2d');
+    offCtx.imageSmoothingEnabled=true;offCtx.imageSmoothingQuality='high'; /* v29: 維持 */
     offCtx.fillStyle='#fff';offCtx.fillRect(0,0,hiVP.width,hiVP.height);
 
-    /* v36: RenderTaskを保持してキャンセル可能にする */
+    /* v37 [残]: RenderTask保持でキャンセル可能に */
     const task=page.render({canvasContext:offCtx,viewport:hiVP});
     _renderTask=task;
     try{
       await task.promise;
     }catch(e){
-      /* キャンセル例外は正常 (新しいrenderPageが起動した) */
       if(e&&(e.name==='RenderingCancelledException'||e.type==='RenderingCancelledException')){
         Logger.debug('[renderPage] cancelled ver='+ver);return;
       }
@@ -1645,25 +1634,23 @@ const App=(() => {
       if(_renderTask===task)_renderTask=null;
     }
 
-    if(ver!==renderVer)return; /* 新しいrenderPageが起動していたらスキップ */
+    if(ver!==renderVer)return;
 
-    /* v36: pdfCvsへの書き込みをRAFでまとめる (リサイズ→クリア→描画の間に
-       ブラウザが再描画して白くなるちらつきを防止) */
-    _offscr=off; /* キャッシュ更新 */
+    /* v37 [残]: RAF でリサイズ+描画を同フレームに集約 (白フラッシュ防止) */
     requestAnimationFrame(()=>{
-      if(ver!==renderVer)return; /* RAF待機中に新しい描画が来た場合もスキップ */
+      if(ver!==renderVer)return;
       pdfCvs.width=hiVP.width;pdfCvs.height=hiVP.height;
       pdfCvs.style.width=vp.width+'px';pdfCvs.style.height=vp.height+'px';
       [annCvs,ovlCvs].forEach(c=>{c.width=vp.width;c.height=vp.height;});
       _updContSize();
-      pdfCtx.imageSmoothingEnabled=true;pdfCtx.imageSmoothingQuality='high';
-      pdfCtx.drawImage(off,0,0);
+      pdfCtx.imageSmoothingEnabled=true;pdfCtx.imageSmoothingQuality='high'; /* v29: 維持 */
+      pdfCtx.drawImage(_offscr,0,0);
       /* v30: 診断ログ */
       console.warn('%c[MAIN 解像度診断]','color:blue;font-weight:bold',{
-        scale:scale.toFixed(3),renderScale:renderScale.toFixed(3),
-        cssExtraZoom:cssExtraZoom.toFixed(3),DPR:(window.devicePixelRatio||1).toFixed(2),
-        hiRS:hiRS.toFixed(3),'canvas.w':hiVP.width,'css.w':vp.width+'px',
-        'area(MP)':(hiVP.width*hiVP.height/1e6).toFixed(1)
+        scale:scale.toFixed(3),RS:renderScale.toFixed(3),EZ:cssExtraZoom.toFixed(3),
+        DPR:dpr.toFixed(2),hiRS:hiRS.toFixed(3),
+        'canvas.w':hiVP.width,'css.w':vp.width+'px',
+        'ratio':(hiVP.width/vp.width).toFixed(3)
       });
       redraw();_clearSel();_clampPan();
       requestAnimationFrame(()=>{_clampPan();_updateTransform();});
