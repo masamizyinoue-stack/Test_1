@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v49</title>
+<title>M_Viewer v50</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -285,7 +285,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v49</div>
+    <div class="dzm">M_Viewer v50</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -391,7 +391,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='49'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='50'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2917,14 +2917,15 @@ function _initCalculator(){
      数字入力中は即時計算しない → iPhone/Windows電卓と同じ挙動 */
   let leftVal='',pendingOp='',curInput='0';
   let _afterEq=false,_justOp=false;
+  let _dispExpr=''; /* v50: 式表示用。=後も保持し新規入力開始時にクリア */
   const histEl=document.getElementById('chist');
   const exprEl=document.getElementById('cexpr');
   const valEl=document.getElementById('cval');
   const decEl=document.getElementById('cdec');
 
-  /* 表示更新: 式欄に "左辺+演算子"、値欄に現在入力値 */
+  /* v50: 表示更新 — _dispExpr を式欄に表示 (=後も式を保持) */
   function _disp(){
-    exprEl.textContent=pendingOp?leftVal+pendingOp:'';
+    exprEl.textContent=_dispExpr;
     valEl.textContent=curInput;
   }
 
@@ -2973,6 +2974,7 @@ function _initCalculator(){
         /* v19: 数字入力 — 演算子直後 or =直後なら入力リセット */
         if(_afterEq||_justOp){
           curInput=(num==='.')?'0.':num==='0'?'0':num;
+          if(_afterEq)_dispExpr=''; /* v50: =後の新規入力で式をクリア */
           _afterEq=false;_justOp=false;
         }else{
           if(num==='.'){
@@ -2983,8 +2985,7 @@ function _initCalculator(){
         }
 
       }else if(op){
-        /* v19: 演算子押下
-           保留演算があれば先に計算してチェーン継続 (例: 10+20+) */
+        /* v19: 演算子押下 */
         if(pendingOp&&!_justOp){
           const result=_calc(leftVal,pendingOp,curInput);
           _hist(leftVal+pendingOp+curInput,result);
@@ -2992,6 +2993,7 @@ function _initCalculator(){
         }
         leftVal=curInput;pendingOp=op;
         _justOp=true;_afterEq=false;
+        _dispExpr=leftVal+pendingOp; /* v50: 演算子入力後に式更新 */
 
       }else if(fn){
         const d=+decEl.value;
@@ -3000,6 +3002,7 @@ function _initCalculator(){
         if(fn==='C'){
           /* AC: 全リセット */
           leftVal='';pendingOp='';curInput='0';_afterEq=false;_justOp=false;
+          _dispExpr=''; /* v50: ACで式もクリア */
 
         }else if(fn==='⌫'){
           /* 数字入力中のみバックスペース有効 */
@@ -3022,10 +3025,12 @@ function _initCalculator(){
         }else if(fn==='='){
           /* v19: = → 保留演算を実行して結果を保持 */
           if(pendingOp&&leftVal!==''){
+            const fullExpr=leftVal+pendingOp+curInput;
             const result=_calc(leftVal,pendingOp,curInput);
-            _hist(leftVal+pendingOp+curInput,result);
+            _hist(fullExpr,result);
             curInput=result;
             leftVal='';pendingOp='';
+            _dispExpr=fullExpr+'='; /* v50: =後も式を保持 */
           }
           _afterEq=true;_justOp=false;
         }
