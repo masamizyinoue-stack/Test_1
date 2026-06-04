@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v58</title>
+<title>M_Viewer v59</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -306,7 +306,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v58</div>
+    <div class="dzm">M_Viewer v59</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -415,7 +415,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='58'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='59'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2505,6 +2505,20 @@ const App=(() => {
   });
   /* v8: PDF出力中はautosaveスキップ (メモリ競合防止) */
   EventBus.on('autosave:periodic',()=>{if(pdfDoc&&!_exportInProgress)AutoSave.schedSave(_getState);});
+
+  /* v59: subwin:transform → メイン窓のサブ窓範囲オーバーレイをリアルタイム更新
+     サブ窓内のパン/ズーム時に SubWin._updateTransform() → EventBus.emit('subwin:transform')
+     が発火するが、従来はメイン窓にリスナーがなくオーバーレイが更新されなかった。
+     RAFスロットルで1フレーム1回に制限し描画負荷を抑制する。 */
+  let _subOvRAF=null;
+  EventBus.on('subwin:transform',()=>{
+    if(_subOvRAF)return;
+    _subOvRAF=requestAnimationFrame(()=>{
+      _subOvRAF=null;
+      ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
+      _drawSubOverlays();
+    });
+  });
 
   /* ライフサイクルイベント */
   ['visibilitychange','pagehide','freeze'].forEach(ev=>{
