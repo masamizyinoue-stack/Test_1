@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v42</title>
+<title>M_Viewer v43</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -83,7 +83,9 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 #selbtn{display:none;position:fixed;z-index:150;background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005;touch-action:manipulation}
 /* v42: コピーボタン・貼り付けボタン */
 #copybtn{display:none;position:fixed;z-index:150;background:var(--acc);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005;touch-action:manipulation}
-#pastebtn{display:none;position:fixed;z-index:149;bottom:24px;left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px #0007;touch-action:manipulation}
+/* v43: 貼り付けモードインジケータ (タップで配置、×で終了) */
+#pastebtn{display:none;position:fixed;z-index:149;bottom:24px;left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px #0007;touch-action:manipulation;display:none;align-items:center;gap:10px}
+#pastebtn.on{display:flex}
 @keyframes swn-appear{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 .swn{position:fixed;z-index:200;background:var(--pan);border:2.5px solid var(--acc);border-radius:11px;box-shadow:0 6px 28px #000b;display:flex;flex-direction:column;min-width:170px;min-height:170px;overflow:hidden;touch-action:none}
 .swn-appearing{animation:swn-appear .15s ease-out both}
@@ -262,7 +264,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v42</div>
+    <div class="dzm">M_Viewer v43</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -279,7 +281,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 </div>
 <button id="selbtn">🗑 削除</button>
 <button id="copybtn">📋 コピー</button>
-<button id="pastebtn">📋 貼り付け</button>
+<div id="pastebtn"><span id="pastebtn-msg">📋 タップして貼り付け</span><button id="pastebtn-cancel" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:4px 8px;touch-action:manipulation">✕ 終了</button></div>
 <div id="calc">
   <div id="ctb"><span>🧮 計算機</span><button id="cclose">✕ 閉じる</button></div>
   <div id="chist"></div>
@@ -350,7 +352,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='42'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='43'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1519,7 +1521,7 @@ const App=(() => {
   /* ツール状態 */
   let _activeTool='pen',_selMode='rect'; /* v16: _activeShape削除 */
   /* v42: コピークリップボード */
-  let _clipboard=null,_pasteCount=0;
+  let _clipboard=null,_pasteCount=0,_isPasteMode=false; /* v43: 貼り付けモードフラグ */
   let _strokeColor='#cc2020',_strokeSize=3;
   const _toolSizes={...TOOL_DEFAULT_SIZES};
   const _penColors={pen:'#cc2020',hl:'#ffd700'};
@@ -1861,6 +1863,10 @@ const App=(() => {
   function _startDraw(e){
     const t=e.touches?e.touches[0]:e;
     const p=_getPdfPos(t);
+    /* v43: 貼り付けモード中はタップ位置にペースト (選択ツール必須) */
+    if(_isPasteMode&&_activeTool==='select'){
+      _pasteAt(p.x,p.y);return;
+    }
     /* v16: text tool削除 */
     if(_activeTool==='select'){
       if(selectedIdx.length>0){
@@ -1973,28 +1979,50 @@ const App=(() => {
     const arr=strokes[curPage]||[];
     _clipboard=selectedIdx.map(i=>JSON.parse(JSON.stringify(arr[i])));
     _pasteCount=0;
-    showToast('📋 コピーしました');
-    document.getElementById('pastebtn').style.display='block';
+    _isPasteMode=true; /* v43: 貼り付けモード開始 */
+    showToast('📋 コピーしました — 貼り付け位置をタップして下さい');
+    document.getElementById('pastebtn').classList.add('on');
   }
   /* v42: 貼り付け — 毎回24ptオフセット、連続貼付対応 */
-  function pasteClipboard(){
-    if(!_clipboard||!_clipboard.length){showToast('コピーされた内容がありません');return;}
-    if(!strokes[curPage])strokes[curPage]=[];
-    const off=24*(_pasteCount+1); /* ペーストごとに右下へずらす */
-    const pasted=_clipboard.map(s=>{
-      const c=JSON.parse(JSON.stringify(s)); /* Deep Copy */
-      if(c.points)c.points=c.points.map(p=>[p[0]+off,p[1]-off]);
-      if(c.x!==undefined)c.x+=off;
-      if(c.y!==undefined)c.y-=off;
-      if(c.x1!==undefined){c.x1+=off;c.x2+=off;}
-      if(c.y1!==undefined){c.y1-=off;c.y2-=off;}
-      return c;
+  /* v43: タップ位置 or オフセットで貼り付け。clipboardのBBoxをpx,py に合わせる */
+  function _pasteAt(px,py){
+    if(!_clipboard||!_clipboard.length)return;
+    /* クリップボードのBBox最小値(左上)を計算 */
+    let minX=Infinity,minY=Infinity;
+    _clipboard.forEach(s=>{
+      if(s.points)s.points.forEach(p=>{minX=Math.min(minX,p[0]);minY=Math.min(minY,p[1]);});
+      if(s.x!==undefined){minX=Math.min(minX,s.x);minY=Math.min(minY,s.y);}
+      if(s.x1!==undefined){minX=Math.min(minX,s.x1,s.x2);minY=Math.min(minY,s.y1,s.y2);}
     });
-    pasted.forEach(c=>strokes[curPage].push(c));
-    _pasteCount++;
+    const dx=isFinite(minX)?px-minX:0,dy=isFinite(minY)?py-minY:0;
+    if(!strokes[curPage])strokes[curPage]=[];
+    _clipboard.map(s=>{
+      const c=JSON.parse(JSON.stringify(s));
+      if(c.points)c.points=c.points.map(p=>[p[0]+dx,p[1]+dy]);
+      if(c.x!==undefined){c.x+=dx;c.y+=dy;}
+      if(c.x1!==undefined){c.x1+=dx;c.x2+=dx;c.y1+=dy;c.y2+=dy;}
+      strokes[curPage].push(c);
+    });
     redraw();SubWinManager.updateAll(strokes,curPage);
     EventBus.emit('stroke:added');
-    showToast('📋 貼り付けました (Undoで戻せます)');
+    showToast('📋 貼り付けました — もう一度タップで連続貼付');
+  }
+  function pasteClipboard(){
+    if(!_clipboard||!_clipboard.length){showToast('コピーされた内容がありません');return;}
+    /* pasteAt はBBox基準。オフセット版はBBox左上 + (0,0) からずらす */
+    const off=24*(_pasteCount+1);
+    let minX=Infinity,minY=Infinity;
+    _clipboard.forEach(s=>{
+      if(s.points)s.points.forEach(p=>{minX=Math.min(minX,p[0]);minY=Math.min(minY,p[1]);});
+      if(s.x!==undefined){minX=Math.min(minX,s.x);minY=Math.min(minY,s.y);}
+      if(s.x1!==undefined){minX=Math.min(minX,s.x1,s.x2);minY=Math.min(minY,s.y1,s.y2);}
+    });
+    _pasteAt(isFinite(minX)?minX+off:off,isFinite(minY)?minY-off:0);
+    _pasteCount++;
+  }
+  function cancelPasteMode(){
+    _isPasteMode=false;_pasteCount=0;
+    document.getElementById('pastebtn').classList.remove('on');
   }
 
   function undo(){
@@ -2015,6 +2043,7 @@ const App=(() => {
     if(tool==='hl')_strokeColor=_penColors.hl;
     else if(tool==='pen')_strokeColor=_penColors.pen;
     _strokeSize=_toolSizes[tool]||3; /* v16: shape削除 */
+    if(_isPasteMode&&tool!=='select')cancelPasteMode(); /* v43: 選択以外に切替→貼付モード終了 */
     _updateToolUI();
     EventBus.emit('tool:changed',{tool});
   }
@@ -2401,10 +2430,10 @@ const App=(() => {
   window.addEventListener('beforeunload',()=>{if(pdfDoc)AutoSave.emergencySave(_getState);});
 
   return{
-    gotoPage,fit,undo,deleteSelected,copySelected,pasteClipboard,closeFile,redraw,loadPDF, /* v42 */
+    gotoPage,fit,undo,deleteSelected,copySelected,pasteClipboard,cancelPasteMode,closeFile,redraw,loadPDF, /* v43 */
     saveState,loadState,restore,downloadBackup,restoreFromZip,exportPDF, /* v21: showHome削除 */
     setTool,setColor,setSize, /* v16: setShape削除 */
-    _clipboardSet(arr){_clipboard=arr;_pasteCount=0;showToast('📋 コピーしました');document.getElementById('pastebtn').style.display='block';}, /* v42 */
+    _clipboardSet(arr){_clipboard=arr;_pasteCount=0;_isPasteMode=true;showToast('📋 コピーしました — タップして貼り付け');document.getElementById('pastebtn').classList.add('on');}, /* v43 */
     get currentTool(){return _activeTool;}, /* v16: currentShape削除 */
     get selMode(){return _selMode;},
     set selMode(v){_selMode=v;},
@@ -2664,6 +2693,9 @@ function _initToolbar(){
   document.getElementById('selbtn').addEventListener('click',()=>App.deleteSelected());
   /* v42: コピー・貼り付けイベント */
   document.getElementById('copybtn').addEventListener('click',()=>App.copySelected());
+  /* v43: ×ボタンで貼り付けモード終了 */
+  document.getElementById('pastebtn-cancel').addEventListener('click',e=>{e.stopPropagation();App.cancelPasteMode();});
+  /* pastebtn本体クリック(×以外)は貼り付け */
   document.getElementById('pastebtn').addEventListener('click',()=>App.pasteClipboard());
 
   /* PDF出力ダイアログ */
