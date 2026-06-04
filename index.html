@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v43</title>
+<title>M_Viewer v45</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -80,12 +80,12 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .home-empty-icon{font-size:52px;opacity:.25}
 .home-empty-msg{font-size:13px;color:var(--tx2);text-align:center;line-height:1.8}
 .home-drop-hint{font-size:11px;color:var(--tx2);text-align:center;padding:10px 18px;border:1.5px dashed var(--brd);border-radius:10px;margin:0 18px 18px;flex-shrink:0}
-#selbtn{display:none;position:fixed;z-index:150;background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005;touch-action:manipulation}
+/* v44: 選択ツールバー — コピーを先、削除を後、iPad向け大型タップ領域 */
+#selbtn{display:none;position:fixed;z-index:150;background:var(--red);color:#fff;border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 12px #0006;touch-action:manipulation;min-width:72px}
+#copybtn{display:none;position:fixed;z-index:150;background:var(--acc);color:#fff;border:none;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 12px #0006;touch-action:manipulation;min-width:72px}
 /* v42: コピーボタン・貼り付けボタン */
 #copybtn{display:none;position:fixed;z-index:150;background:var(--acc);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005;touch-action:manipulation}
-/* v43: 貼り付けモードインジケータ (タップで配置、×で終了) */
-#pastebtn{display:none;position:fixed;z-index:149;bottom:24px;left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px #0007;touch-action:manipulation;display:none;align-items:center;gap:10px}
-#pastebtn.on{display:flex}
+/* v44: pastebtn CSS削除 (paste mode廃止) */
 @keyframes swn-appear{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 .swn{position:fixed;z-index:200;background:var(--pan);border:2.5px solid var(--acc);border-radius:11px;box-shadow:0 6px 28px #000b;display:flex;flex-direction:column;min-width:170px;min-height:170px;overflow:hidden;touch-action:none}
 .swn-appearing{animation:swn-appear .15s ease-out both}
@@ -166,6 +166,19 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .spin{width:34px;height:34px;border:3px solid var(--brd);border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
+/* v45: 説明書モーダル */
+#manual-overlay{display:none;position:fixed;inset:0;z-index:9000;background:#000d;flex-direction:column}
+#manual-overlay.on{display:flex}
+#manual-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1a1a1a;flex-shrink:0;gap:10px}
+#manual-hd span{color:#fff;font-size:13px;font-weight:700}
+#manual-nav{display:flex;align-items:center;gap:8px}
+#manual-prev,#manual-next{background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;touch-action:manipulation}
+#manual-prev:active,#manual-next:active{opacity:.7}
+#manual-pg{color:#aaa;font-size:12px;min-width:60px;text-align:center}
+#manual-close{background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:14px;cursor:pointer;touch-action:manipulation}
+#manual-body{flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:12px;background:#333;-webkit-overflow-scrolling:touch}
+#manual-canvas{max-width:100%;border-radius:4px;box-shadow:0 4px 20px #0008;touch-action:pan-y pinch-zoom;cursor:default}
+#manual-err{color:#f88;font-size:14px;padding:40px;text-align:center}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;padding:8px 16px;font-size:13px;color:var(--tx);opacity:0;pointer-events:none;transition:opacity .3s;z-index:999;white-space:nowrap}
 /* v22: バックアップリマインダー */
 #bkrem{display:none;position:fixed;bottom:24px;right:16px;z-index:800;max-width:300px;background:var(--pan);border:1.5px solid var(--acc);border-radius:12px;padding:14px 16px;box-shadow:0 4px 20px #0008;touch-action:manipulation}
@@ -208,6 +221,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <button class="btn" id="btn-restore" title="ZIP から復元">📂 復元</button>
     <input type="file" id="restoreInput" accept=".zip" style="display:none">
     <button class="btn" id="calcbtn">🧮 計算機</button>
+    <button class="btn" id="btn-manual" title="説明書を表示">📖 説明書</button>
     <div class="sp"></div>
     <!-- v21: ホームボタン削除 -->
     <button class="btn rd" id="btn-close">✕ 閉じる</button>
@@ -264,7 +278,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v43</div>
+    <div class="dzm">M_Viewer v45</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -279,9 +293,9 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <div class="home-drop-hint">📄 PDFをここにドロップして開く</div>
   </div>
 </div>
+<!-- v44: コピーを先、削除を後 -->
+<button id="copybtn">📋 複製</button>
 <button id="selbtn">🗑 削除</button>
-<button id="copybtn">📋 コピー</button>
-<div id="pastebtn"><span id="pastebtn-msg">📋 タップして貼り付け</span><button id="pastebtn-cancel" style="background:rgba(255,255,255,0.25);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:4px 8px;touch-action:manipulation">✕ 終了</button></div>
 <div id="calc">
   <div id="ctb"><span>🧮 計算機</span><button id="cclose">✕ 閉じる</button></div>
   <div id="chist"></div>
@@ -336,6 +350,22 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <button id="bkrem-later">後で通知</button>
   </div>
 </div>
+<!-- v45: 説明書モーダル (manual.pdf を pdf.js で表示) -->
+<div id="manual-overlay">
+  <div id="manual-hd">
+    <span>📖 説明書</span>
+    <div id="manual-nav">
+      <button id="manual-prev">◀ 前</button>
+      <span id="manual-pg">1 / 1</span>
+      <button id="manual-next">次 ▶</button>
+    </div>
+    <button id="manual-close">✕ 閉じる</button>
+  </div>
+  <div id="manual-body">
+    <canvas id="manual-canvas"></canvas>
+    <div id="manual-err" style="display:none"></div>
+  </div>
+</div>
 <div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
 <div id="toast"></div>
 <script>
@@ -352,7 +382,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='43'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='45'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -993,11 +1023,12 @@ function _placeSelBtn(vp){
   if(bY < margin){ bY=margin; }
   btn.style.left=Math.round(bX)+'px';
   btn.style.top =Math.round(bY)+'px';
-  /* v42: copybtn を削除ボタンの右横に配置 */
+  /* v44: copybtn を selbtn の左横に配置 ([コピー][削除]の順) */
   const cpbtn=document.getElementById('copybtn');
   if(cpbtn&&cpbtn.style.display==='block'){
-    const bW2=btn.offsetWidth||80;
-    cpbtn.style.left=Math.round(Math.min(bX+bW2+8,vW-(cpbtn.offsetWidth||80)-margin))+'px';
+    const cpW=cpbtn.offsetWidth||80;
+    const bX2=Math.max(margin,bX-cpW-8);
+    cpbtn.style.left=Math.round(bX2)+'px';
     cpbtn.style.top=Math.round(bY)+'px';
   }
 }
@@ -1452,11 +1483,23 @@ class SubWin{
     if(App.activeSelSubWin===this)App.setActiveSelSubWin(null);
     this.render();EventBus.emit('stroke:added');
   }
-  /* v42: SubWin コピー機能 — App._clipboardSet 経由で共有クリップボードに格納 */
+  /* v44: SubWin duplicate-and-select */
   copySelected(){
     if(!this.selectedIdx.length)return;
     const arr=this.strokes[this.pageNum]||[];
+    const startIdx=arr.length;
+    const off=24;
+    this.selectedIdx.forEach(i=>{
+      const c=JSON.parse(JSON.stringify(arr[i]));
+      if(c.points)c.points=c.points.map(p=>[p[0]+off,p[1]-off]);
+      if(c.x!==undefined){c.x+=off;c.y-=off;}
+      if(c.x1!==undefined){c.x1+=off;c.x2+=off;c.y1-=off;c.y2-=off;}
+      arr.push(c);
+    });
     App._clipboardSet(this.selectedIdx.map(i=>JSON.parse(JSON.stringify(arr[i]))));
+    this.selectedIdx=Array.from({length:this.selectedIdx.length},(_,k)=>startIdx+k);
+    this._drawSelOv();this.render();EventBus.emit('stroke:added');
+    showToast('📋 複製しました — ドラッグで移動できます');
   }
   update(strokes,pageNum){
     if(!Logger.flags.subWindowUpdate)return;
@@ -1521,7 +1564,7 @@ const App=(() => {
   /* ツール状態 */
   let _activeTool='pen',_selMode='rect'; /* v16: _activeShape削除 */
   /* v42: コピークリップボード */
-  let _clipboard=null,_pasteCount=0,_isPasteMode=false; /* v43: 貼り付けモードフラグ */
+  let _clipboard=null; /* v44: clipboard (pasteMode廃止、duplicate-and-selectに統一) */
   let _strokeColor='#cc2020',_strokeSize=3;
   const _toolSizes={...TOOL_DEFAULT_SIZES};
   const _penColors={pen:'#cc2020',hl:'#ffd700'};
@@ -1863,10 +1906,7 @@ const App=(() => {
   function _startDraw(e){
     const t=e.touches?e.touches[0]:e;
     const p=_getPdfPos(t);
-    /* v43: 貼り付けモード中はタップ位置にペースト (選択ツール必須) */
-    if(_isPasteMode&&_activeTool==='select'){
-      _pasteAt(p.x,p.y);return;
-    }
+    /* v44: paste mode廃止 → duplicate-and-select方式 */
     /* v16: text tool削除 */
     if(_activeTool==='select'){
       if(selectedIdx.length>0){
@@ -1973,56 +2013,47 @@ const App=(() => {
     await renderPage(curPage);_centerCanvas();
   }
   /* v42: コピー — Deep Copyで相対位置を保持 */
+  /* v44: duplicate-and-select — 複製を即座に生成して選択状態にする
+     元データはそのまま。複製が選択済みになるのでそのままドラッグ移動可能。
+     連続複製: もう一度コピーボタンを押すと複製の複製を生成。 */
   function copySelected(){
     if(_activeSelSubWin){_activeSelSubWin.copySelected&&_activeSelSubWin.copySelected();return;}
     if(!selectedIdx.length)return;
     const arr=strokes[curPage]||[];
-    _clipboard=selectedIdx.map(i=>JSON.parse(JSON.stringify(arr[i])));
-    _pasteCount=0;
-    _isPasteMode=true; /* v43: 貼り付けモード開始 */
-    showToast('📋 コピーしました — 貼り付け位置をタップして下さい');
-    document.getElementById('pastebtn').classList.add('on');
+    const startIdx=arr.length;
+    const off=24; /* 複製の初期オフセット (px) */
+    selectedIdx.forEach(i=>{
+      const c=JSON.parse(JSON.stringify(arr[i])); /* Deep Copy */
+      if(c.points)c.points=c.points.map(p=>[p[0]+off,p[1]-off]);
+      if(c.x!==undefined){c.x+=off;c.y-=off;}
+      if(c.x1!==undefined){c.x1+=off;c.x2+=off;c.y1-=off;c.y2-=off;}
+      arr.push(c);
+    });
+    _clipboard=selectedIdx.map(i=>JSON.parse(JSON.stringify(arr[i]))); /* clipboard保持 */
+    /* 複製を選択状態にする → そのままドラッグで移動可能 */
+    selectedIdx=Array.from({length:selectedIdx.length},(_,k)=>startIdx+k);
+    _drawSelOv();
+    redraw();
+    EventBus.emit('stroke:added');
+    showToast('📋 複製しました — そのままドラッグで移動できます');
   }
   /* v42: 貼り付け — 毎回24ptオフセット、連続貼付対応 */
-  /* v43: タップ位置 or オフセットで貼り付け。clipboardのBBoxをpx,py に合わせる */
-  function _pasteAt(px,py){
-    if(!_clipboard||!_clipboard.length)return;
-    /* クリップボードのBBox最小値(左上)を計算 */
-    let minX=Infinity,minY=Infinity;
-    _clipboard.forEach(s=>{
-      if(s.points)s.points.forEach(p=>{minX=Math.min(minX,p[0]);minY=Math.min(minY,p[1]);});
-      if(s.x!==undefined){minX=Math.min(minX,s.x);minY=Math.min(minY,s.y);}
-      if(s.x1!==undefined){minX=Math.min(minX,s.x1,s.x2);minY=Math.min(minY,s.y1,s.y2);}
-    });
-    const dx=isFinite(minX)?px-minX:0,dy=isFinite(minY)?py-minY:0;
-    if(!strokes[curPage])strokes[curPage]=[];
-    _clipboard.map(s=>{
-      const c=JSON.parse(JSON.stringify(s));
-      if(c.points)c.points=c.points.map(p=>[p[0]+dx,p[1]+dy]);
-      if(c.x!==undefined){c.x+=dx;c.y+=dy;}
-      if(c.x1!==undefined){c.x1+=dx;c.x2+=dx;c.y1+=dy;c.y2+=dy;}
-      strokes[curPage].push(c);
-    });
-    redraw();SubWinManager.updateAll(strokes,curPage);
-    EventBus.emit('stroke:added');
-    showToast('📋 貼り付けました — もう一度タップで連続貼付');
-  }
+  /* v44: pasteClipboard — clipboardから複製して選択 (copySelectedと同動作) */
   function pasteClipboard(){
     if(!_clipboard||!_clipboard.length){showToast('コピーされた内容がありません');return;}
-    /* pasteAt はBBox基準。オフセット版はBBox左上 + (0,0) からずらす */
-    const off=24*(_pasteCount+1);
-    let minX=Infinity,minY=Infinity;
+    const arr=strokes[curPage]||[];
+    const startIdx=arr.length;
+    const off=24;
     _clipboard.forEach(s=>{
-      if(s.points)s.points.forEach(p=>{minX=Math.min(minX,p[0]);minY=Math.min(minY,p[1]);});
-      if(s.x!==undefined){minX=Math.min(minX,s.x);minY=Math.min(minY,s.y);}
-      if(s.x1!==undefined){minX=Math.min(minX,s.x1,s.x2);minY=Math.min(minY,s.y1,s.y2);}
+      const c=JSON.parse(JSON.stringify(s));
+      if(c.points)c.points=c.points.map(p=>[p[0]+off,p[1]-off]);
+      if(c.x!==undefined){c.x+=off;c.y-=off;}
+      if(c.x1!==undefined){c.x1+=off;c.x2+=off;c.y1-=off;c.y2-=off;}
+      arr.push(c);
     });
-    _pasteAt(isFinite(minX)?minX+off:off,isFinite(minY)?minY-off:0);
-    _pasteCount++;
-  }
-  function cancelPasteMode(){
-    _isPasteMode=false;_pasteCount=0;
-    document.getElementById('pastebtn').classList.remove('on');
+    selectedIdx=Array.from({length:_clipboard.length},(_,k)=>startIdx+k);
+    _drawSelOv();redraw();EventBus.emit('stroke:added');
+    showToast('📋 複製しました');
   }
 
   function undo(){
@@ -2043,7 +2074,6 @@ const App=(() => {
     if(tool==='hl')_strokeColor=_penColors.hl;
     else if(tool==='pen')_strokeColor=_penColors.pen;
     _strokeSize=_toolSizes[tool]||3; /* v16: shape削除 */
-    if(_isPasteMode&&tool!=='select')cancelPasteMode(); /* v43: 選択以外に切替→貼付モード終了 */
     _updateToolUI();
     EventBus.emit('tool:changed',{tool});
   }
@@ -2430,10 +2460,10 @@ const App=(() => {
   window.addEventListener('beforeunload',()=>{if(pdfDoc)AutoSave.emergencySave(_getState);});
 
   return{
-    gotoPage,fit,undo,deleteSelected,copySelected,pasteClipboard,cancelPasteMode,closeFile,redraw,loadPDF, /* v43 */
+    gotoPage,fit,undo,deleteSelected,copySelected,pasteClipboard,closeFile,redraw,loadPDF, /* v44 */
     saveState,loadState,restore,downloadBackup,restoreFromZip,exportPDF, /* v21: showHome削除 */
     setTool,setColor,setSize, /* v16: setShape削除 */
-    _clipboardSet(arr){_clipboard=arr;_pasteCount=0;_isPasteMode=true;showToast('📋 コピーしました — タップして貼り付け');document.getElementById('pastebtn').classList.add('on');}, /* v43 */
+    _clipboardSet(arr){_clipboard=arr;showToast('📋 コピーしました');}, /* v44: SubWin用 */
     get currentTool(){return _activeTool;}, /* v16: currentShape削除 */
     get selMode(){return _selMode;},
     set selMode(v){_selMode=v;},
@@ -2693,10 +2723,7 @@ function _initToolbar(){
   document.getElementById('selbtn').addEventListener('click',()=>App.deleteSelected());
   /* v42: コピー・貼り付けイベント */
   document.getElementById('copybtn').addEventListener('click',()=>App.copySelected());
-  /* v43: ×ボタンで貼り付けモード終了 */
-  document.getElementById('pastebtn-cancel').addEventListener('click',e=>{e.stopPropagation();App.cancelPasteMode();});
-  /* pastebtn本体クリック(×以外)は貼り付け */
-  document.getElementById('pastebtn').addEventListener('click',()=>App.pasteClipboard());
+  /* v44: pastebtn廃止 (duplicate-and-select方式) */
 
   /* PDF出力ダイアログ */
   document.getElementById('pgr-cur').addEventListener('click',()=>document.getElementById('pgrfld').value=String(App.currentPage));
@@ -2754,6 +2781,102 @@ function _dismissKeyboard(el){
 }
 
 
+
+/* ============================================================
+   v45: 説明書モーダル
+   manual.pdf を pdf.js で描画。メインPDFと独立したドキュメントインスタンス。
+   ファイルが見つからない場合はエラーメッセージを表示。
+   ============================================================ */
+const MANUAL_PATH='manual.pdf'; /* 説明書PDFのパス (HTMLと同フォルダ) */
+let _manualDoc=null,_manualPage=1,_manualTotal=1,_manualScale=1.5;
+let _manualRendering=false,_manualPendingPage=null;
+
+async function _openManual(){
+  const overlay=document.getElementById('manual-overlay');
+  const errEl=document.getElementById('manual-err');
+  const cvs=document.getElementById('manual-canvas');
+  overlay.classList.add('on');
+  errEl.style.display='none';cvs.style.display='block';
+  if(!_manualDoc){
+    try{
+      _manualDoc=await pdfjsLib.getDocument(MANUAL_PATH).promise;
+      _manualTotal=_manualDoc.numPages;
+      _manualPage=1;
+    }catch(e){
+      cvs.style.display='none';
+      errEl.style.display='block';
+      errEl.textContent='説明書が見つかりません。manual.pdf をHTMLと同じフォルダに置いて下さい。';
+      return;
+    }
+  }
+  _manualRender(_manualPage);
+}
+
+async function _manualRender(num){
+  if(_manualRendering){_manualPendingPage=num;return;}
+  _manualRendering=true;
+  const cvs=document.getElementById('manual-canvas');
+  const ctx=cvs.getContext('2d');
+  try{
+    const page=await _manualDoc.getPage(num);
+    const vp=page.getViewport({scale:_manualScale});
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    cvs.width=vp.width*dpr;cvs.height=vp.height*dpr;
+    cvs.style.width=vp.width+'px';cvs.style.height=vp.height+'px';
+    ctx.scale(dpr,dpr);
+    await page.render({canvasContext:ctx,viewport:vp}).promise;
+    _manualPage=num;
+    document.getElementById('manual-pg').textContent=num+' / '+_manualTotal;
+    document.getElementById('manual-prev').disabled=num<=1;
+    document.getElementById('manual-next').disabled=num>=_manualTotal;
+  }catch(e){Logger.warn('[manual] render error',e);}
+  _manualRendering=false;
+  if(_manualPendingPage!==null){const p=_manualPendingPage;_manualPendingPage=null;_manualRender(p);}
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('btn-manual').addEventListener('click',_openManual);
+  document.getElementById('manual-close').addEventListener('click',()=>{
+    document.getElementById('manual-overlay').classList.remove('on');
+  });
+  document.getElementById('manual-prev').addEventListener('click',()=>{
+    if(_manualPage>1)_manualRender(_manualPage-1);
+  });
+  document.getElementById('manual-next').addEventListener('click',()=>{
+    if(_manualPage<_manualTotal)_manualRender(_manualPage+1);
+  });
+  /* オーバーレイ外クリックで閉じる */
+  document.getElementById('manual-overlay').addEventListener('click',e=>{
+    if(e.target===e.currentTarget)e.currentTarget.classList.remove('on');
+  });
+  /* キーボード操作: ← → Esc */
+  document.addEventListener('keydown',e=>{
+    if(!document.getElementById('manual-overlay').classList.contains('on'))return;
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp'){if(_manualPage>1)_manualRender(_manualPage-1);}
+    else if(e.key==='ArrowRight'||e.key==='ArrowDown'){if(_manualPage<_manualTotal)_manualRender(_manualPage+1);}
+    else if(e.key==='Escape'){document.getElementById('manual-overlay').classList.remove('on');}
+  });
+  /* ピンチズーム (manual-body内) */
+  const body=document.getElementById('manual-body');
+  let _mPinch=null;
+  body.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){
+      const dx=e.touches[1].clientX-e.touches[0].clientX,dy=e.touches[1].clientY-e.touches[0].clientY;
+      _mPinch={d0:Math.sqrt(dx*dx+dy*dy),s0:_manualScale};e.preventDefault();
+    }
+  },{passive:false});
+  body.addEventListener('touchmove',e=>{
+    if(_mPinch&&e.touches.length===2){
+      const dx=e.touches[1].clientX-e.touches[0].clientX,dy=e.touches[1].clientY-e.touches[0].clientY;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      _manualScale=Math.max(0.8,Math.min(4,_mPinch.s0*(d/_mPinch.d0)));
+      e.preventDefault();
+    }
+  },{passive:false});
+  body.addEventListener('touchend',e=>{
+    if(_mPinch&&e.touches.length<2){_manualRender(_manualPage);_mPinch=null;}
+  });
+});
 
 function closePickers(){['selpop','szp'].forEach(id=>{document.getElementById(id)?.classList.remove('on');}); /* v16: shapepop削除 */}
 function openFile(){document.getElementById('fileInput').click();}
