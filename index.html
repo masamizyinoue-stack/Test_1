@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v57</title>
+<title>M_Viewer v58</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -197,6 +197,12 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 #manual-body{flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:12px;background:#333;-webkit-overflow-scrolling:touch}
 #manual-canvas{max-width:100%;border-radius:4px;box-shadow:0 4px 20px #0008;touch-action:pan-y pinch-zoom;cursor:default}
 #manual-err{color:#f88;font-size:14px;padding:40px;text-align:center}
+/* v58: サブ窓作成案内ヒント */
+#sub-hint{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:700;background:rgba(0,0,0,.65);color:#fff;border-radius:12px;
+  padding:14px 22px;font-size:15px;font-weight:700;text-align:center;
+  pointer-events:none;line-height:1.6;white-space:pre-line}
+#sub-hint.on{display:block}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--pan);border:1.5px solid var(--brd);border-radius:9px;padding:8px 16px;font-size:13px;color:var(--tx);opacity:0;pointer-events:none;transition:opacity .3s;z-index:999;white-space:nowrap}
 /* v22: バックアップリマインダー */
 #bkrem{display:none;position:fixed;bottom:24px;right:16px;z-index:800;max-width:300px;background:var(--pan);border:1.5px solid var(--acc);border-radius:12px;padding:14px 16px;box-shadow:0 4px 20px #0008;touch-action:manipulation}
@@ -300,7 +306,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v57</div>
+    <div class="dzm">M_Viewer v58</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -390,6 +396,9 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <div id="manual-err" style="display:none"></div>
   </div>
 </div>
+<!-- v58: サブ窓作成案内ヒント -->
+<div id="sub-hint">サブ窓を作成する範囲を
+対角にドラッグして下さい</div>
 <div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
 <div id="toast"></div>
 <script>
@@ -406,7 +415,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='57'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='58'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1944,9 +1953,10 @@ const App=(() => {
       selPath=[{x:p.x,y:p.y}];isDrawing=true;return;
     }
     if(_activeTool==='sub'){
-      /* v27: sub作成開始を即時描画 (開始点を視覚的にフィードバック) */
       subRect={x1:p.x,y1:p.y,x2:p.x,y2:p.y};isDrawing=true;
-      ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);return;
+      ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
+      _hideSubHint(); /* v58: ドラッグ開始で案内消去 */
+      return;
     }
     isDrawing=true;lastX=p.x;lastY=p.y;
     /* v16: shape削除。pen/hl/eraser のみ */
@@ -2019,6 +2029,7 @@ const App=(() => {
         }
       }
       subRect=null;ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
+      _hideSubHint(); /* v58 */
       setTool('pen');return;
     }
     if(curStroke?.type==='eraser'){
@@ -2118,6 +2129,8 @@ const App=(() => {
     _strokeSize=_toolSizes[tool]||3; /* v16: shape削除 */
     _updateToolUI();
     EventBus.emit('tool:changed',{tool});
+    /* v58: サブ窓選択時に案内ヒント表示 */
+    if(tool==='sub')_showSubHint();else _hideSubHint();
   }
   /* v16: setShape削除 */
   function setColor(c){
@@ -2946,6 +2959,18 @@ document.addEventListener('DOMContentLoaded',function(){
     if(_mPinch&&e.touches.length<2){_manualRender(_manualPage);_mPinch=null;}
   });
 });
+
+/* v58: サブ窓作成案内ヒント */
+let _subHintTimer=null;
+function _showSubHint(){
+  document.getElementById('sub-hint').classList.add('on');
+  if(_subHintTimer)clearTimeout(_subHintTimer);
+  _subHintTimer=setTimeout(_hideSubHint,5000); /* 5秒で自動消去 */
+}
+function _hideSubHint(){
+  document.getElementById('sub-hint').classList.remove('on');
+  if(_subHintTimer){clearTimeout(_subHintTimer);_subHintTimer=null;}
+}
 
 function closePickers(){['selpop','szp'].forEach(id=>{document.getElementById(id)?.classList.remove('on');}); /* v16: shapepop削除 */}
 function openFile(){document.getElementById('fileInput').click();}
