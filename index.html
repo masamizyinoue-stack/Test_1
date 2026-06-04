@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v26</title>
+<title>M_Viewer v27</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v26</div>
+    <div class="dzm">M_Viewer v27</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,7 +344,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='26'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='27'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -1664,22 +1664,28 @@ const App=(() => {
   caEl.addEventListener('touchstart',e=>{
     if(!pdfDoc)return;e.preventDefault();_cancelInertia();
     if(e.touches.length>=2){
+      /* v27: sub作成中は2本指ピンチをブロック → ドラッグ継続優先 */
+      if(_activeTool==='sub'&&isDrawing)return;
       const hasSt=Array.from(e.touches).some(t=>t.touchType==='stylus');
       if(hasSt)return; /* v10: Pencil含む場合のみ早期リターン */
-      /* v10: 描画中でも2本指→ピンチ開始 (Apple Pencil使用後の回復) */
       isDrawing=false;curStroke=null;panSt=null;_startPinch(e.touches);return;
     }
     const t=e.touches[0];
-    if(Utils.isPalmContact(t))return;
-    if(!_isOnCanvas(t)){_startPan(t);return;}
-    const needPen=['pen','hl'].includes(_activeTool);
-    if(needPen&&t.touchType!=='stylus'){_startPan(t);return;}
+    /* v27: sub tool は isPalmContact/canvasチェックをスキップ
+       指を置いた瞬間から範囲指定を開始するために全ガードをバイパス */
+    if(_activeTool!=='sub'){
+      if(Utils.isPalmContact(t))return;
+      if(!_isOnCanvas(t)){_startPan(t);return;}
+      const needPen=['pen','hl'].includes(_activeTool);
+      if(needPen&&t.touchType!=='stylus'){_startPan(t);return;}
+    }
     _startDraw(e);
   },{passive:false});
   caEl.addEventListener('touchmove',e=>{
     e.preventDefault();
     if(!Logger.flags.touchMove)return;
-    if(e.touches.length>=2&&pinch){_movePinch(e.touches);return;}
+    /* v27: sub作成中はピンチを無効化 → ドラッグを中断させない */
+    if(e.touches.length>=2&&pinch&&!(_activeTool==='sub'&&isDrawing)){_movePinch(e.touches);return;}
     const t=e.touches[0];
     if(panSt){_movePan(t);return;}
     if(isDrawing)_moveDraw(e);
@@ -1776,7 +1782,9 @@ const App=(() => {
       selPath=[{x:p.x,y:p.y}];isDrawing=true;return;
     }
     if(_activeTool==='sub'){
-      subRect={x1:p.x,y1:p.y,x2:p.x,y2:p.y};isDrawing=true;return;
+      /* v27: sub作成開始を即時描画 (開始点を視覚的にフィードバック) */
+      subRect={x1:p.x,y1:p.y,x2:p.x,y2:p.y};isDrawing=true;
+      ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);return;
     }
     isDrawing=true;lastX=p.x;lastY=p.y;
     /* v16: shape削除。pen/hl/eraser のみ */
@@ -1814,7 +1822,7 @@ const App=(() => {
     }
     if(_activeTool==='sub'&&subRect){
       const r={x1:Math.min(subRect.x1,subRect.x2),y1:Math.min(subRect.y1,subRect.y2),x2:Math.max(subRect.x1,subRect.x2),y2:Math.max(subRect.y1,subRect.y2)};
-      if((r.x2-r.x1)>10/scale&&(r.y2-r.y1)>10/scale){
+      if((r.x2-r.x1)>5/scale&&(r.y2-r.y1)>5/scale){ /* v27: 最小サイズ閾値を緩和 10→5 */
         if(SubWinManager.count()>=MAX_SUBWIN){showToast(`サブ窓は最大${MAX_SUBWIN}つです`);}
         else if(!_subCreating){
           _subCreating=true;setTimeout(()=>{_subCreating=false;},400);
