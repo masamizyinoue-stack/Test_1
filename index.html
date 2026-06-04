@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v38</title>
+<title>M_Viewer v39</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -131,7 +131,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 #ctb span{font-size:13px;font-weight:700;color:var(--tx2)}
 #cclose{background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);font-size:12px;cursor:pointer;padding:3px 10px;border-radius:5px;font-weight:700}
 #cclose:active{background:var(--acc);color:#fff}
-#chist{max-height:66px;overflow-y:auto;padding:2px 10px;border-bottom:1px solid var(--brd)}
+/* v39: 履歴エリアは上方向へ拡張。max-heightで制限+スクロール */
+#chist{max-height:40vh;overflow-y:auto;padding:2px 10px;border-bottom:1px solid var(--brd)}
 .chi{font-size:11px;color:var(--tx2);text-align:right;padding:2px 0}
 #cdsp{padding:5px 12px;text-align:right;border-bottom:1px solid var(--brd)}
 #cexpr{font-size:11px;color:var(--tx2);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -277,7 +278,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v38</div>
+    <div class="dzm">M_Viewer v39</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -365,7 +366,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='38'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='39'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2910,77 +2911,85 @@ function _initCalculator(){
      ダブルタップ: 初期位置へリセット */
   const calcEl=document.getElementById('calc');
   const ctbEl=document.getElementById('ctb');
-  const _CALC_POS_KEY='mv_calc_pos';
+  const _CALC_POS_KEY='mv_calc_pos_b'; /* v39: bottomベースのキー (旧topベースと区別) */
 
-  /* 位置クランプ: タイトルバーが常に画面内に収まるよう制限 */
-  function _clampCalc(x,y){
+  /* v39: 位置クランプ — x(左端)とb(viewportからの下端距離)を管理
+     bottomベースで管理することで、履歴が増えても下端が固定され上方向に拡張される */
+  function _clampCalc(x,b){
     const vw=window.visualViewport?window.visualViewport.width:window.innerWidth;
     const vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
     const w=calcEl.offsetWidth||290,tbH=ctbEl.offsetHeight||40;
-    return{x:Math.max(0,Math.min(vw-w,x)),y:Math.max(0,Math.min(vh-tbH,y))};
+    return{x:Math.max(0,Math.min(vw-w,x)),b:Math.max(0,Math.min(vh-tbH,b))};
   }
 
-  /* 位置を calc に適用 */
-  function _applyCalcPos(x,y){
-    calcEl.style.left=x+'px';calcEl.style.top=y+'px';
-    calcEl.style.right='auto';calcEl.style.bottom='auto';
+  /* v39: bottom基準で位置適用 → top:'auto'にすることで履歴増加時に上方向拡張 */
+  function _applyCalcPos(x,b){
+    calcEl.style.left=x+'px';calcEl.style.bottom=b+'px';
+    calcEl.style.right='auto';calcEl.style.top='auto';
   }
 
-  /* 位置を localStorage に保存 */
-  function _saveCalcPos(x,y){
-    try{localStorage.setItem(_CALC_POS_KEY,JSON.stringify({x,y}));}catch(_){}
+  /* v39: {x, b} 形式で保存 */
+  function _saveCalcPos(x,b){
+    try{localStorage.setItem(_CALC_POS_KEY,JSON.stringify({x,b}));}catch(_){}
   }
 
-  /* 保存された位置を復元 (open時に呼ぶ) */
+  /* v39: bottom基準で復元 */
   function _restoreCalcPos(){
     try{
       const s=localStorage.getItem(_CALC_POS_KEY);
       if(!s)return;
-      const{x,y}=JSON.parse(s);
-      if(isFinite(x)&&isFinite(y)){const c=_clampCalc(x,y);_applyCalcPos(c.x,c.y);}
+      const{x,b}=JSON.parse(s);
+      if(isFinite(x)&&isFinite(b)){const c=_clampCalc(x,b);_applyCalcPos(c.x,c.b);}
     }catch(_){}
   }
 
-  /* 初期位置へリセット */
+  /* 初期位置へリセット (CSS既定: bottom:20px; right:16px) */
   function _resetCalcPos(){
     calcEl.style.left='';calcEl.style.top='';
     calcEl.style.right='16px';calcEl.style.bottom='20px';
     try{localStorage.removeItem(_CALC_POS_KEY);}catch(_){}
   }
 
-  /* ドラッグ状態 */
-  let _cdx=0,_cdy=0,_cdragging=false;
+  /* v39: ドラッグ開始時の状態を保持 */
+  let _cdragging=false,_cdStartX=0,_cdStartY=0,_cdStartLeft=0,_cdStartBottom=0;
 
   /* pointerdown: ドラッグ開始 (ボタン上では無効) */
   ctbEl.addEventListener('pointerdown',e=>{
-    if(e.target.tagName==='BUTTON')return; /* 閉じるボタンは除外 */
+    if(e.target.tagName==='BUTTON')return;
     e.preventDefault();
-    ctbEl.setPointerCapture(e.pointerId); /* v23: pointer capture で離れても追従 */
+    ctbEl.setPointerCapture(e.pointerId);
     const r=calcEl.getBoundingClientRect();
-    _cdx=e.clientX-r.left;_cdy=e.clientY-r.top;_cdragging=true;
-    calcEl.style.zIndex='450'; /* 最前面 */
-    ctbEl.style.cursor='grabbing';
+    const vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+    _cdStartX=e.clientX;_cdStartY=e.clientY;
+    _cdStartLeft=r.left;
+    /* v39: ドラッグ開始時点のbottom値を記録 */
+    _cdStartBottom=vh-r.bottom;
+    _cdragging=true;
+    calcEl.style.zIndex='450';ctbEl.style.cursor='grabbing';
   });
 
-  /* pointermove: ドラッグ中 */
+  /* pointermove: ドラッグ中 — bottomを更新することで下端を常に固定 */
   ctbEl.addEventListener('pointermove',e=>{
     if(!_cdragging)return;
     e.preventDefault();
-    const c=_clampCalc(e.clientX-_cdx,e.clientY-_cdy);
-    _applyCalcPos(c.x,c.y);
+    const dx=e.clientX-_cdStartX,dy=e.clientY-_cdStartY;
+    /* v39: dy>0(下移動)→bottom減少, dy<0(上移動)→bottom増加 */
+    const c=_clampCalc(_cdStartLeft+dx,_cdStartBottom-dy);
+    _applyCalcPos(c.x,c.b);
   });
 
-  /* pointerup/cancel: ドラッグ終了 → 位置保存 */
+  /* pointerup/cancel: ドラッグ終了 → bottom基準で保存 */
   function _endDragCalc(e){
     if(!_cdragging)return;
     _cdragging=false;ctbEl.style.cursor='grab';
     const r=calcEl.getBoundingClientRect();
-    _saveCalcPos(r.left,r.top);
+    const vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+    _saveCalcPos(r.left,vh-r.bottom);
   }
   ctbEl.addEventListener('pointerup',_endDragCalc);
   ctbEl.addEventListener('pointercancel',_endDragCalc);
 
-  /* ダブルクリック/ダブルタップ: 初期位置へリセット */
+  /* ダブルタップ: 初期位置へリセット */
   let _ctbTapTs=0;
   ctbEl.addEventListener('pointerdown',e=>{
     if(e.target.tagName==='BUTTON')return;
