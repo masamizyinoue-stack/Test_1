@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v34</title>
+<title>M_Viewer v35</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -277,7 +277,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v34</div>
+    <div class="dzm">M_Viewer v35</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -365,15 +365,16 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='34'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='35'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
    DPR=1 環境: 変化なし (min(1,2)=1 のまま) */
-/* v34: MAX_CANVAS 3600→4090
-   cssExtraZoom=1.017の CSS scale を解消する目的。
-   hiRS は独立して (4096-4)/maxDim で上限管理されるため安全。 */
-const MAX_CANVAS=4090,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=2.0;
+/* v35: MAX_CANVAS を大幅拡大
+   cssExtraZoom=1.0を実現し、CSS scale拡大によるボヤけを排除。
+   renderScale上限は実質MAX_SCALE=8に支配される(数値的に届かない)。
+   hiRS の実質上限は別途 9600px でコントロール。 */
+const MAX_CANVAS=16384,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=2.0;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
 const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
 const SW_FILLS=['rgba(240,120,0,.12)','rgba(0,160,255,.12)','rgba(0,200,80,.12)','rgba(255,80,160,.12)','rgba(200,200,0,.12)'];
@@ -1594,7 +1595,13 @@ const App=(() => {
     const vp=page.getViewport({scale:renderScale});
     _currentVP=vp; /* v6: PDF座標変換用に保存 */
     const dpr=Math.min(window.devicePixelRatio||1,PDF_MAX_DPR);
-    const hiRS=Math.min(renderScale*dpr,(4096-4)/maxDim);
+    /* v35: hiRS修正
+       - DPR適用でcanvasが4092px以内 → Retina高精細(小ズーム向け)
+       - 4092px超 → DPR省略しrenderScaleのみ(サブ窓と同等)
+       - 安全上限9600px(サブ窓で実証済みの最大サイズ) */
+    const _hiRS_dpr=renderScale*dpr;
+    const _hiRS_nat=renderScale;
+    const hiRS=Math.min(_hiRS_dpr*maxDim<=4092?_hiRS_dpr:_hiRS_nat,9600/maxDim);
     const hiVP=page.getViewport({scale:hiRS});
     if(!_offscr||_offscr.width!==hiVP.width||_offscr.height!==hiVP.height){
       _offscr=document.createElement('canvas');_offscr.width=hiVP.width;_offscr.height=hiVP.height;
