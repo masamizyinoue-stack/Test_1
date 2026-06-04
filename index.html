@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v41</title>
+<title>M_Viewer v42</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -80,7 +80,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .home-empty-icon{font-size:52px;opacity:.25}
 .home-empty-msg{font-size:13px;color:var(--tx2);text-align:center;line-height:1.8}
 .home-drop-hint{font-size:11px;color:var(--tx2);text-align:center;padding:10px 18px;border:1.5px dashed var(--brd);border-radius:10px;margin:0 18px 18px;flex-shrink:0}
-#selbtn{display:none;position:fixed;z-index:150;background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005}
+#selbtn{display:none;position:fixed;z-index:150;background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005;touch-action:manipulation}
+/* v42: コピーボタン・貼り付けボタン */
+#copybtn{display:none;position:fixed;z-index:150;background:var(--acc);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 10px #0005;touch-action:manipulation}
+#pastebtn{display:none;position:fixed;z-index:149;bottom:24px;left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px #0007;touch-action:manipulation}
 @keyframes swn-appear{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 .swn{position:fixed;z-index:200;background:var(--pan);border:2.5px solid var(--acc);border-radius:11px;box-shadow:0 6px 28px #000b;display:flex;flex-direction:column;min-width:170px;min-height:170px;overflow:hidden;touch-action:none}
 .swn-appearing{animation:swn-appear .15s ease-out both}
@@ -259,7 +262,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v41</div>
+    <div class="dzm">M_Viewer v42</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -275,6 +278,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
 </div>
 <button id="selbtn">🗑 削除</button>
+<button id="copybtn">📋 コピー</button>
+<button id="pastebtn">📋 貼り付け</button>
 <div id="calc">
   <div id="ctb"><span>🧮 計算機</span><button id="cclose">✕ 閉じる</button></div>
   <div id="chist"></div>
@@ -345,7 +350,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='41'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='42'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -986,6 +991,13 @@ function _placeSelBtn(vp){
   if(bY < margin){ bY=margin; }
   btn.style.left=Math.round(bX)+'px';
   btn.style.top =Math.round(bY)+'px';
+  /* v42: copybtn を削除ボタンの右横に配置 */
+  const cpbtn=document.getElementById('copybtn');
+  if(cpbtn&&cpbtn.style.display==='block'){
+    const bW2=btn.offsetWidth||80;
+    cpbtn.style.left=Math.round(Math.min(bX+bW2+8,vW-(cpbtn.offsetWidth||80)-margin))+'px';
+    cpbtn.style.top=Math.round(bY)+'px';
+  }
 }
 
 /* ============================================================
@@ -1364,6 +1376,7 @@ class SubWin{
     if(this.selectedIdx.length>0){
       App.setActiveSelSubWin(this); /* ⑤修正: 内部変数を正しく更新 */
       document.getElementById('selbtn').style.display='block';
+      document.getElementById('copybtn').style.display='block'; /* v42 */
       this._positionSelBtn();
       Logger.debug('[SubWin._finishSel] selected='+this.selectedIdx.length);
     }
@@ -1423,6 +1436,8 @@ class SubWin{
     this.selectedIdx=[];this.selPath=[];
     if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
     document.getElementById('selbtn').style.display='none';
+    document.getElementById('copybtn').style.display='none'; /* v42 */
+    document.getElementById('copybtn').style.display='none'; /* v42 */
     if(App.activeSelSubWin===this)App.setActiveSelSubWin(null); /* ⑤修正 */
   }
   deleteSelected(){
@@ -1431,8 +1446,15 @@ class SubWin{
     this.selectedIdx=[];this._annDirty=true;
     if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
     document.getElementById('selbtn').style.display='none';
-    if(App.activeSelSubWin===this)App.setActiveSelSubWin(null); /* ⑤修正 */
+    document.getElementById('copybtn').style.display='none'; /* v42 */
+    if(App.activeSelSubWin===this)App.setActiveSelSubWin(null);
     this.render();EventBus.emit('stroke:added');
+  }
+  /* v42: SubWin コピー機能 — App._clipboardSet 経由で共有クリップボードに格納 */
+  copySelected(){
+    if(!this.selectedIdx.length)return;
+    const arr=this.strokes[this.pageNum]||[];
+    App._clipboardSet(this.selectedIdx.map(i=>JSON.parse(JSON.stringify(arr[i]))));
   }
   update(strokes,pageNum){
     if(!Logger.flags.subWindowUpdate)return;
@@ -1496,6 +1518,8 @@ const App=(() => {
 
   /* ツール状態 */
   let _activeTool='pen',_selMode='rect'; /* v16: _activeShape削除 */
+  /* v42: コピークリップボード */
+  let _clipboard=null,_pasteCount=0;
   let _strokeColor='#cc2020',_strokeSize=3;
   const _toolSizes={...TOOL_DEFAULT_SIZES};
   const _penColors={pen:'#cc2020',hl:'#ffd700'};
@@ -1669,6 +1693,7 @@ const App=(() => {
     selPath=[];ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
     _drawSelOv();
     document.getElementById('selbtn').style.display=selectedIdx.length?'block':'none';
+    document.getElementById('copybtn').style.display=selectedIdx.length?'block':'none'; /* v42 */
   }
   function _drawSelPreview(){
     ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();if(!selPath.length||!_currentVP)return;
@@ -1719,6 +1744,8 @@ const App=(() => {
     selectedIdx=[];selPath=[];
     ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
     document.getElementById('selbtn').style.display='none';
+    document.getElementById('copybtn').style.display='none'; /* v42 */
+    document.getElementById('copybtn').style.display='none'; /* v42 */
     _activeSelSubWin=null; /* ⑤修正: サブ窓選択クリア */
   }
 
@@ -1939,6 +1966,37 @@ const App=(() => {
     scale=Math.max(.2,Math.min((aW-32)/vp.width,(aH-32)/vp.height));
     await renderPage(curPage);_centerCanvas();
   }
+  /* v42: コピー — Deep Copyで相対位置を保持 */
+  function copySelected(){
+    if(_activeSelSubWin){_activeSelSubWin.copySelected&&_activeSelSubWin.copySelected();return;}
+    if(!selectedIdx.length)return;
+    const arr=strokes[curPage]||[];
+    _clipboard=selectedIdx.map(i=>JSON.parse(JSON.stringify(arr[i])));
+    _pasteCount=0;
+    showToast('📋 コピーしました');
+    document.getElementById('pastebtn').style.display='block';
+  }
+  /* v42: 貼り付け — 毎回24ptオフセット、連続貼付対応 */
+  function pasteClipboard(){
+    if(!_clipboard||!_clipboard.length){showToast('コピーされた内容がありません');return;}
+    if(!strokes[curPage])strokes[curPage]=[];
+    const off=24*(_pasteCount+1); /* ペーストごとに右下へずらす */
+    const pasted=_clipboard.map(s=>{
+      const c=JSON.parse(JSON.stringify(s)); /* Deep Copy */
+      if(c.points)c.points=c.points.map(p=>[p[0]+off,p[1]-off]);
+      if(c.x!==undefined)c.x+=off;
+      if(c.y!==undefined)c.y-=off;
+      if(c.x1!==undefined){c.x1+=off;c.x2+=off;}
+      if(c.y1!==undefined){c.y1-=off;c.y2-=off;}
+      return c;
+    });
+    pasted.forEach(c=>strokes[curPage].push(c));
+    _pasteCount++;
+    redraw();SubWinManager.updateAll(strokes,curPage);
+    EventBus.emit('stroke:added');
+    showToast('📋 貼り付けました (Undoで戻せます)');
+  }
+
   function undo(){
     const a=strokes[curPage];
     if(!a||!a.length){showToast('操作がありません');return;}
@@ -2343,9 +2401,10 @@ const App=(() => {
   window.addEventListener('beforeunload',()=>{if(pdfDoc)AutoSave.emergencySave(_getState);});
 
   return{
-    gotoPage,fit,undo,deleteSelected,closeFile,redraw,loadPDF,
+    gotoPage,fit,undo,deleteSelected,copySelected,pasteClipboard,closeFile,redraw,loadPDF, /* v42 */
     saveState,loadState,restore,downloadBackup,restoreFromZip,exportPDF, /* v21: showHome削除 */
     setTool,setColor,setSize, /* v16: setShape削除 */
+    _clipboardSet(arr){_clipboard=arr;_pasteCount=0;showToast('📋 コピーしました');document.getElementById('pastebtn').style.display='block';}, /* v42 */
     get currentTool(){return _activeTool;}, /* v16: currentShape削除 */
     get selMode(){return _selMode;},
     set selMode(v){_selMode=v;},
@@ -2603,6 +2662,9 @@ function _initToolbar(){
 
   /* 選択削除 */
   document.getElementById('selbtn').addEventListener('click',()=>App.deleteSelected());
+  /* v42: コピー・貼り付けイベント */
+  document.getElementById('copybtn').addEventListener('click',()=>App.copySelected());
+  document.getElementById('pastebtn').addEventListener('click',()=>App.pasteClipboard());
 
   /* PDF出力ダイアログ */
   document.getElementById('pgr-cur').addEventListener('click',()=>document.getElementById('pgrfld').value=String(App.currentPage));
