@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v29</title>
+<title>M_Viewer v30</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v29</div>
+    <div class="dzm">M_Viewer v30</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,7 +344,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='29'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='30'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1158,6 +1158,18 @@ class SubWin{
     this.cvs.width=vp.width;this.cvs.height=vp.height;
     this.cvs.style.width=vp.width+'px';this.cvs.style.height=vp.height+'px';
     this.ctx.clearRect(0,0,vp.width,vp.height);
+    /* v30: サブ窓解像度診断ログ */
+    console.warn('%c[SUB 解像度診断]','color:green;font-weight:bold',{
+      innerScale: sc.toFixed(3),
+      DPR: (window.devicePixelRatio||1).toFixed(2),
+      'canvas.width(物理)': this.cvs.width,
+      'canvas.height(物理)': this.cvs.height,
+      'style.width(CSS)': this.cvs.style.width,
+      'style.height(CSS)': this.cvs.style.height,
+      'canvas:CSS比率': (this.cvs.width/parseFloat(this.cvs.style.width||'1')).toFixed(2),
+      '期待比率(DPR)': (window.devicePixelRatio||1).toFixed(2),
+      'DPR適用': 'なし(Sub窓はDPR未適用)'
+    });
     this.ctx.drawImage(this._pdfCache,0,0);
     this.ctx.drawImage(this._annCvs,0,0);
     this._updateTransform();
@@ -1590,6 +1602,22 @@ const App=(() => {
     pdfCtx.imageSmoothingEnabled=true;
     pdfCtx.imageSmoothingQuality='high';
     pdfCtx.drawImage(_offscr,0,0);
+    /* v30: 解像度診断ログ (Safari DevTools > コンソールで確認) */
+    console.warn('%c[MAIN 解像度診断]','color:blue;font-weight:bold',{
+      scale: scale.toFixed(3),
+      renderScale: renderScale.toFixed(3),
+      cssExtraZoom: cssExtraZoom.toFixed(3),
+      DPR: (window.devicePixelRatio||1).toFixed(2),
+      PDF_MAX_DPR: PDF_MAX_DPR,
+      hiRS: hiRS.toFixed(3),
+      'canvas.width(物理)': pdfCvs.width,
+      'canvas.height(物理)': pdfCvs.height,
+      'style.width(CSS)': pdfCvs.style.width,
+      'style.height(CSS)': pdfCvs.style.height,
+      'canvas:CSS比率': (pdfCvs.width/parseFloat(pdfCvs.style.width)).toFixed(2),
+      imageSmoothingQuality: pdfCtx.imageSmoothingQuality,
+      '期待比率(DPR)': (window.devicePixelRatio||1).toFixed(2)
+    });
     redraw();_clearSel();_clampPan();
     requestAnimationFrame(()=>{_clampPan();_updateTransform();});
     document.getElementById('pgn').value=num;
