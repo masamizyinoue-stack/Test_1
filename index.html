@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v59</title>
+<title>M_Viewer v60</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -306,7 +306,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v59</div>
+    <div class="dzm">M_Viewer v60</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -415,7 +415,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='59'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='60'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -509,12 +509,15 @@ const Utils=(() => {
     /* v16: text bbox削除 */
     return{x1:Math.min(s.x1,s.x2),y1:Math.min(s.y1,s.y2),x2:Math.max(s.x1,s.x2),y2:Math.max(s.y1,s.y2)};
   }
+  /* v60: isPalmContact 閾値を25→45pxに緩和
+     iPad指タッチ: 20〜35px / 手のひら: 60〜100px
+     25pxは正常な指タッチも拒否していたため45pxに変更 */
   function isPalmContact(t){
     if(!t)return false;
     if(t.touchType==='stylus'||t.pointerType==='pen')return false;
     const rx=t.radiusX||t.width/2||0,ry=t.radiusY||t.height/2||0;
     if(!rx&&!ry)return false;
-    return rx>25||ry>25;
+    return rx>45&&ry>45; /* v60: OR→AND に変更 + 閾値45px。両軸超過時のみ手のひら判定 */
   }
   /* v16: text/shapeもフィルタ (読込時に無視) */
   const _VALID_TYPES=new Set(['pen','hl','eraser']);
