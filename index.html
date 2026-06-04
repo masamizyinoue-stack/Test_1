@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v53</title>
+<title>M_Viewer v54</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -40,11 +40,14 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 /* v11: #szp バックドロップ (outside-tap close) */
 #szp-bd{display:none;position:fixed;inset:0;z-index:340;background:transparent;-webkit-tap-highlight-color:transparent}
 #szp-bd.on{display:block}
-#szp{display:none;position:fixed;z-index:350;background:var(--pan);border:1.5px solid var(--brd);border-radius:11px;padding:12px 14px;box-shadow:0 4px 20px #0008;width:250px;touch-action:manipulation}/* v11 */
+/* v54: szp レイアウト修正 — 固定幅を最大幅に変更、box-sizing追加 */
+#szp{display:none;position:fixed;z-index:350;background:var(--pan);border:1.5px solid var(--brd);border-radius:11px;padding:12px 14px;box-shadow:0 4px 20px #0008;width:min(250px,calc(100vw - 28px));box-sizing:border-box;touch-action:manipulation}
 #szp.on{display:block}
 #szp-title{font-size:12px;color:var(--tx2);font-weight:700;margin-bottom:9px;display:block}
-.szp-row{display:flex;align-items:center;gap:7px;margin-bottom:9px}
-#sz-rng{-webkit-appearance:none;flex:1;height:8px;background:var(--brd);border-radius:4px;cursor:pointer;touch-action:none}/* v11: スライダーはtouch-action:none */
+/* v54: szp-row overflow制御 + min-width:0(flex縮小を許可) */
+.szp-row{display:flex;align-items:center;gap:7px;margin-bottom:9px;width:100%;box-sizing:border-box;overflow:hidden}
+/* v54: min-width:0 — flexアイテムとして正しく縮小可能に */
+#sz-rng{-webkit-appearance:none;flex:1;min-width:0;height:8px;background:var(--brd);border-radius:4px;cursor:pointer;touch-action:none}
 #sz-rng::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid #fff}
 /* v53: 数値入力欄 */
 #sz-n{width:42px;text-align:center;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);border-radius:5px;font-size:13px;font-weight:700;padding:4px;touch-action:manipulation}
@@ -297,7 +300,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v53</div>
+    <div class="dzm">M_Viewer v54</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -403,7 +406,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='53'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='54'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
