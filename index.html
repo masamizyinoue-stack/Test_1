@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v24</title>
+<title>M_Viewer v25</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v24</div>
+    <div class="dzm">M_Viewer v25</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,7 +344,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='24'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='25'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -2541,6 +2541,23 @@ function _initToolbar(){
   /* ピッカー外クリックで閉じる */
   document.addEventListener('click',()=>closePickers());
 }
+
+/* v25: 数値・テキスト入力欄フォーカス時に全選択
+   iOS Safari では select() を setTimeout(0) で遅延しないと効かないため
+   requestAnimationFrame ではなく setTimeout を使用。
+   対象: pgn(ページ番号) / sz-n(線幅) / cdec(小数桁) / pgrfld(ページ範囲) */
+(function(){
+  const _SEL_IDS=['pgn','sz-n','cdec','pgrfld'];
+  function _selectAll(e){
+    const el=e.target;
+    setTimeout(()=>{try{el.select();}catch(_){}},0); /* iOS Safari対応 */
+  }
+  /* DOM読込後に登録 */
+  _SEL_IDS.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.addEventListener('focus',_selectAll);el.addEventListener('click',_selectAll);}
+  });
+})();
 
 function closePickers(){['selpop','szp'].forEach(id=>{document.getElementById(id)?.classList.remove('on');}); /* v16: shapepop削除 */}
 function openFile(){document.getElementById('fileInput').click();}
