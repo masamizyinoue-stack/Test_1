@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v47</title>
+<title>M_Viewer v48</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -216,7 +216,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
     <button class="btn" id="btn-undo">↩ 戻す</button>
-    <button class="btn on" id="btn-save">📤 PDF出力</button>
+    <button class="btn" id="btn-save">📤 PDF出力</button><!-- v48: on削除(常時アクティブ解消) -->
     <button class="btn" id="btn-backup" title="ZIP バックアップ">💾 バックアップ</button>
     <button class="btn" id="btn-restore" title="ZIP から復元">📂 復元</button>
     <input type="file" id="restoreInput" accept=".zip" style="display:none">
@@ -279,7 +279,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v47</div>
+    <div class="dzm">M_Viewer v48</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -383,7 +383,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='47'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='48'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2940,7 +2940,7 @@ function _initCalculator(){
   }
 
   /* v23: calcbtnリスナーはドラッグコードに移動 */
-  document.getElementById('cclose').addEventListener('click',()=>document.getElementById('calc').classList.remove('on'));
+  document.getElementById('cclose').addEventListener('click',()=>{document.getElementById('calc').classList.remove('on');document.getElementById('calcbtn').classList.remove('on');}); /* v48 */
   /* v28: 計算機の小数桁 Enter でキーボード収納 */
   document.getElementById('cdec').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();_dismissKeyboard(e.target);}});
 
@@ -3107,10 +3107,12 @@ function _initCalculator(){
   });
 
   /* calc open時に保存済み位置を復元 */
+  /* v48: 計算機開閉に合わせて calcbtn の on クラスをトグル */
   document.getElementById('calcbtn').addEventListener('click',()=>{
     const wasHidden=!calcEl.classList.contains('on');
     calcEl.classList.toggle('on');
     if(wasHidden&&calcEl.classList.contains('on'))_restoreCalcPos();
+    document.getElementById('calcbtn').classList.toggle('on', calcEl.classList.contains('on'));
   });
 }
 
