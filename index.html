@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v51</title>
+<title>M_Viewer v52</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -147,7 +147,11 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 .chi{font-size:11px;color:var(--tx2);text-align:right;padding:2px 0}
 #cdsp{padding:5px 12px;text-align:right;border-bottom:1px solid var(--brd)}
 #cexpr{font-size:11px;color:var(--tx2);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#cval{font-size:26px;font-weight:700;color:var(--tx)}
+/* v52: 計算結果を約2倍(52px)に拡大。大きな桁はfit-contentで自動縮小 */
+#cval{font-size:52px;font-weight:700;color:var(--tx);line-height:1.1;
+  overflow:hidden;white-space:nowrap;
+  /* 桁数が多い場合は自動縮小 (ブラウザ対応範囲でfit-text) */
+}
 #cdecrow{display:flex;align-items:center;gap:5px;padding:3px 10px;border-bottom:1px solid var(--brd)}
 #cdecrow label{font-size:11px;color:var(--tx2)}
 #cdec{width:34px;text-align:center;background:var(--pan2);border:1px solid var(--brd);color:var(--tx);border-radius:4px;font-size:12px;padding:2px}
@@ -286,7 +290,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v51</div>
+    <div class="dzm">M_Viewer v52</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -392,7 +396,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='51'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='52'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2928,6 +2932,9 @@ function _initCalculator(){
   function _disp(){
     exprEl.textContent=_dispExpr;
     valEl.textContent=curInput;
+    /* v52: 桁数が多い場合は自動縮小 (8桁超で縮小) */
+    const len=curInput.replace(/[^0-9]/g,'').length;
+    valEl.style.fontSize=len>10?'28px':len>8?'38px':'52px';
   }
 
   /* 二項演算: 精度丸め付き */
