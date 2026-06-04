@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v28</title>
+<title>M_Viewer v29</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v28</div>
+    <div class="dzm">M_Viewer v29</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,9 +344,12 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='28'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='29'; /* ← ★ バージョンアップ時はここだけ変える */
 
-const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
+/* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
+   iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
+   DPR=1 環境: 変化なし (min(1,2)=1 のまま) */
+const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=2.0;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
 const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
 const SW_FILLS=['rgba(240,120,0,.12)','rgba(0,160,255,.12)','rgba(0,200,80,.12)','rgba(255,80,160,.12)','rgba(200,200,0,.12)'];
@@ -1573,6 +1576,9 @@ const App=(() => {
       _offscr=document.createElement('canvas');_offscr.width=hiVP.width;_offscr.height=hiVP.height;
     }
     const offCtx=_offscr.getContext('2d');
+    /* v29: オフスクリーン canvas も高品質設定 */
+    offCtx.imageSmoothingEnabled=true;
+    offCtx.imageSmoothingQuality='high';
     offCtx.fillStyle='#fff';offCtx.fillRect(0,0,hiVP.width,hiVP.height);
     await page.render({canvasContext:offCtx,viewport:hiVP}).promise;
     if(ver!==renderVer)return;
@@ -1580,6 +1586,9 @@ const App=(() => {
     pdfCvs.style.width=vp.width+'px';pdfCvs.style.height=vp.height+'px';
     [annCvs,ovlCvs].forEach(c=>{c.width=vp.width;c.height=vp.height;});
     _updContSize(); /* v17: コンテナサイズ再キャッシュ */
+    /* v29: 高品質ダウンサンプリング (hiRS→CSS表示への縮小を綺麗に) */
+    pdfCtx.imageSmoothingEnabled=true;
+    pdfCtx.imageSmoothingQuality='high';
     pdfCtx.drawImage(_offscr,0,0);
     redraw();_clearSel();_clampPan();
     requestAnimationFrame(()=>{_clampPan();_updateTransform();});
