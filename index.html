@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v55</title>
+<title>M_Viewer v56</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -300,7 +300,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v55</div>
+    <div class="dzm">M_Viewer v56</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -406,7 +406,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='55'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='56'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2723,6 +2723,8 @@ function _initToolbar(){
   /* v11: szp内タッチのstopPropagation → caElへの漏れ防止 */
   document.getElementById('szp').addEventListener('touchstart',e=>{e.stopPropagation();},{passive:true});
   document.getElementById('szp').addEventListener('pointerdown',e=>{e.stopPropagation();},{capture:false});
+  /* v56: clickもstopPropagation — szp内クリックがdocumentのclosePickers()に届いてpopupが閉じる問題を修正 */
+  document.getElementById('szp').addEventListener('click',e=>{e.stopPropagation();});
   /* v53: +/-ステッパーボタン (短押し1増減、長押し連続増減) */
   (function(){
     let _szTimer=null,_szInterval=null;
