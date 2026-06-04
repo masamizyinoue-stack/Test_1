@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v48</title>
+<title>M_Viewer v49</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -137,7 +137,13 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 #cclose{background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx);font-size:12px;cursor:pointer;padding:3px 10px;border-radius:5px;font-weight:700}
 #cclose:active{background:var(--acc);color:#fff}
 /* v39: 履歴エリアは上方向へ拡張。max-heightで制限+スクロール */
-#chist{max-height:40vh;overflow-y:auto;padding:2px 10px;border-bottom:1px solid var(--brd)}
+/* v49: 履歴パネル — 履歴ボタンで開閉 (デフォルト非表示) */
+#chist{display:none;max-height:40vh;overflow-y:auto;padding:4px 10px 6px;border-bottom:1px solid var(--brd)}
+#chist.on{display:block}
+#chist-hd{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 2px;border-bottom:1px solid var(--brd)}
+#chist-hd span{font-size:11px;font-weight:700;color:var(--tx2)}
+#chist-close{background:none;border:none;font-size:12px;color:var(--tx2);cursor:pointer;padding:2px 6px;touch-action:manipulation}
+.chi{font-size:11px;color:var(--tx2);padding:2px 0;border-bottom:1px solid var(--brd);text-align:right}
 .chi{font-size:11px;color:var(--tx2);text-align:right;padding:2px 0}
 #cdsp{padding:5px 12px;text-align:right;border-bottom:1px solid var(--brd)}
 #cexpr{font-size:11px;color:var(--tx2);min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -279,7 +285,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v48</div>
+    <div class="dzm">M_Viewer v49</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -298,7 +304,9 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 <button id="copybtn">📋 コピー</button>
 <button id="selbtn">🗑 削除</button>
 <div id="calc">
-  <div id="ctb"><span>🧮 計算機</span><button id="cclose">✕ 閉じる</button></div>
+  <div id="ctb"><span>🧮 計算機</span><div style="display:flex;gap:6px;align-items:center"><button id="chist-btn" style="background:var(--pan2);border:1px solid var(--brd);color:var(--tx2);border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;padding:3px 8px;touch-action:manipulation">🕐 履歴</button><button id="cclose">✕ 閉じる</button></div></div>
+  <!-- v49: 履歴パネル(chist-hd+chist) — 履歴ボタンで開閉 -->
+  <div id="chist-hd" style="display:none"><span>計算履歴</span><button id="chist-close">✕</button></div>
   <div id="chist"></div>
   <div id="cdsp"><div id="cexpr"></div><div id="cval">0</div></div>
   <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="1">桁</div>
@@ -383,7 +391,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='48'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='49'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2941,6 +2949,19 @@ function _initCalculator(){
 
   /* v23: calcbtnリスナーはドラッグコードに移動 */
   document.getElementById('cclose').addEventListener('click',()=>{document.getElementById('calc').classList.remove('on');document.getElementById('calcbtn').classList.remove('on');}); /* v48 */
+  /* v49: 履歴ボタン — 履歴パネル開閉 */
+  function _toggleCalcHist(show){
+    var hist=document.getElementById('chist');
+    var hd=document.getElementById('chist-hd');
+    var btn=document.getElementById('chist-btn');
+    var open=show!==undefined?show:!hist.classList.contains('on');
+    hist.classList.toggle('on',open);
+    hd.style.display=open?'flex':'none';
+    btn.classList.toggle('on',open);
+    if(open)hist.scrollTop=hist.scrollHeight;
+  }
+  document.getElementById('chist-btn').addEventListener('click',()=>_toggleCalcHist());
+  document.getElementById('chist-close').addEventListener('click',()=>_toggleCalcHist(false));
   /* v28: 計算機の小数桁 Enter でキーボード収納 */
   document.getElementById('cdec').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();_dismissKeyboard(e.target);}});
 
