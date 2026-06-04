@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v56</title>
+<title>M_Viewer v57</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -300,7 +300,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v56</div>
+    <div class="dzm">M_Viewer v57</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -406,7 +406,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='56'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='57'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1568,6 +1568,9 @@ const App=(() => {
   let strokes={};
   let renderScale=1,cssExtraZoom=1;
   let curStroke=null,isDrawing=false,lastX=0,lastY=0;
+  /* v57: 手書き直線補正 (Line Assist) */
+  const LINE_ASSIST_HOLD_MS=400; /* 保持時間(ms) — この間停止で直線化 */
+  let _lineAssistTimer=null;     /* 保持検出タイマー */
   let pinch=null,panSt=null;
   let _gestureRAF=null; /* v10: ジェスチャーRAFフラグ */
   let selectedIdx=[],selPath=[];
@@ -1966,7 +1969,20 @@ const App=(() => {
     }
     if(!curStroke)return;
     const s=curStroke;
-    if(['pen','hl'].includes(s.type)){s.points.push([p.x,p.y]);if(_currentVP)DrawUtil.drawLivePen(annCtx,s,_currentVP.transform);lastX=p.x;lastY=p.y;}
+    if(['pen','hl'].includes(s.type)){
+      s.points.push([p.x,p.y]);
+      if(_currentVP)DrawUtil.drawLivePen(annCtx,s,_currentVP.transform);
+      lastX=p.x;lastY=p.y;
+      /* v57: 直線補正タイマー — 動きが止まったら始点→現在点の直線化 */
+      if(_lineAssistTimer)clearTimeout(_lineAssistTimer);
+      _lineAssistTimer=setTimeout(()=>{
+        if(!curStroke||!['pen','hl'].includes(curStroke.type)||curStroke.points.length<2)return;
+        const start=curStroke.points[0];
+        curStroke.points=[start,[lastX,lastY]]; /* 始点と終点のみ残す */
+        annCtx.clearRect(0,0,annCvs.width,annCvs.height);
+        if(_currentVP)DrawUtil.drawLivePen(annCtx,curStroke,_currentVP.transform); /* 直線を再描画 */
+      },LINE_ASSIST_HOLD_MS);
+    }
     else if(s.type==='eraser'){
       s.points.push([p.x,p.y]);lastX=p.x;lastY=p.y;
       ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
@@ -1975,6 +1991,8 @@ const App=(() => {
   }
   function _endDraw(e){
     isDrawing=false;
+    /* v57: 直線補正タイマーをキャンセル (ペンを離したら以降のタイマー発火は不要) */
+    if(_lineAssistTimer){clearTimeout(_lineAssistTimer);_lineAssistTimer=null;}
     if(_activeTool==='select'){
       if(selectedIdx.length>0&&!selPath.length){_drawSelOv();EventBus.emit('stroke:added');return;}
       _finishSel();return;
