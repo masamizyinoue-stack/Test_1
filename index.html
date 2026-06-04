@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v60</title>
+<title>M_Viewer v61</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -306,7 +306,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v60</div>
+    <div class="dzm">M_Viewer v61</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -415,7 +415,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='60'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='61'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1584,6 +1584,9 @@ const App=(() => {
   const LINE_ASSIST_HOLD_MS=400; /* 保持時間(ms) — この間停止で直線化 */
   let _lineAssistTimer=null;     /* 保持検出タイマー */
   let pinch=null,panSt=null;
+  /* v61: ペン系ツール用 パン候補点 (閾値超過後にパン開始) */
+  let _panCandidate=null;
+  const PEN_PAN_THRESHOLD=15; /* ペン系ツールでパン開始するまでの移動距離(px) */
   let _gestureRAF=null; /* v10: ジェスチャーRAFフラグ */
   let selectedIdx=[],selPath=[];
   let subRect=null;
@@ -1850,7 +1853,12 @@ const App=(() => {
       if(Utils.isPalmContact(t))return;
       if(!_isOnCanvas(t)){_startPan(t);return;}
       const needPen=['pen','hl'].includes(_activeTool);
-      if(needPen&&t.touchType!=='stylus'){_startPan(t);return;}
+      if(needPen&&t.touchType!=='stylus'){
+        /* v61: 描画中(Pencil使用中)は指パンを完全禁止。
+           非描画中でも PEN_PAN_THRESHOLD 分移動後にパン開始(誤反応防止) */
+        if(isDrawing)return; /* 描画中は指タッチを無視 */
+        _panCandidate={x0:t.clientX,y0:t.clientY,touch:t};return;
+      }
     }
     _startDraw(e);
   },{passive:false});
@@ -1860,10 +1868,19 @@ const App=(() => {
     /* v27: sub作成中はピンチを無効化 → ドラッグを中断させない */
     if(e.touches.length>=2&&pinch&&!(_activeTool==='sub'&&isDrawing)){_movePinch(e.touches);return;}
     const t=e.touches[0];
+    /* v61: ペン系ツールのパン候補点が閾値を超えたらパン開始 */
+    if(_panCandidate){
+      const dx=t.clientX-_panCandidate.x0,dy=t.clientY-_panCandidate.y0;
+      if(dx*dx+dy*dy>PEN_PAN_THRESHOLD*PEN_PAN_THRESHOLD){
+        _startPan(_panCandidate.touch);_panCandidate=null;_movePan(t);
+      }
+      return; /* 閾値未満は何もしない(誤パン防止) */
+    }
     if(panSt){_movePan(t);return;}
     if(isDrawing)_moveDraw(e);
   },{passive:false});
   caEl.addEventListener('touchend',e=>{
+    _panCandidate=null; /* v61: タッチ終了で候補クリア */
     if(pinch&&e.touches.length<2){_endPinch();return;}
     if(panSt){_endPan(e.changedTouches[0]);return;}
     if(isDrawing)_endDraw(e);
