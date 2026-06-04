@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v27</title>
+<title>M_Viewer v28</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -258,7 +258,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v27</div>
+    <div class="dzm">M_Viewer v28</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -344,7 +344,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='27'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='28'; /* ← ★ バージョンアップ時はここだけ変える */
 
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=1.5;
 const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
@@ -2444,7 +2444,14 @@ function _initToolbar(){
   document.getElementById('btn-prev').addEventListener('click',()=>App.gotoPage(-1));
   document.getElementById('btn-next').addEventListener('click',()=>App.gotoPage(1));
   document.getElementById('btn-fit').addEventListener('click',()=>App.fit());
-  document.getElementById('pgn').addEventListener('change',e=>App.gotoPage(parseInt(e.target.value)||1,true));
+  /* v28: ページ番号入力後にキーボードを閉じる */
+  document.getElementById('pgn').addEventListener('change',e=>{
+    App.gotoPage(parseInt(e.target.value)||1,true);
+    _dismissKeyboard(e.target); /* iPad キーボード収納 */
+  });
+  document.getElementById('pgn').addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();App.gotoPage(parseInt(e.target.value)||1,true);_dismissKeyboard(e.target);}
+  });
 
   /* ツール */
   /* ①修正: ツール切替時に即座にスウォッチ色・サイズUI更新 */
@@ -2514,6 +2521,8 @@ function _initToolbar(){
   document.getElementById('sz-rng').addEventListener('input',_onSzSlider);
   document.getElementById('sz-rng').addEventListener('change',_onSzSlider);
   document.getElementById('sz-n').addEventListener('input',e=>{const v=Math.max(1,Math.min(40,+e.target.value));document.getElementById('sz-rng').value=v;_prevSize(v);App.setSize(v);});
+  /* v28: 線幅 Enter でキーボード収納 */
+  document.getElementById('sz-n').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();_dismissKeyboard(e.target);}});
   /* v11: ok/cancel は click + touchend 両対応 */
   function _szpOk(){_closeSzp();}
   function _szpCancel(){_closeSzp();}
@@ -2539,11 +2548,12 @@ function _initToolbar(){
   /* PDF出力ダイアログ */
   document.getElementById('pgr-cur').addEventListener('click',()=>document.getElementById('pgrfld').value=String(App.currentPage));
   document.getElementById('pgr-all').addEventListener('click',()=>document.getElementById('pgrfld').value='1-'+App.totalPages);
-  document.getElementById('pgrCancel').addEventListener('click',()=>document.getElementById('pgrov').classList.remove('on'));
+  document.getElementById('pgrCancel').addEventListener('click',()=>{document.getElementById('pgrov').classList.remove('on');_dismissKeyboard(document.getElementById('pgrfld'));});
   document.getElementById('pgrConfirm').addEventListener('click',()=>{
     const fld=document.getElementById('pgrfld').value.trim();
     const pages=_parsePageRange(fld,App.totalPages);
     document.getElementById('pgrov').classList.remove('on');
+    _dismissKeyboard(document.getElementById('pgrfld')); /* v28: キーボード収納 */
     if(pages.length)App.exportPDF(pages);
     else showToast('ページ指定が無効です');
   });
@@ -2578,6 +2588,17 @@ function _initToolbar(){
     if(el){el.addEventListener('focus',_selectAll);el.addEventListener('click',_selectAll);}
   });
 })();
+
+/* v28: iOS Safari でソフトウェアキーボードを確実に閉じる
+   input.blur() だけでは閉じない場合があるため、
+   ダミー要素に一瞬フォーカスを移してから blur する */
+function _dismissKeyboard(el){
+  if(el)el.blur();
+  /* Safari 対応: body にフォーカス移動で確実収納 */
+  if(document.activeElement&&document.activeElement!==document.body){
+    document.activeElement.blur();
+  }
+}
 
 function closePickers(){['selpop','szp'].forEach(id=>{document.getElementById(id)?.classList.remove('on');}); /* v16: shapepop削除 */}
 function openFile(){document.getElementById('fileInput').click();}
@@ -2637,6 +2658,8 @@ function _initCalculator(){
 
   /* v23: calcbtnリスナーはドラッグコードに移動 */
   document.getElementById('cclose').addEventListener('click',()=>document.getElementById('calc').classList.remove('on'));
+  /* v28: 計算機の小数桁 Enter でキーボード収納 */
+  document.getElementById('cdec').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();_dismissKeyboard(e.target);}});
 
   document.querySelectorAll('.cb').forEach(btn=>{
     btn.addEventListener('click',()=>{
