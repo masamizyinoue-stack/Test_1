@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v63</title>
+<title>M_Viewer v62</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -316,7 +316,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v63</div>
+    <div class="dzm">M_Viewer v62</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -435,7 +435,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='63'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='62'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3033,8 +3033,6 @@ function _hideSubHint(){
 
 /* v62: 一本指感度設定パネル */
 function _initSensPanel(){
-  /* v63: デバッグログ */
-  console.log('[v63] _initSensPanel called');
   const panel=document.getElementById('sens-panel');
   const btn=document.getElementById('sens-btn');
   /* 現在値でラジオ選択 */
@@ -3069,7 +3067,7 @@ function _initSensPanel(){
   panel.addEventListener('click',e=>e.stopPropagation());
   _syncRadio();
 }
-/* v63: DOMContentLoaded廃止 → _initToolbar末尾から直接呼び出し */
+document.addEventListener('DOMContentLoaded',_initSensPanel);
 
 function closePickers(){['selpop','szp'].forEach(id=>{document.getElementById(id)?.classList.remove('on');}); /* v16: shapepop削除 */}
 function openFile(){document.getElementById('fileInput').click();}
@@ -3323,8 +3321,6 @@ function _initCalculator(){
     if(wasHidden&&calcEl.classList.contains('on'))_restoreCalcPos();
     document.getElementById('calcbtn').classList.toggle('on', calcEl.classList.contains('on'));
   });
-  /* v63: 感度設定パネル初期化 — DOM確定後に直接呼び出し */
-  _initSensPanel();
 }
 
 /* ============================================================
