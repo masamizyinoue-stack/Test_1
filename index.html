@@ -3,162 +3,456 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v65 - Cyber OS</title>
+<title>M_Viewer v65 - Cyber OS Full</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<style>
-:root{--bg:#1e2228;--pan:#262c34;--pan2:#2e363f;--brd:#4a5a6a;--acc:#f07800;--tx:#fff;--tx2:#c8d8e4;--red:#c02020}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,sans-serif;display:flex;flex-direction:column;height:100vh;height:100dvh;user-select:none;-webkit-user-select:none}
-#top-bar{height:44px;background:var(--pan);display:flex;align-items:center;padding:0 8px;gap:6px;border-bottom:1px solid var(--brd);z-index:100;flex-shrink:0}
-.logo{font-size:15px;font-weight:bold;color:var(--acc);margin-right:4px;white-space:nowrap}
-.btn{height:32px;padding:0 10px;background:var(--pan2);border:1px solid var(--brd);color:var(--tx);border-radius:4px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
-.btn:active{opacity:0.7}
-.btn-icon{font-size:16px}
-.btn-p{background:var(--acc);border-color:var(--acc);color:#fff}
-.spacer{flex-grow:1}
-#main-container{flex-grow:1;position:relative;overflow:hidden;background:#14171c}
-#sidebar{position:absolute;left:8px;top:8px;bottom:8px;width:46px;background:rgba(38,44,52,0.85);backdrop-filter:blur(4px);border:1px solid var(--brd);border-radius:6px;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:8px;z-index:90}
-.side-btn{width:34px;height:34px;border-radius:4px;background:transparent;border:none;color:var(--tx2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative}
-.side-btn.active-tool{background:var(--acc);color:#fff}
-.side-btn .badge{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-size:9px;padding:1px 3px;border-radius:10px;font-weight:bold}
-.side-sep{width:20px;height:1px;background:var(--brd);margin:4px 0}
-#cvs-wrapper{width:100%;height:100%;position:relative;overflow:hidden}
-#pdf-cvs,#ann-cvs{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
-#ann-cvs{z-index:10;pointer-events:none}
-.panel{position:absolute;background:var(--pan);border:1px solid var(--brd);border-radius:6px;padding:12px;box-shadow:0 6px 16px rgba(0,0,0,0.4);z-index:200;display:none}
-.panel-header{display:flex;align-items:center;justify-content:between;margin-bottom:8px;border-bottom:1px solid var(--brd);padding-bottom:4px;font-weight:bold;font-size:13px;color:var(--acc)}
-.panel-close{cursor:pointer;font-size:14px;color:var(--tx2)}
-.panel-close:hover{color:#fff}
-#p-file{top:52px;left:8px;width:280px}
-#p-sens{top:52px;left:120px;width:240px}
-#p-calc{top:80px;right:8px;width:240px}
-#p-hist{bottom:8px;right:8px;width:320px;max-height:240px;overflow-y:auto}
-.file-item{padding:6px;border-bottom:1px solid var(--pan2);cursor:pointer;font-size:12px;display:flex;justify-content:between}
-.file-item:hover{background:var(--pan2)}
-.input-row{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px}
-.input-row label{width:70px;flex-shrink:0}
-.input-row input[type="range"]{flex-grow:1}
-.input-row input[type="number"],.input-row select{width:100%;height:26px;background:#14171c;border:1px solid var(--brd);color:#fff;padding:0 4px;border-radius:3px}
-.sub-win{position:absolute;width:260px;height:200px;background:var(--pan);border:1px solid var(--brd);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:150;display:flex;flex-direction:column;overflow:hidden;touch-action:none}
-.win-header{height:28px;background:var(--pan2);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 6px;cursor:move;user-select:none;flex-shrink:0}
-.win-title{font-size:11px;font-weight:bold;color:var(--tx2);flex-grow:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.win-btn{width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;color:var(--tx2);border-radius:3px}
-.win-btn:hover{background:rgba(255,255,255,0.1);color:#fff}
-.win-body{flex-grow:1;position:relative;overflow:hidden;background:#000}
-.win-resizer{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:se-resize;z-index:30;background:linear-gradient(135deg,transparent 70%,var(--brd) 70%)}
-.cal-disp{width:100%;height:44px;background:#14171c;border:1px solid var(--brd);border-radius:4px;margin-bottom:8px;padding:4px 8px;text-align:right;font-size:18px;font-family:monospace;overflow:hidden}
-.cal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
-.cb{width:50px;height:50px;background:#3a4454;border:none;border-radius:6px;color:#fff;font-size:32px;font-weight:bold;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
-#p-bottom-bar{position:absolute;bottom:8px;left:62px;background:rgba(38,44,52,0.8);backdrop-filter:blur(4px);border:1px solid var(--brd);border-radius:4px;padding:4px 8px;font-size:11px;z-index:90;display:flex;gap:12px}
-.toast{position:absolute;top:52px;right:8px;background:rgba(0,0,0,0.85);border-left:4px solid var(--acc);padding:8px 12px;border-radius:4px;font-size:12px;z-index:300;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
-@media(pointer:coarse){.btn{height:38px;padding:0 14px;font-size:14px}.side-btn{width:40px;height:40px;font-size:20px}#sidebar{width:52px}}
-@media(max-width:430px){.logo{display:none}#p-bottom-bar{display:none}}
 
-/* --- 近未来SF (v65 Cyber OS) オーバーライドテーマ --- */
+<style>
+/* --- ベース＆マテリアルカラー定義 --- */
 :root {
-  --bg: #0a0d14;
-  --pan: rgba(16, 24, 40, 0.85);
-  --pan2: rgba(24, 36, 58, 0.9);
-  --brd: #00f0ff;
-  --acc: #00ff66;
-  --tx: #e0f7fc;
-  --tx2: #8ab4f8;
-  --red: #ff0055;
+  --bg: #0a0d14;                  /* 漆黒の宇宙・深海デジタルベース */
+  --pan: rgba(16, 24, 40, 0.82);   /* ガラスモルフィズム用透過パネル */
+  --pan2: rgba(24, 36, 58, 0.9);   /* コントロール用深色 */
+  --brd: #00f0ff;                 /* ネオンサイバーブルー（外周フレーム） */
+  --acc: #00ff66;                 /* ネオングリーン（活性・選択状態） */
+  --tx: #e0f7fc;                  /* メインテキスト */
+  --tx2: #8ab4f8;                 /* サブテキスト */
+  --red: #ff0055;                 /* クリティカル警告レッド */
+}
+
+/* --- 全体最適化と近未来グリッド背景 --- */
+*, *::before, *::after {
+  box-shrink: 0;
+  box-sizing: border-box;
+  margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg);
 }
 body {
-  font-family: 'Consolas', 'Courier New', monospace, sans-serif !important;
+  color: var(--tx);
+  font-family: 'Consolas', 'Courier New', monospace, 'Helvetica Neue', Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  user-select: none;
+  -webkit-user-select: none;
+  /* 背景に高精細な設計用グリッド線を描写 */
   background-image: 
     linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
   background-size: 20px 20px;
 }
-.panel, #top-bar, .dialog, #sidebar, .sub-win, .win-header {
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+
+/* --- コンポーネントのSFガラスモルフィズム化 --- */
+#top-bar, #sidebar, .panel, .sub-win, .win-header {
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
   border: 1px solid var(--brd) !important;
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.2) !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.15) !important;
   border-radius: 4px !important;
 }
+
+/* --- トップバーのレイアウト --- */
+#top-bar {
+  height: 46px;
+  background: var(--pan);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  z-index: 100;
+  flex-shrink: 0;
+}
+.logo {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--brd);
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+/* --- サイバーボタン・入力コントロール設計 --- */
 button, select, input {
-  font-family: 'Consolas', 'Courier New', monospace, sans-serif !important;
+  font-family: inherit !important;
   border: 1px solid rgba(0, 240, 255, 0.4) !important;
   background: rgba(10, 25, 47, 0.6) !important;
   color: var(--tx2) !important;
+  border-radius: 3px;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   transition: all 0.2s ease !important;
-  position: relative;
-  overflow: hidden;
 }
-button:hover {
+.btn {
+  height: 32px;
+  padding: 0 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.btn:hover {
   background: rgba(0, 240, 255, 0.2) !important;
   color: var(--brd) !important;
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.5) !important;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4) !important;
   border-color: var(--brd) !important;
 }
-button:active {
+.btn:active {
   background: rgba(0, 255, 102, 0.3) !important;
   border-color: var(--acc) !important;
 }
-.active-tool, button.active {
-  background: rgba(0, 240, 255, 0.25) !important;
-  color: var(--brd) !important;
-  border-color: var(--brd) !important;
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.6) !important;
+.btn-p {
+  background: rgba(0, 255, 102, 0.15) !important;
+  border-color: var(--acc) !important;
+  color: var(--acc) !important;
+}
+.spacer { flex-grow: 1; }
+
+/* --- メインコンテンツ・サイドバー --- */
+#main-container {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+  background: #06080c;
+}
+#sidebar {
+  position: absolute;
+  left: 8px; top: 8px; bottom: 8px;
+  width: 48px;
+  background: var(--pan);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 10px;
+  z-index: 90;
+}
+.side-btn {
+  width: 36px; height: 36px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent !important;
+  color: var(--tx2);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+/* アクティブツールのサイバーパルス発光 */
+.side-btn.active-tool {
+  background: rgba(0, 255, 102, 0.2) !important;
+  color: var(--acc) !important;
+  border-color: var(--acc) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.5) !important;
   animation: cyber-pulse 2s infinite alternate;
 }
 @keyframes cyber-pulse {
-  0% { box-shadow: 0 0 4px rgba(0, 240, 255, 0.4); }
-  100% { box-shadow: 0 0 15px rgba(0, 240, 255, 0.8); }
+  0% { box-shadow: 0 0 4px rgba(0, 255, 102, 0.3); }
+  100% { box-shadow: 0 0 14px rgba(0, 255, 102, 0.7); }
+}
+.side-btn .badge {
+  position: absolute;
+  top: -3px; right: -3px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  font-weight: bold;
+  box-shadow: 0 0 6px var(--red);
+}
+.side-sep {
+  width: 24px; height: 1px;
+  background: rgba(0, 240, 255, 0.3);
+  margin: 2px 0;
+}
+
+/* --- キャンバス描写エリア --- */
+#cvs-wrapper {
+  width: 100%; height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+#pdf-cvs, #ann-cvs {
+  position: absolute;
+  left: 0; top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+#ann-cvs {
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* --- フローティング・サイバーパネル層 --- */
+.panel {
+  position: absolute;
+  background: rgba(12, 18, 28, 0.95);
+  padding: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+  z-index: 200;
+  display: none;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.4);
+  padding-bottom: 6px;
+  font-weight: bold;
+  font-size: 12px;
+  color: var(--brd);
+  letter-spacing: 1px;
+}
+.panel-close {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--tx2);
+  transition: color 0.2s;
+}
+.panel-close:hover { color: var(--red); }
+
+#p-file { top: 54px; left: 8px; width: 300px; }
+#p-sens { top: 54px; left: 124px; width: 260px; }
+#p-calc { top: 54px; right: 8px; width: 244px; }
+
+.file-item {
+  padding: 8px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.file-item:hover {
+  background: rgba(0, 240, 255, 0.1);
+  color: var(--brd);
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.input-row label { width: 64px; flex-shrink: 0; color: var(--tx2); }
+.input-row input[type="range"] {
+  flex-grow: 1;
+  height: 4px;
+  background: var(--pan2);
+  outline: none;
+  -webkit-appearance: none;
+}
+.input-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  background: var(--brd);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--brd);
+}
+
+/* --- 高性能マルチサブ窓のサイバー意匠 --- */
+.sub-win {
+  position: absolute;
+  width: 280px; height: 220px;
+  background: rgba(10, 16, 26, 0.9);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.7) !important;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: none;
+}
+.win-header {
+  height: 30px;
+  background: rgba(24, 36, 58, 0.95);
+  border-bottom: 1px solid var(--brd) !important;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  cursor: move;
+  user-select: none;
+  flex-shrink: 0;
+}
+.win-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--brd);
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.win-btn {
+  width: 20px; height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--tx2);
+  border-radius: 3px;
+  margin-left: 2px;
+}
+.win-btn:hover {
+  background: rgba(0, 240, 255, 0.2);
+  color: var(--brd);
+}
+.win-body {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+  background: #020406;
+}
+.win-resizer {
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 16px; height: 16px;
+  cursor: se-resize;
+  z-index: 30;
+  background: linear-gradient(135deg, transparent 70%, var(--brd) 70%);
+}
+
+/* --- ホログラム計算機デザイン（Flexbox中央揃え完全適用） --- */
+.cal-disp {
+  width: 100%; height: 46px;
+  background: #020406;
+  border: 1px solid var(--brd);
+  border-radius: 4px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  text-align: right;
+  font-size: 20px;
+  font-family: monospace;
+  color: var(--brd);
+  text-shadow: 0 0 6px var(--brd);
+  overflow: hidden;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 .cb {
-  border: 1px solid var(--brd) !important;
-  background: rgba(0, 240, 255, 0.05) !important;
+  width: 52px; height: 48px;
+  border: 1px solid rgba(0, 240, 255, 0.4) !important;
+  background: rgba(0, 240, 255, 0.04) !important;
   color: var(--brd) !important;
-  text-shadow: 0 0 5px var(--brd);
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 0 0 4px var(--brd);
 }
 .cb:hover {
-  background: rgba(0, 240, 255, 0.3) !important;
+  background: rgba(0, 240, 255, 0.25) !important;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
 }
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: rgba(10, 13, 20, 0.5); }
-::-webkit-scrollbar-thumb { background: var(--brd); border-radius: 3px; }
 
-/* トースト通知 */
-#toast-container{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
-.toast-msg{background:rgba(255,0,85,0.85); border:2px solid #ff0055; text-shadow: 0 0 5px #fff; box-shadow: 0 0 20px rgba(255,0,85,0.6);color:#fff;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:bold;opacity:0;transform:translateY(20px);transition:all 0.3s ease;pointer-events:auto}
-.toast-msg.show{opacity:1;transform:translateY(0)}
+/* --- ボトムインフォバー --- */
+#p-bottom-bar {
+  position: absolute;
+  bottom: 8px; left: 64px;
+  background: rgba(14, 22, 36, 0.85);
+  border: 1px solid var(--brd);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 11px;
+  z-index: 90;
+  display: flex;
+  gap: 16px;
+  letter-spacing: 0.5px;
+}
+
+/* --- 警告用ホログラムトースト通知システム --- */
+#toast-container {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.toast-msg {
+  background: rgba(255, 0, 85, 0.88);
+  border: 2px solid var(--red);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  text-shadow: 0 0 4px #fff;
+  box-shadow: 0 0 20px rgba(255, 0, 85, 0.5);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+  pointer-events: auto;
+}
+.toast-msg.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- モバイル・レスポンシブ最適化 --- */
+@media(pointer:coarse){
+  .btn { height: 38px; padding: 0 16px; font-size: 13px; }
+  .side-btn { width: 42px; height: 42px; font-size: 20px; }
+  #sidebar { width: 56px; }
+  #top-bar { height: 52px; }
+  #p-file, #p-sens { top: 60px; }
+}
+@media(max-width:430px){
+  .logo { display: none; }
+  #p-bottom-bar { display: none; }
+}
 </style>
 </head>
 <body>
 
 <div id="top-bar">
   <div class="logo">M_VIEWER // CYBER_OS</div>
-  <button class="btn" id="btn-fpanel"><span class="btn-icon">📁</span>図面選択</button>
-  <button class="btn btn-p" id="btn-fsel"><span class="btn-icon">📥</span>ファイルを開く</button>
+  <button class="btn" id="btn-fpanel">📁 図面履歴</button>
+  <button class="btn btn-p" id="btn-fsel">📥 ファイル追加</button>
   <input type="file" id="fi-loader" accept=".pdf" style="display:none">
-  <button class="btn" id="btn-spanel"><span class="btn-icon">👆</span>感度</button>
-  <button class="btn" id="btn-subwin"><span class="btn-icon">🔲</span>サブ窓</button>
+  <button class="btn" id="btn-spanel">👆 感度設定</button>
+  <button class="btn" id="btn-subwin">🔲 サブ窓生成</button>
   <div class="spacer"></div>
-  <button class="btn" id="btn-calc"><span class="btn-icon">🧮</span>計算機</button>
-  <button class="btn" id="btn-zip"><span class="btn-icon">📦</span>全BK</button>
+  <button class="btn" id="btn-calc">🧮 計算機</button>
+  <button class="btn" id="btn-zip">📦 全BK</button>
 </div>
 
 <div id="main-container">
   <div id="sidebar">
-    <button class="side-btn active-tool" data-tool="pan" title="手のひら (スクロール)">✋</button>
-    <button class="side-btn" data-tool="pen" title="赤ペン">✏️</button>
-    <button class="side-btn" data-tool="marker" title="蛍光ペン">🖍️</button>
-    <button class="side-btn" data-tool="eraser" title="消しゴム">🧼</button>
+    <button class="side-btn active-tool" data-tool="pan" title="手のひらパン移動">✋</button>
+    <button class="side-btn" data-tool="pen" title="赤ペン描写">✏️</button>
+    <button class="side-btn" data-tool="marker" title="蛍光マーカー">🖍️</button>
+    <button class="side-btn" data-tool="eraser" title="幾何部分消しゴム">🧼</button>
     <div class="side-sep"></div>
-    <button class="side-btn" id="sbtn-prev" title="前ページ">◀</button>
-    <div id="page-num-disp" style="font-size:11px;font-weight:bold;margin:2px 0">1</div>
-    <button class="side-btn" id="sbtn-next" title="次ページ">▶</button>
+    <button class="side-btn" id="sbtn-prev" title="前のページ">◀</button>
+    <div id="page-num-disp" style="font-size:12px;font-weight:bold;margin:2px 0;color:var(--brd)">1</div>
+    <button class="side-btn" id="sbtn-next" title="次のページ">▶</button>
     <div class="side-sep"></div>
-    <button class="side-btn" id="sbtn-clear" title="全消去" style="color:var(--red)">🗑️</button>
+    <button class="side-btn" id="sbtn-clear" title="全赤入れ消去" style="color:var(--red)">🗑️</button>
   </div>
 
   <div id="cvs-wrapper">
@@ -168,7 +462,7 @@ button:active {
 
   <div class="panel" id="p-file">
     <div class="panel-header"><span>📁 保存済みドキュメント</span><span class="panel-close" onclick="App.togglePanel('p-file')">✖</span></div>
-    <div id="file-list-container" style="max-height:200px;overflow-y:auto;margin-bottom:8px"></div>
+    <div id="file-list-container" style="max-height:220px;overflow-y:auto;margin-bottom:4px"></div>
   </div>
 
   <div class="panel" id="p-sens">
@@ -176,10 +470,10 @@ button:active {
     <div class="input-row">
       <label>検知閾値</label>
       <input type="range" id="rng-sens" min="1" max="20" value="5">
-      <span id="lbl-sens" style="width:24px;text-align:right">5px</span>
+      <span id="lbl-sens" style="width:28px;text-align:right;color:var(--brd);font-weight:bold">5px</span>
     </div>
-    <div style="font-size:10px;color:var(--tx2);line-height:1.4">
-      ※ペン描画中の指が誤って触れた際、描画・スクロールを無視する移動ピクセル量のしきい値です。
+    <div style="font-size:11px;color:var(--tx2);line-height:1.4">
+      ※ペン描写中の手のひらや指の誤接触をシャットアウトする移動検知しきい値(px)です。
     </div>
   </div>
 
@@ -205,208 +499,222 @@ button:active {
       <button class="cb" onclick="App.calcCmd('+')">+</button>
       <button class="cb" onclick="App.calcCmd('0')">0</button>
       <button class="cb" onclick="App.calcCmd('.')">.</button>
-      <button class="cb" style="grid-column:span 2;background:var(--acc);color:#fff" onclick="App.calcCmd('=')">=</button>
+      <button class="cb" style="grid-column:span 2;background:rgba(0,255,102,0.2) !important;color:var(--acc) !important;border-color:var(--acc) !important" onclick="App.calcCmd('=')">=</button>
     </div>
   </div>
 
   <div id="p-bottom-bar">
     <span id="lbl-doc-info">ファイル未選択</span>
-    <span id="lbl-save-status">● 同期完了</span>
+    <span id="lbl-save-status" style="color:var(--acc)">● 待機中</span>
   </div>
-
-  <div class="toast" id="main-toast"></div>
 </div>
 
 <div id="toast-container"></div>
 
 <script>
-window.showToast = function(msg, duration = 3000) {
+/* ==========================================================================
+   コアロジック：M_Viewer v63の全関数・全イベント機構を完全無傷で100%完全統合
+   ========================================================================== */
+
+/* トースト発火関数 */
+window.showToast = function(msg, duration = 3500) {
   const container = document.getElementById('toast-container');
   if (!container) return;
   const toast = document.createElement('div');
   toast.className = 'toast-msg';
   toast.innerText = msg;
   container.appendChild(toast);
-  setTimeout(() => toast.classList.add('show'), 50);
+  setTimeout(() => toast.classList.add('show'), 40);
   setTimeout(() => {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
   }, duration);
 };
 
-/* Logger & Utilities */
-const DBG={info(m,...v){console.log(`[INFO] ${m}`,...v)},error(m,...v){console.error(`[ERR] ${m}`,...v)}};
-const EventBus={
-  _evs:{},
-  on(e,f){(this._evs[e]=this._evs[e]||[]).push(f)},
-  emit(e,...a){if(this._evs[e])this._evs[e].forEach(f=>f(...a))}
+/* Logger 定義 */
+const DBG = {
+  info(m, ...v) { console.log(`[INFO] ${m}`, ...v) },
+  error(m, ...v) { console.error(`[ERR] ${m}`, ...v) }
 };
-const Utils={
-  safeKey(s){return s.replace(/[\.\#\$\/\[\]]/g,'_')},
-  getVPScale(v,r=0){if(r%180===0)return{x:v.transform[0],y:v.transform[3]};return{x:v.transform[1],y:v.transform[2]}},
-  distPtSeg(x,y,x1,y1,x2,y2){
-    const dx=x2-x1,dy=y2-y1;
-    if(dx===0&&dy===0)return Math.hypot(x-x1,y-y1);
-    const t=((x-x1)*dx+(y-y1)*dy)/(dx*dx+dy*dy);
-    if(t<0)return Math.hypot(x-x1,y-y1);
-    if(t>1)return Math.hypot(x-x2,y-y2);
-    return Math.hypot(x-(x1+t*dx),y-(y1+t*dy));
+
+/* 疎結合通信 EventBus */
+const EventBus = {
+  _evs: {},
+  on(e, f) { (this._evs[e] = this._evs[e] || []).push(f) },
+  emit(e, ...a) { if (this._evs[e]) this._evs[e].forEach(f => f(...a)) }
+};
+
+/* 幾何計算・コンテキスト判定ユーティリティ */
+const Utils = {
+  safeKey(s) { return s.replace(/[\.\#\$\/\[\]]/g, '_') },
+  getVPScale(v, r = 0) { 
+    if (r % 180 === 0) return { x: v.transform[0], y: v.transform[3] };
+    return { x: v.transform[1], y: v.transform[2] };
   },
-  isPalmContact(e){
-    if(!e.targetTouches||e.targetTouches.length===0)return false;
-    const t=e.targetTouches[0];
-    if(typeof t.radiusX==='number'&&typeof t.radiusY==='number'){
-      return t.radiusX>45&&t.radiusY>45;
+  distPtSeg(x, y, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    if (dx === 0 && dy === 0) return Math.hypot(x - x1, y - y1);
+    const t = ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy);
+    if (t < 0) return Math.hypot(x - x1, y - y1);
+    if (t > 1) return Math.hypot(x - x2, y - y2);
+    return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
+  },
+  isPalmContact(e) {
+    if (!e.targetTouches || e.targetTouches.length === 0) return false;
+    const t = e.targetTouches[0];
+    if (typeof t.radiusX === 'number' && typeof t.radiusY === 'number') {
+      return t.radiusX > 45 && t.radiusY > 45;
     }
     return false;
   }
 };
 
-/* IndexedDB Store */
-const IDBStore={
-  _db:null,
-  init(){
-    return new Promise((res,rej)=>{
-      const r=indexedDB.open("MViewerStore",4);
-      r.onupgradeneeded=e=>{
-        const db=e.target.result;
-        if(!db.objectStoreNames.contains("kv"))db.createObjectStore("kv");
+/* IndexedDB 高速ストレージエンジン */
+const IDBStore = {
+  _db: null,
+  init() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("MViewerStore", 4);
+      r.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
       };
-      r.onsuccess=e=>{this._db=e.target.result;res()};
-      r.onerror=e=>rej(e.target.error);
+      r.onsuccess = e => { this._db = e.target.result; res() };
+      r.onerror = e => rej(e.target.error);
     });
   },
-  get(k){
-    return new Promise((res,rej)=>{
-      if(!this._db)return res(null);
-      const t=this._db.transaction("kv","readonly"),s=t.objectStoreNames.contains("kv")?t.objectStore("kv"):null;
-      if(!s)return res(null);
-      const r=s.get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+  get(k) {
+    return new Promise((res, rej) => {
+      if (!this._db) return res(null);
+      const t = this._db.transaction("kv", "readonly"), s = t.objectStoreNames.contains("kv") ? t.objectStore("kv") : null;
+      if (!s) return res(null);
+      const r = s.get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
     });
   },
-  set(k,v){
-    return new Promise((res,rej)=>{
-      if(!this._db)return res();
-      const t=this._db.transaction("kv","readwrite"),s=t.objectStore("kv");
-      const r=s.put(v,k);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);
+  set(k, v) {
+    return new Promise((res, rej) => {
+      if (!this._db) return res();
+      const t = this._db.transaction("kv", "readwrite"), s = t.objectStore("kv");
+      const r = s.put(v, k); r.onsuccess = () => res(); r.onerror = () => rej(r.error);
     });
   },
-  del(k){
-    return new Promise((res,rej)=>{
-      if(!this._db)return res();
-      const t=this._db.transaction("kv","readwrite"),s=t.objectStore("kv");
-      const r=s.delete(k);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);
+  del(k) {
+    return new Promise((res, rej) => {
+      if (!this._db) return res();
+      const t = this._db.transaction("kv", "readwrite"), s = t.objectStore("kv");
+      const r = s.delete(k); r.onsuccess = () => res(); r.onerror = () => rej(r.error);
     });
   },
-  async getAllKeys(){
-    return new Promise((res)=>{
-      if(!this._db)return res([]);
-      const t=this._db.transaction("kv","readonly"),s=t.objectStore("kv"),r=s.getAllKeys();
-      r.onsuccess=()=>res(r.result);r.onerror=()=>res([]);
+  async getAllKeys() {
+    return new Promise((res) => {
+      if (!this._db) return res([]);
+      const t = this._db.transaction("kv", "readonly"), s = t.objectStore("kv"), r = s.getAllKeys();
+      r.onsuccess = () => res(r.result); r.onerror = () => res([]);
     });
   }
 };
 
-/* Document & Storage Management */
-const DocMgr={
-  async saveDoc(name,bytes){
-    const id=Utils.safeKey(name)+'_'+Date.now();
-    const meta={id,name,ts:Date.now()};
-    await IDBStore.set('doc:'+id,{meta,originalPdfBytes:bytes});
-    let idx=await IDBStore.get('doc_index').catch(()=>[])||[];
-    idx=idx.filter(i=>i.name!==name);idx.push(meta);
-    await IDBStore.set('doc_index',idx);
+/* 図面データ管理クラス */
+const DocMgr = {
+  async saveDoc(name, bytes) {
+    const id = Utils.safeKey(name) + '_' + Date.now();
+    const meta = { id, name, ts: Date.now() };
+    await IDBStore.set('doc:' + id, { meta, originalPdfBytes: bytes });
+    let idx = await IDBStore.get('doc_index').catch(() => []) || [];
+    idx = idx.filter(i => i.name !== name); idx.push(meta);
+    await IDBStore.set('doc_index', idx);
     return id;
   },
-  async getList(){return await IDBStore.get('doc_index').catch(()=>[])||[]},
-  async findByName(name){
-    const idx=await this.getList();const m=idx.find(i=>i.name===name);
-    if(m)return await IDBStore.get('doc:'+m.id).catch(()=>null);return null;
+  async getList() { return await IDBStore.get('doc_index').catch(() => []) || [] },
+  async findByName(name) {
+    const idx = await this.getList(); const m = idx.find(i => i.name === name);
+    if (m) return await IDBStore.get('doc:' + m.id).catch(() => null); return null;
   }
 };
 
-const AutoSave={
-  _tid:null,_pending:false,
-  trigger(){
-    App.updateSaveStatus("● 未保存の変更");
-    if(this._tid)clearTimeout(this._tid);
-    this._tid=setTimeout(()=>this.saveNow(),1200);
+/* 多重クラッシュ回復・自動セーブロジック */
+const AutoSave = {
+  _tid: null, _pending: false,
+  trigger() {
+    App.updateSaveStatus("● 未保存の変更あり");
+    if (this._tid) clearTimeout(this._tid);
+    this._tid = setTimeout(() => this.saveNow(), 1200);
   },
-  async saveNow(){
-    if(!App.currentFileName)return;
-    if(this._tid)clearTimeout(this._tid);
-    this._pending=true;
-    try{
-      const key='f:'+Utils.safeKey(App.currentFileName);
-      const data={file:App.currentFileName,page:App.pageNum,strokes:App.strokes,ts:Date.now()};
-      await IDBStore.set(key,data);
+  async saveNow() {
+    if (!App.currentFileName) return;
+    if (this._tid) clearTimeout(this._tid);
+    this._pending = true;
+    try {
+      const key = 'f:' + Utils.safeKey(App.currentFileName);
+      const data = { file: App.currentFileName, page: App.pageNum, strokes: App.strokes, ts: Date.now() };
+      await IDBStore.set(key, data);
       App.updateSaveStatus("● 同期完了");
-    }catch(e){
-      App.updateSaveStatus("⚠️ 保存失敗");
-    }finally{this._pending=false;}
+    } catch (e) {
+      App.updateSaveStatus("⚠️ 同期失敗");
+    } finally { this._pending = false; }
   },
-  emergencySave(){
-    if(!App.currentFileName)return;
-    const data={file:App.currentFileName,page:App.pageNum,strokes:App.strokes,ts:Date.now()};
-    try{localStorage.setItem('mv_lsbk2',JSON.stringify(data));}catch(_){}
+  emergencySave() {
+    if (!App.currentFileName) return;
+    const data = { file: App.currentFileName, page: App.pageNum, strokes: App.strokes, ts: Date.now() };
+    try { localStorage.setItem('mv_lsbk2', JSON.stringify(data)); } catch (_) {}
   }
 };
 
-/* Draw Utilities */
-const DrawUtil={
-  drawStroke(ctx,st,scaleX,scaleY,vp){
-    if(!st.pts||st.pts.length===0)return;
+/* 高精度ベクトル描画・幾何消しゴムエンジン */
+const DrawUtil = {
+  drawStroke(ctx, st, scaleX, scaleY, vp) {
+    if (!st.pts || st.pts.length === 0) return;
     ctx.save();
-    ctx.lineCap='round';ctx.lineJoin='round';
-    ctx.strokeStyle=st.color||'#ff0000';
-    ctx.lineWidth=(st.width||2)*Math.abs(scaleX);
-    if(st.tool==='marker'){ctx.globalAlpha=0.4;ctx.lineWidth=(st.width||12)*Math.abs(scaleX);}
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = st.color || '#ff0000';
+    ctx.lineWidth = (st.width || 2) * Math.abs(scaleX);
+    if (st.tool === 'marker') { ctx.globalAlpha = 0.4; ctx.lineWidth = (st.width || 12) * Math.abs(scaleX); }
     ctx.beginPath();
-    const p0=st.pts[0];ctx.moveTo(p0.x,p0.y);
-    if(st.pts.length===1){ctx.lineTo(p0.x+0.1,p0.y);}
-    else if(st.pts.length===2){ctx.lineTo(st.pts[1].x,st.pts[1].y);}
-    else{
+    const p0 = st.pts[0]; ctx.moveTo(p0.x, p0.y);
+    if (st.pts.length === 1) { ctx.lineTo(p0.x + 0.1, p0.y); }
+    else if (st.pts.length === 2) { ctx.lineTo(st.pts[1].x, st.pts[1].y); }
+    else {
       let i;
-      for(i=1;i<st.pts.length-2;i++){
-        const xc=(st.pts[i].x+st.pts[i+1].x)/2;
-        const yc=(st.pts[i].y+st.pts[i+1].y)/2;
-        ctx.quadraticCurveTo(st.pts[i].x,st.pts[i].y,xc,yc);
+      for (i = 1; i < st.pts.length - 2; i++) {
+        const xc = (st.pts[i].x + st.pts[i + 1].x) / 2;
+        const yc = (st.pts[i].y + st.pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(st.pts[i].x,st.pts[i].y, xc, yc);
       }
-      ctx.quadraticCurveTo(st.pts[i].x,st.pts[i].y,st.pts[i+1].x,st.pts[i+1].y);
+      ctx.quadraticCurveTo(st.pts[i].x, st.pts[i].y, st.pts[i + 1].x, st.pts[i + 1].y);
     }
-    ctx.stroke();ctx.restore();
+    ctx.stroke(); ctx.restore();
   },
-  applyEraser(strokes,p1,p2,radius){
-    let changed=false;
-    for(let i=0;i<strokes.length;i++){
-      const st=strokes[i];if(!st||!st.pts)continue;
-      let hit=false;const newStrokes=[];let curPts=[];
-      for(let j=0;j<st.pts.length;j++){
-        const p=st.pts[j];let d=Infinity;
-        if(j>0){const prev=st.pts[j-1];d=Utils.distPtSeg(p.x,p.y,prev.x,prev.y,p1.x,p1.y,p2.x,p2.y);}
-        else{d=Math.hypot(p.x-p1.x,p.y-p1.y);}
-        if(d<=radius){hit=true;changed=true;if(curPts.length>0){newStrokes.push({...st,pts:curPts});curPts=[];}}
-        else{curPts.push(p);}
+  applyEraser(strokes, p1, p2, radius) {
+    let changed = false;
+    for (let i = 0; i < strokes.length; i++) {
+      const st = strokes[i]; if (!st || !st.pts) continue;
+      let hit = false; const newStrokes = []; let curPts = [];
+      for (let j = 0; j < st.pts.length; j++) {
+        const p = st.pts[j]; let d = Infinity;
+        if (j > 0) { const prev = st.pts[j - 1]; d = Utils.distPtSeg(p.x, p.y, prev.x, prev.y, p1.x, p1.y, p2.x, p2.y); }
+        else { d = Math.hypot(p.x - p1.x, p.y - p1.y); }
+        if (d <= radius) { hit = true; changed = true; if (curPts.length > 0) { newStrokes.push({ ...st, pts: curPts }); curPts = []; } }
+        else { curPts.push(p); }
       }
-      if(curPts.length>0)newStrokes.push({...st,pts:curPts});
-      if(hit){strokes.splice(i,1,...newStrokes);i+=newStrokes.length-1;}
+      if (curPts.length > 0) newStrokes.push({ ...st, pts: curPts });
+      if (hit) { strokes.splice(i, 1, ...newStrokes); i += newStrokes.length - 1; }
     }
     return changed;
   }
 };
 
-/* Sub Window Management */
+/* マルチウィンドウ破棄・クリーンアップ機構内蔵 サブ窓オブジェクト */
 class SubWin {
-  constructor(id,title,page,opts={}){
-    this.id=id;this.title=title;this.page=page;
-    this.innerScale=opts.scale||0.8;this.offX=opts.offX||0;this.offY=opts.offY||0;
-    this._cleanups=[];this.div=null;this.cvs=null;this.ctx=null;
-    this.initDOM();this.initEvents();this.render();
+  constructor(id, title, page, opts = {}) {
+    this.id = id; this.title = title; this.page = page;
+    this.innerScale = opts.scale || 0.8; this.offX = opts.offX || 0; this.offY = opts.offY || 0;
+    this._cleanups = []; this.div = null; this.cvs = null; this.ctx = null;
+    this.initDOM(); this.initEvents(); this.render();
   }
-  initDOM(){
-    const d=document.createElement('div');d.className='sub-win';
-    d.style.left=(140+(this.id%4)*20)+'px';d.style.top=(80+(this.id%3)*20)+'px';
-    d.innerHTML=`
+  initDOM() {
+    const d = document.createElement('div'); d.className = 'sub-win';
+    d.style.left = (140 + (this.id % 4) * 20) + 'px'; d.style.top = (80 + (this.id % 3) * 20) + 'px';
+    d.innerHTML = `
       <div class="win-header">
         <div class="win-title">[P.${this.page}] ${this.title}</div>
         <div class="win-btn" id="sw-zout-${this.id}">➖</div>
@@ -416,396 +724,393 @@ class SubWin {
       <div class="win-body"><canvas id="sw-cvs-${this.id}" style="position:absolute;left:0;top:0"></canvas></div>
       <div class="win-resizer"></div>
     `;
-    document.getElementById('main-container').appendChild(d);this.div=d;
-    this.cvs=d.querySelector(`#sw-cvs-${this.id}`);this.ctx=this.cvs.getContext('2d');
+    document.getElementById('main-container').appendChild(d); this.div = d;
+    this.cvs = d.querySelector(`#sw-cvs-${this.id}`); this.ctx = this.cvs.getContext('2d');
   }
-  initEvents(){
-    const hd=this.div.querySelector('.win-header');
-    let drag=false,sx,sy,sl,st;
-    const startDrag=e=>{
-      if(e.target.classList.contains('win-btn'))return;
-      drag=true;const p=e.touches?e.touches[0]:e;
-      sx=p.clientX;sy=p.clientY;sl=this.div.offsetLeft;st=this.div.offsetTop;
-      if(e.pointerId)hd.setPointerCapture(e.pointerId);
+  initEvents() {
+    const hd = this.div.querySelector('.win-header');
+    let drag = false, sx, sy, sl, st;
+    const startDrag = e => {
+      if (e.target.classList.contains('win-btn')) return;
+      drag = true; const p = e.touches ? e.touches[0] : e;
+      sx = p.clientX; sy = p.clientY; sl = this.div.offsetLeft; st = this.div.offsetTop;
+      if (e.pointerId) hd.setPointerCapture(e.pointerId);
     };
-    const moveDrag=e=>{
-      if(!drag)return;const p=e.touches?e.touches[0]:e;
-      this.div.style.left=(sl+(p.clientX-sx))+'px';this.div.style.top=(st+(p.clientY-sy))+'px';
+    const moveDrag = e => {
+      if (!drag) return; const p = e.touches ? e.touches[0] : e;
+      this.div.style.left = (sl + (p.clientX - sx)) + 'px'; this.div.style.top = (st + (p.clientY - sy)) + 'px';
     };
-    const endDrag=e=>{drag=false;if(e.pointerId)try{hd.releasePointerCapture(e.pointerId)}catch(_){}};
-    hd.addEventListener('pointerdown',startDrag);hd.addEventListener('pointermove',moveDrag);
-    hd.addEventListener('pointerup',endDrag);
-    this._cleanups.push(()=>{
-      hd.removeEventListener('pointerdown',startDrag);
-      hd.removeEventListener('pointermove',moveDrag);
-      hd.removeEventListener('pointerup',endDrag);
+    const endDrag = e => { drag = false; if (e.pointerId) try { hd.releasePointerCapture(e.pointerId) } catch (_) {} };
+    hd.addEventListener('pointerdown', startDrag); hd.addEventListener('pointermove', moveDrag);
+    hd.addEventListener('pointerup', endDrag);
+    this._cleanups.push(() => {
+      hd.removeEventListener('pointerdown', startDrag); hd.removeEventListener('pointermove', moveDrag); hd.removeEventListener('pointerup', endDrag);
     });
 
-    const rsz=this.div.querySelector('.win-resizer');
-    let rszing=false,rw,rh;
-    const startRsz=e=>{rszing=true;const p=e.touches?e.touches[0]:e;sx=p.clientX;sy=p.clientY;rw=this.div.offsetWidth;rh=this.div.offsetHeight;if(e.pointerId)rsz.setPointerCapture(e.pointerId);e.stopPropagation();};
-    const moveRsz=e=>{if(!rszing)return;const p=e.touches?e.touches[0]:e;this.div.style.width=Math.max(160,rw+(p.clientX-sx))+'px';this.div.style.height=Math.max(120,rh+(p.clientY-sy))+'px';this.render();};
-    const endRsz=e=>{rszing=false;if(e.pointerId)try{rsz.releasePointerCapture(e.pointerId)}catch(_){}};
-    rsz.addEventListener('pointerdown',startRsz);rsz.addEventListener('pointermove',moveRsz);
-    rsz.addEventListener('pointerup',endRsz);
-    this._cleanups.push(()=>{
-      rsz.removeEventListener('pointerdown',startRsz);
-      rsz.removeEventListener('pointermove',moveRsz);
-      rsz.removeEventListener('pointerup',endRsz);
+    const rsz = this.div.querySelector('.win-resizer');
+    let rszing = false, rw, rh;
+    const startRsz = e => { rszing = true; const p = e.touches ? e.touches[0] : e; sx = p.clientX; sy = p.clientY; rw = this.div.offsetWidth; rh = this.div.offsetHeight; if (e.pointerId) rsz.setPointerCapture(e.pointerId); e.stopPropagation(); };
+    const moveRsz = e => { if (!rszing) return; const p = e.touches ? e.touches[0] : e; this.div.style.width = Math.max(160, rw + (p.clientX - sx)) + 'px'; this.div.style.height = Math.max(120, rh + (p.clientY - sy)) + 'px'; this.render(); };
+    const endRsz = e => { rszing = false; if (e.pointerId) try { rsz.releasePointerCapture(e.pointerId) } catch (_) {} };
+    rsz.addEventListener('pointerdown', startRsz); rsz.addEventListener('pointermove', moveRsz);
+    rsz.addEventListener('pointerup', endRsz);
+    this._cleanups.push(() => {
+      rsz.removeEventListener('pointerdown', startRsz); rsz.removeEventListener('pointermove', moveRsz); rsz.removeEventListener('pointerup', endRsz);
     });
 
-    const bdy=this.div.querySelector('.win-body');
-    let pan=false,px,py;
-    const startPan=e=>{
-      if(App.currentTool==='pen'||App.currentTool==='marker'||App.currentTool==='eraser'){
-        this._startDraw(e);return;
+    const bdy = this.div.querySelector('.win-body');
+    let pan = false, px, py;
+    const startPan = e => {
+      if (App.currentTool === 'pen' || App.currentTool === 'marker' || App.currentTool === 'eraser') {
+        this._startDraw(e); return;
       }
-      pan=true;const p=e.touches?e.touches[0]:e;px=p.clientX;py=p.clientY;
+      pan = true; const p = e.touches ? e.touches[0] : e; px = p.clientX; py = p.clientY;
     };
-    const movePan=e=>{
-      if(this._drawing){this._moveDraw(e);return;}
-      if(!pan)return;const p=e.touches?e.touches[0]:e;this.offX+=(p.clientX-px);this.offY+=(p.clientY-py);px=p.clientX;py=p.clientY;this.render();
+    const movePan = e => {
+      if (this._drawing) { this._moveDraw(e); return; }
+      if (!pan) return; const p = e.touches ? e.touches[0] : e; this.offX += (p.clientX - px); this.offY += (p.clientY - py); px = p.clientX; py = p.clientY; this.render();
     };
-    const endPan=e=>{pan=false;this._endDraw(e);};
-    bdy.addEventListener('pointerdown',startPan);bdy.addEventListener('pointermove',movePan);
-    bdy.addEventListener('pointerup',endPan);bdy.addEventListener('pointerleave',endPan);
-    this._cleanups.push(()=>{
-      bdy.removeEventListener('pointerdown',startPan);bdy.removeEventListener('pointermove',movePan);
-      bdy.removeEventListener('pointerup',endPan);bdy.removeEventListener('pointerleave',endPan);
+    const endPan = e => { pan = false; this._endDraw(e); };
+    bdy.addEventListener('pointerdown', startPan); bdy.addEventListener('pointermove', movePan);
+    bdy.addEventListener('pointerup', endPan); bdy.addEventListener('pointerleave', endPan);
+    this._cleanups.push(() => {
+      bdy.removeEventListener('pointerdown', startPan); bdy.removeEventListener('pointermove', movePan); bdy.removeEventListener('pointerup', endPan); bdy.removeEventListener('pointerleave', endPan);
     });
 
-    this.div.querySelector(`#sw-zout-${this.id}`).onclick=()=>{this.innerScale=Math.max(0.2,this.innerScale-0.1);this.render();};
-    this.div.querySelector(`#sw-zin-${this.id}`).onclick=()=>{this.innerScale=Math.min(5,this.innerScale+0.1);this.render();};
-    this.div.querySelector(`#sw-cls-${this.id}`).onclick=()=>{this.close();};
+    this.div.querySelector(`#sw-zout-${this.id}`).onclick = () => { this.innerScale = Math.max(0.2, this.innerScale - 0.1); this.render(); };
+    this.div.querySelector(`#sw-zin-${this.id}`).onclick = () => { this.innerScale = Math.min(5, this.innerScale + 0.1); this.render(); };
+    this.div.querySelector(`#sw-cls-${this.id}`).onclick = () => { this.close(); };
   }
-  async render(){
-    if(!App.pdfDoc||!this.cvs)return;
-    const bdy=this.div.querySelector('.win-body');
-    const w=bdy.clientWidth,h=bdy.clientHeight;
-    this.cvs.width=w;this.cvs.height=h;this.cvs.style.width=w+'px';this.cvs.style.height=h+'px';
-    this.ctx.fillStyle='#14171c';this.ctx.fillRect(0,0,w,h);
-    try{
-      const pg=await App.pdfDoc.getPage(this.page);const vp=pg.getViewport({scale:this.innerScale});
-      const sc=Utils.getVPScale(vp,vp.rotation);
-      this.ctx.save();this.ctx.translate(this.offX,this.offY);
+  async render() {
+    if (!App.pdfDoc || !this.cvs) return;
+    const bdy = this.div.querySelector('.win-body');
+    const w = bdy.clientWidth, h = bdy.clientHeight;
+    this.cvs.width = w; this.cvs.height = h; this.cvs.style.width = w + 'px'; this.cvs.style.height = h + 'px';
+    this.ctx.fillStyle = '#020406'; this.ctx.fillRect(0, 0, w, h);
+    try {
+      const pg = await App.pdfDoc.getPage(this.page); const vp = pg.getViewport({ scale: this.innerScale });
+      const sc = Utils.getVPScale(vp, vp.rotation);
+      this.ctx.save(); this.ctx.translate(this.offX, this.offY);
       this.ctx.save();
-      if(vp.rotation===90){this.ctx.translate(vp.height,0);this.ctx.rotate(Math.PI/2);}
-      else if(vp.rotation===180){this.ctx.translate(vp.width,vp.height);this.ctx.rotate(Math.PI);}
-      else if(vp.rotation===270){this.ctx.translate(0,vp.width);this.ctx.rotate(-Math.PI/2);}
-      await pg.render({canvasContext:this.ctx,viewport:vp}).promise.catch(()=>{});
+      if (vp.rotation === 90) { this.ctx.translate(vp.height, 0); this.ctx.rotate(Math.PI / 2); }
+      else if (vp.rotation === 180) { this.ctx.translate(vp.width, vp.height); this.ctx.rotate(Math.PI); }
+      else if (vp.rotation === 270) { this.ctx.translate(0, vp.width); this.ctx.rotate(-Math.PI / 2); }
+      await pg.render({ canvasContext: this.ctx, viewport: vp }).promise.catch(() => {});
       this.ctx.restore();
-      const sts=App.strokes[this.page]||[];
-      sts.forEach(st=>DrawUtil.drawStroke(this.ctx,st,sc.x,sc.y,vp));
+      const sts = App.strokes[this.page] || [];
+      sts.forEach(st => DrawUtil.drawStroke(this.ctx, st, sc.x, sc.y, vp));
       this.ctx.restore();
-    }catch(_){}
+    } catch (_) {}
   }
-  _startDraw(e){
-    if(e.pointerType==='touch'&&App.currentTool!=='eraser')return;
-    this._drawing=true;const r=this.cvs.getBoundingClientRect();
-    const px=e.clientX-r.left-this.offX,py=e.clientY-r.top-this.offY;
-    this._lastPt={x:px,y:py};
-    if(App.currentTool==='eraser'){
-      const changed=DrawUtil.applyEraser(App.strokes[this.page]||[],this._lastPt,this._lastPt,16*this.innerScale);
-      if(changed){this.render();EventBus.emit('stroke-updated',this.page);}
-    }else{
-      this._curStroke={tool:App.currentTool,color:App.currentTool==='marker'?'#ffff00':'#ff0000',width:App.currentTool==='marker'?12:2,pts:[this._lastPt]};
-      App.strokes[this.page]=App.strokes[this.page]||[];
-      if(App.strokes[this.page].length>=500){
+  _startDraw(e) {
+    if (e.pointerType === 'touch' && App.currentTool !== 'eraser') return;
+    this._drawing = true; const r = this.cvs.getBoundingClientRect();
+    const px = e.clientX - r.left - this.offX, py = e.clientY - r.top - this.offY;
+    this._lastPt = { x: px, y: py };
+    if (App.currentTool === 'eraser') {
+      const changed = DrawUtil.applyEraser(App.strokes[this.page] || [], this._lastPt, this._lastPt, 16 * this.innerScale);
+      if (changed) { this.render(); EventBus.emit('stroke-updated', this.page); }
+    } else {
+      this._curStroke = { tool: App.currentTool, color: App.currentTool === 'marker' ? '#ffff00' : '#ff0000', width: App.currentTool === 'marker' ? 12 : 2, pts: [this._lastPt] };
+      App.strokes[this.page] = App.strokes[this.page] || [];
+      
+      /* 500本上限トースト検知ロジック */
+      if (App.strokes[this.page].length >= 500) {
         App.strokes[this.page].shift();
-        if(!App._warned500){App._warned500=true;window.showToast('1ページあたりの上限(500本)に達したため古い線から削除されました');setTimeout(()=>{App._warned500=false;},10000);}
+        if (!App._warned500) {
+          App._warned500 = true;
+          window.showToast('1ページあたりの上限(500本)に達したため古い線から削除されました');
+          setTimeout(() => { App._warned500 = false; }, 10000);
+        }
       }
       App.strokes[this.page].push(this._curStroke);
     }
   }
-  _moveDraw(e){
-    if(!this._drawing)return;const r=this.cvs.getBoundingClientRect();
-    const px=e.clientX-r.left-this.offX,py=e.clientY-r.top-this.offY;
-    const pt={x:px,y:py};
-    if(App.currentTool==='eraser'){
-      const changed=DrawUtil.applyEraser(App.strokes[this.page]||[],this._lastPt,pt,16*this.innerScale);
-      if(changed){this.render();EventBus.emit('stroke-updated',this.page);}
-    }else if(this._curStroke){
-      this._curStroke.pts.push(pt);this.render();
+  _moveDraw(e) {
+    if (!this._drawing) return; const r = this.cvs.getBoundingClientRect();
+    const px = e.clientX - r.left - this.offX, py = e.clientY - r.top - this.offY;
+    const pt = { x: px, y: py };
+    if (App.currentTool === 'eraser') {
+      const changed = DrawUtil.applyEraser(App.strokes[this.page] || [], this._lastPt, pt, 16 * this.innerScale);
+      if (changed) { this.render(); EventBus.emit('stroke-updated', this.page); }
+    } else if (this._curStroke) {
+      this._curStroke.pts.push(pt); this.render();
     }
-    this._lastPt=pt;
+    this._lastPt = pt;
   }
-  _endDraw(e){if(!this._drawing)return;this._drawing=false;this._curStroke=null;AutoSave.trigger();EventBus.emit('stroke-updated',this.page);}
-  close(){
-    if(this._cleanups && Array.isArray(this._cleanups)){
-      this._cleanups.forEach(fn => { try { fn(); } catch(_) {} });
+  _endDraw(e) { if (!this._drawing) return; this._drawing = false; this._curStroke = null; AutoSave.trigger(); EventBus.emit('stroke-updated', this.page); }
+  close() {
+    if (this._cleanups && Array.isArray(this._cleanups)) {
+      this._cleanups.forEach(fn => { try { fn(); } catch (_) {} });
     }
-    if(this.div&&this.div.parentNode)this.div.parentNode.removeChild(this.div);
-    if(typeof this.onClose==='function')this.onClose(this.id);
+    if (this.div && this.div.parentNode) this.div.parentNode.removeChild(this.div);
+    if (typeof this.onClose === 'function') this.onClose(this.id);
   }
 }
 
-const SubWinManager={
-  _wins:{},_idAcc:0,
-  create(title,page){
-    if(Object.keys(this._wins).length>=5){window.showToast("サブ窓は最大5つまでです");return;}
-    const id=++this._idAcc;const w=new SubWin(id,title,page);
-    w.onClose=id=>delete this._wins[id];this._wins[id]=w;
+/* サブウィンドウマネージャー */
+const SubWinManager = {
+  _wins: {}, _idAcc: 0,
+  create(title, page) {
+    if (Object.keys(this._wins).length >= 5) { window.showToast("サブ窓は最大5つまでです"); return; }
+    const id = ++this._idAcc; const w = new SubWin(id, title, page);
+    w.onClose = id => delete this._wins[id]; this._wins[id] = w;
   },
-  refreshAll(page){Object.values(this._wins).forEach(w=>{if(w.page===page)w.render();})},
-  closeAll(){Object.values(this._wins).forEach(w=>w.close());this._wins={};}
+  refreshAll(page) { Object.values(this._wins).forEach(w => { if (w.page === page) w.render(); }) },
+  closeAll() { Object.values(this._wins).forEach(w => w.close()); this._wins = {}; }
 };
 
-/* Core Application Control */
-const App={
-  pdfDoc:null,currentFileName:'',pageNum:1,maxPages:1,scale:1.0,offX:0,offY:0,
-  strokes:{},currentTool:'pan',calcValue:'0',oneFingerSens:5,
-  _pCvs:null,_pCtx:null,_aCvs:null,_aCtx:null,_wrapper:null,
-  _isDrawing:false,_isPanning:false,_lastPt:{x:0,y:0},_curStroke:null,
-  _touchStartDist:0,_touchStartScale:1.0,_baseVPScale:{x:1,y:1},_vp:null,
+/* メインアプリケーション・コア・コントローラー */
+const App = {
+  pdfDoc: null, currentFileName: '', pageNum: 1, maxPages: 1, scale: 1.0, offX: 0, offY: 0,
+  strokes: {}, currentTool: 'pan', calcValue: '0', oneFingerSens: 5,
+  _pCvs: null, _pCtx: null, _aCvs: null, _aCtx: null, _wrapper: null,
+  _isDrawing: false, _isPanning: false, _lastPt: { x: 0, y: 0 }, _curStroke: null,
+  _touchStartDist: 0, _touchStartScale: 1.0, _baseVPScale: { x: 1, y: 1 }, _vp: null,
+  _warned500: false,
 
-  async init(){
-    this._pCvs=document.getElementById('pdf-cvs');this._pCtx=this._pCvs.getContext('2d');
-    this._aCvs=document.getElementById('ann-cvs');this._aCtx=this._aCvs.getContext('2d');
-    this._wrapper=document.getElementById('cvs-wrapper');
-    await IDBStore.init().catch(e=>DBG.error("IDB init error",e));
-    this.initDOMEvents();this.initCanvasEvents();
-    EventBus.on('stroke-updated',pg=>{if(pg===this.pageNum)this.renderAnnotations();SubWinManager.refreshAll(pg);});
-    window.addEventListener('pagehide',()=>AutoSave.emergencySave());
-    window.addEventListener('visibilitychange',()=>{if(document.hidden)AutoSave.emergencySave();});
+  async init() {
+    this._pCvs = document.getElementById('pdf-cvs'); this._pCtx = this._pCvs.getContext('2d');
+    this._aCvs = document.getElementById('ann-cvs'); this._aCtx = this._aCvs.getContext('2d');
+    this._wrapper = document.getElementById('cvs-wrapper');
+    await IDBStore.init().catch(e => DBG.error("IDB init error",e));
+    this.initDOMEvents(); this.initCanvasEvents();
+    EventBus.on('stroke-updated', pg => { if (pg === this.pageNum) this.renderAnnotations(); SubWinManager.refreshAll(pg); });
+    window.addEventListener('pagehide', () => AutoSave.emergencySave());
+    window.addEventListener('visibilitychange', () => { if (document.hidden) AutoSave.emergencySave(); });
     this.loadLastSession();
   },
 
-  initDOMEvents(){
-    document.getElementById('btn-fpanel').onclick=()=>this.togglePanel('p-file');
-    
-    // 【修正箇所】「感度（👆）」ボタンのクリックイベントを確実にバインドしてパネルをトグル表示
-    document.getElementById('btn-spanel').onclick=(e)=>{
-      e.stopPropagation();
-      this.togglePanel('p-sens');
-    };
-    
-    document.getElementById('btn-calc').onclick=()=>this.togglePanel('p-calc');
-    document.getElementById('btn-subwin').onclick=()=>{if(this.pdfDoc)SubWinManager.create(this.currentFileName,this.pageNum);};
-    document.getElementById('btn-fsel').onclick=()=>document.getElementById('fi-loader').click();
-    document.getElementById('fi-loader').onchange=e=>this.handleFileSelect(e);
-    document.getElementById('sbtn-prev').onclick=()=>this.changePage(-1);
-    document.getElementById('sbtn-next').onclick=()=>this.changePage(1);
-    document.getElementById('sbtn-clear').onclick=()=>this.clearCurrentPageStrokes();
-    document.getElementById('btn-zip').onclick=()=>this.exportAllBackup();
-    
-    const rSens=document.getElementById('rng-sens');
-    rSens.oninput=()=>{
-      this.oneFingerSens=parseInt(rSens.value)||5;
-      document.getElementById('lbl-sens').innerText=this.oneFingerSens+'px';
+  initDOMEvents() {
+    document.getElementById('btn-fpanel').onclick = () => this.togglePanel('p-file');
+    document.getElementById('btn-spanel').onclick = (e) => { e.stopPropagation(); this.togglePanel('p-sens'); };
+    document.getElementById('btn-calc').onclick = () => this.togglePanel('p-calc');
+    document.getElementById('btn-subwin').onclick = () => { if (this.pdfDoc) SubWinManager.create(this.currentFileName, this.pageNum); };
+    document.getElementById('btn-fsel').onclick = () => document.getElementById('fi-loader').click();
+    document.getElementById('fi-loader').onchange = e => this.handleFileSelect(e);
+    document.getElementById('sbtn-prev').onclick = () => this.changePage(-1);
+    document.getElementById('sbtn-next').onclick = () => this.changePage(1);
+    document.getElementById('sbtn-clear').onclick = () => this.clearCurrentPageStrokes();
+    document.getElementById('btn-zip').onclick = () => this.exportAllBackup();
+
+    const rSens = document.getElementById('rng-sens');
+    rSens.oninput = () => {
+      this.oneFingerSens = parseInt(rSens.value) || 5;
+      document.getElementById('lbl-sens').innerText = this.oneFingerSens + 'px';
     };
 
-    document.querySelectorAll('#sidebar .side-btn[data-tool]').forEach(b=>{
-      b.onclick=()=>{
-        document.querySelectorAll('#sidebar .side-btn[data-tool]').forEach(x=>x.classList.remove('active-tool'));
-        b.classList.add('active-tool');this.currentTool=b.getAttribute('data-tool');
+    document.querySelectorAll('#sidebar .side-btn[data-tool]').forEach(b => {
+      b.onclick = () => {
+        document.querySelectorAll('#sidebar .side-btn[data-tool]').forEach(x => x.classList.remove('active-tool'));
+        b.classList.add('active-tool'); this.currentTool = b.getAttribute('data-tool');
       };
     });
   },
 
-  togglePanel(id){
-    const p=document.getElementById(id);
-    if(!p) return;
-    const show=(p.style.display!=='block');
-    // 他の全パネルを一応隠す
-    document.querySelectorAll('.panel').forEach(x=>x.style.display='none');
-    if(show) {
-      p.style.display='block';
-      // 前面に持ってくる
-      p.style.zIndex = '250';
-    }
+  togglePanel(id) {
+    const p = document.getElementById(id); if (!p) return;
+    const show = (p.style.display !== 'block');
+    document.querySelectorAll('.panel').forEach(x => x.style.display = 'none');
+    if (show) { p.style.display = 'block'; p.style.zIndex = '250'; }
   },
 
-  updateSaveStatus(txt){document.getElementById('lbl-save-status').innerText=txt;},
+  updateSaveStatus(txt) { document.getElementById('lbl-save-status').innerText = txt; },
 
-  async handleFileSelect(e){
-    const f=e.target.files[0];if(!f)return;
-    const buf=await f.arrayBuffer();this.currentFileName=f.name;
-    await DocMgr.saveDoc(f.name,buf);this.strokes={};this.pageNum=1;
-    await this.loadPdfBytes(buf);this.refreshFilePanel();
+  async handleFileSelect(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const buf = await f.arrayBuffer(); this.currentFileName = f.name;
+    await DocMgr.saveDoc(f.name, buf); this.strokes = {}; this.pageNum = 1;
+    await this.loadPdfBytes(buf); this.refreshFilePanel();
   },
 
-  async loadPdfBytes(buf){
+  async loadPdfBytes(buf) {
     SubWinManager.closeAll();
-    try{
-      this.pdfDoc=await pdfjsLib.getDocument({data:buf}).promise;
-      this.maxPages=this.pdfDoc.numPages;this.offX=0;this.offY=0;this.scale=1.0;
-      document.getElementById('lbl-doc-info').innerText=`${this.currentFileName} (${this.maxPages}階/頁)`;
-      const saved=await IDBStore.get('f:'+Utils.safeKey(this.currentFileName));
-      if(saved&&saved.strokes){this.strokes=saved.strokes;this.pageNum=saved.page||1;}
+    try {
+      this.pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+      this.maxPages = this.pdfDoc.numPages; this.offX = 0; this.offY = 0; this.scale = 1.0;
+      document.getElementById('lbl-doc-info').innerText = `${this.currentFileName} (${this.maxPages}頁/階)`;
+      const saved = await IDBStore.get('f:' + Utils.safeKey(this.currentFileName));
+      if (saved && saved.strokes) { this.strokes = saved.strokes; this.pageNum = saved.page || 1; }
       this.renderAll();
-    }catch(e){window.showToast("PDFの読み込みに失敗しました");}
+    } catch (e) { window.showToast("PDFの解析・展開に失敗しました"); }
   },
 
-  async changePage(dir){
-    if(!this.pdfDoc)return;const n=this.pageNum+dir;
-    if(n<1||n>this.maxPages)return;this.pageNum=n;AutoSave.saveNow();this.renderAll();
+  async changePage(dir) {
+    if (!this.pdfDoc) return; const n = this.pageNum + dir;
+    if (n < 1 || n > this.maxPages) return; this.pageNum = n; AutoSave.saveNow(); this.renderAll();
   },
 
-  clearCurrentPageStrokes(){
-    if(!this.pdfDoc)return;if(!confirm("現在のページの赤入れをすべて消去しますか？"))return;
-    this.strokes[this.pageNum]=[];AutoSave.trigger();EventBus.emit('stroke-updated',this.pageNum);this.renderAnnotations();
+  clearCurrentPageStrokes() {
+    if (!this.pdfDoc) return; if (!confirm("このページのすべての赤入れを完全削除しますか？")) return;
+    this.strokes[this.pageNum] = []; AutoSave.trigger(); EventBus.emit('stroke-updated', this.pageNum); this.renderAnnotations();
   },
 
-  async renderAll(){
-    if(!this.pdfDoc)return;
-    document.getElementById('page-num-disp').innerText=this.pageNum;
-    try{
-      const pg=await this.pdfDoc.getPage(this.pageNum);
-      this._vp=pg.getViewport({scale:this.scale});
-      this._baseVPScale=Utils.getVPScale(this._vp,this._vp.rotation);
-      const w=this._vp.width,h=this._vp.height;
-      
-      this._pCvs.width=w;this._pCvs.height=h;this._pCvs.style.width=w+'px';this._pCvs.style.height=h+'px';
-      this._aCvs.width=w;this._aCvs.height=h;this._aCvs.style.width=w+'px';this._aCvs.style.height=h+'px';
-      
+  async renderAll() {
+    if (!this.pdfDoc) return;
+    document.getElementById('page-num-disp').innerText = this.pageNum;
+    try {
+      const pg = await this.pdfDoc.getPage(this.pageNum);
+      this._vp = pg.getViewport({ scale: this.scale });
+      this._baseVPScale = Utils.getVPScale(this._vp, this._vp.rotation);
+      const w = this._vp.width, h = this._vp.height;
+
+      this._pCvs.width = w; this._pCvs.height = h; this._pCvs.style.width = w + 'px'; this._pCvs.style.height = h + 'px';
+      this._aCvs.width = w; this._aCvs.height = h; this._aCvs.style.width = w + 'px'; this._aCvs.style.height = h + 'px';
+
       this._pCtx.save();
-      if(this._vp.rotation===90){this._pCtx.translate(this._vp.height,0);this._pCtx.rotate(Math.PI/2);}
-      else if(this._vp.rotation===180){this._pCtx.translate(this._vp.width,this._vp.height);this._pCtx.rotate(Math.PI);}
-      else if(this._vp.rotation===270){this._pCtx.translate(0,this._vp.width);this._pCtx.rotate(-Math.PI/2);}
-      
-      this._pCtx.fillStyle='#ffffff';this._pCtx.fillRect(0,0,w,h);
-      await pg.render({canvasContext:this._pCtx,viewport:this._vp}).promise;
+      if (this._vp.rotation === 90) { this._pCtx.translate(this._vp.height, 0); this._pCtx.rotate(Math.PI / 2); }
+      else if (this._vp.rotation === 180) { this._pCtx.translate(this._vp.width, this._vp.height); this._pCtx.rotate(Math.PI); }
+      else if (this._vp.rotation === 270) { this._pCtx.translate(0, this._vp.width); this._pCtx.rotate(-Math.PI / 2); }
+
+      this._pCtx.fillStyle = '#ffffff'; this._pCtx.fillRect(0, 0, w, h);
+      await pg.render({ canvasContext: this._pCtx, viewport: this._vp }).promise;
       this._pCtx.restore();
-      
-      this.applyTransform();this.renderAnnotations();
-    }catch(e){DBG.error("Render error",e);}
+
+      this.applyTransform(); this.renderAnnotations();
+    } catch (e) { DBG.error("描画コアプロセスエラー", e); }
   },
 
-  applyTransform(){
-    const t=`translate(${this.offX}px,${this.offY}px)`;
-    this._pCvs.style.transform=t;this._aCvs.style.transform=t;
+  applyTransform() {
+    const t = `translate(${this.offX}px,${this.offY}px)`;
+    this._pCvs.style.transform = t; this._aCvs.style.transform = t;
   },
 
-  renderAnnotations(){
-    this._aCtx.clearRect(0,0,this._aCvs.width,this._aCvs.height);
-    const sts=this.strokes[this.pageNum]||[];
-    sts.forEach(st=>DrawUtil.drawStroke(this._aCtx,st,this._baseVPScale.x,this._baseVPScale.y,this._vp));
+  renderAnnotations() {
+    this._aCtx.clearRect(0, 0, this._aCvs.width, this._aCvs.height);
+    const sts = this.strokes[this.pageNum] || [];
+    sts.forEach(st => DrawUtil.drawStroke(this._aCtx, st, this._baseVPScale.x, this._baseVPScale.y, this._vp));
   },
 
-  initCanvasEvents(){
-    const tw=this._wrapper;
-    let isTouch=false,touchMoved=false,f1StartPt={x:0,y:0};
-    
-    const getPos=e=>{
-      const p=e.touches?e.touches[0]:e;const r=tw.getBoundingClientRect();
-      return{x:p.clientX-r.left-this.offX,y:p.clientY-r.top-this.offY};
+  initCanvasEvents() {
+    const tw = this._wrapper;
+    let isTouch = false, touchMoved = false, f1StartPt = { x: 0, y: 0 };
+
+    const getPos = e => {
+      const p = e.touches ? e.touches[0] : e; const r = tw.getBoundingClientRect();
+      return { x: p.clientX - r.left - this.offX, y: p.clientY - r.top - this.offY };
     };
 
-    tw.addEventListener('pointerdown',e=>{
-      if(!this.pdfDoc)return;
-      if(e.pointerType==='touch'){isTouch=true;touchMoved=false;f1StartPt={x:e.clientX,y:e.clientY};}
-      if(this.currentTool==='pan'||(isTouch && e.pointerType==='touch' && this.currentTool!=='eraser')){
-        this._isPanning=true;this._lastPt={x:e.clientX,y:e.clientY};
-      }else{
-        if(Utils.isPalmContact(e))return;
-        this._isDrawing=true;const pos=getPos(e);this._lastPt=pos;
-        if(this.currentTool==='eraser'){
-          DrawUtil.applyEraser(this.strokes[this.pageNum]||[],pos,pos,18);
-          EventBus.emit('stroke-updated',this.pageNum);
-        }else{
-          this._curStroke={tool:this.currentTool,color:this.currentTool=='marker'?'#ffff00':'#ff0000',width:this.currentTool==='marker'?12:2,pts:[pos]};
-          this.strokes[this.pageNum]=this.strokes[this.pageNum]||[];
-          if(this.strokes[this.pageNum].length>=500){
+    tw.addEventListener('pointerdown', e => {
+      if (!this.pdfDoc) return;
+      if (e.pointerType === 'touch') { isTouch = true; touchMoved = false; f1StartPt = { x: e.clientX, y: e.clientY }; }
+      if (this.currentTool === 'pan' || (isTouch && e.pointerType === 'touch' && this.currentTool !== 'eraser')) {
+        this._isPanning = true; this._lastPt = { x: e.clientX, y: e.clientY };
+      } else {
+        if (Utils.isPalmContact(e)) return;
+        this._isDrawing = true; const pos = getPos(e); this._lastPt = pos;
+        if (this.currentTool === 'eraser') {
+          DrawUtil.applyEraser(this.strokes[this.pageNum] || [], pos, pos, 18);
+          EventBus.emit('stroke-updated', this.pageNum);
+        } else {
+          this._curStroke = { tool: this.currentTool, color: this.currentTool == 'marker' ? '#ffff00' : '#ff0000', width: this.currentTool === 'marker' ? 12 : 2, pts: [pos] };
+          this.strokes[this.pageNum] = this.strokes[this.pageNum] || [];
+          
+          /* メイン窓500本上限判定フック */
+          if (this.strokes[this.pageNum].length >= 500) {
             this.strokes[this.pageNum].shift();
-            if(!this._warned500){this._warned500=true;window.showToast('1ページあたりの上限(500本)に達したため古い線から削除されました');setTimeout(()=>{this._warned500=false;},10000);}
+            if (!this._warned500) {
+              this._warned500 = true;
+              window.showToast('1ページあたりの上限(500本)に達したため古い線から削除されました');
+              setTimeout(() => { this._warned500 = false; }, 10000);
+            }
           }
           this.strokes[this.pageNum].push(this._curStroke);
         }
       }
     });
 
-    tw.addEventListener('pointermove',e=>{
-      if(isTouch && !touchMoved && f1StartPt){
-        if(Math.hypot(e.clientX-f1StartPt.x,e.clientY-f1StartPt.y)>this.oneFingerSens)touchMoved=true;
+    tw.addEventListener('pointermove', e => {
+      if (isTouch && !touchMoved && f1StartPt) {
+        if (Math.hypot(e.clientX - f1StartPt.x, e.clientY - f1StartPt.y) > this.oneFingerSens) touchMoved = true;
       }
-      if(this._isPanning){
-        this.offX+=(e.clientX-this._lastPt.x);this.offY+=(e.clientY-this._lastPt.y);
-        this._lastPt={x:e.clientX,y:e.clientY};this.applyTransform();
-      }else if(this._isDrawing){
-        if(isTouch && !touchMoved && this.currentTool!=='eraser')return;
-        const pos=getPos(e);
-        if(this.currentTool==='eraser'){
-          DrawUtil.applyEraser(this.strokes[this.pageNum]||[],this._lastPt,pos,18);
-          EventBus.emit('stroke-updated',this.pageNum);
-        }else if(this._curStroke){
-          this._curStroke.pts.push(pos);this.renderAnnotations();
+      if (this._isPanning) {
+        this.offX += (e.clientX - this._lastPt.x); this.offY += (e.clientY - this._lastPt.y);
+        this._lastPt = { x: e.clientX, y: e.clientY }; this.applyTransform();
+      } else if (this._isDrawing) {
+        if (isTouch && !touchMoved && this.currentTool !== 'eraser') return;
+        const pos = getPos(e);
+        if (this.currentTool === 'eraser') {
+          DrawUtil.applyEraser(this.strokes[this.pageNum] || [], this._lastPt, pos, 18);
+          EventBus.emit('stroke-updated', this.pageNum);
+        } else if (this._curStroke) {
+          this._curStroke.pts.push(pos); this.renderAnnotations();
         }
-        this._lastPt=pos;
+        this._lastPt = pos;
       }
     });
 
-    const endAct=()=>{
-      if(this._isDrawing)AutoSave.trigger();
-      this._isPanning=false;this._isDrawing=false;this._curStroke=null;isTouch=false;
+    const endAct = () => {
+      if (this._isDrawing) AutoSave.trigger();
+      this._isPanning = false; this._isDrawing = false; this._curStroke = null; isTouch = false;
     };
-    tw.addEventListener('pointerup',endAct);tw.addEventListener('pointerleave',endAct);
+    tw.addEventListener('pointerup', endAct); tw.addEventListener('pointerleave', endAct);
 
-    /* 二本指ピンチズーム対応 */
-    tw.addEventListener('touchstart',e=>{
-      if(e.touches.length===2){
-        this._isPanning=false;this._isDrawing=false;
-        this._touchStartDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-        this._touchStartScale=this.scale;
+    tw.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        this._isPanning = false; this._isDrawing = false;
+        this._touchStartDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        this._touchStartScale = this.scale;
       }
-    },{passive:true});
+    }, { passive: true });
 
-    tw.addEventListener('touchmove',e=>{
-      if(e.touches.length===2 && this._touchStartDist>0){
-        const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-        const factor=d/this._touchStartDist;this.scale=Math.max(0.3,Math.min(6.0,this._touchStartScale*factor));
+    tw.addEventListener('touchmove', e => {
+      if (e.touches.length === 2 && this._touchStartDist > 0) {
+        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const factor = d / this._touchStartDist; this.scale = Math.max(0.3, Math.min(6.0, this._touchStartScale * factor));
         this.renderAll();
       }
-    },{passive:true});
+    }, { passive: true });
   },
 
-  calcCmd(c){
-    const v=document.getElementById('calc-val');
-    if(c==='C'){this.calcValue='0';}
-    else if(c==='='){try{this.calcValue=String(eval(this.calcValue.replace(/×/g,'*').replace(/÷/g,'/')))}catch(_){this.calcValue='Error'}}
-    else if(c==='√'){this.calcValue=String(Math.sqrt(parseFloat(this.calcValue)||0));}
-    else if(c==='sq'){this.calcValue=String(Math.pow(parseFloat(this.calcValue)||0,2));}
-    else{if(this.calcValue==='0' && !isNaN(c)){this.calcValue=c;}else{this.calcValue+=c;}}
-    v.innerText=this.calcValue;
+  calcCmd(c) {
+    const v = document.getElementById('calc-val');
+    if (c === 'C') { this.calcValue = '0'; }
+    else if (c === '=') { try { this.calcValue = String(eval(this.calcValue.replace(/×/g, '*').replace(/÷/g, '/'))) } catch (_) { this.calcValue = 'Error' } }
+    else if (c === '√') { this.calcValue = String(Math.sqrt(parseFloat(this.calcValue) || 0)); }
+    else if (c === 'sq') { this.calcValue = String(Math.pow(parseFloat(this.calcValue) || 0, 2)); }
+    else { if (this.calcValue === '0' && !isNaN(c)) { this.calcValue = c; } else { this.calcValue += c; } }
+    v.innerText = this.calcValue;
   },
 
-  async refreshFilePanel(){
-    const c=document.getElementById('file-list-container');c.innerHTML='';
-    const list=await DocMgr.getList();
-    if(list.length===0){c.innerHTML='<div style="font-size:11px;color:var(--tx2)">履歴なし</div>';return;}
-    list.forEach(m=>{
-      const d=document.createElement('div');d.className='file-item';
-      d.innerHTML=`<span>${m.name}</span><span style="color:var(--acc)">▶開く</span>`;
-      d.onclick=async()=>{
-        const doc=await IDBStore.get('doc:'+m.id);
-        if(doc){this.currentFileName=m.name;this.strokes={};this.pageNum=1;await this.loadPdfBytes(doc.originalPdfBytes);this.togglePanel('p-file');}
+  async refreshFilePanel() {
+    const c = document.getElementById('file-list-container'); c.innerHTML = '';
+    const list = await DocMgr.getList();
+    if (list.length === 0) { c.innerHTML = '<div style="font-size:11px;color:var(--tx2);padding:8px;">履歴データがありません</div>'; return; }
+    list.forEach(m => {
+      const d = document.createElement('div'); d.className = 'file-item';
+      d.innerHTML = `<span>${m.name}</span><span style="color:var(--brd);font-weight:bold">LOAD ▶</span>`;
+      d.onclick = async () => {
+        const doc = await IDBStore.get('doc:' + m.id);
+        if (doc) { this.currentFileName = m.name; this.strokes = {}; this.pageNum = 1; await this.loadPdfBytes(doc.originalPdfBytes); this.togglePanel('p-file'); }
       };
       c.appendChild(d);
     });
   },
 
-  async loadLastSession(){
-    this.refreshFilePanel();const idx=await DocMgr.getList();
-    if(idx.length>0){
-      const last=idx[idx.length-1];const doc=await IDBStore.get('doc:'+last.id);
-      if(doc){this.currentFileName=last.name;await this.loadPdfBytes(doc.originalPdfBytes);}
+  async loadLastSession() {
+    this.refreshFilePanel(); const idx = await DocMgr.getList();
+    if (idx.length > 0) {
+      const last = idx[idx.length - 1]; const doc = await IDBStore.get('doc:' + last.id);
+      if (doc) { this.currentFileName = last.name; await this.loadPdfBytes(doc.originalPdfBytes); }
     }
   },
 
-  async exportAllBackup(){
-    try{
-      const zip=new JSZip();const ks=await IDBStore.getAllKeys();
-      for(const k of ks){
-        if(k.startsWith('f:')||k.startsWith('doc_index')||k.startsWith('doc:')){
-          const v=await IDBStore.get(k);zip.file(k+'.json',JSON.stringify(v));
+  async exportAllBackup() {
+    try {
+      const zip = new JSZip(); const ks = await IDBStore.getAllKeys();
+      for (const k of ks) {
+        if (k.startsWith('f:') || k.startsWith('doc_index') || k.startsWith('doc:')) {
+          const v = await IDBStore.get(k); zip.file(k + '.json', JSON.stringify(v));
         }
       }
-      const b=await zip.generateAsync({type:'blob'});const a=document.createElement('a');
-      a.href=URL.createObjectURL(b);a.download=`MViewer_Backup_${Date.now()}.zip`;a.click();
-    }catch(e){window.showToast("バックアップ作成に失敗しました");}
+      const b = await zip.generateAsync({ type: 'blob' }); const a = document.createElement('a');
+      a.href = URL.createObjectURL(b); a.download = `MViewer_SYSTEM_BACKUP_${Date.now()}.zip`; a.click();
+    } catch (e) { window.showToast("システム一括バックアップの生成に失敗しました"); }
   }
 };
 
-window.onload=()=>App.init();
+/* システムブート */
+window.onload = () => App.init();
 </script>
 </body>
 </html>
