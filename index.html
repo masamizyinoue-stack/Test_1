@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.05</title>
+<title>M_Viewer V2.06</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════
-   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.05
+   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.06
    Design: 近未来 / ハイテク / プロフェッショナル / 高級感
    ════════════════════════════════════════════════════ */
 :root{
@@ -885,6 +885,15 @@ body{
   .logo{display:none}
   #fnlbl{max-width:60px}
 }
+/* ── 描画診断オーバーレイ ── */
+#diag-ov{display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.8);align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#diag-ov.on{display:flex}
+#diag-box{background:linear-gradient(180deg,#0a1828 0%,#06101a 100%);border:1.5px solid var(--brd-hi);border-radius:10px;width:min(700px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.05)}
+#diag-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--brd-hi);flex-shrink:0;gap:10px}
+#diag-hdr span{font-size:13px;font-weight:700;color:var(--acc);letter-spacing:.06em;text-shadow:0 0 10px var(--acc-glow)}
+#diag-close-btn{background:linear-gradient(180deg,#b02020 0%,#881010 100%);border:1.5px solid var(--red);color:#fff;border-radius:5px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+#diag-pre{flex:1;overflow-y:auto;overflow-x:auto;padding:12px 16px;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.75;color:var(--tx);white-space:pre;margin:0;background:transparent}
+@media(pointer:coarse){#diag-pre{font-size:11px;line-height:1.6}}
 </style>
 </head>
 <body>
@@ -903,7 +912,7 @@ body{
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.05</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.06</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -915,6 +924,7 @@ body{
     <!-- v47: 説明書を左、計算機を右に変更 -->
     <button class="btn" id="btn-manual" title="説明書を表示">説明書</button>
     <button class="btn" id="calcbtn">計算機</button>
+    <button class="btn" id="btn-diag" title="描画診断ログ">診断</button>
     <div class="sp"></div>
     <!-- v21: ホームボタン削除 -->
     <button class="btn rd" id="btn-close">閉じる</button>
@@ -974,7 +984,7 @@ body{
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.05</div>
+    <div class="dzm">M_Viewer V2.06</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1069,6 +1079,12 @@ body{
 対角にドラッグして下さい</div>
 <div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
 <div id="toast"></div>
+<div id="diag-ov">
+  <div id="diag-box">
+    <div id="diag-hdr"><span>描画診断ログ</span><button id="diag-close-btn">閉じる</button></div>
+    <pre id="diag-pre"></pre>
+  </div>
+</div>
 <script>
 'use strict';
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1083,7 +1099,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.05'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.06'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3250,7 +3266,117 @@ const App=(() => {
     /* v16: _textAt削除 */
     _showHome,_hideHome,
     setFileHandle(fh){_fileHandle=fh;},
-    setPostLoad(fn){_postLoadFn=fn;}
+    setPostLoad(fn){_postLoadFn=fn;},
+
+    /* --- 描画診断 --- */
+    diagnose(){
+      const MB=b=>(b/1048576).toFixed(2)+' MB';
+      const cB=(w,h)=>w*h*4;
+      const L=[];
+      const dpr=window.devicePixelRatio||1;
+      L.push('╔══════════════════════════════════════════════════════╗');
+      L.push('  M_Viewer 描画診断ログ');
+      L.push('  '+new Date().toLocaleString('ja-JP'));
+      L.push('╚══════════════════════════════════════════════════════╝');
+      L.push('');
+      L.push('── 環境情報 ─────────────────────────────────────────────');
+      L.push('  devicePixelRatio : '+dpr);
+      L.push('  表示倍率 (scale)  : '+Math.round(scale*100)+'%');
+      L.push('  renderScale      : '+renderScale.toFixed(3));
+      L.push('  cssExtraZoom     : '+cssExtraZoom.toFixed(3));
+      L.push('');
+      let total=0;
+      const items=[];
+      /* ── メインCanvas ── */
+      L.push('── メインウインドウ Canvas ──────────────────────────────');
+      const pB=cB(pdfCvs.width,pdfCvs.height);
+      total+=pB;items.push({n:'pdfCvs (メイン表示)',b:pB});
+      L.push('  pdfCvs   : '+pdfCvs.width+' × '+pdfCvs.height+' px  →  '+MB(pB));
+      L.push('    CSSサイズ: '+pdfCvs.style.width+' × '+pdfCvs.style.height);
+      const aB=cB(annCvs.width,annCvs.height);total+=aB;items.push({n:'annCvs (注釈Canvas)',b:aB});
+      L.push('  annCvs   : '+annCvs.width+' × '+annCvs.height+' px  →  '+MB(aB));
+      const oB=cB(ovlCvs.width,ovlCvs.height);total+=oB;items.push({n:'ovlCvs (選択Canvas)',b:oB});
+      L.push('  ovlCvs   : '+ovlCvs.width+' × '+ovlCvs.height+' px  →  '+MB(oB));
+      L.push('');
+      /* ── 一時Canvas ── */
+      L.push('── 一時 Canvas (_offscr) ────────────────────────────────');
+      if(_offscr){
+        const ob=cB(_offscr.width,_offscr.height);total+=ob;items.push({n:'_offscr (再レンダリング一時)',b:ob});
+        L.push('  _offscr  : '+_offscr.width+' × '+_offscr.height+' px  →  '+MB(ob));
+        L.push('  ★ renderPage()実行中に描画後 pdfCvs へ転写。終了後も再利用のため保持。');
+      }else{
+        L.push('  _offscr  : なし（未レンダリング）');
+      }
+      L.push('');
+      /* ── サブ窓 ── */
+      const wins=SubWinManager.getAll();
+      L.push('── サブ窓 ('+wins.length+'個) ──────────────────────────────────');
+      if(wins.length===0){L.push('  サブ窓なし');}
+      wins.forEach((sw,i)=>{
+        const n=i+1;
+        L.push('  [サブ窓'+n+'] innerScale='+sw.innerScale.toFixed(2)+
+               ' ('+Math.round(sw.innerScale*100)+'%)  ページ='+sw.pageNum);
+        const cb=cB(sw.cvs.width,sw.cvs.height);total+=cb;items.push({n:'サブ窓'+n+' cvs(表示)',b:cb});
+        L.push('    cvs       : '+sw.cvs.width+' × '+sw.cvs.height+' px  →  '+MB(cb));
+        if(sw._pdfCache){
+          const pb=cB(sw._pdfCache.width,sw._pdfCache.height);total+=pb;
+          items.push({n:'サブ窓'+n+' _pdfCache★',b:pb});
+          L.push('    _pdfCache : '+sw._pdfCache.width+' × '+sw._pdfCache.height+' px  →  '+MB(pb)+
+                 '  ★ズーム変更まで保持');
+        }else{L.push('    _pdfCache : なし');}
+        if(sw._annCvs){
+          const ab=cB(sw._annCvs.width,sw._annCvs.height);total+=ab;
+          items.push({n:'サブ窓'+n+' _annCvs',b:ab});
+          L.push('    _annCvs   : '+sw._annCvs.width+' × '+sw._annCvs.height+' px  →  '+MB(ab));
+        }else{L.push('    _annCvs   : なし');}
+        const st=items.filter(x=>x.n.startsWith('サブ窓'+n)).reduce((a,x)=>a+x.b,0);
+        L.push('    ▶ サブ窓'+n+'合計 : '+MB(st));
+      });
+      L.push('');
+      /* ── PDFページキャッシュ ── */
+      L.push('── PDFページキャッシュ ─────────────────────────────────');
+      L.push('  _pageCache : '+_pageCache.size+' / 10 ページ保持中');
+      L.push('  ※ PDF.js内部オブジェクト（Canvas外・JS Heap消費、計上外）');
+      L.push('');
+      /* ── 合計 ── */
+      L.push('── Canvas メモリ合計 ───────────────────────────────────');
+      L.push('  全Canvas合計 : '+MB(total));
+      if(performance.memory){
+        L.push('  JS Heap使用  : '+MB(performance.memory.usedJSHeapSize));
+        L.push('  JS Heap上限  : '+MB(performance.memory.jsHeapSizeLimit));
+      }else{
+        L.push('  JS Heap      : 取得不可（Chrome以外では非公開）');
+      }
+      L.push('');
+      /* ── ランキング ── */
+      L.push('── メモリ消費ランキング ────────────────────────────────');
+      items.sort((a,b)=>b.b-a.b);
+      items.forEach((it,i)=>{
+        const pct=((it.b/total)*100).toFixed(1);
+        const bar='█'.repeat(Math.max(1,Math.round(Number(pct)/4)));
+        L.push('  '+(i+1)+'. '+it.n.padEnd(26)+MB(it.b).padStart(9)+
+               '  '+pct.padStart(5)+'%  '+bar);
+      });
+      L.push('');
+      /* ── サブ窓2個時の分析 ── */
+      if(wins.length>=2){
+        const swnTotal=items.filter(x=>x.n.startsWith('サブ窓')).reduce((a,x)=>a+x.b,0);
+        const swnPct=((swnTotal/total)*100).toFixed(1);
+        L.push('── サブ窓2個時のメモリ分析 ─────────────────────────────');
+        L.push('  サブ窓Canvas合計 : '+MB(swnTotal)+' (全体の'+swnPct+'%)');
+        L.push('  各サブ窓の構成:');
+        L.push('    cvs       : 表示用Canvas（innerScale倍サイズ）');
+        L.push('    _pdfCache : ★最大消費源 — PDFをinnerScale倍で直接レンダリングしたCanvas');
+        L.push('                  ズーム倍率変更まで破棄されず常駐する');
+        L.push('    _annCvs   : 注釈専用Canvas（_pdfCacheと同サイズ）');
+        const bigItem=items.find(x=>x.n.includes('_pdfCache'));
+        if(bigItem){
+          L.push('  ★ 最大消費: '+bigItem.n+' = '+MB(bigItem.b)+' ('+((bigItem.b/total)*100).toFixed(1)+'%)');
+        }
+      }
+      L.push('══════════════════════════════════════════════════════════');
+      return L.join('\n');
+    }
   };
 })();
 
@@ -3622,6 +3748,16 @@ async function _manualRender(num){
 }
 
 document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('btn-diag').addEventListener('click',()=>{
+    document.getElementById('diag-pre').textContent=App.diagnose();
+    document.getElementById('diag-ov').classList.add('on');
+  });
+  document.getElementById('diag-close-btn').addEventListener('click',()=>{
+    document.getElementById('diag-ov').classList.remove('on');
+  });
+  document.getElementById('diag-ov').addEventListener('click',e=>{
+    if(e.target===e.currentTarget)e.currentTarget.classList.remove('on');
+  });
   document.getElementById('btn-manual').addEventListener('click',_openManual);
   document.getElementById('manual-close').addEventListener('click',()=>{
     document.getElementById('manual-overlay').classList.remove('on');
