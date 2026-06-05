@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer v61</title>
+<title>M_Viewer v62</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -198,6 +198,15 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
 #manual-canvas{max-width:100%;border-radius:4px;box-shadow:0 4px 20px #0008;touch-action:pan-y pinch-zoom;cursor:default}
 #manual-err{color:#f88;font-size:14px;padding:40px;text-align:center}
 /* v58: サブ窓作成案内ヒント */
+/* v62: 一本指感度設定パネル */
+#sens-panel{display:none;position:fixed;z-index:800;background:var(--pan);border:1.5px solid var(--brd);border-radius:11px;padding:14px 16px;box-shadow:0 4px 20px #0008;min-width:220px;touch-action:manipulation}
+#sens-panel.on{display:block}
+#sens-title{font-size:12px;font-weight:800;color:var(--tx2);margin-bottom:10px;display:block}
+.sens-opt{display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;touch-action:manipulation}
+.sens-opt input[type=radio]{width:16px;height:16px;accent-color:var(--acc);cursor:pointer;flex-shrink:0}
+.sens-opt label{font-size:13px;font-weight:600;color:var(--tx);cursor:pointer}
+.sens-opt.active label{color:var(--acc)}
+#sens-close{margin-top:10px;width:100%;height:34px;background:var(--pan2);border:1.5px solid var(--brd);color:var(--tx2);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}
 #sub-hint{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   z-index:700;background:rgba(0,0,0,.65);color:#fff;border-radius:12px;
   padding:14px 22px;font-size:15px;font-weight:700;text-align:center;
@@ -246,6 +255,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <input type="file" id="restoreInput" accept=".zip" style="display:none">
     <!-- v47: 説明書を左、計算機を右に変更 -->
     <button class="btn" id="btn-manual" title="説明書を表示">📖 説明書</button>
+    <button class="btn" id="sens-btn" title="一本指感度設定" style="font-size:10px;padding:3px 7px;opacity:0.8">👆 感度</button>
     <button class="btn" id="calcbtn">🧮 計算機</button>
     <div class="sp"></div>
     <!-- v21: ホームボタン削除 -->
@@ -306,7 +316,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer v61</div>
+    <div class="dzm">M_Viewer v62</div>
     <div class="dzs">📂 タップして選択 / ドラッグ＆ドロップ<br>✏️ ペン・蛍光ペン: Apple Pencil専用<br>👉 その他ツール・スクロール: 指でも操作可<br>🔍 2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">📂 PDFを開く</button>
   </div>
@@ -396,6 +406,16 @@ body{background:var(--bg);color:var(--tx);font-family:'Helvetica Neue',Arial,san
     <div id="manual-err" style="display:none"></div>
   </div>
 </div>
+<!-- v62: 一本指感度設定パネル -->
+<div id="sens-panel">
+  <span id="sens-title">👆 一本指感度（ペン使用時のパン）</span>
+  <div class="sens-opt"><input type="radio" name="sens" id="s0" value="20"><label for="s0">非常に低い（誤反応を最小化）</label></div>
+  <div class="sens-opt"><input type="radio" name="sens" id="s1" value="13"><label for="s1">低い</label></div>
+  <div class="sens-opt"><input type="radio" name="sens" id="s2" value="7"><label for="s2">標準</label></div>
+  <div class="sens-opt"><input type="radio" name="sens" id="s3" value="3"><label for="s3">高い</label></div>
+  <div class="sens-opt"><input type="radio" name="sens" id="s4" value="1"><label for="s4">非常に高い（即反応）</label></div>
+  <button id="sens-close">閉じる</button>
+</div>
 <!-- v58: サブ窓作成案内ヒント -->
 <div id="sub-hint">サブ窓を作成する範囲を
 対角にドラッグして下さい</div>
@@ -415,7 +435,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='61'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='62'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1586,7 +1606,12 @@ const App=(() => {
   let pinch=null,panSt=null;
   /* v61: ペン系ツール用 パン候補点 (閾値超過後にパン開始) */
   let _panCandidate=null;
-  const PEN_PAN_THRESHOLD=15; /* ペン系ツールでパン開始するまでの移動距離(px) */
+  /* v62: ユーザー設定で変更可能なパン開始閾値 (localStorage: mv_pan_sens) */
+  const _SENS_LEVELS=[20,13,7,3,1]; /* [非常に低い,低い,標準,高い,非常に高い] */
+  const _SENS_KEY='mv_pan_sens';
+  let PEN_PAN_THRESHOLD=(()=>{
+    try{const v=parseInt(localStorage.getItem(_SENS_KEY));return isFinite(v)?v:7;}catch(_){return 7;}
+  })();
   let _gestureRAF=null; /* v10: ジェスチャーRAFフラグ */
   let selectedIdx=[],selPath=[];
   let subRect=null;
@@ -3005,6 +3030,44 @@ function _hideSubHint(){
   document.getElementById('sub-hint').classList.remove('on');
   if(_subHintTimer){clearTimeout(_subHintTimer);_subHintTimer=null;}
 }
+
+/* v62: 一本指感度設定パネル */
+function _initSensPanel(){
+  const panel=document.getElementById('sens-panel');
+  const btn=document.getElementById('sens-btn');
+  /* 現在値でラジオ選択 */
+  function _syncRadio(){
+    document.querySelectorAll('input[name=sens]').forEach(r=>{
+      r.checked=(parseInt(r.value)===PEN_PAN_THRESHOLD);
+      r.closest('.sens-opt').classList.toggle('active',r.checked);
+    });
+  }
+  /* 設定変更 */
+  document.querySelectorAll('input[name=sens]').forEach(r=>{
+    r.addEventListener('change',()=>{
+      PEN_PAN_THRESHOLD=parseInt(r.value);
+      try{localStorage.setItem(_SENS_KEY,String(PEN_PAN_THRESHOLD));}catch(_){}
+      document.querySelectorAll('.sens-opt').forEach(o=>o.classList.toggle('active',o.querySelector('input').checked));
+      showToast('👆 感度を変更しました');
+    });
+  });
+  /* 開閉 */
+  btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const isOpen=panel.classList.contains('on');
+    if(isOpen){panel.classList.remove('on');btn.classList.remove('on');return;}
+    _syncRadio();
+    const r=btn.getBoundingClientRect();
+    panel.style.left=Math.min(r.left,window.innerWidth-240)+'px';
+    panel.style.top=(r.bottom+4)+'px';
+    panel.classList.add('on');btn.classList.add('on');
+  });
+  document.getElementById('sens-close').addEventListener('click',()=>{panel.classList.remove('on');btn.classList.remove('on');});
+  document.addEventListener('click',e=>{if(!panel.contains(e.target)&&e.target!==btn){panel.classList.remove('on');btn.classList.remove('on');}});
+  panel.addEventListener('click',e=>e.stopPropagation());
+  _syncRadio();
+}
+document.addEventListener('DOMContentLoaded',_initSensPanel);
 
 function closePickers(){['selpop','szp'].forEach(id=>{document.getElementById(id)?.classList.remove('on');}); /* v16: shapepop削除 */}
 function openFile(){document.getElementById('fileInput').click();}
