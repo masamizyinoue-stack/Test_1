@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.08</title>
+<title>M_Viewer V2.11</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════
-   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.08
+   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.11
    Design: 近未来 / ハイテク / プロフェッショナル / 高級感
    ════════════════════════════════════════════════════ */
 :root{
@@ -112,6 +112,12 @@ body{
   box-shadow:var(--inset-hi),0 0 12px var(--red-glow),0 1px 4px rgba(0,0,0,.5);
 }
 .btn.rd:hover{box-shadow:var(--inset-hi),0 0 20px var(--red-glow),0 1px 4px rgba(0,0,0,.5)}
+/* v2.10: Undo/Redoボタン無効状態 */
+.btn:disabled,.btn:disabled:hover{
+  color:var(--tx3);border-color:var(--brd);
+  background:linear-gradient(180deg,#0f1820 0%,#0a1018 100%);
+  box-shadow:none;transform:none;cursor:not-allowed;opacity:.55;
+}
 
 /* ── PAGE INPUT ── */
 .pgni{
@@ -886,14 +892,7 @@ body{
   #fnlbl{max-width:60px}
 }
 /* ── 描画診断オーバーレイ ── */
-#diag-ov{display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.8);align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-#diag-ov.on{display:flex}
-#diag-box{background:linear-gradient(180deg,#0a1828 0%,#06101a 100%);border:1.5px solid var(--brd-hi);border-radius:10px;width:min(700px,96vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.05)}
-#diag-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--brd-hi);flex-shrink:0;gap:10px}
-#diag-hdr span{font-size:13px;font-weight:700;color:var(--acc);letter-spacing:.06em;text-shadow:0 0 10px var(--acc-glow)}
-#diag-close-btn{background:linear-gradient(180deg,#b02020 0%,#881010 100%);border:1.5px solid var(--red);color:#fff;border-radius:5px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
-#diag-pre{flex:1;overflow-y:auto;overflow-x:auto;padding:12px 16px;font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.75;color:var(--tx);white-space:pre;margin:0;background:transparent}
-@media(pointer:coarse){#diag-pre{font-size:11px;line-height:1.6}}
+
 </style>
 </head>
 <body>
@@ -912,11 +911,12 @@ body{
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.08</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.11</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
     <button class="btn" id="btn-undo">戻す</button>
+    <button class="btn" id="btn-redo">進む</button>
     <button class="btn" id="btn-save">PDF出力</button><!-- v48: on削除(常時アクティブ解消) -->
     <button class="btn" id="btn-backup" title="ZIP バックアップ">バックアップ</button>
     <button class="btn" id="btn-restore" title="ZIP から復元">復元</button>
@@ -924,7 +924,6 @@ body{
     <!-- v47: 説明書を左、計算機を右に変更 -->
     <button class="btn" id="btn-manual" title="説明書を表示">説明書</button>
     <button class="btn" id="calcbtn">計算機</button>
-    <button class="btn" id="btn-diag" title="描画診断ログ">診断</button>
     <div class="sp"></div>
     <!-- v21: ホームボタン削除 -->
     <button class="btn rd" id="btn-close">閉じる</button>
@@ -984,7 +983,7 @@ body{
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.08</div>
+    <div class="dzm">M_Viewer V2.11</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1079,12 +1078,6 @@ body{
 対角にドラッグして下さい</div>
 <div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
 <div id="toast"></div>
-<div id="diag-ov">
-  <div id="diag-box">
-    <div id="diag-hdr"><span>描画診断ログ</span><button id="diag-close-btn">閉じる</button></div>
-    <pre id="diag-pre"></pre>
-  </div>
-</div>
 <script>
 'use strict';
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1099,7 +1092,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.08'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.11'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1115,8 +1108,6 @@ const SW_FILLS=['rgba(240,120,0,.12)','rgba(0,160,255,.12)','rgba(0,200,80,.12)'
 const PEN_COLORS=[{id:'sw0',c:'#cc2020'},{id:'sw1',c:'#1a1a1a'},{id:'sw2',c:'#1a55cc'},{id:'sw3',c:'#108030'}];
 const HL_COLORS=[{id:'sw0',c:'#ffd700'},{id:'sw1',c:'#50c040'},{id:'sw2',c:'#ff69b4'},{id:'sw3',c:'#40d4e8'}];
 const TOOL_DEFAULT_SIZES={pen:3,hl:3,eraser:20}; /* v16: text/shape削除 */
-/* パフォーマンスカウンタ (診断ログ・デバッグ用) */
-const PerfCount={pdfRender:0,canvasCreate:0,subRender:0,overlayDraw:0,autoSave:0,strokeAdded:0,reset(){Object.keys(this).forEach(k=>{if(typeof this[k]==='number')this[k]=0;});}};
 
 /* ============================================================
    Module: Logger
@@ -1470,7 +1461,6 @@ const AutoSave=(() => {
     _timer=setTimeout(async()=>{
       const data=_buildData(getState);
       if(!data)return;
-      PerfCount.autoSave++;
       Logger.info('[AutoSave] sched start ts='+data.ts);
       IDBStore.enqueue(_saveKeys(data));
       IDBStore.enqueue([['resume:prv',data]]);
@@ -1907,7 +1897,6 @@ class SubWin{
 
   async render(){
     if(!this.pdfDoc)return;
-    PerfCount.subRender++;
     const ver=++this._renderVer;
     const sc=this.innerScale;
     /* getPage()キャッシュ: 同一ページは再取得しない */
@@ -1920,7 +1909,7 @@ class SubWin{
     this._vp=vp; /* v6: PDF座標変換用 */
     if(!this._pdfCache||this._pdfCacheSc!==sc||this._pdfCachePg!==this.pageNum){
       /* _pdfCache再利用: 毎回createElement不要 → Canvas生成回数削減 */
-      if(!this._pdfCache){this._pdfCache=document.createElement('canvas');PerfCount.canvasCreate++;}
+      if(!this._pdfCache){this._pdfCache=document.createElement('canvas');}
       if(this._pdfCache.width!==vp.width||this._pdfCache.height!==vp.height){
         this._pdfCache.width=vp.width;this._pdfCache.height=vp.height;
       }
@@ -2297,6 +2286,10 @@ const App=(() => {
   let _postLoadFn=null;
   let _docId=null;
   /* v16: _txX/_txY削除 */
+  /* v2.09: Undo/Redoスタック */
+  const _undoStack={};  /* page→snapshot[] */
+  const _redoStack={};  /* page→snapshot[] */
+  const MAX_UNDO_STEPS=50;
 
   /* ツール状態 */
   let _activeTool='pen',_selMode='rect'; /* v16: _activeShape削除 */
@@ -2356,7 +2349,6 @@ const App=(() => {
   /* --- サブ窓オーバーレイ --- */
   function _drawSubOverlays(){
     if(!pdfDoc||!SubWinManager.count())return;
-    PerfCount.overlayDraw++;
     const sc=renderScale,invEZ=1/cssExtraZoom;
     SubWinManager.getAll().forEach(sw=>{
       const br=sw.body.getBoundingClientRect();if(!br.width||!br.height)return;
@@ -2385,7 +2377,6 @@ const App=(() => {
   async function renderPage(num){
     if(!Logger.flags.pdfRender)return;
     if(!pdfDoc)return;
-    PerfCount.pdfRender++;
     Logger.debug('[renderPage] page='+num+' scale='+scale.toFixed(3)+' dpr='+(window.devicePixelRatio||1).toFixed(2));
     const ver=++renderVer;
 
@@ -2422,8 +2413,7 @@ const App=(() => {
     /* v37 [v28]: 共有_offscr を再利用 (メモリリーク解消) */
     if(!_offscr||_offscr.width!==hiVP.width||_offscr.height!==hiVP.height){
       _offscr=document.createElement('canvas');_offscr.width=hiVP.width;_offscr.height=hiVP.height;
-      PerfCount.canvasCreate++;
-    }
+          }
     const offCtx=_offscr.getContext('2d');
     offCtx.imageSmoothingEnabled=true;offCtx.imageSmoothingQuality='high'; /* v29: 維持 */
     offCtx.fillStyle='#fff';offCtx.fillRect(0,0,hiVP.width,hiVP.height);
@@ -2668,7 +2658,7 @@ const App=(() => {
     if(_activeTool==='select'){
       if(selectedIdx.length>0){
         const bb=_selBBox();
-        if(bb&&p.x>=bb.x1-10/scale&&p.x<=bb.x2+10/scale&&p.y>=bb.y1-10/scale&&p.y<=bb.y2+10/scale){isDrawing=true;lastX=p.x;lastY=p.y;return;}
+        if(bb&&p.x>=bb.x1-10/scale&&p.x<=bb.x2+10/scale&&p.y>=bb.y1-10/scale&&p.y<=bb.y2+10/scale){_saveUndoSnap();isDrawing=true;lastX=p.x;lastY=p.y;return;} /* v2.09: move前スナップ */
         else _clearSel();
       }
       selPath=[{x:p.x,y:p.y}];isDrawing=true;return;
@@ -2755,12 +2745,14 @@ const App=(() => {
     }
     if(curStroke?.type==='eraser'){
       const er=curStroke,r=(er.size||20)*2/3;
+      _saveUndoSnap();  /* v2.09: eraser前スナップ */
       strokes[curPage]=(strokes[curPage]||[]).flatMap(s=>DrawUtil.applyEraserAll(s,er.points||[],r));
       curStroke=null;ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);
       redraw();_drawSelOv(); /* サブ窓更新はstroke:added→refreshAnnotations()に一本化 */
       EventBus.emit('stroke:added');return;
     }
     if(!curStroke)return;
+    _saveUndoSnap();  /* v2.09: pen/hl前スナップ */
     if(!strokes[curPage])strokes[curPage]=[];
     if(strokes[curPage].length>=MAX_STROKES_PER_PAGE){strokes[curPage].shift();showToast('⚠️ ストローク上限に達しました');}
     strokes[curPage].push({...curStroke,points:curStroke.points?[...curStroke.points]:undefined});
@@ -2793,6 +2785,7 @@ const App=(() => {
   function copySelected(){
     if(_activeSelSubWin){_activeSelSubWin.copySelected&&_activeSelSubWin.copySelected();return;}
     if(!selectedIdx.length)return;
+    _saveUndoSnap();  /* v2.09: copySelected前スナップ */
     const arr=strokes[curPage]||[];
     const startIdx=arr.length;
     const off=24; /* 複製の初期オフセット (px) */
@@ -2815,6 +2808,7 @@ const App=(() => {
   /* v44: pasteClipboard — clipboardから複製して選択 (copySelectedと同動作) */
   function pasteClipboard(){
     if(!_clipboard||!_clipboard.length){showToast('コピーされた内容がありません');return;}
+    _saveUndoSnap();  /* v2.09: pasteClipboard前スナップ */
     const arr=strokes[curPage]||[];
     const startIdx=arr.length;
     const off=24;
@@ -2830,14 +2824,45 @@ const App=(() => {
     showToast('📋 複製しました');
   }
 
-  function undo(){
-    const a=strokes[curPage];
-    if(!a||!a.length){showToast('操作がありません');return;}
-    a.pop();redraw();SubWinManager.updateAll(strokes,curPage);EventBus.emit('stroke:added');
+  /* v2.09: スナップショット保存（Undo前に呼ぶ） */
+  /* v2.10: 戻す/進むボタン有効無効更新 */
+  function _updateUndoRedoBtn(){
+    const undoBtn=document.getElementById('btn-undo');
+    const redoBtn=document.getElementById('btn-redo');
+    const hasUndo=!!(_undoStack[curPage]&&_undoStack[curPage].length);
+    const hasRedo=!!(_redoStack[curPage]&&_redoStack[curPage].length);
+    if(undoBtn)undoBtn.disabled=!hasUndo;
+    if(redoBtn)redoBtn.disabled=!hasRedo;
   }
+  function _saveUndoSnap(){
+    const pg=curPage;
+    if(!_undoStack[pg])_undoStack[pg]=[];
+    _undoStack[pg].push(JSON.parse(JSON.stringify(strokes[pg]||[])));
+    if(_undoStack[pg].length>MAX_UNDO_STEPS)_undoStack[pg].shift();
+    _redoStack[pg]=[];  /* 新操作でRedoクリア */
+    _updateUndoRedoBtn();  /* v2.10: 状態同期 */
+  }
+  function undo(){
+    if(!_undoStack[curPage]||!_undoStack[curPage].length){showToast('操作がありません');return;}
+    if(!_redoStack[curPage])_redoStack[curPage]=[];
+    _redoStack[curPage].push(JSON.parse(JSON.stringify(strokes[curPage]||[])));
+    strokes[curPage]=_undoStack[curPage].pop();
+    redraw();SubWinManager.updateAll(strokes,curPage);EventBus.emit('stroke:added');
+    _updateUndoRedoBtn();  /* v2.10: 状態同期 */
+  }
+  function redo(){
+    if(!_redoStack[curPage]||!_redoStack[curPage].length){showToast('進む操作がありません');return;}
+    if(!_undoStack[curPage])_undoStack[curPage]=[];
+    _undoStack[curPage].push(JSON.parse(JSON.stringify(strokes[curPage]||[])));
+    strokes[curPage]=_redoStack[curPage].pop();
+    redraw();SubWinManager.updateAll(strokes,curPage);EventBus.emit('stroke:added');
+    _updateUndoRedoBtn();  /* v2.10: 状態同期 */
+  }
+  EventBus.on('stroke:added',_updateUndoRedoBtn); /* v2.10: ページ移動・全操作後に同期 */
   function deleteSelected(){
     if(_activeSelSubWin){_activeSelSubWin.deleteSelected();return;}
     if(!selectedIdx.length)return;
+    _saveUndoSnap();  /* v2.09: deleteSelected前スナップ */
     strokes[curPage]=(strokes[curPage]||[]).filter((_,i)=>!selectedIdx.includes(i));
     _clearSel();redraw();SubWinManager.updateAll(strokes,curPage);EventBus.emit('stroke:added');
   }
@@ -3187,6 +3212,9 @@ const App=(() => {
     totalPages=sh.totalPages||0;scale=sh.scale||1;renderScale=sh.renderScale||1;cssExtraZoom=sh.cssExtraZoom||1;
     panX=sh.panX??16;panY=sh.panY??16;strokes=sh.strokes||{};_docId=sh.docId||null;
     _pageCache.clear();selectedIdx=[];selPath=[];
+    Object.keys(_undoStack).forEach(k=>delete _undoStack[k]);  /* v2.09: シート切替時クリア */
+    Object.keys(_redoStack).forEach(k=>delete _redoStack[k]);
+    _updateUndoRedoBtn();  /* v2.10: シート切替後に同期 */
     document.getElementById('fnlbl').textContent=fileName||'ファイル未選択';
     document.getElementById('tpn').textContent=totalPages||'0';
     document.getElementById('pgn').value=curPage;
@@ -3216,7 +3244,6 @@ const App=(() => {
      v38でdouble redraw防止として削除したが、それによりサブ窓操作がメインに反映されなくなっていた。
      redraw()はannCtx clear+drawのみで軽量なので二重呼びは許容できる。 */
   EventBus.on('stroke:added',()=>{
-    PerfCount.strokeAdded++;
     AutoSave.schedSave(_getState);
     clearTimeout(_docUpdateTimer);
     _docUpdateTimer=setTimeout(()=>{
@@ -3255,7 +3282,8 @@ const App=(() => {
   window.addEventListener('beforeunload',()=>{if(pdfDoc)AutoSave.emergencySave(_getState);});
 
   return{
-    gotoPage,fit,undo,deleteSelected,copySelected,pasteClipboard,closeFile,redraw,loadPDF, /* v44 */
+    gotoPage,fit,undo,redo,deleteSelected,copySelected,pasteClipboard,closeFile,redraw,loadPDF, /* v44, v2.09 */
+    updateUndoRedoBtn:_updateUndoRedoBtn, /* v2.10 */
     saveState,loadState,restore,downloadBackup,restoreFromZip,exportPDF, /* v21: showHome削除 */
     setTool,setColor,setSize, /* v16: setShape削除 */
     _clipboardSet(arr){_clipboard=arr;showToast('📋 コピーしました');}, /* v44: SubWin用 */
@@ -3283,124 +3311,6 @@ const App=(() => {
     setFileHandle(fh){_fileHandle=fh;},
     setPostLoad(fn){_postLoadFn=fn;},
 
-    /* --- 描画診断 --- */
-    diagnose(){
-      const MB=b=>(b/1048576).toFixed(2)+' MB';
-      const cB=(w,h)=>w*h*4;
-      const L=[];
-      const dpr=window.devicePixelRatio||1;
-      L.push('╔══════════════════════════════════════════════════════╗');
-      L.push('  M_Viewer 描画診断ログ');
-      L.push('  '+new Date().toLocaleString('ja-JP'));
-      L.push('╚══════════════════════════════════════════════════════╝');
-      L.push('');
-      L.push('── 環境情報 ─────────────────────────────────────────────');
-      L.push('  devicePixelRatio : '+dpr);
-      L.push('  表示倍率 (scale)  : '+Math.round(scale*100)+'%');
-      L.push('  renderScale      : '+renderScale.toFixed(3));
-      L.push('  cssExtraZoom     : '+cssExtraZoom.toFixed(3));
-      L.push('');
-      let total=0;
-      const items=[];
-      /* ── メインCanvas ── */
-      L.push('── メインウインドウ Canvas ──────────────────────────────');
-      const pB=cB(pdfCvs.width,pdfCvs.height);
-      total+=pB;items.push({n:'pdfCvs (メイン表示)',b:pB});
-      L.push('  pdfCvs   : '+pdfCvs.width+' × '+pdfCvs.height+' px  →  '+MB(pB));
-      L.push('    CSSサイズ: '+pdfCvs.style.width+' × '+pdfCvs.style.height);
-      const aB=cB(annCvs.width,annCvs.height);total+=aB;items.push({n:'annCvs (注釈Canvas)',b:aB});
-      L.push('  annCvs   : '+annCvs.width+' × '+annCvs.height+' px  →  '+MB(aB));
-      const oB=cB(ovlCvs.width,ovlCvs.height);total+=oB;items.push({n:'ovlCvs (選択Canvas)',b:oB});
-      L.push('  ovlCvs   : '+ovlCvs.width+' × '+ovlCvs.height+' px  →  '+MB(oB));
-      L.push('');
-      /* ── 一時Canvas ── */
-      L.push('── 一時 Canvas (_offscr) ────────────────────────────────');
-      if(_offscr){
-        const ob=cB(_offscr.width,_offscr.height);total+=ob;items.push({n:'_offscr (再レンダリング一時)',b:ob});
-        L.push('  _offscr  : '+_offscr.width+' × '+_offscr.height+' px  →  '+MB(ob));
-        L.push('  ★ renderPage()実行中に描画後 pdfCvs へ転写。終了後も再利用のため保持。');
-      }else{
-        L.push('  _offscr  : なし（未レンダリング）');
-      }
-      L.push('');
-      /* ── サブ窓 ── */
-      const wins=SubWinManager.getAll();
-      L.push('── サブ窓 ('+wins.length+'個) ──────────────────────────────────');
-      if(wins.length===0){L.push('  サブ窓なし');}
-      wins.forEach((sw,i)=>{
-        const n=i+1;
-        L.push('  [サブ窓'+n+'] innerScale='+sw.innerScale.toFixed(2)+
-               ' ('+Math.round(sw.innerScale*100)+'%)  ページ='+sw.pageNum);
-        const cb=cB(sw.cvs.width,sw.cvs.height);total+=cb;items.push({n:'サブ窓'+n+' cvs(表示)',b:cb});
-        L.push('    cvs       : '+sw.cvs.width+' × '+sw.cvs.height+' px  →  '+MB(cb));
-        if(sw._pdfCache){
-          const pb=cB(sw._pdfCache.width,sw._pdfCache.height);total+=pb;
-          items.push({n:'サブ窓'+n+' _pdfCache★',b:pb});
-          L.push('    _pdfCache : '+sw._pdfCache.width+' × '+sw._pdfCache.height+' px  →  '+MB(pb)+
-                 '  ★ズーム変更まで保持');
-        }else{L.push('    _pdfCache : なし');}
-        if(sw._annCvs){
-          const ab=cB(sw._annCvs.width,sw._annCvs.height);total+=ab;
-          items.push({n:'サブ窓'+n+' _annCvs',b:ab});
-          L.push('    _annCvs   : '+sw._annCvs.width+' × '+sw._annCvs.height+' px  →  '+MB(ab));
-        }else{L.push('    _annCvs   : なし');}
-        const st=items.filter(x=>x.n.startsWith('サブ窓'+n)).reduce((a,x)=>a+x.b,0);
-        L.push('    ▶ サブ窓'+n+'合計 : '+MB(st));
-      });
-      L.push('');
-      /* ── PDFページキャッシュ ── */
-      L.push('── PDFページキャッシュ ─────────────────────────────────');
-      L.push('  _pageCache : '+_pageCache.size+' / 10 ページ保持中');
-      L.push('  ※ PDF.js内部オブジェクト（Canvas外・JS Heap消費、計上外）');
-      L.push('');
-      /* ── 合計 ── */
-      L.push('── Canvas メモリ合計 ───────────────────────────────────');
-      L.push('  全Canvas合計 : '+MB(total));
-      if(performance.memory){
-        L.push('  JS Heap使用  : '+MB(performance.memory.usedJSHeapSize));
-        L.push('  JS Heap上限  : '+MB(performance.memory.jsHeapSizeLimit));
-      }else{
-        L.push('  JS Heap      : 取得不可（Chrome以外では非公開）');
-      }
-      L.push('');
-      /* ── ランキング ── */
-      L.push('── メモリ消費ランキング ────────────────────────────────');
-      items.sort((a,b)=>b.b-a.b);
-      items.forEach((it,i)=>{
-        const pct=((it.b/total)*100).toFixed(1);
-        const bar='█'.repeat(Math.max(1,Math.round(Number(pct)/4)));
-        L.push('  '+(i+1)+'. '+it.n.padEnd(26)+MB(it.b).padStart(9)+
-               '  '+pct.padStart(5)+'%  '+bar);
-      });
-      L.push('');
-      /* ── サブ窓2個時の分析 ── */
-      if(wins.length>=2){
-        const swnTotal=items.filter(x=>x.n.startsWith('サブ窓')).reduce((a,x)=>a+x.b,0);
-        const swnPct=((swnTotal/total)*100).toFixed(1);
-        L.push('── サブ窓2個時のメモリ分析 ─────────────────────────────');
-        L.push('  サブ窓Canvas合計 : '+MB(swnTotal)+' (全体の'+swnPct+'%)');
-        L.push('  各サブ窓の構成:');
-        L.push('    cvs       : 表示用Canvas（innerScale倍サイズ）');
-        L.push('    _pdfCache : ★最大消費源 — PDFをinnerScale倍で直接レンダリングしたCanvas');
-        L.push('                  ズーム倍率変更まで破棄されず常駐する');
-        L.push('    _annCvs   : 注釈専用Canvas（_pdfCacheと同サイズ）');
-        const bigItem=items.find(x=>x.n.includes('_pdfCache'));
-        if(bigItem){
-          L.push('  ★ 最大消費: '+bigItem.n+' = '+MB(bigItem.b)+' ('+((bigItem.b/total)*100).toFixed(1)+'%)');
-        }
-      }
-      /* ── パフォーマンスカウンタ ── */
-      L.push('── パフォーマンスカウンタ（起動/リセット以降の累計） ──────────');
-      L.push('  PDFレンダリング回数  : '+PerfCount.pdfRender);
-      L.push('  Canvas生成回数       : '+PerfCount.canvasCreate);
-      L.push('  サブ窓描画回数       : '+PerfCount.subRender);
-      L.push('  Overlay描画回数      : '+PerfCount.overlayDraw);
-      L.push('  AutoSave実行回数     : '+PerfCount.autoSave);
-      L.push('  strokeAdded発火回数  : '+PerfCount.strokeAdded);
-      L.push('  ※ リセット: ブラウザコンソールで PerfCount.reset() を実行');
-      L.push('══════════════════════════════════════════════════════════');
-      return L.join('\n');
-    }
   };
 })();
 
@@ -3506,6 +3416,7 @@ function _initToolbar(){
   document.getElementById('btn-close').addEventListener('click',()=>App.closeFile());
   /* v21: btn-homeイベントリスナー削除 */
   document.getElementById('btn-undo').addEventListener('click',()=>App.undo());
+  document.getElementById('btn-redo').addEventListener('click',()=>App.redo()); /* v2.09 */
   document.getElementById('btn-save').addEventListener('click',()=>{document.getElementById('pgrov').classList.add('on');document.getElementById('pgrfld').value='';});
   document.getElementById('btn-backup').addEventListener('click',()=>App.downloadBackup());
   /* v22: バックアップリマインダーボタン */
@@ -3772,16 +3683,6 @@ async function _manualRender(num){
 }
 
 document.addEventListener('DOMContentLoaded',function(){
-  document.getElementById('btn-diag').addEventListener('click',()=>{
-    document.getElementById('diag-pre').textContent=App.diagnose();
-    document.getElementById('diag-ov').classList.add('on');
-  });
-  document.getElementById('diag-close-btn').addEventListener('click',()=>{
-    document.getElementById('diag-ov').classList.remove('on');
-  });
-  document.getElementById('diag-ov').addEventListener('click',e=>{
-    if(e.target===e.currentTarget)e.currentTarget.classList.remove('on');
-  });
   document.getElementById('btn-manual').addEventListener('click',_openManual);
   document.getElementById('manual-close').addEventListener('click',()=>{
     document.getElementById('manual-overlay').classList.remove('on');
@@ -4153,6 +4054,7 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
   const _logoEl=document.getElementById('logo-ver');
   if(_logoEl)_logoEl.innerHTML='M_Viewer <span style="font-size:10px">'+APP_VER+'</span>';
   console.log('%c[M_Viewer] ver '+APP_VER+' 起動','color:#1a8a50;font-weight:bold;font-size:13px');
+  App.updateUndoRedoBtn(); /* v2.10: 起動時ボタン初期状態設定 */
 
   IDBStore.warmup();
   _renderTabBar();
