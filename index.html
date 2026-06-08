@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.06</title>
+<title>M_Viewer V2.07</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════
-   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.06
+   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.07
    Design: 近未来 / ハイテク / プロフェッショナル / 高級感
    ════════════════════════════════════════════════════ */
 :root{
@@ -912,7 +912,7 @@ body{
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.06</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.07</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -984,7 +984,7 @@ body{
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.06</div>
+    <div class="dzm">M_Viewer V2.07</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1099,7 +1099,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.06'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.07'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1109,7 +1109,7 @@ const APP_VER='V2.06'; /* ← ★ バージョンアップ時はここだけ変�
    3600 は安定実績があり、cssExtraZoom=1.87(800%)程度で許容範囲
    低倍率(100-200%)は PDF_MAX_DPR=2.0 で v28 より高品質を維持 */
 const MAX_CANVAS=3600,MAX_SCALE=8,SAVE_DELAY=1200,PDF_MAX_DPR=2.0;
-const MAX_SUBWIN=5,MAX_STROKES_PER_PAGE=500;
+const MAX_SUBWIN=2,MAX_STROKES_PER_PAGE=500;
 const SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0','#c0c000'];
 const SW_FILLS=['rgba(240,120,0,.12)','rgba(0,160,255,.12)','rgba(0,200,80,.12)','rgba(255,80,160,.12)','rgba(200,200,0,.12)'];
 const PEN_COLORS=[{id:'sw0',c:'#cc2020'},{id:'sw1',c:'#1a1a1a'},{id:'sw2',c:'#1a55cc'},{id:'sw3',c:'#108030'}];
@@ -2717,7 +2717,7 @@ const App=(() => {
     if(_activeTool==='sub'&&subRect){
       const r={x1:Math.min(subRect.x1,subRect.x2),y1:Math.min(subRect.y1,subRect.y2),x2:Math.max(subRect.x1,subRect.x2),y2:Math.max(subRect.y1,subRect.y2)};
       if((r.x2-r.x1)>5/scale&&(r.y2-r.y1)>5/scale){ /* v27: 最小サイズ閾値を緩和 10→5 */
-        if(SubWinManager.count()>=MAX_SUBWIN){showToast(`サブ窓は最大${MAX_SUBWIN}つです`);}
+        if(SubWinManager.count()>=MAX_SUBWIN){showToast(`サブ窓は最大${MAX_SUBWIN}個までです`);}
         else if(!_subCreating){
           _subCreating=true;setTimeout(()=>{_subCreating=false;},400);
           const cr=caEl.getBoundingClientRect();
