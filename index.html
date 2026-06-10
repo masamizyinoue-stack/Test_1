@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.12</title>
+<title>M_Viewer V2.13</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -923,7 +923,7 @@ body{
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.12</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.13</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -995,7 +995,7 @@ body{
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.12</div>
+    <div class="dzm">M_Viewer V2.13</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1105,7 +1105,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.12'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.13'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1774,6 +1774,33 @@ function _placeSelBtn(vp){
    設計: document に touchmove/touchend/mousemove/mouseup を1本ずつ
          アクティブなサブ窓の onMove/onEnd コールバックに委譲
    ============================================================ */
+/* ============================================================
+   Module: ZManager  v2.13
+   責務: サブ窓・計算機など全フローティング窓のZ-index統一管理
+   範囲: 401–490 (静的UI ≦400, モーダル 500+)
+   ============================================================ */
+const ZManager=(() => {
+  const _wins=new Set();
+  const _BASE=401;
+  let _c=_BASE-1;
+  function _renormalize(){
+    const arr=[..._wins].sort((a,b)=>(parseInt(a.style.zIndex)||_BASE)-(parseInt(b.style.zIndex)||_BASE));
+    arr.forEach((w,i)=>{w.style.zIndex=String(_BASE+i);});
+    _c=_BASE-1+arr.length;
+  }
+  function register(el){_wins.add(el);}   /* セットに追加のみ (z-indexは呼び元で設定済み) */
+  function unregister(el){_wins.delete(el);}
+  function bringToFront(el){
+    if(_c-_BASE>=50&&_wins.size>0)_renormalize();
+    el.style.zIndex=String(++_c);
+  }
+  function nextForNew(){              /* SubWinManager.nextZ() 互換シム */
+    if(_c-_BASE>=50&&_wins.size>0)_renormalize();
+    return++_c;
+  }
+  return{register,unregister,bringToFront,nextForNew};
+})();
+
 const SubWinManager=(() => {
   const _wins=[];
   let _zBase=200;
@@ -1790,7 +1817,7 @@ const SubWinManager=(() => {
 
   function setActive(onMove,onEnd){_active.onMove=onMove;_active.onEnd=onEnd;}
   function clearActive(){_active.onMove=null;_active.onEnd=null;}
-  function nextZ(){return++_zBase;}
+  function nextZ(){return ZManager.nextForNew();}  /* v2.13: ZManagerに委譲 */
   function add(sw){_wins.push(sw);}
   function remove(sw){const i=_wins.indexOf(sw);if(i>=0)_wins.splice(i,1);}
   function getAll(){return[..._wins];}
@@ -1880,6 +1907,7 @@ class SubWin{
     const el=document.createElement('div');
     el.className='swn';
     el.style.cssText=`left:${this.sx}px;top:${this.sy}px;width:${this.winW}px;height:${this.winH}px;z-index:${SubWinManager.nextZ()};border-color:${this.swColor}`;
+    ZManager.register(el);  /* v2.13: Z-index管理対象に登録 */
     const n=SubWinManager.count()+1;
     el.innerHTML=`<div class="swn-tb"><span>🔍 サブ窓${n}</span><button class="swn-close">✕</button></div>
 <div class="swn-body"><canvas class="swn-cvs"></canvas><canvas class="swn-sel" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5"></canvas><span class="swn-zl"></span></div>
@@ -1893,7 +1921,7 @@ class SubWin{
     this.selCtx=this.selCvs.getContext('2d');
     this.zlEl=el.querySelector('.swn-zl');
     el.querySelector('.swn-close').addEventListener('pointerdown',e=>{e.stopPropagation();this.close();});
-    el.addEventListener('pointerdown',()=>{el.style.zIndex=SubWinManager.nextZ();},{capture:true,passive:true});
+    el.addEventListener('pointerdown',()=>{ZManager.bringToFront(el);},{capture:true,passive:true});  /* v2.13 */
     this._bindDrag(el.querySelector('.swn-tb'));
     this._bindResize(el.querySelector('.swn-rz'),'se');
     this._bindResize(el.querySelector('.swn-rz-sw'),'sw');
@@ -2262,6 +2290,7 @@ class SubWin{
     if(this._resizeRAF){cancelAnimationFrame(this._resizeRAF);this._resizeRAF=null;}
     this._cleanups.forEach(fn=>fn());this._cleanups=[];
     document.body.removeChild(this.el);
+    ZManager.unregister(this.el);  /* v2.13 */
     SubWinManager.remove(this);
     this._pdfCache=null;this._annCvs=null;this._vp=null;
     this._pageObj=null;this._pageObjNum=-1;
@@ -3986,7 +4015,7 @@ function _initCalculator(){
     /* v39: ドラッグ開始時点のbottom値を記録 */
     _cdStartBottom=vh-r.bottom;
     _cdragging=true;
-    calcEl.style.zIndex='450';ctbEl.style.cursor='grabbing';
+    ZManager.bringToFront(calcEl);ctbEl.style.cursor='grabbing';  /* v2.13 */
   });
 
   /* pointermove: ドラッグ中 — bottomを更新することで下端を常に固定 */
@@ -4024,9 +4053,12 @@ function _initCalculator(){
   document.getElementById('calcbtn').addEventListener('click',()=>{
     const wasHidden=!calcEl.classList.contains('on');
     calcEl.classList.toggle('on');
-    if(wasHidden&&calcEl.classList.contains('on'))_restoreCalcPos();
+    if(wasHidden&&calcEl.classList.contains('on')){_restoreCalcPos();ZManager.bringToFront(calcEl);}  /* v2.13 */
     document.getElementById('calcbtn').classList.toggle('on', calcEl.classList.contains('on'));
   });
+  /* v2.13: 計算機タッチ/クリック時に最前面へ */
+  ZManager.register(calcEl);
+  calcEl.addEventListener('pointerdown',()=>ZManager.bringToFront(calcEl),{capture:true,passive:true});
 }
 
 /* ============================================================
@@ -4146,3 +4178,4 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
 </script>
 </body>
 </html>
+     
