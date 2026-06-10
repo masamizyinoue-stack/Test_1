@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.13</title>
+<title>M_Viewer V2.14</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -905,6 +905,26 @@ body{
 }
 /* ── 描画診断オーバーレイ ── */
 
+
+/* ── PREVIEW OVERLAY (v2.14) ── */
+#preview-overlay{display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.92);flex-direction:column;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+#preview-overlay.on{display:flex}
+#pv-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(180deg,#0f1824 0%,#090e18 100%);border-bottom:1px solid rgba(240,120,0,.18);flex-shrink:0;gap:10px;}
+#pv-title{color:var(--tx);font-size:14px;font-weight:700;letter-spacing:.06em}
+#pv-close{background:linear-gradient(180deg,#b02020 0%,#881010 100%);color:#fff;border:1.5px solid var(--red);border-radius:6px;padding:6px 14px;font-size:14px;cursor:pointer;touch-action:manipulation;box-shadow:var(--inset-hi),0 0 10px var(--red-glow);transition:box-shadow .12s;}
+#pv-close:hover{box-shadow:var(--inset-hi),0 0 18px var(--red-glow)}
+#pv-close:active{opacity:.7}
+#pv-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px;background:rgba(4,8,14,.6);-webkit-overflow-scrolling:touch;}
+#pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;}
+.pv-item{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;padding:7px;border-radius:8px;border:2px solid transparent;background:var(--pan);transition:border-color .12s,background .12s;touch-action:manipulation;}
+.pv-item:hover{border-color:var(--brd-hi);background:var(--pan2);}
+.pv-item:active{opacity:.65;}
+.pv-item.pv-active{border-color:var(--acc);background:rgba(240,120,0,.1);}
+.pv-img{width:100%;border-radius:3px;box-shadow:0 2px 8px rgba(0,0,0,.7);display:block;pointer-events:none;}
+.pv-ph{width:100%;aspect-ratio:1/1.414;background:var(--pan2);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:18px;}
+.pv-pg{color:var(--tx2);font-size:11px;letter-spacing:.04em;}
+.pv-item.pv-active .pv-pg{color:var(--acc);font-weight:700;}
+@media(pointer:coarse){#pv-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}.pv-item{padding:8px;}}
 </style>
 </head>
 <body>
@@ -923,7 +943,7 @@ body{
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.13</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.14</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -945,6 +965,7 @@ body{
     <input id="pgn" class="pgni" type="number" min="1" value="1">
     <span class="pgtot">/<span id="tpn">0</span></span>
     <button class="btn" id="btn-next">▶</button>
+    <button class="btn" id="btn-preview">プレビュー</button>  <!-- v2.14 -->
     <span id="zlbl" class="zlbl">--</span>
     <button class="btn" id="btn-fit">全体</button>
     <div style="width:30px;flex-shrink:0"></div>
@@ -995,7 +1016,7 @@ body{
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.13</div>
+    <div class="dzm">M_Viewer V2.14</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1085,6 +1106,16 @@ body{
     <div id="manual-err" style="display:none"></div>
   </div>
 </div>
+<!-- v2.14: プレビューオーバーレイ -->
+<div id="preview-overlay">
+  <div id="pv-hd">
+    <span id="pv-title">ページ一覧</span>
+    <button id="pv-close">閉じる</button>
+  </div>
+  <div id="pv-body">
+    <div id="pv-grid"></div>
+  </div>
+</div>
 <!-- v58: サブ窓作成案内ヒント -->
 <div id="sub-hint">サブ窓を作成する範囲を
 対角にドラッグして下さい</div>
@@ -1105,7 +1136,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.13'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.14'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1533,6 +1564,92 @@ const SaveStatus=(() => {
   };
 })();
 
+
+/* ============================================================
+   Module: PreviewPanel  v2.14
+   責務: サムネイル一覧表示・ページ選択ナビゲーション
+   ・遅延レンダリング（3枚ずつ、20ms間隔でフリーズ防止）
+   ・キャッシュ（同一PDF中は再生成しない）
+   ・PDF切替時にキャッシュ自動クリア
+   ============================================================ */
+const PreviewPanel=(() => {
+  const _THUMB_W=160;   /* サムネイル幅px */
+  let _cache={};        /* page番号→dataURL */
+  let _lastDoc=null;    /* PDF変更検知 */
+
+  async function _renderThumb(pageNum){
+    const pd=App.pdfDoc;if(!pd)return null;
+    if(_lastDoc!==pd){_cache={};_lastDoc=pd;}  /* PDF変更→キャッシュクリア */
+    if(_cache[pageNum])return _cache[pageNum];
+    try{
+      const page=await pd.getPage(pageNum);
+      const sc=_THUMB_W/page.getViewport({scale:1}).width;
+      const vp=page.getViewport({scale:sc});
+      const cvs=document.createElement('canvas');
+      cvs.width=Math.round(vp.width);cvs.height=Math.round(vp.height);
+      await page.render({canvasContext:cvs.getContext('2d'),viewport:vp}).promise;
+      const url=cvs.toDataURL('image/jpeg',.72);
+      _cache[pageNum]=url;return url;
+    }catch(_e){return null;}
+  }
+
+  function _buildGrid(){
+    const total=App.totalPages,cur=App.currentPage;
+    const grid=document.getElementById('pv-grid');
+    grid.innerHTML='';
+    for(let n=1;n<=total;n++){
+      const item=document.createElement('div');
+      item.className='pv-item'+(n===cur?' pv-active':'');
+      item.dataset.page=n;
+      const ph=document.createElement('div');ph.className='pv-ph';ph.dataset.page=n;ph.textContent='…';
+      const pg=document.createElement('span');pg.className='pv-pg';pg.textContent=n+'ページ';
+      item.append(ph,pg);
+      item.addEventListener('click',()=>{App.gotoPage(n,true);_setActive(n);close();},{passive:true});
+      grid.appendChild(item);
+    }
+  }
+
+  function _setActive(n){
+    document.getElementById('pv-grid').querySelectorAll('.pv-item').forEach(el=>{
+      el.classList.toggle('pv-active',+el.dataset.page===n);
+    });
+  }
+
+  function _loadThumbs(){
+    const ov=document.getElementById('preview-overlay');
+    const phs=[...document.getElementById('pv-grid').querySelectorAll('.pv-ph')];
+    let i=0;
+    async function batch(){
+      const chunk=phs.slice(i,i+3);i+=3;
+      if(!chunk.length||!ov.classList.contains('on'))return;
+      for(const ph of chunk){
+        const n=+ph.dataset.page;
+        const url=await _renderThumb(n);
+        if(!url||!ph.isConnected||!ov.classList.contains('on'))continue;
+        const img=document.createElement('img');
+        img.src=url;img.className='pv-img';img.draggable=false;
+        ph.replaceWith(img);
+      }
+      if(i<phs.length&&ov.classList.contains('on'))setTimeout(batch,20);
+    }
+    setTimeout(batch,0);
+  }
+
+  function open(){
+    if(!App.pdfDoc){showToast('PDFが開かれていません');return;}
+    const ov=document.getElementById('preview-overlay');
+    _buildGrid();ov.classList.add('on');
+    setTimeout(()=>{
+      const act=document.getElementById('pv-grid').querySelector('.pv-active');
+      if(act)act.scrollIntoView({block:'center'});
+    },50);
+    _loadThumbs();
+  }
+
+  function close(){document.getElementById('preview-overlay').classList.remove('on');}
+
+  return{open,close};
+})();
 /* ============================================================
    Module: DocMgr
    責務: ドキュメント一覧管理（IDB doclist / doc:{id}）
@@ -3508,6 +3625,9 @@ function _initToolbar(){
   document.getElementById('btn-prev').addEventListener('click',()=>App.gotoPage(-1));
   document.getElementById('btn-next').addEventListener('click',()=>App.gotoPage(1));
   document.getElementById('btn-fit').addEventListener('click',()=>App.fit());
+  document.getElementById('btn-preview').addEventListener('click',()=>PreviewPanel.open());  /* v2.14 */
+  document.getElementById('pv-close').addEventListener('click',()=>PreviewPanel.close());
+  document.getElementById('preview-overlay').addEventListener('click',e=>{if(e.target===e.currentTarget)PreviewPanel.close();});
   /* v28: ページ番号入力後にキーボードを閉じる */
   document.getElementById('pgn').addEventListener('change',e=>{
     App.gotoPage(parseInt(e.target.value)||1,true);
