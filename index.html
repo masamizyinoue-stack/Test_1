@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.11</title>
+<title>M_Viewer V2.12</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════
-   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.11
+   M_Viewer — NEAR-FUTURE PROFESSIONAL THEME  v2.12
    Design: 近未来 / ハイテク / プロフェッショナル / 高級感
    ════════════════════════════════════════════════════ */
 :root{
@@ -118,6 +118,18 @@ body{
   background:linear-gradient(180deg,#0f1820 0%,#0a1018 100%);
   box-shadow:none;transform:none;cursor:not-allowed;opacity:.55;
 }
+/* v2.12: 保存状態表示 */
+#save-status{
+  position:fixed;bottom:7px;right:10px;z-index:200;
+  font-size:11px;font-weight:700;padding:2px 10px;border-radius:10px;
+  border:1px solid transparent;pointer-events:none;white-space:nowrap;
+  letter-spacing:.03em;user-select:none;
+  transition:background .25s,color .25s,border-color .25s;
+}
+#save-status[data-s="saved"] {background:rgba(0,40,20,.8);color:#3ecc88;border-color:#1a5032;}
+#save-status[data-s="saving"]{background:rgba(44,32,0,.8);color:#f0b800;border-color:#5a4200;}
+#save-status[data-s="dirty"] {background:rgba(50,6,6,.8);color:#ff6464;border-color:#5a0e0e;}
+@media(pointer:coarse){#save-status{font-size:10px;bottom:5px;right:8px;}}
 
 /* ── PAGE INPUT ── */
 .pgni{
@@ -911,7 +923,7 @@ body{
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.11</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.12</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -983,7 +995,7 @@ body{
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.11</div>
+    <div class="dzm">M_Viewer V2.12</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1078,6 +1090,7 @@ body{
 対角にドラッグして下さい</div>
 <div id="loading"><div class="spin"></div><span style="font-size:14px;color:var(--tx)">処理中…</span></div>
 <div id="toast"></div>
+<div id="save-status" data-s="saved">保存済み</div>
 <script>
 'use strict';
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -1092,7 +1105,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.11'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.12'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1275,7 +1288,8 @@ const IDBStore=(() => {
       _queue.unshift(merged); /* 失敗時は先頭に戻す */
     }
     _flushing=false;
-    if(_queue.length>0)setTimeout(_flush,30);
+    if(_queue.length===0)EventBus.emit('idb:flushed'); /* v2.12: 保存完了通知 */
+    else setTimeout(_flush,30);
   }
 
   /* 非同期キュー書き込み（通常の自動保存） */
@@ -1462,6 +1476,7 @@ const AutoSave=(() => {
       const data=_buildData(getState);
       if(!data)return;
       Logger.info('[AutoSave] sched start ts='+data.ts);
+      EventBus.emit('autosave:saving'); /* v2.12: 保存中通知 */
       IDBStore.enqueue(_saveKeys(data));
       IDBStore.enqueue([['resume:prv',data]]);
       /* verify: IDBStore._flush()のリトライ機構に一元化（重複IDB読み込み削除） */
@@ -1473,6 +1488,7 @@ const AutoSave=(() => {
     if(!data)return;
     _lsBackup(data);
     Logger.info('[AutoSave] immediate ts='+data.ts);
+    EventBus.emit('autosave:saving'); /* v2.12: 保存中通知 */
     IDBStore.enqueue(_saveKeys(data));
   }
 
@@ -1501,6 +1517,21 @@ const AutoSave=(() => {
 
 /* 60秒周期バックグラウンド保存 */
 setInterval(()=>EventBus.emit('autosave:periodic'),60000);
+
+/* ============================================================
+   Module: SaveStatus  v2.12
+   保存状態表示: saved(保存済み) / saving(保存中) / dirty(未保存)
+   ============================================================ */
+const SaveStatus=(() => {
+  const el=document.getElementById('save-status');
+  function set(s){if(el)el.dataset.s=s;}
+  function setText(s,t){if(el){el.dataset.s=s;el.textContent=t;}}
+  return{
+    setDirty() {setText('dirty','未保存');},
+    setSaving(){setText('saving','保存中…');},
+    setSaved() {setText('saved','保存済み');},
+  };
+})();
 
 /* ============================================================
    Module: DocMgr
@@ -2922,6 +2953,7 @@ const App=(() => {
       IDBStore.enqueue([['resume:buf:'+Utils.safeKey(file.name),origBuf]]);
       _postLoadFn?.();
       EventBus.emit('stroke:added');
+      SaveStatus.setSaved(); /* v2.12: 読込後は保存済み */
     }catch(e){showToast('読み込みに失敗しました');Logger.error(e);}
     showLoading(false);_pdfLoadingLock=false;
   }
@@ -3215,6 +3247,7 @@ const App=(() => {
     Object.keys(_undoStack).forEach(k=>delete _undoStack[k]);  /* v2.09: シート切替時クリア */
     Object.keys(_redoStack).forEach(k=>delete _redoStack[k]);
     _updateUndoRedoBtn();  /* v2.10: シート切替後に同期 */
+    SaveStatus.setSaved(); /* v2.12: シート切替後は保存済み */
     document.getElementById('fnlbl').textContent=fileName||'ファイル未選択';
     document.getElementById('tpn').textContent=totalPages||'0';
     document.getElementById('pgn').value=curPage;
@@ -3494,6 +3527,10 @@ function _initToolbar(){
     });
   });
   EventBus.on('stroke:added',()=>{_updateSwatches();});
+  /* v2.12: 保存状態表示 */
+  EventBus.on('stroke:added',()=>{if(App.pdfDoc)SaveStatus.setDirty();});
+  EventBus.on('autosave:saving',()=>SaveStatus.setSaving());
+  EventBus.on('idb:flushed',()=>SaveStatus.setSaved());
 
   /* 太さパネル */
   /* v11: click → pointerdown で即時反応 (iOS Safari対応) */
