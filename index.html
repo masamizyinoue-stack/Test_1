@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.14</title>
+<title>M_Viewer V2.15</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -397,15 +397,6 @@ body{
   border-radius:8px;padding:11px 18px;
   font-size:15px;font-weight:700;cursor:pointer;
   box-shadow:var(--inset-hi),0 0 16px var(--red-glow);
-  touch-action:manipulation;min-width:72px;letter-spacing:.03em;
-}
-#copybtn{
-  display:none;position:fixed;z-index:150;
-  background:linear-gradient(180deg,#c86000 0%,#a04800 100%);
-  color:#fff;border:1.5px solid var(--acc);
-  border-radius:8px;padding:11px 18px;
-  font-size:15px;font-weight:700;cursor:pointer;
-  box-shadow:var(--inset-hi),0 0 14px var(--acc-glow);
   touch-action:manipulation;min-width:72px;letter-spacing:.03em;
 }
 /* v42 */
@@ -903,9 +894,6 @@ body{
   .logo{display:none}
   #fnlbl{max-width:60px}
 }
-/* ── 描画診断オーバーレイ ── */
-
-
 /* ── PREVIEW OVERLAY (v2.14) ── */
 #preview-overlay{display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.92);flex-direction:column;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
 #preview-overlay.on{display:flex}
@@ -943,7 +931,7 @@ body{
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.14</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.15</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1016,7 +1004,7 @@ body{
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.14</div>
+    <div class="dzm">M_Viewer V2.15</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1136,7 +1124,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.14'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.15'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1276,8 +1264,7 @@ const IDBStore=(() => {
   let _db=null;
   const _queue=[];  // Array<Map<key,value>>
   let _flushing=false;
-  let _pendingSave=false;
-  let _isSaving=false; // 後方互換
+  // Refactor: _pendingSave/_isSaving 未使用変数を削除（getter で直接参照に統一）
 
   async function _open(){
     if(_db)return _db;
@@ -1473,7 +1460,7 @@ const AutoSave=(() => {
     return id;
   })();
   const K_LAST='last:'+INST_ID;
-  const K_BK_LAT='bk:lat:'+INST_ID;
+  // Refactor: K_BK_LAT 未使用定数を削除
 
   function _buildData(getState){
     const s=getState();
@@ -1555,7 +1542,7 @@ setInterval(()=>EventBus.emit('autosave:periodic'),60000);
    ============================================================ */
 const SaveStatus=(() => {
   const el=document.getElementById('save-status');
-  function set(s){if(el)el.dataset.s=s;}
+  // Refactor: set() 未使用プライベート関数を削除
   function setText(s,t){if(el){el.dataset.s=s;el.textContent=t;}}
   return{
     setDirty() {setText('dirty','未保存');},
@@ -1799,14 +1786,14 @@ const DrawUtil=(() => {
   }
 
   /* 消しゴム: ペン点からセグメントへの距離で部分削除 */
-  function _distPtSeg(px,py,ax,ay,bx,by){return Utils.distPtSeg(px,py,ax,ay,bx,by);}
+  // Refactor: _distPtSeg() ラッパー削除。直接 Utils.distPtSeg() を呼ぶ
 
   function applyEraser(penStroke,erPts,hitR){
     if(!penStroke.points?.length||erPts.length===0)return[penStroke];
     const ptHits=(px,py)=>{
       if(Math.hypot(px-erPts[0][0],py-erPts[0][1])<hitR)return true;
       for(let i=1;i<erPts.length;i++){
-        if(_distPtSeg(px,py,erPts[i-1][0],erPts[i-1][1],erPts[i][0],erPts[i][1])<hitR)return true;
+        if(Utils.distPtSeg(px,py,erPts[i-1][0],erPts[i-1][1],erPts[i][0],erPts[i][1])<hitR)return true;
       }
       return false;
     };
@@ -1839,7 +1826,7 @@ const DrawUtil=(() => {
       if(i>0){
         const cx=(bb.x1+bb.x2)/2,cy=(bb.y1+bb.y2)/2;
         const reach=hitR+Math.hypot(bb.x2-bb.x1,bb.y2-bb.y1)/2;
-        if(_distPtSeg(cx,cy,erPts[i-1][0],erPts[i-1][1],ex,ey)<reach)return[];
+        if(Utils.distPtSeg(cx,cy,erPts[i-1][0],erPts[i-1][1],ex,ey)<reach)return[];
       }
     }
     return[stroke];
@@ -2198,11 +2185,7 @@ class SubWin{
       this.selCtx.save();this.selCtx.strokeStyle='#888';this.selCtx.lineWidth=1.5;this.selCtx.setLineDash([4,2]);
       this.selCtx.beginPath();this.selCtx.arc(eb.x,eb.y,ewR,0,Math.PI*2);this.selCtx.stroke();
       this.selCtx.restore();
-    }else{
-      s.x2=p.x;s.y2=p.y;
-      cancelAnimationFrame(this._drawRafId);
-      this._drawRafId=requestAnimationFrame(()=>this.render());
-    }
+    } // Refactor: v16で削除済み図形タイプ用のelseブランチを削除
   }
   _endDraw(){
     if(App.currentTool==='select'&&this.isDrawing){
@@ -2363,8 +2346,7 @@ class SubWin{
     this.selectedIdx=[];this.selPath=[];
     if(this.selCvs)this.selCtx.clearRect(0,0,this.selCvs.width,this.selCvs.height);
     document.getElementById('selbtn').style.display='none';
-    document.getElementById('copybtn').style.display='none'; /* v42 */
-    document.getElementById('copybtn').style.display='none'; /* v42 */
+    document.getElementById('copybtn').style.display='none'; /* v42 */ // Refactor: 重複行削除
     if(App.activeSelSubWin===this)App.setActiveSelSubWin(null); /* ⑤修正 */
   }
   deleteSelected(){
@@ -2699,8 +2681,7 @@ const App=(() => {
     selectedIdx=[];selPath=[];
     ovlCtx.clearRect(0,0,ovlCvs.width,ovlCvs.height);_drawSubOverlays();
     document.getElementById('selbtn').style.display='none';
-    document.getElementById('copybtn').style.display='none'; /* v42 */
-    document.getElementById('copybtn').style.display='none'; /* v42 */
+    document.getElementById('copybtn').style.display='none'; /* v42 */ // Refactor: 重複行削除
     _activeSelSubWin=null; /* ⑤修正: サブ窓選択クリア */
   }
 
@@ -3065,7 +3046,7 @@ const App=(() => {
     _toolSizes[_activeTool]=sz; /* v16: shape削除 */
     _updateToolUI();             /* ①修正: sz-v同期 */
     EventBus.emit('tool:changed',{tool:_activeTool}); /* ①修正: スウォッチ同期 */
-    Logger.debug('[setSize] tool='+k+' size='+sz);
+    Logger.debug('[setSize] tool='+_activeTool+' size='+sz); // Debug Fix: k未定義→_activeTool
   }
   function _updateToolUI(){
     ['pen','hl','eraser','select','sub'].forEach(t=>{ /* v16: text/shape削除 */
@@ -3675,9 +3656,8 @@ function _initToolbar(){
       document.querySelectorAll('.csw').forEach(s=>s.classList.toggle('on',s.dataset.c===sw.dataset.c));
     });
   });
-  EventBus.on('stroke:added',()=>{_updateSwatches();});
-  /* v2.12: 保存状態表示 */
-  EventBus.on('stroke:added',()=>{if(App.pdfDoc)SaveStatus.setDirty();});
+  /* v2.12: 保存状態表示 / Refactor: stroke:added リスナーを1つに統合 */
+  EventBus.on('stroke:added',()=>{_updateSwatches();if(App.pdfDoc)SaveStatus.setDirty();}); // Refactor: 重複リスナー統合
   EventBus.on('autosave:saving',()=>SaveStatus.setSaving());
   EventBus.on('idb:flushed',()=>SaveStatus.setSaved());
 
@@ -3988,9 +3968,9 @@ function _initCalculator(){
   document.getElementById('cclose').addEventListener('click',()=>{document.getElementById('calc').classList.remove('on');document.getElementById('calcbtn').classList.remove('on');}); /* v48 */
   /* v49: 履歴ボタン — 履歴パネル開閉 */
   function _toggleCalcHist(show){
-    var hist=document.getElementById('chist');
-    var hd=document.getElementById('chist-hd');
-    var btn=document.getElementById('chist-btn');
+    const hist=document.getElementById('chist'); // Refactor: var→const
+    const hd=document.getElementById('chist-hd');
+    const btn=document.getElementById('chist-btn');
     var open=show!==undefined?show:!hist.classList.contains('on');
     hist.classList.toggle('on',open);
     hd.style.display=open?'flex':'none';
