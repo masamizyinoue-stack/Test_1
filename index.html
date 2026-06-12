@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.25</title>
+<title>M_Viewer V2.26</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.25
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.26
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -490,7 +490,7 @@ button{font-family:inherit}
   animation:swn-stripe .7s linear infinite;
 }
 .swn-tb{
-  height:30px;
+  height:28px; /* JSの+30/-30定数(タイトルバー高)に合わせ旧値を維持 — 変更禁止 */
   background:linear-gradient(180deg,rgba(255,138,30,.24) 0%,rgba(255,138,30,.06) 100%);
   display:flex;align-items:center;justify-content:space-between;
   padding:0 9px;cursor:grab;flex-shrink:0;
@@ -537,7 +537,7 @@ button{font-family:inherit}
     linear-gradient(225deg,transparent calc(86% - 1px),rgba(255,150,50,.4) calc(86% - 1px) calc(86% + 1px),transparent calc(86% + 1px));
 }
 .swn-rz-nw{
-  position:absolute;top:30px;left:0;width:38px;height:38px;
+  position:absolute;top:28px;left:0;width:38px;height:38px;
   cursor:nw-resize;touch-action:none;border-radius:7px 0 0 0;
   background:
     linear-gradient(315deg,transparent calc(50% - 1px),rgba(255,150,50,.85) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px)),
@@ -997,16 +997,16 @@ button{font-family:inherit}
 #pv-close:hover{box-shadow:var(--inset-hi),0 0 20px var(--red-glow)}
 #pv-close:active{opacity:.7;transform:translateY(1px)}
 #pv-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px;background:rgba(3,6,11,.6);-webkit-overflow-scrolling:touch;}
-#pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:11px;}
-.pv-item{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;padding:8px;border-radius:var(--r-m);border:2px solid transparent;background:var(--pan);transition:border-color .12s,background .12s,transform .12s;touch-action:manipulation;}
+#pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(264px,100%),1fr));gap:16px;}
+.pv-item{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;padding:10px;border-radius:var(--r-m);border:2px solid transparent;background:var(--pan);transition:border-color .12s,background .12s,transform .12s;touch-action:manipulation;}
 .pv-item:hover{border-color:var(--brd-hi);background:var(--pan2);transform:translateY(-2px);}
 .pv-item:active{opacity:.65;transform:translateY(0);}
 .pv-item.pv-active{border-color:var(--acc);background:rgba(255,138,30,.1);box-shadow:0 0 14px rgba(255,138,30,.18);}
-.pv-img{width:100%;border-radius:3px;box-shadow:0 2px 9px rgba(0,0,0,.7);display:block;pointer-events:none;}
-.pv-ph{width:100%;aspect-ratio:1/1.414;background:var(--pan2);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:18px;}
-.pv-pg{color:var(--tx2);font-size:11px;letter-spacing:.04em;font-family:var(--mono);font-variant-numeric:tabular-nums;}
+.pv-img{width:100%;border-radius:4px;box-shadow:0 3px 12px rgba(0,0,0,.7);display:block;pointer-events:none;}
+.pv-ph{width:100%;aspect-ratio:1/1.414;background:var(--pan2);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:24px;}
+.pv-pg{color:var(--tx2);font-size:14px;font-weight:600;letter-spacing:.04em;font-family:var(--mono);font-variant-numeric:tabular-nums;}
 .pv-item.pv-active .pv-pg{color:var(--acc2);font-weight:700;}
-@media(pointer:coarse){#pv-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}.pv-item{padding:9px;}}
+@media(pointer:coarse){#pv-grid{grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:18px;}.pv-item{padding:12px;gap:9px;}.pv-pg{font-size:15px;}}
 </style>
 </head>
 <body>
@@ -1025,7 +1025,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.25</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.26</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1098,7 +1098,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.25</div>
+    <div class="dzm">M_Viewer V2.26</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1218,7 +1218,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.25'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.26'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -1654,7 +1654,7 @@ const SaveStatus=(() => {
    ・PDF切替時にキャッシュ自動クリア
    ============================================================ */
 const PreviewPanel=(() => {
-  const _THUMB_W=160;   /* サムネイル幅px */
+  const _THUMB_W=320;   /* サムネイル幅px (v2.26: 160→320 表示2倍化に伴い解像度も2倍、画質維持) */
   let _cache={};        /* page番号→dataURL */
   let _lastDoc=null;    /* PDF変更検知 */
 
