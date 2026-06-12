@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.29</title>
+<title>M_Viewer V2.30</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.29
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.30
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1069,7 +1069,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.29</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.30</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1109,14 +1109,19 @@ button{font-family:inherit}
     </div>
     <button class="btn" id="t-sub">サブ窓</button>
     <div class="vs" id="szgrp-vs"></div>
-    <!-- v2.29: ヘッダーは既定の太さ/色ボタンのみ常時表示。タップでポップアップから変更し、選択値が既定として保存される -->
+    <!-- v2.30: 既定3ボタン方式。タップ=その値を即適用+変更ポップアップ表示。ポップアップで選ぶとそのボタンだけ置換され保存される -->
     <span id="szgrp">
       <span class="szlbl">太さ</span>
-      <span id="sz-v" class="sz-val" title="太さの変更">3</span>
+      <button class="szq" data-slot="0" title="タップで適用・変更">2</button>
+      <button class="szq" data-slot="1" title="タップで適用・変更">3</button>
+      <button class="szq" data-slot="2" title="タップで適用・変更">6</button>
+      <span id="sz-v" class="sz-val" style="display:none">3</span><!-- App中核(_updateToolUI)が参照するため非表示で温存 -->
     </span>
     <div class="vs" id="cgrp-vs"></div>
     <span id="cgrp">
-      <button id="csw-more" title="色の変更（全12色）"><span id="csw-cur"></span>色▾</button>
+      <div class="csw" id="sw0" data-slot="0" title="タップで適用・変更"></div>
+      <div class="csw" id="sw1" data-slot="1" title="タップで適用・変更"></div>
+      <div class="csw" id="sw2" data-slot="2" title="タップで適用・変更"></div>
     </span>
   </div>
 </div>
@@ -1150,7 +1155,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.29</div>
+    <div class="dzm">M_Viewer V2.30</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1270,7 +1275,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.29'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.30'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3795,7 +3800,14 @@ function _initToolbar(){
 
   /* ツール */
   /* ①修正: ツール切替時に即座にスウォッチ色・サイズUI更新 */
-  EventBus.on('tool:changed',()=>{_updateSwatches();_persistDefaults();});  /* v2.29: UI同期+既定値保存(太さ変更時もここを通る) */
+  EventBus.on('tool:changed',()=>{
+    /* v2.30: 太さポップ表示中の値変更は、開いた太さボタンのみ置換して保存 */
+    if(_editSzSlot!=null&&document.getElementById('szp').classList.contains('on')){
+      const sl=_sizeSlots();
+      if(+sl[_editSzSlot]!==App.strokeSize){sl[_editSzSlot]=App.strokeSize;_persistSlots();}
+    }
+    _updateSwatches();_persistDefaults();
+  });  /* v2.29: UI同期+既定値保存 */
   ['pen','hl','eraser','sub'].forEach(t=>{ /* v16: text削除 */
     document.getElementById('t-'+t)?.addEventListener('click',()=>{App.setTool(t);closePickers();});
   });
@@ -3820,6 +3832,29 @@ function _initToolbar(){
   const HL_ALL =['#404040','#ffffff','#ff5050','#4080ff','#50c040','#ffd700','#ffa030','#b070ff','#ff69b4','#40d4e8','#c08850','#a8a8a8'];
   const COLOR_TOOLS=['pen','hl'];   /* 色UIを表示するツール */
   const SIZE_HIDE_TOOLS=['select','sub'];   /* v2.29: 太さUIを非表示にするツール */
+  /* v2.30: 既定3ボタン(スロット)の内容をツール別に保持・永続化 */
+  const _SLOT_KEY='mv_slot_defaults';
+  function _defaultSlots(){return{
+    pen:{c:['#cc2020','#1a1a1a','#1a55cc'],s:[2,3,6]},
+    hl:{c:['#ffd700','#50c040','#ff69b4'],s:[2,3,6]},
+    eraser:{s:[10,20,40]}};}
+  let _slots=_defaultSlots();
+  (function(){ /* 検証付き読込(改ざん・破損データは既定値へフォールバック) */
+    let d=null;try{d=JSON.parse(localStorage.getItem(_SLOT_KEY)||'null');}catch(_){}
+    if(!d)return;
+    const okC=c=>typeof c==='string'&&/^#[0-9a-fA-F]{6}$/.test(c);
+    const okS=s=>Number.isFinite(+s)&&+s>=1&&+s<=100;
+    ['pen','hl','eraser'].forEach(t=>{
+      if(!d[t])return;
+      if(_slots[t].c&&Array.isArray(d[t].c))d[t].c.forEach((c,i)=>{if(i<3&&okC(c))_slots[t].c[i]=c;});
+      if(Array.isArray(d[t].s))d[t].s.forEach((s,i)=>{if(i<3&&okS(s))_slots[t].s[i]=+s;});
+    });
+  })();
+  function _persistSlots(){try{localStorage.setItem(_SLOT_KEY,JSON.stringify(_slots));}catch(_){}}
+  function _sizeToolKey(){const t=App.currentTool;return(_slots[t]&&_slots[t].s)?t:'pen';}
+  function _sizeSlots(){return _slots[_sizeToolKey()].s;}
+  function _colorSlots(){return _slots[App.currentTool==='hl'?'hl':'pen'].c;}
+  let _editSzSlot=null,_editCSlot=null;   /* ポップアップで編集中のスロット番号 */
   function _updateSwatches(){
     const tool=App.currentTool;
     const showC=COLOR_TOOLS.includes(tool);          /* 色: ペン/蛍光のみ */
@@ -3828,10 +3863,40 @@ function _initToolbar(){
     document.getElementById('cgrp-vs').style.display=showC?'':'none';
     document.getElementById('szgrp').style.display=showS?'flex':'none';
     document.getElementById('szgrp-vs').style.display=showS?'':'none';
+    if(showS){ /* 太さ3ボタンへスロット値を反映 */
+      const sl=_sizeSlots();
+      document.querySelectorAll('#szgrp .szq').forEach((b,i)=>{
+        b.textContent=sl[i];b.classList.toggle('on',+sl[i]===App.strokeSize);
+      });
+    }
     if(!showC){_closeCpop();return;}
-    document.getElementById('csw-cur').style.background=App.strokeColor;  /* 既定色を常時表示 */
+    const cs=_colorSlots();   /* 色3ボタンへスロット色を反映 */
+    document.querySelectorAll('#cgrp .csw').forEach((d,i)=>{
+      d.style.background=cs[i];d.dataset.c=cs[i];
+      d.classList.toggle('on',cs[i]===App.strokeColor);
+    });
     _renderCpop();
   }
+  /* v2.30: 太さ3ボタン — タップ=その太さを即適用し、太さポップアップを表示。
+     ポップアップ操作中の値はそのボタンへ即時置換され保存される(他ボタンは不変)。 */
+  document.querySelectorAll('#szgrp .szq').forEach(b=>{
+    b.addEventListener('pointerdown',e=>{
+      const i=+b.dataset.slot;
+      _editSzSlot=null;                       /* 適用時の誤書込防止 */
+      App.setSize(_sizeSlots()[i]);
+      const p=document.getElementById('szp');
+      if(p.classList.contains('on')){_closeSzp();return;}   /* 再タップで閉じる(従来のトグル動作) */
+      _editSzSlot=i;
+      p.classList.add('on');
+      document.getElementById('szp-bd').classList.add('on');
+      const r=b.getBoundingClientRect();
+      const vvTop=(window.visualViewport?window.visualViewport.offsetTop:0);
+      p.style.left=Math.min(r.left,window.innerWidth-260)+'px';
+      p.style.top=(r.bottom+4-vvTop)+'px';
+      const cur=App.strokeSize;document.getElementById('sz-rng').value=cur;document.getElementById('sz-n').value=cur;_prevSize(cur);
+      e.preventDefault();
+    });
+  });
   /* v2.29: ツール別の既定色・既定太さを保存し、次回起動時に復元 */
   const _DEF_KEY='mv_tool_defaults';
   let _defs={};
@@ -3869,20 +3934,28 @@ function _initToolbar(){
     });
   }
   function _closeCpop(){document.getElementById('cpop').classList.remove('on');}
-  document.getElementById('csw-more').addEventListener('click',e=>{
-    const p=document.getElementById('cpop');
-    if(p.classList.contains('on')){_closeCpop();return;}
-    _renderCpop();p.classList.add('on');
-    const r=e.currentTarget.getBoundingClientRect();
-    p.style.left=Math.max(8,Math.min(r.left,window.innerWidth-(p.offsetWidth||190)-8))+'px';
-    p.style.top=(r.bottom+4)+'px';
-    e.stopPropagation();
+  /* v2.30: 色3ボタン — タップ=その色を即適用し、12色ピッカーを表示。
+     ピッカーで選んだ色はそのボタンだけを置換して保存(他ボタンは不変)。 */
+  document.querySelectorAll('#cgrp .csw').forEach(sw=>{
+    sw.addEventListener('click',e=>{
+      const i=+sw.dataset.slot;
+      _editCSlot=null;
+      App.setColor(sw.dataset.c);_persistDefaults();_updateSwatches();
+      const p=document.getElementById('cpop');
+      if(p.classList.contains('on')){_closeCpop();return;}   /* 再タップで閉じる */
+      _editCSlot=i;_renderCpop();p.classList.add('on');
+      const r=sw.getBoundingClientRect();
+      p.style.left=Math.max(8,Math.min(r.left,window.innerWidth-(p.offsetWidth||190)-8))+'px';
+      p.style.top=(r.bottom+4)+'px';
+      e.stopPropagation();
+    });
   });
   document.getElementById('cpop').addEventListener('click',e=>{
     const sw=e.target.closest('.cpop-sw');
     e.stopPropagation();
     if(!sw)return;
-    App.setColor(sw.dataset.c);_persistDefaults();_updateSwatches();_closeCpop();   /* v2.29: 既定色として保存 */
+    if(_editCSlot!=null){const cs=_colorSlots();cs[_editCSlot]=sw.dataset.c;_persistSlots();}   /* v2.30: 押したボタンの色だけ置換 */
+    App.setColor(sw.dataset.c);_persistDefaults();_updateSwatches();_closeCpop();
   });
   _restoreDefaults();_updateSwatches();   /* v2.29: 既定値復元→初期表示同期 */
   /* v2.12: 保存状態表示 / Refactor: stroke:added リスナーを1つに統合 */
