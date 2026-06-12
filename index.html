@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.28</title>
+<title>M_Viewer V2.29</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.28
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.29
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1001,6 +1001,7 @@ button{font-family:inherit}
 .szq:hover{border-color:#5a86c0;color:var(--tx);background:var(--srf-hov)}
 .szq.on{background:var(--acc-deep);border-color:var(--acc2);color:#fff;box-shadow:var(--inset-hi),0 0 10px var(--acc-glow);text-shadow:0 1px 2px rgba(0,0,0,.4)}
 #cgrp{display:flex;align-items:center;gap:5px;flex-shrink:0}
+#szgrp{display:flex;align-items:center;gap:6px;flex-shrink:0} /* v2.29: 選択/サブ窓では非表示 */
 #csw-more{
   height:27px;padding:0 10px;display:flex;align-items:center;gap:6px;
   border:1.5px solid var(--brd-hi);background:var(--srf);color:var(--tx2);
@@ -1010,7 +1011,7 @@ button{font-family:inherit}
 }
 #csw-more:hover{border-color:#5a86c0;color:var(--tx);background:var(--srf-hov)}
 #csw-more.on{border-color:var(--acc);color:var(--tx);box-shadow:var(--inset-hi),0 0 10px var(--acc-glow)}
-#csw-cur{width:13px;height:13px;border-radius:50%;display:inline-block;flex-shrink:0;background:#cc2020;box-shadow:0 0 0 1px rgba(255,255,255,.3)}
+#csw-cur{width:15px;height:15px;border-radius:50%;display:inline-block;flex-shrink:0;background:#cc2020;box-shadow:0 0 0 1px rgba(255,255,255,.35)} /* v2.29: 既定色を明示 */
 #cpop{
   display:none;position:fixed;z-index:300;
   background:var(--glass);border:1.5px solid var(--brd-hi);border-radius:var(--r-m);
@@ -1068,7 +1069,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.28</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.29</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1107,20 +1108,15 @@ button{font-family:inherit}
       </div>
     </div>
     <button class="btn" id="t-sub">サブ窓</button>
-    <div class="vs"></div>
-    <!-- v2.28: 並び順を「太さ→色」へ統一・太さ3段プリセット追加(詳細はsz-vから従来どおり) -->
-    <span class="szlbl">太さ</span>
-    <button class="szq" data-szq="0">2</button>
-    <button class="szq on" data-szq="1">3</button>
-    <button class="szq" data-szq="2">6</button>
-    <span id="sz-v" class="sz-val" title="太さ詳細設定">3</span>
+    <div class="vs" id="szgrp-vs"></div>
+    <!-- v2.29: ヘッダーは既定の太さ/色ボタンのみ常時表示。タップでポップアップから変更し、選択値が既定として保存される -->
+    <span id="szgrp">
+      <span class="szlbl">太さ</span>
+      <span id="sz-v" class="sz-val" title="太さの変更">3</span>
+    </span>
     <div class="vs" id="cgrp-vs"></div>
-    <!-- v2.28: ヘッダーは既定3色のみ・全12色は「色▾」ピッカーから選択。ペン/蛍光ペン以外では非表示 -->
     <span id="cgrp">
-      <div class="csw on" id="sw0" style="background:#cc2020" data-c="#cc2020"></div>
-      <div class="csw" id="sw1" style="background:#1a1a1a" data-c="#1a1a1a"></div>
-      <div class="csw" id="sw2" style="background:#1a55cc" data-c="#1a55cc"></div>
-      <button id="csw-more" title="全12色から選択"><span id="csw-cur"></span>色▾</button>
+      <button id="csw-more" title="色の変更（全12色）"><span id="csw-cur"></span>色▾</button>
     </span>
   </div>
 </div>
@@ -1154,7 +1150,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.28</div>
+    <div class="dzm">M_Viewer V2.29</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1274,7 +1270,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.28'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.29'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3799,7 +3795,7 @@ function _initToolbar(){
 
   /* ツール */
   /* ①修正: ツール切替時に即座にスウォッチ色・サイズUI更新 */
-  EventBus.on('tool:changed',()=>{_updateSwatches();_updateSzq();});  /* v2.28: 太さプリセット同期 */
+  EventBus.on('tool:changed',()=>{_updateSwatches();_persistDefaults();});  /* v2.29: UI同期+既定値保存(太さ変更時もここを通る) */
   ['pen','hl','eraser','sub'].forEach(t=>{ /* v16: text削除 */
     document.getElementById('t-'+t)?.addEventListener('click',()=>{App.setTool(t);closePickers();});
   });
@@ -3818,34 +3814,47 @@ function _initToolbar(){
     });
   });
 
-  /* カラースウォッチ v2.28: ヘッダー既定3色+全12色ピッカー+ツール連動表示 */
-  const PEN_C=[{id:'sw0',c:'#cc2020'},{id:'sw1',c:'#1a1a1a'},{id:'sw2',c:'#1a55cc'}];
-  const HL_C =[{id:'sw0',c:'#ffd700'},{id:'sw1',c:'#50c040'},{id:'sw2',c:'#ff69b4'}];
+  /* カラースウォッチ v2.29: ヘッダーは既定色ボタン1個(色▾)のみ。全12色はピッカーで選択 */
   /* 12色: 黒/白/赤/青/緑/黄/橙/紫/桃/水/茶/灰 (蛍光ペンは半透明描画に映える明色系) */
   const PEN_ALL=['#1a1a1a','#ffffff','#cc2020','#1a55cc','#108030','#e0b000','#f07800','#8030c0','#e060a8','#30b8d8','#8a5a2a','#888888'];
   const HL_ALL =['#404040','#ffffff','#ff5050','#4080ff','#50c040','#ffd700','#ffa030','#b070ff','#ff69b4','#40d4e8','#c08850','#a8a8a8'];
   const COLOR_TOOLS=['pen','hl'];   /* 色UIを表示するツール */
+  const SIZE_HIDE_TOOLS=['select','sub'];   /* v2.29: 太さUIを非表示にするツール */
   function _updateSwatches(){
     const tool=App.currentTool;
-    const show=COLOR_TOOLS.includes(tool);   /* v2.28: 消しゴム/選択/サブ窓では色UIを非表示 */
-    document.getElementById('cgrp').style.display=show?'flex':'none';
-    document.getElementById('cgrp-vs').style.display=show?'':'none';
-    if(!show){_closeCpop();return;}
-    const colors=tool==='hl'?HL_C:PEN_C;
-    colors.forEach(({id,c})=>{
-      const el=document.getElementById(id);if(!el)return;
-      el.style.background=c;el.dataset.c=c;
-      el.classList.toggle('on',c===App.strokeColor);
-    });
-    /* 現在色インジケータ: ヘッダー3色以外を選択中は「色▾」側を点灯 */
-    const inHdr=colors.some(({c})=>c===App.strokeColor);
-    document.getElementById('csw-cur').style.background=App.strokeColor;
-    document.getElementById('csw-more').classList.toggle('on',!inHdr);
+    const showC=COLOR_TOOLS.includes(tool);          /* 色: ペン/蛍光のみ */
+    const showS=!SIZE_HIDE_TOOLS.includes(tool);     /* 太さ: 選択/サブ窓では非表示 */
+    document.getElementById('cgrp').style.display=showC?'flex':'none';
+    document.getElementById('cgrp-vs').style.display=showC?'':'none';
+    document.getElementById('szgrp').style.display=showS?'flex':'none';
+    document.getElementById('szgrp-vs').style.display=showS?'':'none';
+    if(!showC){_closeCpop();return;}
+    document.getElementById('csw-cur').style.background=App.strokeColor;  /* 既定色を常時表示 */
     _renderCpop();
   }
-  document.querySelectorAll('#cgrp .csw').forEach(sw=>{
-    sw.addEventListener('click',()=>{App.setColor(sw.dataset.c);_updateSwatches();});
-  });
+  /* v2.29: ツール別の既定色・既定太さを保存し、次回起動時に復元 */
+  const _DEF_KEY='mv_tool_defaults';
+  let _defs={};
+  try{_defs=JSON.parse(localStorage.getItem(_DEF_KEY)||'{}')||{};}catch(_){_defs={};}
+  function _persistDefaults(){
+    const t=App.currentTool;
+    if(t!=='pen'&&t!=='hl'&&t!=='eraser')return;
+    const e=_defs[t]||(_defs[t]={});
+    if(t!=='eraser')e.c=App.strokeColor;
+    e.s=App.strokeSize;
+    try{localStorage.setItem(_DEF_KEY,JSON.stringify(_defs));}catch(_){}
+  }
+  function _restoreDefaults(){
+    const okC=c=>typeof c==='string'&&/^#[0-9a-fA-F]{6}$/.test(c);
+    const okS=s=>Number.isFinite(+s)&&+s>=1&&+s<=100;
+    try{
+      const d=_defs;
+      if(d.eraser&&okS(d.eraser.s)){App.setTool('eraser');App.setSize(+d.eraser.s);}
+      if(d.hl){App.setTool('hl');if(okC(d.hl.c))App.setColor(d.hl.c);if(okS(d.hl.s))App.setSize(+d.hl.s);}
+      if(d.pen){App.setTool('pen');if(okC(d.pen.c))App.setColor(d.pen.c);if(okS(d.pen.s))App.setSize(+d.pen.s);}
+    }catch(_){}
+    App.setTool('pen');   /* 初期ツールはペン(従来どおり) */
+  }
   /* 12色ピッカー */
   function _renderCpop(){
     const grid=document.getElementById('cpop-grid');
@@ -3873,21 +3882,9 @@ function _initToolbar(){
     const sw=e.target.closest('.cpop-sw');
     e.stopPropagation();
     if(!sw)return;
-    App.setColor(sw.dataset.c);_updateSwatches();_closeCpop();
+    App.setColor(sw.dataset.c);_persistDefaults();_updateSwatches();_closeCpop();   /* v2.29: 既定色として保存 */
   });
-  /* 太さ3段プリセット v2.28 (詳細値はsz-v→スライダーで従来どおり) */
-  const SIZE_PRESETS={pen:[2,3,6],hl:[2,3,6],eraser:[10,20,40],select:[2,3,6],sub:[2,3,6]};
-  function _updateSzq(){
-    const pr=SIZE_PRESETS[App.currentTool]||SIZE_PRESETS.pen;
-    document.querySelectorAll('.szq').forEach((b,i)=>{
-      b.textContent=pr[i];b.dataset.sz=pr[i];
-      b.classList.toggle('on',+pr[i]===App.strokeSize);
-    });
-  }
-  document.querySelectorAll('.szq').forEach(b=>{
-    b.addEventListener('click',()=>{App.setSize(+b.dataset.sz);});
-  });
-  _updateSwatches();_updateSzq();   /* 初期表示同期 */
+  _restoreDefaults();_updateSwatches();   /* v2.29: 既定値復元→初期表示同期 */
   /* v2.12: 保存状態表示 / Refactor: stroke:added リスナーを1つに統合 */
   EventBus.on('stroke:added',()=>{_updateSwatches();if(App.pdfDoc)SaveStatus.setDirty();}); // Refactor: 重複リスナー統合
   EventBus.on('autosave:saving',()=>SaveStatus.setSaving());
