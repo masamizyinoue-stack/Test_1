@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.30</title>
+<title>M_Viewer V2.31</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.30
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.31
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -231,7 +231,7 @@ button{font-family:inherit}
   position:fixed;
   background:var(--glass);
   border:1.5px solid var(--brd-hi);border-radius:var(--r-m);
-  padding:6px;z-index:300;
+  padding:6px;z-index:495; /* v2.31: フロート窓(401-490)より前面 */
   box-shadow:var(--shadow-3),var(--inset-hi);
   display:none;flex-direction:column;gap:4px;min-width:128px;
   backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
@@ -253,10 +253,10 @@ button{font-family:inherit}
 }
 
 /* ── 太さ設定ポップ ── */
-#szp-bd{display:none;position:fixed;inset:0;z-index:340;background:transparent;-webkit-tap-highlight-color:transparent}
+#szp-bd{display:none;position:fixed;inset:0;z-index:496; /* v2.31 */background:transparent;-webkit-tap-highlight-color:transparent}
 #szp-bd.on{display:block}
 #szp{
-  display:none;position:fixed;z-index:350;
+  display:none;position:fixed;z-index:497; /* v2.31: サブ窓・計算機より前面 */
   background:var(--glass);
   border:1.5px solid var(--brd-hi);border-radius:var(--r-l);
   padding:14px 15px;
@@ -1013,7 +1013,7 @@ button{font-family:inherit}
 #csw-more.on{border-color:var(--acc);color:var(--tx);box-shadow:var(--inset-hi),0 0 10px var(--acc-glow)}
 #csw-cur{width:15px;height:15px;border-radius:50%;display:inline-block;flex-shrink:0;background:#cc2020;box-shadow:0 0 0 1px rgba(255,255,255,.35)} /* v2.29: 既定色を明示 */
 #cpop{
-  display:none;position:fixed;z-index:300;
+  display:none;position:fixed;z-index:495; /* v2.31: サブ窓・計算機より前面 */
   background:var(--glass);border:1.5px solid var(--brd-hi);border-radius:var(--r-m);
   padding:11px 12px;
   backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
@@ -1069,7 +1069,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.30</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.31</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1155,7 +1155,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.30</div>
+    <div class="dzm">M_Viewer V2.31</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1275,7 +1275,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.30'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.31'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2079,7 +2079,7 @@ const ZManager=(() => {
     el.style.zIndex=String(++_c);
   }
   function nextForNew(){              /* SubWinManager.nextZ() 互換シム */
-    if(_c-_BASE>=50&&_wins.size>0)_renormalize();
+    if(_c-_BASE>=50)_renormalize();   /* v2.31: 窓が0個でもカウンタを再正規化し、401-490帯を厳守(空集合時は_BASEへリセット) */
     return++_c;
   }
   return{register,unregister,bringToFront,nextForNew};
@@ -3882,10 +3882,15 @@ function _initToolbar(){
   document.querySelectorAll('#szgrp .szq').forEach(b=>{
     b.addEventListener('pointerdown',e=>{
       const i=+b.dataset.slot;
+      const wasActive=(+_sizeSlots()[i]===App.strokeSize);   /* v2.31: タップ前に選択中だったか */
       _editSzSlot=null;                       /* 適用時の誤書込防止 */
       App.setSize(_sizeSlots()[i]);
       const p=document.getElementById('szp');
-      if(p.classList.contains('on')){_closeSzp();return;}   /* 再タップで閉じる(従来のトグル動作) */
+      if(!wasActive){                          /* v2.31: 非選択ボタンはワンタップ適用のみ(ポップ非表示) */
+        if(p.classList.contains('on'))_closeSzp();
+        e.preventDefault();return;
+      }
+      if(p.classList.contains('on')){_closeSzp();return;}   /* 選択中ボタン再タップでトグル */
       _editSzSlot=i;
       p.classList.add('on');
       document.getElementById('szp-bd').classList.add('on');
@@ -3939,10 +3944,15 @@ function _initToolbar(){
   document.querySelectorAll('#cgrp .csw').forEach(sw=>{
     sw.addEventListener('click',e=>{
       const i=+sw.dataset.slot;
+      const wasActive=(sw.dataset.c===App.strokeColor);      /* v2.31: タップ前に選択中だったか */
       _editCSlot=null;
       App.setColor(sw.dataset.c);_persistDefaults();_updateSwatches();
       const p=document.getElementById('cpop');
-      if(p.classList.contains('on')){_closeCpop();return;}   /* 再タップで閉じる */
+      if(!wasActive){                          /* v2.31: 非選択ボタンはワンタップ適用のみ(ポップ非表示) */
+        if(p.classList.contains('on'))_closeCpop();
+        e.stopPropagation();return;
+      }
+      if(p.classList.contains('on')){_closeCpop();return;}   /* 選択中ボタン再タップでトグル */
       _editCSlot=i;_renderCpop();p.classList.add('on');
       const r=sw.getBoundingClientRect();
       p.style.left=Math.max(8,Math.min(r.left,window.innerWidth-(p.offsetWidth||190)-8))+'px';
