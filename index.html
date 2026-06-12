@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.32</title>
+<title>M_Viewer V2.33</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.32
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.33
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -738,7 +738,8 @@ button{font-family:inherit}
   border-bottom:1px solid rgba(40,64,96,.45);
   background:linear-gradient(180deg,rgba(0,0,0,.32) 0%,transparent 100%);
 }
-#cexpr{font-size:12px;color:#8ab4d4;min-height:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:.03em;font-family:var(--mono);font-variant-numeric:tabular-nums} /* v2.32 [3]: 視認性向上 */
+#cexpr{font-size:12px;color:#8ab4d4;min-height:15px;overflow-x:auto;overflow-y:hidden;text-overflow:clip;white-space:nowrap;letter-spacing:.03em;font-family:var(--mono);font-variant-numeric:tabular-nums;scrollbar-width:none} /* v2.33: 横スクロール対応 */
+#cexpr::-webkit-scrollbar{display:none}
 #cval{
   font-size:48px;font-weight:600;color:var(--tx);line-height:1.15;
   overflow:hidden;white-space:nowrap;
@@ -1077,7 +1078,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.32</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.33</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1163,7 +1164,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.32</div>
+    <div class="dzm">M_Viewer V2.33</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1283,7 +1284,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.32'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.33'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -4251,11 +4252,16 @@ function _initCalculator(){
   let leftVal='',pendingOp='',curInput='0';
   let _afterEq=false,_justOp=false;
   let _dispExpr=''; /* v50: 式表示用。=後も保持し新規入力開始時にクリア */
+  let _dispTokens=[]; /* v2.33: 表示用トークン(内部計算から分離) */
   const histEl=document.getElementById('chist');
   const exprEl=document.getElementById('cexpr');
   const valEl=document.getElementById('cval');
   const decEl=document.getElementById('cdec');
 
+  /* v2.33: 演算子記号変換マップ */
+  const _OP_DISP={'+':'+','-':'−','*':'×','/':'÷'};
+  /* v2.33: トークン列→表示文字列(演算子を記号に変換してスペース区切り) */
+  function _tokensToStr(tks){return tks.map(tk=>tk.type==='op'?(_OP_DISP[tk.val]||tk.val):tk.val).join(' ');}
   /* v50: 表示更新 — _dispExpr を式欄に表示 (=後も式を保持) */
   function _disp(){
     exprEl.textContent=_dispExpr;
@@ -4310,31 +4316,41 @@ function _initCalculator(){
         /* v19: 数字入力 — 演算子直後 or =直後なら入力リセット */
         if(_afterEq||_justOp){
           curInput=(num==='.')?'0.':num==='0'?'0':num;
-          if(_afterEq)_dispExpr=''; /* v50: =後の新規入力で式をクリア */
+          if(_afterEq){_dispExpr='';_dispTokens=[];} /* v2.33: =後の新規入力でトークンもクリア */
           _afterEq=false;_justOp=false;
+          _dispTokens.push({type:'num',val:curInput}); /* v2.33: 新numトークン追加 */
         }else{
           if(num==='.'){
             if(!curInput.includes('.'))curInput+='.';
           }else{
             curInput=(curInput==='0')?num:curInput+num;
           }
+          /* v2.33: 末尾numトークンをcurInputと同期 */
+          if(_dispTokens.length&&_dispTokens[_dispTokens.length-1].type==='num')
+            _dispTokens[_dispTokens.length-1].val=curInput;
+          else
+            _dispTokens.push({type:'num',val:curInput});
         }
+        _dispExpr=_tokensToStr(_dispTokens);
 
       }else if(op){
-        /* v2.32 [2]: 演算子押下 — Windows標準電卓と同じ挙動。
-           途中式を確定せず継続し、=が押された時点で初めて履歴へ追加。
-           演算子が連続した場合(例: 5+ → -): 先の演算子を上書きして式末尾だけ更新。
-           前の演算子と数値がある場合(5+3×): チェーン計算を継続し left 側を更新。 */
+        /* v2.33: 演算子押下 — 表示トークンと内部計算を分離。
+           ■ 内部: leftVal/pendingOpを更新(連鎖計算継続)。curInputも同期。
+           ■ 表示: _dispTokensのop末尾を上書き/追加(ユーザー入力をそのまま保存) */
         if(pendingOp&&!_justOp){
-          /* 左辺が確定していれば左辺を更新(連鎖計算)。履歴には追加しない。 */
           const result=_calc(leftVal,pendingOp,curInput);
-          leftVal=result;curInput=result;
+          leftVal=result;curInput=result; /* 内部のみ更新 — 表示トークンは変更しない */
         }else if(!pendingOp){
           leftVal=curInput;
         }
         pendingOp=op;
         _justOp=true;_afterEq=false;
-        _dispExpr=(_dispExpr.replace(/[+\-*/]\s*$/,'').trimEnd()||leftVal)+' '+op+' '; /* v2.32: 式末尾の演算子を更新 */
+        /* v2.33: 末尾がopなら上書き(連続演算子)、なければ追加 */
+        if(_dispTokens.length&&_dispTokens[_dispTokens.length-1].type==='op')
+          _dispTokens[_dispTokens.length-1].val=op;
+        else
+          _dispTokens.push({type:'op',val:op});
+        _dispExpr=_tokensToStr(_dispTokens);
 
       }else if(fn){
         const d=+decEl.value;
@@ -4343,7 +4359,7 @@ function _initCalculator(){
         if(fn==='C'){
           /* AC: 全リセット */
           leftVal='';pendingOp='';curInput='0';_afterEq=false;_justOp=false;
-          _dispExpr=''; /* v50: ACで式もクリア */
+          _dispExpr='';_dispTokens=[]; /* v2.33: ACでトークンもクリア */
 
         }else if(fn==='⌫'){
           /* 数字入力中のみバックスペース有効 */
@@ -4364,15 +4380,18 @@ function _initCalculator(){
           curInput=parseFloat((cur**2).toFixed(d)).toString();
 
         }else if(fn==='='){
-          /* v2.32 [2]: = → 保留演算を実行し、継続表示してきた式を履歴に追加 */
+          /* v2.33: = → トークン列から完全な式を組み立て、内部演算を実行、履歴に追加 */
           if(pendingOp&&leftVal!==''){
-            /* _dispExpr の末尾に現在の入力を補完して完全な式文字列を生成 */
-            const dispForHist=(_dispExpr.trimEnd().replace(/[+\-*/]\s*$/,'')||leftVal)+' '+pendingOp+' '+curInput;
+            const toks=[..._dispTokens];
+            if(toks.length&&toks[toks.length-1].type==='op')
+              toks.push({type:'num',val:curInput}); /* 演算子直後の=: rhsをトークンに補完 */
+            const dispForHist=_tokensToStr(toks);
             const result=_calc(leftVal,pendingOp,curInput);
             _hist(dispForHist,result);
             curInput=result;
             leftVal='';pendingOp='';
-            _dispExpr=dispForHist+' ='; /* v2.32: 完全な式を保持 */
+            _dispExpr=dispForHist+' =';
+            _dispTokens=[];
           }
           _afterEq=true;_justOp=false;
         }
