@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.40</title>
+<title>M_Viewer V2.41</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.40
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.41
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1158,7 +1158,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.40</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.41</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1271,7 +1271,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.40</div>
+    <div class="dzm">M_Viewer V2.41</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1391,7 +1391,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.40'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.41'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3975,7 +3975,7 @@ async function switchToSheet(idx){
   _sheetIdx=idx;const sh=_sheets[_sheetIdx];
   await App.loadState(sh);
   SubWinManager.thawAll(sh.subWinStates,sh.pdfDoc,App.strokes);
-  _renderTabBar();showLoading(false);
+  _renderTabBar();showLoading(false);_schedSessionSave(); /* v2.41 */
 }
 async function addSheet(){
   if(_sheets.length>=MAX_SHEETS){showToast(`タブは最大${MAX_SHEETS}つです`);return;}
@@ -3998,9 +3998,102 @@ async function closeSheetAt(idx){
     await App.loadState(_sheets[_sheetIdx]);
     SubWinManager.thawAll(_sheets[_sheetIdx].subWinStates||[],_sheets[_sheetIdx].pdfDoc,App.strokes);
   }
-  _renderTabBar();showLoading(false);
+  _renderTabBar();showLoading(false);_schedSessionSave(); /* v2.41 */
 }
-App.setPostLoad(()=>{_sheetSync();_checkBkReminder();}); /* v22: バックアップチェック */
+App.setPostLoad(()=>{_sheetSync();_checkBkReminder();_schedSessionSave();}); /* v22: バックアップチェック / v2.41: セッション保存 */
+
+/* v2.41: 複数タブセッションの保存・復元 ============================== */
+let _sesTimer=null;
+function _schedSessionSave(){clearTimeout(_sesTimer);_sesTimer=setTimeout(_saveSession,2000);}
+
+async function _saveSession(){
+  try{
+    _sheetSync(); /* アクティブタブの状態を _sheets へ反映 */
+    if(_sheets[_sheetIdx]?.pdfDoc)_sheets[_sheetIdx].subWinStates=SubWinManager.freezeAll();
+    const pairs=[];const meta={sheets:[],activeIdx:_sheetIdx,ts:Date.now()};
+    for(let i=0;i<_sheets.length;i++){
+      const sh=_sheets[i];
+      if(!sh.pdfDoc||!sh.origBuf)continue;
+      pairs.push(['resume:ses:buf:'+i,sh.origBuf]);
+      meta.sheets.push({
+        bufIdx:i,fileName:sh.fileName,docId:sh.docId||null,
+        curPage:sh.curPage||1,totalPages:sh.totalPages||0,
+        scale:sh.scale||1,panX:sh.panX??16,panY:sh.panY??16,
+        strokes:Utils.cloneStrokes(Utils.pruneEraserStrokes(sh.strokes||{})),
+        subWinStates:sh.subWinStates||[]
+      });
+    }
+    if(!meta.sheets.length)return;
+    /* 古いバッファキーをクリーンアップ(タブ数が減った場合) */
+    for(let k=meta.sheets.length;k<8;k++)pairs.push(['resume:ses:buf:'+k,null]);
+    pairs.push(['resume:session',meta]);
+    await IDBStore.saveNow(pairs);
+  }catch(e){Logger.error('[Session] save failed:',e);}
+}
+function _emergencySessionSave(){
+  try{
+    _sheetSync();
+    if(_sheets[_sheetIdx]?.pdfDoc)_sheets[_sheetIdx].subWinStates=SubWinManager.freezeAll();
+    const pairs=[];const meta={sheets:[],activeIdx:_sheetIdx,ts:Date.now()};
+    for(let i=0;i<_sheets.length;i++){
+      const sh=_sheets[i];
+      if(!sh.pdfDoc||!sh.origBuf)continue;
+      pairs.push(['resume:ses:buf:'+i,sh.origBuf]);
+      meta.sheets.push({bufIdx:i,fileName:sh.fileName,docId:sh.docId||null,
+        curPage:sh.curPage||1,totalPages:sh.totalPages||0,
+        scale:sh.scale||1,panX:sh.panX??16,panY:sh.panY??16,
+        strokes:Utils.cloneStrokes(Utils.pruneEraserStrokes(sh.strokes||{})),
+        subWinStates:sh.subWinStates||[]});
+    }
+    if(!meta.sheets.length)return;
+    for(let k=meta.sheets.length;k<8;k++)pairs.push(['resume:ses:buf:'+k,null]);
+    pairs.push(['resume:session',meta]);
+    IDBStore.saveNow(pairs).catch(()=>{});
+  }catch(_){}
+}
+
+async function _restoreSession(){
+  let meta=null;
+  try{meta=await IDBStore.get('resume:session');}catch(_){return false;}
+  if(!meta||!Array.isArray(meta.sheets)||!meta.sheets.length)return false;
+  /* 30日以上古いデータは無視 */
+  if(typeof meta.ts==='number'&&Date.now()-meta.ts>30*24*3600*1000)return false;
+  showLoading(true);
+  _sheets=[];
+  for(const sd of meta.sheets){
+    let buf=null;
+    try{buf=await IDBStore.get('resume:ses:buf:'+sd.bufIdx);}catch(_){}
+    if(!buf&&sd.docId){try{const d=await IDBStore.get('doc:'+sd.docId);if(d?.originalPdfBytes)buf=new Uint8Array(d.originalPdfBytes);}catch(_){}}
+    if(!buf)continue;
+    if(!(buf instanceof Uint8Array))buf=new Uint8Array(buf);
+    const sh=_emptySheet();
+    sh.origBuf=buf;sh.fileName=sd.fileName;sh.docId=sd.docId;
+    sh.curPage=sd.curPage;sh.totalPages=sd.totalPages;
+    sh.scale=sd.scale;sh.panX=sd.panX;sh.panY=sd.panY;
+    sh.strokes=sd.strokes||{};sh.subWinStates=sd.subWinStates||[];
+    try{sh.pdfDoc=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;sh.totalPages=sh.pdfDoc.numPages;}
+    catch(e){Logger.error('[Session] PDF load fail:',sd.fileName,e);continue;}
+    if(sd.docId){DocMgr.setId(sd.docId);}
+    _sheets.push(sh);
+  }
+  if(!_sheets.length){_sheets.push(_emptySheet());return false;}
+  _sheetIdx=Math.min(meta.activeIdx||0,_sheets.length-1);
+  await App.loadState(_sheets[_sheetIdx]);
+  if(_sheets[_sheetIdx].subWinStates?.length)
+    SubWinManager.thawAll(_sheets[_sheetIdx].subWinStates,_sheets[_sheetIdx].pdfDoc,App.strokes);
+  _renderTabBar();
+  return true;
+}
+
+/* セッション保存のライフサイクルフック */
+['visibilitychange','pagehide','freeze'].forEach(ev=>{
+  (ev==='visibilitychange'?document:window).addEventListener(ev,()=>{
+    if(ev==='visibilitychange'&&document.visibilityState!=='hidden')return;
+    if(_sheets.some(sh=>sh.pdfDoc))_emergencySessionSave();
+  });
+});
+window.addEventListener('beforeunload',()=>{if(_sheets.some(sh=>sh.pdfDoc))_emergencySessionSave();});
+/* ================================================================== */
 
 /* ============================================================
    バックアップ確認ダイアログ
@@ -4850,6 +4943,15 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
 
   /* 安全タイムアウト: 6秒後に強制解除 */
   const _safety=setTimeout(()=>{showLoading(false);App._showHome();Logger.warn('[起動] restore タイムアウト');},6000);
+
+  /* v2.41: 複数タブセッション復元を先に試行 */
+  let _sessionRestored=false;
+  try{_sessionRestored=await Promise.race([_restoreSession(),new Promise((_,rej)=>setTimeout(()=>rej(new Error('ses timeout')),8000))]).catch(()=>false);}catch(_){}
+  if(_sessionRestored){
+    clearTimeout(_safety);showLoading(false);
+    _sheetSync();showToast('前回のセッションを復元しました（'+_sheets.length+'タブ）');
+    return;
+  }
 
   let saved=null;
   try{
