@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.34</title>
+<title>M_Viewer V2.35</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.34
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.35
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1041,6 +1041,43 @@ button{font-family:inherit}
 @media(pointer:coarse) and (max-width:600px){.szq{height:30px;min-width:32px;font-size:12px}#csw-more{height:28px;font-size:11px;padding:0 8px}}
 @media(pointer:coarse) and (max-width:430px){.szq{height:26px;min-width:26px;font-size:11px;padding:0 4px}#csw-more{height:24px;font-size:10px;padding:0 6px}#csw-cur{width:10px;height:10px}}
 
+/* ── ビューブックマーク (v2.35) ── */
+.vbm-grp{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.vbm-lbl{font-size:9px;color:var(--tx3);font-weight:800;letter-spacing:.12em;margin-right:2px;flex-shrink:0}
+.vbm{
+  width:30px;height:24px;border-radius:var(--r-s);
+  border:1.5px solid var(--brd);background:var(--srf-low);
+  color:var(--tx3);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .15s,background .15s,color .12s,box-shadow .15s;
+  box-shadow:var(--inset-hi);position:relative;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;
+}
+.vbm:hover{border-color:var(--brd-hi);color:var(--tx2);background:var(--srf)}
+.vbm.on{
+  border-color:var(--acc);color:var(--acc2);
+  background:linear-gradient(180deg,rgba(255,138,30,.18) 0%,rgba(255,138,30,.06) 100%);
+  box-shadow:var(--inset-hi),0 0 8px var(--acc-glow);text-shadow:0 0 6px var(--acc-glow);
+}
+.vbm.on:hover{border-color:var(--acc2);box-shadow:var(--inset-hi),0 0 14px var(--acc-glow)}
+.vbm.active{
+  border-color:#5ae0a8;color:#5ae0a8;
+  background:linear-gradient(180deg,rgba(61,220,145,.18) 0%,rgba(61,220,145,.06) 100%);
+  box-shadow:var(--inset-hi),0 0 8px rgba(61,220,145,.4);text-shadow:0 0 6px rgba(61,220,145,.4);
+}
+.vbm-tip{
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:var(--glass);border:1px solid var(--brd-hi);border-radius:5px;
+  padding:3px 8px;font-size:10px;color:var(--tx2);white-space:nowrap;
+  pointer-events:none;z-index:100;display:none;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 3px 10px rgba(0,0,0,.6);
+}
+.vbm:hover .vbm-tip{display:block}
+@media(pointer:coarse){.vbm{width:34px;height:30px;font-size:12px;border-radius:7px}.vbm-lbl{font-size:8px}.vbm:hover .vbm-tip{display:none}}
+@media(pointer:coarse) and (max-width:600px){.vbm{width:28px;height:26px;font-size:10px}.vbm-lbl{display:none}}
+@media(pointer:coarse) and (max-width:430px){.vbm{width:24px;height:22px;font-size:9px}}
+
 /* ── ページ一覧プレビュー ── */
 #preview-overlay{display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.93);flex-direction:column;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
 #preview-overlay.on{display:flex}
@@ -1078,7 +1115,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.34</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.35</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1092,6 +1129,15 @@ button{font-family:inherit}
     <button class="btn" id="btn-manual" title="説明書を表示">説明書</button>
     <div class="vs"></div><!-- v2.28: 計算機を独立グループ化 -->
     <button class="btn" id="calcbtn">計算機</button>
+    <div class="vs"></div>
+    <span id="vbm-grp" class="vbm-grp">
+      <span class="vbm-lbl">VIEW</span>
+      <button class="vbm" data-vi="0">1</button>
+      <button class="vbm" data-vi="1">2</button>
+      <button class="vbm" data-vi="2">3</button>
+      <button class="vbm" data-vi="3">4</button>
+      <button class="vbm" data-vi="4">5</button>
+    </span>
     <div class="sp"></div>
     <!-- v21: ホームボタン削除 -->
     <button class="btn rd" id="btn-close">閉じる</button>
@@ -1164,7 +1210,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.34</div>
+    <div class="dzm">M_Viewer V2.35</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1284,7 +1330,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.34'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.35'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3683,6 +3729,7 @@ const App=(() => {
 
     get panX(){return panX;},
     get panY(){return panY;},
+    async restoreView(pg,px,py,sc){if(!pdfDoc)return;scale=sc;panX=px;panY=py;await gotoPage(pg,true);_clampPan();_updateTransform();_zlblEl.textContent=Math.round(scale*100)+'%';},
     get docId(){return _docId;},
     /* v16: textX/textY削除 */
     get activeSelSubWin(){return _activeSelSubWin;}, /* ⑤修正: サブ窓選択参照 */
@@ -3693,6 +3740,52 @@ const App=(() => {
     setPostLoad(fn){_postLoadFn=fn;},
 
   };
+})();
+
+/* ============================================================
+   ビューブックマーク (ViewBookmark) v2.35
+   ============================================================ */
+(function _initViewBookmark(){
+  const SLOTS=5,KEY='mv_viewbm';
+  let _bm=[null,null,null,null,null],_longTimer=null,_longSlot=-1;
+  function _load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(Array.isArray(d)&&d.length===SLOTS)_bm=d;}catch(_){}}
+  function _save(){try{localStorage.setItem(KEY,JSON.stringify(_bm));}catch(_){}}
+  _load();
+  function _render(){
+    document.querySelectorAll('.vbm').forEach((btn,i)=>{
+      const bk=_bm[i];btn.classList.toggle('on',!!bk);
+      if(bk&&App.pdfDoc){
+        const match=(bk.page===App.currentPage&&Math.abs(bk.scale-App.scale)<0.01&&Math.abs(bk.panX-App.panX)<2&&Math.abs(bk.panY-App.panY)<2);
+        btn.classList.toggle('active',match);
+      }else{btn.classList.remove('active');}
+      let tip=btn.querySelector('.vbm-tip');
+      if(!tip){tip=document.createElement('span');tip.className='vbm-tip';btn.appendChild(tip);}
+      tip.textContent=bk?'P'+bk.page+' '+Math.round(bk.scale*100)+'%':'空 — タップで保存';
+    });
+  }
+  function _saveSlot(i){
+    if(!App.pdfDoc){showToast('PDFが開いていません');return;}
+    _bm[i]={page:App.currentPage,panX:App.panX,panY:App.panY,scale:App.scale};
+    _save();_render();showToast('VIEW '+(i+1)+' に保存 (P'+_bm[i].page+' '+Math.round(_bm[i].scale*100)+'%)');
+  }
+  async function _restoreSlot(i){
+    const bk=_bm[i];if(!bk||!App.pdfDoc)return;
+    await App.restoreView(bk.page,bk.panX,bk.panY,bk.scale);_render();showToast('VIEW '+(i+1)+' に復帰');
+  }
+  document.querySelectorAll('.vbm').forEach(btn=>{
+    const i=+btn.dataset.vi;
+    btn.addEventListener('pointerdown',e=>{
+      _longSlot=i;_longTimer=setTimeout(()=>{_longTimer=null;_saveSlot(i);_longSlot=-1;},500);
+    });
+    btn.addEventListener('pointerup',()=>{
+      if(_longTimer){clearTimeout(_longTimer);_longTimer=null;if(_bm[i])_restoreSlot(i);else _saveSlot(i);}
+      _longSlot=-1;
+    });
+    btn.addEventListener('pointercancel',()=>{if(_longTimer){clearTimeout(_longTimer);_longTimer=null;}_longSlot=-1;});
+    btn.addEventListener('pointerleave',()=>{if(_longTimer){clearTimeout(_longTimer);_longTimer=null;}_longSlot=-1;});
+    btn.addEventListener('contextmenu',e=>e.preventDefault());
+  });
+  EventBus.on('stroke:added',_render);_render();
 })();
 
 /* ============================================================
