@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.42</title>
+<title>M_Viewer V2.43</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.42
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.43
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1140,6 +1140,12 @@ button{font-family:inherit}
 .more-menu button:active{background:var(--acc-deep);border-color:var(--acc2);color:#fff}
 @media(pointer:coarse){.more-menu button{height:48px;font-size:14px}}
 
+/* ── DXFビューア (v2.43) ── */
+#dxf-canvas{background:#1a1e26}
+#dxf-toolbar{background:linear-gradient(180deg,rgba(255,138,30,.08) 0%,transparent 100%);border-top:1px solid rgba(255,138,30,.3)}
+#dxf-toolbar .btn{height:30px;padding:0 10px;font-size:12px}
+@media(pointer:coarse){#dxf-toolbar .btn{height:36px;padding:0 12px;font-size:13px}}
+
 /* ── ページ一覧プレビュー ── */
 #preview-overlay{display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.93);flex-direction:column;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
 #preview-overlay.on{display:flex}
@@ -1177,8 +1183,8 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.42</span></span>
-    <input type="file" id="fileInput" accept="application/pdf" style="display:none">
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.43</span></span>
+    <input type="file" id="fileInput" accept="application/pdf,.dxf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
     <button class="btn" id="btn-undo">戻す</button>
@@ -1297,9 +1303,9 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.42</div>
+    <div class="dzm">M_Viewer V2.43</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
-    <button class="dzb" id="dz-open">PDFを開く</button>
+    <button class="dzb" id="dz-open">PDF / DXF を開く</button>
   </div>
   <div id="home">
     <div class="home-hdr">
@@ -1417,7 +1423,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.42'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.43'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -4150,6 +4156,8 @@ function _initToolbar(){
   document.getElementById('fileInput').addEventListener('change',async e=>{
     const f=e.target.files[0];if(!f){e.target.value='';return;}
     if(App.pdfDoc){const r=await _confirmClose(App.fileName,'読み込む（バックアップしない）');if(r==='cancel'){e.target.value='';return;}if(r==='backup'){await _backupThenClose(async()=>await App.loadPDF(f));e.target.value='';return;}}
+    /* v2.43: DXF判定 */
+    if(f.name.toLowerCase().endsWith('.dxf')){await DxfViewer.open(f);e.target.value='';return;}
     await App.loadPDF(f);e.target.value='';
   });
   document.getElementById('dz-open').addEventListener('click',()=>openFile());
@@ -4470,10 +4478,10 @@ function _initToolbar(){
   /* ドラッグ&ドロップ */
   const caEl=document.getElementById('ca');
   caEl.addEventListener('dragover',e=>e.preventDefault());
-  caEl.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)App.loadPDF(f);});
+  caEl.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return;if(f.name.toLowerCase().endsWith('.dxf'))DxfViewer.open(f);else App.loadPDF(f);});
   const homeEl=document.getElementById('home');
   homeEl.addEventListener('dragover',e=>e.preventDefault());
-  homeEl.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f){App._hideHome();App.loadPDF(f);}});
+  homeEl.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(!f)return;if(f.name.toLowerCase().endsWith('.dxf')){App._hideHome();DxfViewer.open(f);}else{App._hideHome();App.loadPDF(f);}});
 
   /* ピッカー外クリックで閉じる */
   document.addEventListener('click',()=>closePickers());
@@ -5047,6 +5055,502 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
   }catch(e){Logger.error('[起動] restore 失敗:',e);App._showHome();}
   finally{clearTimeout(_safety);showLoading(false);}
 })();
+/* ============================================================
+   DXF Viewer Module v2.43
+   — 独立したDXFパーサ・レンダラ・計測ツール
+   — 既存PDF機能に一切依存しない完全独立モジュール
+   ============================================================ */
+const DxfViewer=(function(){
+'use strict';
+
+/* ── ACI(AutoCAD Color Index)→HEX 変換テーブル(基本16色) ── */
+const ACI=['#000000','#ff0000','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff',
+  '#808080','#c0c0c0','#ff0000','#ff8080','#a60000','#a65353','#800000','#804040'];
+function aciColor(c){return(c>=1&&c<=255)?ACI[Math.min(c,ACI.length-1)]||'#ffffff':'#ffffff';}
+
+/* ── DXFパーサ ── */
+function parseDxf(text){
+  const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  const pairs=[];
+  for(let i=0;i<lines.length-1;i+=2){
+    const code=parseInt(lines[i].trim(),10);
+    const val=lines[i+1]?.trim()||'';
+    if(!isNaN(code))pairs.push({c:code,v:val});
+  }
+  /* セクション分割 */
+  const sections={};let sec=null,buf=[];
+  for(const p of pairs){
+    if(p.c===0&&p.v==='SECTION'){sec=null;buf=[];continue;}
+    if(p.c===2&&sec===null){sec=p.v;buf=[];continue;}
+    if(p.c===0&&p.v==='ENDSEC'){if(sec)sections[sec]=buf;sec=null;buf=[];continue;}
+    if(sec)buf.push(p);
+  }
+  /* レイヤーテーブル解析 */
+  const layers={};
+  if(sections.TABLES){
+    const tb=sections.TABLES;let inLayer=false,ln='',lc=7,loff=false;
+    for(const p of tb){
+      if(p.c===0&&p.v==='LAYER'){if(inLayer&&ln)layers[ln]={color:lc,off:loff};inLayer=true;ln='';lc=7;loff=false;continue;}
+      if(p.c===0&&p.v!=='LAYER'){if(inLayer&&ln)layers[ln]={color:lc,off:loff};inLayer=false;continue;}
+      if(inLayer){
+        if(p.c===2)ln=p.v;
+        if(p.c===62)lc=Math.abs(parseInt(p.v,10));
+        if(p.c===62&&parseInt(p.v,10)<0)loff=true;
+      }
+    }
+    if(inLayer&&ln)layers[ln]={color:lc,off:loff};
+  }
+  /* ブロック解析 */
+  const blocks={};
+  if(sections.BLOCKS){
+    const bb=sections.BLOCKS;let bn=null,bents=[];
+    for(let i=0;i<bb.length;i++){
+      if(bb[i].c===0&&bb[i].v==='BLOCK'){bn=null;bents=[];continue;}
+      if(bb[i].c===2&&bn===null){bn=bb[i].v;bents=[];continue;}
+      if(bb[i].c===0&&bb[i].v==='ENDBLK'){if(bn)blocks[bn]=bents;bn=null;continue;}
+      if(bn)bents.push(bb[i]);
+    }
+  }
+  /* エンティティ解析 */
+  const entities=[];
+  if(sections.ENTITIES){
+    const eb=sections.ENTITIES;let ent=null;
+    function flush(){if(ent)entities.push(ent);ent=null;}
+    for(const p of eb){
+      if(p.c===0){flush();ent={type:p.v,layer:'0',color:256,pts:[]};continue;}
+      if(!ent)continue;
+      const v=p.v,n=parseFloat(v);
+      if(p.c===8)ent.layer=v;
+      if(p.c===62)ent.color=parseInt(v,10);
+      if(p.c===10)ent.x1=n; if(p.c===20)ent.y1=n;
+      if(p.c===11)ent.x2=n; if(p.c===21)ent.y2=n;
+      if(p.c===12)ent.x3=n; if(p.c===22)ent.y3=n;
+      if(p.c===13)ent.x4=n; if(p.c===23)ent.y4=n;
+      if(p.c===40)ent.r=n;   /* radius / height / bulge */
+      if(p.c===41)ent.r2=n;  /* minor axis ratio(ELLIPSE) / end width */
+      if(p.c===42)ent.bulge=n;
+      if(p.c===50)ent.a1=n;  /* start angle */
+      if(p.c===51)ent.a2=n;  /* end angle */
+      if(p.c===1)ent.text=v; /* TEXT/MTEXT content */
+      if(p.c===7)ent.style=v;
+      if(p.c===2)ent.blockName=v; /* INSERT block name */
+      /* LWPOLYLINE vertices */
+      if(ent.type==='LWPOLYLINE'){
+        if(p.c===90)ent.numVerts=parseInt(v,10);
+        if(p.c===70)ent.flags=parseInt(v,10);
+        if(p.c===10){ent.pts.push({x:n,y:0,bulge:0});}
+        if(p.c===20&&ent.pts.length)ent.pts[ent.pts.length-1].y=n;
+        if(p.c===42&&ent.pts.length)ent.pts[ent.pts.length-1].bulge=n;
+      }
+      /* POLYLINE vertex collection */
+      if(ent.type==='VERTEX'){
+        if(p.c===10)ent.x1=n; if(p.c===20)ent.y1=n;
+      }
+    }
+    flush();
+  }
+  /* POLYLINE→VERTEX列をグループ化 */
+  const merged=[];let curPoly=null;
+  for(const e of entities){
+    if(e.type==='POLYLINE'){curPoly={type:'POLYLINE',layer:e.layer,color:e.color,flags:e.flags||0,pts:[]};continue;}
+    if(e.type==='VERTEX'&&curPoly){curPoly.pts.push({x:e.x1||0,y:e.y1||0,bulge:0});continue;}
+    if(e.type==='SEQEND'&&curPoly){merged.push(curPoly);curPoly=null;continue;}
+    merged.push(e);
+  }
+  if(curPoly)merged.push(curPoly);
+  /* 範囲計算 */
+  let xMin=Infinity,yMin=Infinity,xMax=-Infinity,yMax=-Infinity;
+  function ext(x,y){if(isFinite(x)&&isFinite(y)){xMin=Math.min(xMin,x);yMin=Math.min(yMin,y);xMax=Math.max(xMax,x);yMax=Math.max(yMax,y);}}
+  for(const e of merged){
+    if(e.x1!=null)ext(e.x1,e.y1);if(e.x2!=null)ext(e.x2,e.y2);
+    if(e.type==='CIRCLE'&&e.r){ext(e.x1-e.r,e.y1-e.r);ext(e.x1+e.r,e.y1+e.r);}
+    if(e.pts)for(const p of e.pts)ext(p.x,p.y);
+  }
+  if(!isFinite(xMin)){xMin=0;yMin=0;xMax=100;yMax=100;}
+  return{layers,blocks,entities:merged,extents:{xMin,yMin,xMax,yMax}};
+}
+
+/* ── DXFレンダラ ── */
+function renderDxf(ctx,dxf,vp,opts={}){
+  const{tx,ty,sc,w,h}=vp;
+  ctx.save();ctx.clearRect(0,0,w,h);
+  ctx.fillStyle=opts.bg||'#1a1e26';ctx.fillRect(0,0,w,h);
+  function toS(x,y){return{x:tx+x*sc,y:ty-y*sc};} /* DXF→screen (Y反転) */
+  function entColor(e){
+    if(e.color===0)return'#000000';
+    if(e.color!==256&&e.color!=null)return aciColor(e.color);
+    const ly=dxf.layers[e.layer];
+    return ly?aciColor(ly.color):'#ffffff';
+  }
+  const lw=Math.max(0.5,sc*0.3);
+  for(const e of dxf.entities){
+    const ly=dxf.layers[e.layer];
+    if(ly?.off)continue;
+    const col=entColor(e);
+    ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=lw;ctx.lineCap='round';
+    if(e.type==='LINE'){
+      const a=toS(e.x1,e.y1),b=toS(e.x2,e.y2);
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    }else if(e.type==='CIRCLE'){
+      const c=toS(e.x1,e.y1),r=e.r*sc;
+      if(r<0.3)continue;
+      ctx.beginPath();ctx.arc(c.x,c.y,r,0,Math.PI*2);ctx.stroke();
+    }else if(e.type==='ARC'){
+      const c=toS(e.x1,e.y1),r=e.r*sc;
+      if(r<0.3)continue;
+      const a1=(e.a1||0)*Math.PI/180,a2=(e.a2||360)*Math.PI/180;
+      ctx.beginPath();ctx.arc(c.x,c.y,r,-a1,-a2,true);ctx.stroke();
+    }else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+      if(e.pts.length<2)continue;
+      const closed=!!(e.flags&1);
+      ctx.beginPath();
+      for(let i=0;i<e.pts.length;i++){
+        const p=toS(e.pts[i].x,e.pts[i].y);
+        if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);
+      }
+      if(closed)ctx.closePath();
+      ctx.stroke();
+    }else if(e.type==='POINT'){
+      const p=toS(e.x1,e.y1);
+      ctx.fillRect(p.x-1.5,p.y-1.5,3,3);
+    }else if(e.type==='TEXT'||e.type==='MTEXT'){
+      const p=toS(e.x1,e.y1);
+      const fs=Math.max(8,(e.r||2.5)*sc);
+      if(fs<3)continue;
+      ctx.font=fs+'px sans-serif';ctx.textBaseline='bottom';
+      ctx.fillText(e.text||'',p.x,p.y);
+    }else if(e.type==='INSERT'){
+      /* ブロック参照(簡易: ブロック内LINE/CIRCLE等を再描画) */
+      const bk=dxf.blocks[e.blockName];if(!bk)continue;
+      /* TODO: 回転/スケール対応 */
+    }else if(e.type==='ELLIPSE'){
+      const c=toS(e.x1,e.y1);
+      const majX=(e.x2||1)*sc,majY=(e.y2||0)*sc;
+      const majR=Math.sqrt(majX*majX+majY*majY);
+      const minR=majR*(e.r2||0.5);
+      const rot=Math.atan2(-majY,majX);
+      ctx.beginPath();ctx.ellipse(c.x,c.y,majR,minR,rot,0,Math.PI*2);ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/* ── スナップエンジン ── */
+function findSnap(dxf,wx,wy,snapR){
+  let best=null,bestD=snapR*snapR;
+  function chk(x,y,type){const d=(x-wx)*(x-wx)+(y-wy)*(y-wy);if(d<bestD){bestD=d;best={x,y,type};}}
+  for(const e of dxf.entities){
+    if(e.type==='LINE'){
+      chk(e.x1,e.y1,'端点');chk(e.x2,e.y2,'端点');
+      chk((e.x1+e.x2)/2,(e.y1+e.y2)/2,'中点');
+    }else if(e.type==='CIRCLE'){
+      chk(e.x1,e.y1,'中心');
+      chk(e.x1+e.r,e.y1,'四半点');chk(e.x1-e.r,e.y1,'四半点');
+      chk(e.x1,e.y1+e.r,'四半点');chk(e.x1,e.y1-e.r,'四半点');
+    }else if(e.type==='ARC'){
+      chk(e.x1,e.y1,'中心');
+    }else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+      for(let i=0;i<e.pts.length;i++){
+        chk(e.pts[i].x,e.pts[i].y,'端点');
+        if(i>0)chk((e.pts[i-1].x+e.pts[i].x)/2,(e.pts[i-1].y+e.pts[i].y)/2,'中点');
+      }
+    }else if(e.type==='POINT'){chk(e.x1,e.y1,'点');}
+    else if(e.type==='TEXT'||e.type==='MTEXT'){chk(e.x1,e.y1,'基点');}
+  }
+  return best;
+}
+
+/* ── DXFビューア(Canvas/UI/パン・ズーム・計測) ── */
+let _active=false,_dxf=null,_fileName='';
+let _cvs=null,_ctx=null;
+let _tx=0,_ty=0,_sc=1; /* transform: screen = tx + dxf_x * sc, ty - dxf_y * sc */
+let _caEl=null;
+let _measuring=false,_mPt1=null,_mPt2=null,_mCursor=null;
+let _panStart=null,_pinch=null;
+let _toolbarEl=null,_infoEl=null;
+
+function _vp(){return{tx:_tx,ty:_ty,sc:_sc,w:_cvs.width,h:_cvs.height};}
+function _toWorld(sx,sy){return{x:(sx-_tx)/_sc,y:(_ty-sy)/_sc};}
+function _toScreen(wx,wy){return{x:_tx+wx*_sc,y:_ty-wy*_sc};}
+
+function _fitAll(){
+  if(!_dxf||!_cvs)return;
+  const{xMin,yMin,xMax,yMax}=_dxf.extents;
+  const dw=xMax-xMin||1,dh=yMax-yMin||1;
+  const cw=_cvs.width,ch=_cvs.height;
+  const margin=40;
+  _sc=Math.min((cw-margin*2)/dw,(ch-margin*2)/dh);
+  const cx=(xMin+xMax)/2,cy=(yMin+yMax)/2;
+  _tx=cw/2-cx*_sc;_ty=ch/2+cy*_sc;
+}
+
+function _redraw(){
+  if(!_dxf||!_cvs)return;
+  renderDxf(_ctx,_dxf,_vp());
+  _drawMeasure();
+  _drawSnapCursor();
+}
+
+function _drawMeasure(){
+  if(!_mPt1)return;
+  const ctx=_ctx;
+  const a=_toScreen(_mPt1.x,_mPt1.y);
+  ctx.save();
+  /* 第1点マーカー */
+  ctx.strokeStyle='#ff4060';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(a.x,a.y,6,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(a.x-8,a.y);ctx.lineTo(a.x+8,a.y);ctx.moveTo(a.x,a.y-8);ctx.lineTo(a.x,a.y+8);ctx.stroke();
+  if(_mPt2){
+    const b=_toScreen(_mPt2.x,_mPt2.y);
+    ctx.beginPath();ctx.arc(b.x,b.y,6,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(b.x-8,b.y);ctx.lineTo(b.x+8,b.y);ctx.moveTo(b.x,b.y-8);ctx.lineTo(b.x,b.y+8);ctx.stroke();
+    /* 距離線 */
+    ctx.setLineDash([6,4]);ctx.strokeStyle='#ff8040';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    ctx.setLineDash([]);
+    /* 距離表示 */
+    const dist=Math.sqrt(((_mPt2.x-_mPt1.x)**2)+((_mPt2.y-_mPt1.y)**2));
+    const dx=_mPt2.x-_mPt1.x,dy=_mPt2.y-_mPt1.y;
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    ctx.font='bold 14px "SF Mono",Consolas,monospace';ctx.textAlign='center';ctx.textBaseline='bottom';
+    const txt=dist.toFixed(2);
+    const tw=ctx.measureText(txt).width+12;
+    ctx.fillStyle='rgba(10,16,26,.88)';ctx.fillRect(mx-tw/2,my-22,tw,20);
+    ctx.strokeStyle='#ff8040';ctx.lineWidth=1;ctx.strokeRect(mx-tw/2,my-22,tw,20);
+    ctx.fillStyle='#ffcc40';ctx.fillText(txt,mx,my-5);
+    /* ΔX,ΔY表示 */
+    ctx.font='11px sans-serif';ctx.fillStyle='#90b8d8';ctx.textAlign='left';
+    ctx.fillText('ΔX='+Math.abs(dx).toFixed(2)+'  ΔY='+Math.abs(dy).toFixed(2),mx+tw/2+6,my-5);
+  }
+  ctx.restore();
+}
+
+function _drawSnapCursor(){
+  if(!_mCursor||!_measuring)return;
+  const s=_toScreen(_mCursor.x,_mCursor.y);
+  _ctx.save();
+  _ctx.strokeStyle='#40ff80';_ctx.lineWidth=1.5;
+  _ctx.beginPath();_ctx.arc(s.x,s.y,8,0,Math.PI*2);_ctx.stroke();
+  /* スナップ種別表示 */
+  if(_mCursor.type){
+    _ctx.font='bold 10px sans-serif';_ctx.fillStyle='#40ff80';_ctx.textAlign='center';
+    _ctx.fillText(_mCursor.type,s.x,s.y-12);
+  }
+  _ctx.restore();
+}
+
+function _resize(){
+  if(!_cvs||!_caEl)return;
+  const dpr=window.devicePixelRatio||1;
+  const w=_caEl.clientWidth,h=_caEl.clientHeight;
+  _cvs.width=w*dpr;_cvs.height=h*dpr;
+  _cvs.style.width=w+'px';_cvs.style.height=h+'px';
+  _ctx.setTransform(dpr,0,0,dpr,0,0);
+  _redraw();
+}
+
+/* ── イベントハンドラ ── */
+function _onWheel(e){
+  e.preventDefault();
+  const r=e.deltaY<0?1.15:0.87;
+  const rect=_cvs.getBoundingClientRect();
+  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const wx=_toWorld(mx,my);
+  _sc*=r;_sc=Math.max(0.0001,Math.min(10000,_sc));
+  _tx=mx-wx.x*_sc;_ty=my+wx.y*_sc;
+  _redraw();
+}
+
+function _onPointerDown(e){
+  if(e.button===1||e.ctrlKey||(!_measuring&&e.button===0)){
+    /* パン開始 */
+    _panStart={x:e.clientX,y:e.clientY,tx:_tx,ty:_ty};
+    _cvs.setPointerCapture(e.pointerId);return;
+  }
+  if(_measuring&&e.button===0){
+    const rect=_cvs.getBoundingClientRect();
+    const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
+    const w=_toWorld(sx,sy);
+    const snap=findSnap(_dxf,w.x,w.y,15/_sc);
+    const pt=snap||w;
+    if(!_mPt1||_mPt2){_mPt1=pt;_mPt2=null;}
+    else{_mPt2=pt;}
+    _redraw();
+    _updateInfo();
+  }
+}
+function _onPointerMove(e){
+  if(_panStart){
+    _tx=_panStart.tx+(e.clientX-_panStart.x);
+    _ty=_panStart.ty+(e.clientY-_panStart.y);
+    _redraw();return;
+  }
+  if(_measuring){
+    const rect=_cvs.getBoundingClientRect();
+    const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
+    const w=_toWorld(sx,sy);
+    _mCursor=findSnap(_dxf,w.x,w.y,15/_sc)||w;
+    _redraw();
+  }
+}
+function _onPointerUp(e){_panStart=null;}
+
+/* タッチ: ピンチズーム */
+function _onTouchStart(e){
+  e.preventDefault();
+  if(e.touches.length>=2){
+    const t=e.touches;
+    const cx=(t[0].clientX+t[1].clientX)/2,cy=(t[0].clientY+t[1].clientY)/2;
+    const d=Math.hypot(t[1].clientX-t[0].clientX,t[1].clientY-t[0].clientY);
+    _pinch={cx,cy,d,sc:_sc,tx:_tx,ty:_ty};return;
+  }
+  if(!_measuring){
+    const t=e.touches[0];
+    _panStart={x:t.clientX,y:t.clientY,tx:_tx,ty:_ty};
+  }else{
+    const t=e.touches[0];const rect=_cvs.getBoundingClientRect();
+    const sx=t.clientX-rect.left,sy=t.clientY-rect.top;
+    const w=_toWorld(sx,sy);
+    const snap=findSnap(_dxf,w.x,w.y,20/_sc)||w;
+    if(!_mPt1||_mPt2){_mPt1=snap;_mPt2=null;}else{_mPt2=snap;}
+    _redraw();_updateInfo();
+  }
+}
+function _onTouchMove(e){
+  e.preventDefault();
+  if(_pinch&&e.touches.length>=2){
+    const t=e.touches;
+    const cx=(t[0].clientX+t[1].clientX)/2,cy=(t[0].clientY+t[1].clientY)/2;
+    const d=Math.hypot(t[1].clientX-t[0].clientX,t[1].clientY-t[0].clientY);
+    const r=d/_pinch.d;_sc=_pinch.sc*r;
+    _tx=cx-(_pinch.cx-_pinch.tx)*r;_ty=cy-(_pinch.cy-_pinch.ty)*r;
+    _redraw();return;
+  }
+  if(_panStart&&e.touches.length===1){
+    const t=e.touches[0];
+    _tx=_panStart.tx+(t.clientX-_panStart.x);
+    _ty=_panStart.ty+(t.clientY-_panStart.y);
+    _redraw();
+  }
+}
+function _onTouchEnd(e){_panStart=null;if(e.touches.length<2)_pinch=null;}
+
+/* ── UIツールバー作成 ── */
+function _createUI(){
+  if(document.getElementById('dxf-toolbar'))return;
+  /* ツールバー */
+  const tb=document.createElement('div');tb.id='dxf-toolbar';
+  tb.innerHTML=`
+    <button class="btn" id="dxf-fit">全体表示</button>
+    <div class="vs"></div>
+    <button class="btn" id="dxf-measure">計測</button>
+    <button class="btn" id="dxf-clear-m" style="display:none">計測クリア</button>
+    <div class="vs"></div>
+    <span id="dxf-info" style="font-size:12px;color:#90b8d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+    <div class="sp"></div>
+    <span id="dxf-zlbl" style="font-size:14px;font-weight:700;color:#ffa648;font-family:var(--mono);min-width:50px;text-align:center">--</span>
+  `;
+  _toolbarEl=tb;_infoEl=tb.querySelector('#dxf-info');
+  /* Canvas */
+  const cvs=document.createElement('canvas');cvs.id='dxf-canvas';
+  cvs.style.cssText='position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;';
+  _cvs=cvs;_ctx=cvs.getContext('2d');
+  /* イベント登録 */
+  cvs.addEventListener('wheel',_onWheel,{passive:false});
+  cvs.addEventListener('pointerdown',_onPointerDown);
+  cvs.addEventListener('pointermove',_onPointerMove);
+  cvs.addEventListener('pointerup',_onPointerUp);
+  cvs.addEventListener('pointercancel',_onPointerUp);
+  cvs.addEventListener('touchstart',_onTouchStart,{passive:false});
+  cvs.addEventListener('touchmove',_onTouchMove,{passive:false});
+  cvs.addEventListener('touchend',_onTouchEnd);
+  /* ボタン */
+  tb.querySelector('#dxf-fit').addEventListener('click',()=>{_fitAll();_redraw();});
+  tb.querySelector('#dxf-measure').addEventListener('click',()=>{
+    _measuring=!_measuring;
+    tb.querySelector('#dxf-measure').classList.toggle('on',_measuring);
+    tb.querySelector('#dxf-clear-m').style.display=_measuring?'':'none';
+    _cvs.style.cursor=_measuring?'crosshair':'grab';
+    if(!_measuring){_mPt1=null;_mPt2=null;_mCursor=null;_redraw();}
+    _updateInfo();
+  });
+  tb.querySelector('#dxf-clear-m').addEventListener('click',()=>{
+    _mPt1=null;_mPt2=null;_mCursor=null;_redraw();_updateInfo();
+  });
+}
+
+function _updateInfo(){
+  if(!_infoEl)return;
+  if(!_measuring){_infoEl.textContent=_fileName+' ('+(_dxf?.entities.length||0)+'要素)';return;}
+  if(_mPt1&&_mPt2){
+    const d=Math.sqrt(((_mPt2.x-_mPt1.x)**2)+((_mPt2.y-_mPt1.y)**2));
+    _infoEl.textContent='距離: '+d.toFixed(3)+' | ΔX='+Math.abs(_mPt2.x-_mPt1.x).toFixed(3)+' ΔY='+Math.abs(_mPt2.y-_mPt1.y).toFixed(3);
+  }else if(_mPt1){
+    _infoEl.textContent='計測: 第2点を選択 (スナップ: 端点/中点/中心)';
+  }else{
+    _infoEl.textContent='計測: 第1点を選択 (スナップ: 端点/中点/中心)';
+  }
+}
+
+function _updateZoomLabel(){
+  const el=document.getElementById('dxf-zlbl');
+  if(el)el.textContent=(_sc*100).toFixed(0)+'%';
+}
+
+/* ── 公開API ── */
+function activate(){
+  _active=true;
+  const ca=document.getElementById('ca');_caEl=ca;
+  /* 既存PDF要素を非表示 */
+  const cw=document.getElementById('cw');if(cw)cw.style.display='none';
+  const dz=document.getElementById('dz');if(dz)dz.style.display='none';
+  const home=document.getElementById('home');if(home)home.style.display='none';
+  /* DXF要素を表示 */
+  _createUI();
+  if(!_cvs.parentElement)ca.appendChild(_cvs);
+  if(!_toolbarEl.parentElement){
+    /* ヘッダー2段目の下にツールバーを挿入 */
+    const hdr=document.getElementById('hdr');
+    _toolbarEl.className='hr';_toolbarEl.style.borderTop='1px solid rgba(255,138,30,.3)';
+    hdr.appendChild(_toolbarEl);
+  }
+  _toolbarEl.style.display='flex';
+  _resize();
+  window.addEventListener('resize',_resize);
+}
+
+function deactivate(){
+  _active=false;
+  if(_toolbarEl)_toolbarEl.style.display='none';
+  if(_cvs&&_cvs.parentElement)_cvs.parentElement.removeChild(_cvs);
+  window.removeEventListener('resize',_resize);
+  /* 既存PDF要素を復元 */
+  const cw=document.getElementById('cw');if(cw)cw.style.display='block';
+}
+
+async function open(file){
+  showLoading(true);
+  try{
+    const text=await file.text();
+    _dxf=parseDxf(text);
+    _fileName=file.name;
+    _measuring=false;_mPt1=null;_mPt2=null;_mCursor=null;
+    activate();
+    _fitAll();_redraw();_updateInfo();_updateZoomLabel();
+    showToast('DXF読み込み完了: '+_dxf.entities.length+'要素');
+  }catch(e){
+    showToast('DXF読み込みエラー');Logger.error('[DXF]',e);
+  }
+  showLoading(false);
+}
+
+function isActive(){return _active;}
+function getData(){return _dxf;}
+function getState(){return{fileName:_fileName,tx:_tx,ty:_ty,sc:_sc,measuring:_measuring};}
+
+return{open,activate,deactivate,isActive,getData,getState,parseDxf,renderDxf,findSnap,redraw:_redraw,fitAll:_fitAll};
+})();
+
 </script>
 </body>
 </html>
