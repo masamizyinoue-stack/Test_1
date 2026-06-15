@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.41</title>
+<title>M_Viewer V2.42</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.41
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.42
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1043,7 +1043,7 @@ button{font-family:inherit}
 
 /* ── ビューブックマーク (v2.35) ── */
 .vbm-grp{display:flex;align-items:center;gap:3px;flex-shrink:0}
-.vbm-lbl{font-size:9px;color:var(--tx3);font-weight:800;letter-spacing:.12em;margin-right:2px;flex-shrink:0}
+.vbm-lbl{font-size:8px;color:#c8daf0;font-weight:800;letter-spacing:.08em;margin-right:3px;flex-shrink:0;text-align:center;line-height:1.25;white-space:nowrap} /* v2.42: 2行・明るい白系 */
 .vbm{
   width:30px;height:24px;border-radius:var(--r-s);
   border:1.5px solid var(--brd);background:var(--srf-low);
@@ -1121,6 +1121,25 @@ button{font-family:inherit}
 }
 @media(pointer:coarse){.vbm-clr{width:32px;height:24px;font-size:9px}.vbm-menu button{height:44px;font-size:14px}}
 
+/* ── その他メニュー (v2.42) ── */
+.more-menu{
+  display:none;position:fixed;z-index:498;
+  background:var(--glass);border:1.5px solid var(--brd-hi);border-radius:var(--r-m);
+  padding:5px;min-width:170px;
+  backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);
+  box-shadow:var(--shadow-3),var(--inset-hi);flex-direction:column;gap:3px;
+}
+.more-menu.on{display:flex}
+.more-menu button{
+  height:40px;padding:0 14px;background:var(--srf);border:1.5px solid var(--brd);
+  color:var(--tx2);border-radius:var(--r-s);font-size:13px;font-weight:700;
+  cursor:pointer;text-align:left;transition:all .12s ease;box-shadow:var(--inset-hi);
+  white-space:nowrap;
+}
+.more-menu button:hover{border-color:var(--brd-hi);color:var(--tx);background:var(--srf-hov)}
+.more-menu button:active{background:var(--acc-deep);border-color:var(--acc2);color:#fff}
+@media(pointer:coarse){.more-menu button{height:48px;font-size:14px}}
+
 /* ── ページ一覧プレビュー ── */
 #preview-overlay{display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.93);flex-direction:column;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
 #preview-overlay.on{display:flex}
@@ -1158,7 +1177,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.41</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.42</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1166,15 +1185,22 @@ button{font-family:inherit}
     <button class="btn" id="btn-redo">進む</button>
     <button class="btn" id="btn-save">PDF出力</button><!-- v48: on削除(常時アクティブ解消) -->
     <button class="btn" id="btn-backup" title="ZIP バックアップ">バックアップ</button>
-    <button class="btn" id="btn-restore" title="ZIP から復元">復元</button>
     <input type="file" id="restoreInput" accept=".zip" style="display:none">
-    <!-- v47: 説明書を左、計算機を右に変更 -->
-    <button class="btn" id="btn-manual" title="説明書を表示">説明書</button>
-    <div class="vs"></div><!-- v2.28: 計算機を独立グループ化 -->
+    <!-- v2.42: その他メニュー(復元・説明書を集約) -->
+    <div class="pkw">
+      <button class="btn" id="btn-more">その他 ▾</button>
+      <div id="more-menu" class="more-menu">
+        <button id="more-restore">📂 復元（ZIPから）</button>
+        <button id="more-manual">📖 説明書</button>
+      </div>
+    </div>
+    <button class="btn" id="btn-restore" style="display:none">復元</button>
+    <button class="btn" id="btn-manual" style="display:none">説明書</button>
+    <div class="vs"></div>
     <button class="btn" id="calcbtn">計算機</button>
     <div class="vs"></div>
     <span id="vbm-grp" class="vbm-grp">
-      <span class="vbm-lbl">VIEW</span>
+      <span class="vbm-lbl">記憶<br>VIEW</span>
       <button class="vbm" data-vi="0">1</button>
       <button class="vbm" data-vi="1">2</button>
       <button class="vbm" data-vi="2">3</button>
@@ -1271,7 +1297,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.41</div>
+    <div class="dzm">M_Viewer V2.42</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1391,7 +1417,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.41'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.42'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -4940,6 +4966,32 @@ function showLoading(v){document.getElementById('loading').classList.toggle('on'
   _renderTabBar();
   _initToolbar();
   _initCalculator();
+  /* v2.42: その他メニュー */
+  (function(){
+    const moreBtn=document.getElementById('btn-more');
+    const moreMenu=document.getElementById('more-menu');
+    if(!moreBtn||!moreMenu)return;
+    moreBtn.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(moreMenu.classList.contains('on')){moreMenu.classList.remove('on');return;}
+      moreMenu.classList.add('on');
+      const r=moreBtn.getBoundingClientRect();
+      moreMenu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-180))+'px';
+      moreMenu.style.top=(r.bottom+4)+'px';
+    });
+    document.addEventListener('pointerdown',e=>{
+      if(moreMenu.classList.contains('on')&&!moreMenu.contains(e.target)&&e.target!==moreBtn)moreMenu.classList.remove('on');
+    },{capture:true});
+    /* 復元: 既存btn-restoreのclickハンドラをID経由で呼び出す(既存JSが document.getElementById('btn-restore') でリスナー登録済み) */
+    document.getElementById('more-restore').addEventListener('click',()=>{
+      moreMenu.classList.remove('on');
+      document.getElementById('restoreInput').click(); /* 既存の復元ファイル選択を直接起動 */
+    });
+    document.getElementById('more-manual').addEventListener('click',()=>{
+      moreMenu.classList.remove('on');
+      document.getElementById('btn-manual')?.click?.(); /* 既存ボタンが非表示でもclickイベントは発火する */
+    });
+  })();
 
   /* 安全タイムアウト: 6秒後に強制解除 */
   const _safety=setTimeout(()=>{showLoading(false);App._showHome();Logger.warn('[起動] restore タイムアウト');},6000);
