@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.37</title>
+<title>M_Viewer V2.38</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.37
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.38
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1158,7 +1158,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.37</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.38</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1271,7 +1271,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.37</div>
+    <div class="dzm">M_Viewer V2.38</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1391,7 +1391,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.37'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.38'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3808,30 +3808,28 @@ const App=(() => {
    ============================================================ */
 (function _initViewBookmark(){
   const SLOTS=5,KEY='mv_viewbm';
-  /* v2.37: ビュー情報をPDFごとに独立管理。
-     localStorage構造: { docKey1: [slot0,...,slot4], docKey2: [...], ... }
-     docKey = App.docId || App.fileName || '_none' */
-  let _allBm={};
+  /* v2.38: ビュー情報をアプリ全体で共通管理(PDFごとの分離を廃止)。
+     どのPDFを開いていても同じVIEW番号で同じ表示位置へ移動できる。
+     localStorage: [slot0, slot1, slot2, slot3, slot4] のフラット配列。 */
+  let _bm=[null,null,null,null,null];
   let _longTimer=null,_longSlot=-1;
   const menuEl=document.getElementById('vbm-menu');
   const confirmEl=document.getElementById('vbm-confirm');
   let _menuSlot=-1;
 
-  function _docKey(){return App.docId||App.fileName||'_none';}
-  function _bm(){return _allBm[_docKey()]||[null,null,null,null,null];}
-  function _setBm(arr){_allBm[_docKey()]=arr;}
-
   function _load(){try{const d=JSON.parse(localStorage.getItem(KEY));
-    if(d&&typeof d==='object'&&!Array.isArray(d))_allBm=d;
-    else if(Array.isArray(d)){_allBm={'_migrated':d};}  /* v2.35以前の旧形式をマイグレーション */
+    if(Array.isArray(d)&&d.length===SLOTS){_bm=d;}
+    else if(d&&typeof d==='object'&&!Array.isArray(d)){
+      /* v2.37形式(辞書)からマイグレーション: 最初に見つかった非null配列を採用 */
+      for(const k of Object.keys(d)){if(Array.isArray(d[k])&&d[k].some(x=>x!==null)){_bm=d[k];break;}}
+    }
   }catch(_){}}
-  function _save(){try{localStorage.setItem(KEY,JSON.stringify(_allBm));}catch(_){}}
+  function _save(){try{localStorage.setItem(KEY,JSON.stringify(_bm));}catch(_){}}
   _load();
 
   function _render(){
-    const bm=_bm();
     document.querySelectorAll('.vbm').forEach((btn,i)=>{
-      const bk=bm[i];btn.classList.toggle('on',!!bk);
+      const bk=_bm[i];btn.classList.toggle('on',!!bk);
       if(bk&&App.pdfDoc){
         const match=(bk.page===App.currentPage&&Math.abs(bk.scale-App.scale)<0.01&&Math.abs(bk.panX-App.panX)<2&&Math.abs(bk.panY-App.panY)<2);
         btn.classList.toggle('active',match);
@@ -3843,19 +3841,18 @@ const App=(() => {
   }
   function _saveSlot(i){
     if(!App.pdfDoc){showToast('PDF\u304c\u958b\u3044\u3066\u3044\u307e\u305b\u3093');return;}
-    const bm=[..._bm()];
-    bm[i]={page:App.currentPage,panX:App.panX,panY:App.panY,scale:App.scale};
-    _setBm(bm);_save();_render();showToast('VIEW '+(i+1)+' \u306b\u4fdd\u5b58 (P'+bm[i].page+' '+Math.round(bm[i].scale*100)+'%)');
+    _bm[i]={page:App.currentPage,panX:App.panX,panY:App.panY,scale:App.scale};
+    _save();_render();showToast('VIEW '+(i+1)+' \u306b\u4fdd\u5b58 (P'+_bm[i].page+' '+Math.round(_bm[i].scale*100)+'%)');
   }
   async function _restoreSlot(i){
-    const bk=_bm()[i];if(!bk||!App.pdfDoc)return;
+    const bk=_bm[i];if(!bk||!App.pdfDoc)return;
     await App.restoreView(bk.page,bk.panX,bk.panY,bk.scale);_render();showToast('VIEW '+(i+1)+' \u306b\u5fa9\u5e30');
   }
   function _resetSlot(i){
-    const bm=[..._bm()];bm[i]=null;_setBm(bm);_save();_render();showToast('VIEW '+(i+1)+' \u3092\u30ea\u30bb\u30c3\u30c8\u3057\u307e\u3057\u305f');
+    _bm[i]=null;_save();_render();showToast('VIEW '+(i+1)+' \u3092\u30ea\u30bb\u30c3\u30c8\u3057\u307e\u3057\u305f');
   }
   function _resetAll(){
-    _setBm([null,null,null,null,null]);_save();_render();showToast('\u5168\u30d3\u30e5\u30fc\u3092\u30ea\u30bb\u30c3\u30c8\u3057\u307e\u3057\u305f');
+    _bm=[null,null,null,null,null];_save();_render();showToast('\u5168\u30d3\u30e5\u30fc\u3092\u30ea\u30bb\u30c3\u30c8\u3057\u307e\u3057\u305f');
   }
   function _showMenu(i,anchorEl){
     _menuSlot=i;menuEl.classList.add('on');
@@ -3875,7 +3872,7 @@ const App=(() => {
   },{capture:true});
   document.getElementById('vbm-clr').addEventListener('click',e=>{
     e.stopPropagation();
-    if(_bm().every(b=>b===null)){showToast('\u4fdd\u5b58\u6e08\u307f\u30d3\u30e5\u30fc\u306f\u3042\u308a\u307e\u305b\u3093');return;}
+    if(_bm.every(b=>b===null)){showToast('\u4fdd\u5b58\u6e08\u307f\u30d3\u30e5\u30fc\u306f\u3042\u308a\u307e\u305b\u3093');return;}
     confirmEl.classList.add('on');
   });
   document.getElementById('vbm-yes').addEventListener('click',()=>{confirmEl.classList.remove('on');_resetAll();});
@@ -3885,11 +3882,11 @@ const App=(() => {
     const i=+btn.dataset.vi;
     btn.addEventListener('pointerdown',e=>{
       _longSlot=i;_longTimer=setTimeout(()=>{
-        _longTimer=null;if(_bm()[i])_showMenu(i,btn);else _saveSlot(i);_longSlot=-1;
+        _longTimer=null;if(_bm[i])_showMenu(i,btn);else _saveSlot(i);_longSlot=-1;
       },500);
     });
     btn.addEventListener('pointerup',()=>{
-      if(_longTimer){clearTimeout(_longTimer);_longTimer=null;if(_bm()[i])_restoreSlot(i);else _saveSlot(i);}
+      if(_longTimer){clearTimeout(_longTimer);_longTimer=null;if(_bm[i])_restoreSlot(i);else _saveSlot(i);}
       _longSlot=-1;
     });
     btn.addEventListener('pointercancel',()=>{if(_longTimer){clearTimeout(_longTimer);_longTimer=null;}_longSlot=-1;});
