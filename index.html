@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.33</title>
+<title>M_Viewer V2.34</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.33
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.34
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1078,7 +1078,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.33</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.34</span></span>
     <input type="file" id="fileInput" accept="application/pdf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1164,7 +1164,7 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.33</div>
+    <div class="dzm">M_Viewer V2.34</div>
     <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDFを開く</button>
   </div>
@@ -1284,7 +1284,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.33'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.34'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -2619,6 +2619,7 @@ const App=(() => {
   /* v61: ペン系ツール用 パン候補点 (閾値超過後にパン開始) */
   let _panCandidate=null;
   const PEN_PAN_THRESHOLD=15; /* ペン系ツールでパン開始するまでの移動距離(px) */
+  let _stylusDrawing=false; /* v2.34: Apple Pencil/スタイラス描画中フラグ — trueの間は指タッチを完全遮断 */
   let _gestureRAF=null; /* v10: ジェスチャーRAFフラグ */
   let selectedIdx=[],selPath=[];
   let subRect=null;
@@ -2877,6 +2878,13 @@ const App=(() => {
   /* --- タッチハンドラ --- */
   caEl.addEventListener('touchstart',e=>{
     if(!pdfDoc)return;e.preventDefault();_cancelInertia();
+    /* v2.34: スタイラス描画中は指タッチ(ピンチ・パン含む)を完全遮断。
+       Apple Pencilで書いている最中に手のひら/指が画面に触れても
+       スクロール・ズーム・描画中断が起きないようにする。 */
+    if(_stylusDrawing){
+      /* 描画中のスタイラスのtouchendだけは通す(描画完了に必要) */
+      return;
+    }
     if(e.touches.length>=2){
       /* v27: sub作成中は2本指ピンチをブロック → ドラッグ継続優先 */
       if(_activeTool==='sub'&&isDrawing)return;
@@ -2898,11 +2906,25 @@ const App=(() => {
         _panCandidate={x0:t.clientX,y0:t.clientY,touch:t};return;
       }
     }
+    /* v2.34: スタイラス判定 — 書き込み開始時にフラグを立てる */
+    const drawTouch=e.touches[0];
+    if(drawTouch&&drawTouch.touchType==='stylus'){_stylusDrawing=true;}
     _startDraw(e);
   },{passive:false});
   caEl.addEventListener('touchmove',e=>{
     e.preventDefault();
     if(!Logger.flags.touchMove)return;
+    /* v2.34: スタイラス描画中はピンチ/パンのmoveを無視し、スタイラスのmoveのみ通す */
+    if(_stylusDrawing){
+      /* スタイラスタッチのみを描画に使用(指のtouchmoveは一切無視) */
+      const sty=Array.from(e.touches).find(t=>t.touchType==='stylus');
+      if(sty&&isDrawing){
+        /* スタイラスの座標を使った描画のみ実行。
+           _moveDraw はe.touches[0]を参照するため、stylusタッチを先頭に持つ仮想eventを渡す */
+        _moveDraw({touches:[sty],preventDefault:()=>{}});
+      }
+      return;
+    }
     /* v27: sub作成中はピンチを無効化 → ドラッグを中断させない */
     if(e.touches.length>=2&&pinch&&!(_activeTool==='sub'&&isDrawing)){_movePinch(e.touches);return;}
     const t=e.touches[0];
@@ -2919,13 +2941,23 @@ const App=(() => {
   },{passive:false});
   caEl.addEventListener('touchend',e=>{
     _panCandidate=null; /* v61: タッチ終了で候補クリア */
+    /* v2.34: スタイラス描画中のtouchend — スタイラスが離れた場合のみ描画完了 */
+    if(_stylusDrawing){
+      const wasSty=Array.from(e.changedTouches).some(t=>t.touchType==='stylus');
+      if(wasSty){
+        _stylusDrawing=false;  /* スタイラスが離れた → フラグ解除 */
+        if(isDrawing)_endDraw(e);
+      }
+      /* 指が離れた場合は何もしない(遮断継続) */
+      return;
+    }
     if(pinch&&e.touches.length<2){_endPinch();return;}
     if(panSt){_endPan(e.changedTouches[0]);return;}
     if(isDrawing)_endDraw(e);
   });
   caEl.addEventListener('mousedown',e=>{if(pdfDoc){_cancelInertia();_startDraw(e);}});
   caEl.addEventListener('mousemove',e=>{if(isDrawing)_moveDraw(e);else if(panSt)_movePan(e);});
-  caEl.addEventListener('mouseup',e=>{if(isDrawing)_endDraw(e);else if(panSt)_endPan(e);});
+  caEl.addEventListener('mouseup',e=>{_stylusDrawing=false;if(isDrawing)_endDraw(e);else if(panSt)_endPan(e);});  /* v2.34: フォールバックで_stylusDrawingクリア */
   caEl.addEventListener('wheel',e=>{
     if(!Logger.flags.wheelZoom){e.preventDefault();return;}
     if(!pdfDoc)return;e.preventDefault();
