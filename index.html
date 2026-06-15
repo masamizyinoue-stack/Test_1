@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
-<title>M_Viewer V2.43</title>
+<title>M_Viewer V2.44</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════
-   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.43
+   M_Viewer — AERO-GRADE PROFESSIONAL THEME  V2.44
    Design: 近未来計器盤 / ガラス調 / 高コントラスト / 低疲労
    方針: 全セレクタ互換・JS無変更・状態(hover/active/on/disabled/focus)完全分離
    ════════════════════════════════════════════════════════════ */
@@ -1183,7 +1183,7 @@ button{font-family:inherit}
 </div>
 <div id="hdr">
   <div class="hr">
-    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.43</span></span>
+    <span class="logo" id="logo-ver">M_Viewer <span style="font-size:10px">V2.44</span></span>
     <input type="file" id="fileInput" accept="application/pdf,.dxf" style="display:none">
     <span id="fnlbl">ファイル未選択</span>
     <div class="vs"></div>
@@ -1303,18 +1303,18 @@ button{font-family:inherit}
   </div>
   <div id="dz">
     <div class="dzi">📄</div>
-    <div class="dzm">M_Viewer V2.43</div>
-    <div class="dzs">タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
+    <div class="dzm">M_Viewer V2.44</div>
+    <div class="dzs">PDF・DXFに対応<br>タップして選択 / ドラッグ＆ドロップ<br>ペン・蛍光ペン: Apple Pencil専用<br>その他ツール・スクロール: 指でも操作可<br>2本指でピンチ拡大縮小 (最大800%)</div>
     <button class="dzb" id="dz-open">PDF / DXF を開く</button>
   </div>
   <div id="home">
     <div class="home-hdr">
       <div class="home-title">M_Viewer</div>
-      <button class="home-open-btn" id="home-open">PDFを開く</button>
+      <button class="home-open-btn" id="home-open">PDF / DXF を開く</button>
     </div>
     <div class="home-section">最近開いた図面</div>
     <div id="home-list"></div>
-    <div id="home-empty"><div class="home-empty-icon">📂</div><div class="home-empty-msg">図面をドラッグ＆ドロップするか<br>「PDFを開く」で追加してください</div></div>
+    <div id="home-empty"><div class="home-empty-icon">📂</div><div class="home-empty-msg">図面をドラッグ＆ドロップするか<br>「PDF / DXF を開く」で追加してください</div></div>
     <div class="home-drop-hint">PDFをここにドロップして開く</div>
   </div>
 </div>
@@ -1423,7 +1423,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
      2. ファイル名 M_Viewer_vN.html を更新
    それ以外 (meta.json / console / title / dzm / ロゴ左上) は自動反映。
    ============================================================ */
-const APP_VER='V2.43'; /* ← ★ バージョンアップ時はここだけ変える */
+const APP_VER='V2.44'; /* ← ★ バージョンアップ時はここだけ変える */
 
 /* v29: PDF_MAX_DPR を 1.5 → 2.0 に変更
    iPad Retina(DPR=2): canvas物理px = CSS px × 2 = 画面物理px → 完全1:1 → ぼやけ解消
@@ -3996,7 +3996,7 @@ function _renderTabBar(){
     });
     bar.appendChild(div);
   });
-  const add=document.createElement('button');add.className='shtab-add';add.title='PDF追加';add.textContent='＋ PDF追加';
+  const add=document.createElement('button');add.className='shtab-add';add.title='ファイル追加';add.textContent='＋ 追加';
   add.addEventListener('click',()=>addSheet());bar.appendChild(add);
 }
 async function switchToSheet(idx){
