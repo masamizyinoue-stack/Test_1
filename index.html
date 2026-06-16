@@ -276,7 +276,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_26</div>
+  <div id="ver-label">DXF_View V0_27</div>
 </div>
 
 <div id="colorOverlay">
@@ -308,7 +308,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_26';
+const APP_VERSION = 'V0_27';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1221,6 +1221,7 @@ function drawOverlay(){
       end:{col:'#00ff7f',lbl:'端点'},
       cen:{col:'#00f0ff',lbl:'中心'},
       mid:{col:'#ffbb33',lbl:'中点'},
+      on:{col:'#cc88ff',lbl:'線上'},
     };
     const sc=STC[snapPt.type]||{col:'#f39c12',lbl:''};
     octx.strokeStyle=sc.col;octx.fillStyle=sc.col;
@@ -1278,18 +1279,28 @@ function drawOverlay(){
     }
   }
   // dxdyツールのP3選択中: 方向プレビュー（V0_13改善）
-  if((currentTool==='dxdy') && dimState.pts.length===2 && snapPt){
-    const p1_=dimState.pts[0], p2_=dimState.pts[1];
-    const midX=(p1_.x+p2_.x)/2, midY=(p1_.y+p2_.y)/2;
-    const horizOfs=Math.abs(snapPt.x-midX);
-    const vertOfs=Math.abs(snapPt.y-midY);
-
+  if((currentTool==='dxdy') && dimState.pts.length===2){
+    // 整列ガイドライン: 既存寸法線との整列を検出して表示
+    const _curW=snapPt||currentCursorWorld;
+    if(_curW && dimPendingDown){
+      const p1_=dimState.pts[0], p2_=dimState.pts[1];
+      const midX=(p1_.x+p2_.x)/2, midY=(p1_.y+p2_.y)/2;
+      const pType_=Math.abs(_curW.y-midY)>=Math.abs(_curW.x-midX)?'dx':'dy';
+      drawAlignGuide(octx,_curW,pType_);
+    }
   }
   // Eraser
   if(eraserPos&&currentTool==='eraser'){
     const[sx,sy]=w2s(eraserPos.x,eraserPos.y);
     octx.strokeStyle='rgba(255,100,100,0.7)';octx.lineWidth=2;
     octx.beginPath();octx.arc(sx,sy,ERASER_RADIUS_PX,0,Math.PI*2);octx.stroke();
+  }
+  // ── スナップ拡大補助ビュー（計測モード中のみ）────────────────────────────
+  if(snapPt && ['dxdy','diag','circDim','distDim'].indexOf(currentTool)>=0){
+    const[_smx,_smy]=w2s(snapPt.x,snapPt.y);
+    const _STC2={int:'#ffd700',end:'#00ff7f',cen:'#00f0ff',mid:'#ffbb33',on:'#cc88ff'};
+    const _smc=_STC2[snapPt.type]||'#f39c12';
+    drawSnapMagnifier(octx,_smx,_smy,_smc);
   }
   // ── 寸法プレビュー（点線でリアルタイム表示）────────────────────────────
   if(dimState && dimState.pts && dimState.pts.length>=1){
@@ -1492,7 +1503,7 @@ function buildDim(p1,p2,pArrow,type){
     arrows.push({x:p1.x,y:p1.y,angle:Math.PI+ang});arrows.push({x:p2.x,y:p2.y,angle:ang});
     tx2=(p1.x+p2.x)/2;ty2=(p1.y+p2.y)/2;tangle=-ang;
   }
-  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:'#f39c12'};
+  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:'#f39c12',type:type};
 }
 
 function formatDim(d){
@@ -1623,18 +1634,27 @@ function handlePointerDown(sx,sy,isPenInput){
         const _pt5=_snap5||{x:wx,y:wy};
         dimState.pts.push(_pt5);
         dimPendingDown=true;
-        showGuide('P2: ドラッグして位置決定');
+        showGuide('② ドラッグして2点目→離して確定');
         scheduleOverlay();
         return;
       }
-      dimPendingDown=true;return;
+      dimPendingDown=true;
+      // dxdy: P1確定済みならP3ドラッグ開始
+      if(currentTool==='dxdy' && dimState.pts.length===2){
+        showGuide('③ そのまま動かして→離して確定');
+      }
+      return;
     }
     const snap=snapAt(wx,wy);const pt=snap||{x:wx,y:wy};
     dimState.pts.push(pt);
     // ガイドメッセージ更新
     if(currentTool==='dxdy'||currentTool==='diag'){
-      if(dimState.pts.length===1) showGuide('2点目を選択してください');
-      else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
+      if(dimState.pts.length===1){
+        var _snapLabel=snap?`[${{int:'交点',end:'端点',cen:'中心',mid:'中点',on:'線上'}[snap.type]||'スナップ'}] `:'';
+        showGuide('② '+_snapLabel+'2点目をタップ');
+      } else if(dimState.pts.length===2){
+        showGuide('③ ペンを当てて動かし→離して確定');
+      }
     }
     const need=currentTool==='diag'?2:3;
     if(dimState.pts.length>=need){
@@ -1726,8 +1746,8 @@ function handlePointerUp(sx,sy,isPenInput){
       dimState.pts.push(pt);
       // ガイドメッセージ更新
       if(currentTool==='dxdy'||currentTool==='diag'){
-        if(dimState.pts.length===1) showGuide('2点目を選択してください');
-        else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
+        if(dimState.pts.length===1) showGuide('② 2点目をタップ');
+        else if(dimState.pts.length===2) showGuide('③ ペンを当てて動かし→離して確定');
       }
       const need=currentTool==='diag'?2:3;
       if(dimState.pts.length>=need){
@@ -1986,14 +2006,21 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     btn.classList.add('active');currentTool=btn.dataset.tool;
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     // ── 新ツールのステートリセット
-    if(typeof circDimState!=='undefined') circDimState={phase:0,ent:null};
+    if(typeof circDimState!=='undefined') circDimState={phase:0,ent:null,dimType:'R'};
     if(typeof distDimState!=='undefined') distDimState={phase:0,t1:null};
+    // circTypeMenu を閉じる
+    var _cm=document.getElementById('circTypeMenu');
+    var _cb=document.getElementById('circTypeBg');
+    if(_cm) _cm.style.display='none';
+    if(_cb) _cb.style.display='none';
     // ガイドメッセージ
     const guideMap={
       'sketch':'Apple Pencilまたは指でスケッチ',
       'eraser':'消去したい線をなぞってください',
-      'dxdy':'1点目を選択してください',
-      'diag':'1点目を選択してください'
+      'dxdy':'① 1点目をタップ',
+      'diag':'① 1点目をタップ',
+      'circDim':'円または円弧をタップ',
+      'distDim':'線または点をタップ'
     };
     if(currentTool==='sketch'||currentTool==='eraser'){
       showGuide(guideMap[currentTool]||'', 2000);
@@ -2424,7 +2451,7 @@ if(vd) vd.textContent = APP_VERSION;
   <div id="memMenuReset" style="padding:13px 20px;color:#ff6b6b;font-size:15px;cursor:pointer;">記憶リセット</div>
 </div>
 <script>
-// ── V0_26 追加機能スクリプト ─────────────────────────────
+// ── V0_27 追加機能スクリプト ─────────────────────────────
 
 // ── ③ 寸法自動整列 snapDimPos ──────────────────────────
 function snapDimPos(p3c, type){
@@ -2523,93 +2550,10 @@ function calcDistDim(t1,t2){
   return{p1:ptT.pt,p2:ft,type:'diag'};
 }
 
-// ── circDim / distDim ポインターハンドリング（関数 wrap）──
+// ── circDim / distDim ポインターハンドリング（V0_27で置き換え済み）──
 (function(){
-  var _origDown=window.handlePointerDown;
-  var _origUp=window.handlePointerUp;
-
-  window.handlePointerDown=function(sx,sy,isPenInput){
-    // ── ② circDim ──
-    if(currentTool==='circDim'){
-      var _wxy=s2w(sx,sy);var _wx=_wxy[0],_wy=_wxy[1];
-      if(circDimState.phase===0){
-        // 最近の円/円弧エンティティを探す
-        var _best=null,_bDist=Infinity;
-        if(doc&&doc.enko){
-          for(var _e of doc.enko){
-            if(hiddenLayers.has(_e.layer)) continue;
-            var _dc=Math.hypot(_wx-_e.cx,_wy-_e.cy);
-            if(_dc<_bDist){_bDist=_dc;_best=_e;}
-          }
-        }
-        if(_best && _bDist<60/scale){
-          circDimState.ent=_best;
-          circDimState.phase=1;
-          dimPendingDown=true;
-          showGuide('ドラッグして寸法位置を決定（φ: 中心付近、R: 外側）');
-          scheduleOverlay();
-          return;
-        }
-        return;
-      }
-      return;
-    }
-    // ── ⑦ distDim ──
-    if(currentTool==='distDim'){
-      var _wxy2=s2w(sx,sy);var _wx2=_wxy2[0],_wy2=_wxy2[1];
-      var _sp2=snapPt;
-      var _target;
-      if(_sp2&&_sp2.type==='on'&&_sp2.onLine){
-        _target={kind:'line',e:_sp2.onLine,pt:{x:_sp2.x,y:_sp2.y}};
-      } else {
-        _target={kind:'pt',pt:_sp2||{x:_wx2,y:_wy2}};
-      }
-      if(distDimState.phase===0){
-        distDimState.t1=_target;
-        distDimState.phase=1;
-        showGuide('2点目を選択（線または点）');
-        scheduleOverlay();
-        return;
-      } else {
-        var _res=calcDistDim(distDimState.t1,_target);
-        if(_res){
-          snapshot();
-          var _dd=buildDim(_res.p1,_res.p2,_res.p2,_res.type);
-          dims.push(_dd);
-          scheduleSave();
-          hideGuide();
-          showGuide('距離寸法を追加しました ↩ で取消',2000);
-        }
-        distDimState={phase:0,t1:null};
-        scheduleOverlay();
-        return;
-      }
-    }
-    _origDown(sx,sy,isPenInput);
-  };
-
-  window.handlePointerUp=function(sx,sy,isPenInput){
-    // ── ② circDim フェーズ1 ペンアップで確定 ──
-    if(currentTool==='circDim' && circDimState.phase===1 && dimPendingDown){
-      dimPendingDown=false;
-      var _wxy=s2w(sx,sy);
-      var _p3c={x:_wxy[0],y:_wxy[1]};
-      var _ent=circDimState.ent;
-      if(_ent){
-        var _dc2=Math.hypot(_p3c.x-_ent.cx,_p3c.y-_ent.cy);
-        var _type=_dc2<_ent.r*0.5?'phi':'R';
-        snapshot();
-        dims.push(buildCircDim(_ent,_p3c,_type));
-        scheduleSave();
-        hideGuide();
-        showGuide('寸法を追加しました ↩ で取消',2000);
-      }
-      circDimState={phase:0,ent:null};
-      scheduleOverlay();
-      return;
-    }
-    _origUp(sx,sy,isPenInput);
-  };
+  if(typeof circDimState==='undefined') circDimState={phase:0,ent:null,dimType:'R'};
+  if(typeof distDimState==='undefined') distDimState={phase:0,t1:null};
 })();
 
 // ── 線幅管理 ─────────────────────────────────────────────
@@ -2658,6 +2602,249 @@ document.querySelectorAll('.wp-btn').forEach(function(btn){
 applyPenLineWidth(); // 初期化
 </script>
 
+<script>
+// =========================================================
+// V0_27: 計測UX改善スクリプト
+// =========================================================
+
+// ── drawSnapMagnifier: スナップ拡大補助ビュー ──────────────
+function drawSnapMagnifier(ctx, sx, sy, color){
+  var MR=42, MZ=3.5;
+  var cv2=document.getElementById('cv');
+  if(!cv2) return;
+  var mx=window.innerWidth-70, my=70;
+  var dpr=window.devicePixelRatio||1;
+  ctx.save();
+  // 背景円
+  ctx.beginPath(); ctx.arc(mx,my,MR,0,Math.PI*2);
+  ctx.fillStyle='rgba(8,18,36,0.92)';
+  ctx.fill();
+  ctx.strokeStyle=color; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.clip();
+  // DXFキャンバスの該当領域を拡大描画
+  try{
+    var srcX=(sx-MR/MZ)*dpr, srcY=(sy-MR/MZ)*dpr;
+    var srcW=(MR*2/MZ)*dpr, srcH=(MR*2/MZ)*dpr;
+    ctx.drawImage(cv2, srcX,srcY,srcW,srcH, mx-MR,my-MR,MR*2,MR*2);
+  }catch(e){}
+  // クロスヘア
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(mx-14,my); ctx.lineTo(mx+14,my);
+  ctx.moveTo(mx,my-14); ctx.lineTo(mx,my+14);
+  ctx.stroke();
+  // 小さな中心点
+  ctx.beginPath(); ctx.arc(mx,my,2,0,Math.PI*2);
+  ctx.fillStyle=color; ctx.fill();
+  ctx.restore();
+}
+
+// ── drawAlignGuide: 整列ガイドライン ──────────────────────
+function drawAlignGuide(ctx, p3c, type){
+  var THRESH=16/scale;
+  var matched=null;
+  for(var _ad of dims){
+    if(type==='dx' && _ad.type==='dx' && _ad.lines && _ad.lines[2]){
+      if(Math.abs(p3c.y-_ad.lines[2].y1)<THRESH){ matched={v:_ad.lines[2].y1,axis:'y'}; break; }
+    }
+    if(type==='dy' && _ad.type==='dy' && _ad.lines && _ad.lines[2]){
+      if(Math.abs(p3c.x-_ad.lines[2].x1)<THRESH){ matched={v:_ad.lines[2].x1,axis:'x'}; break; }
+    }
+  }
+  if(!matched) return;
+  ctx.save();
+  ctx.strokeStyle='rgba(255,200,0,0.55)';
+  ctx.lineWidth=1.2; ctx.setLineDash([5,4]);
+  ctx.beginPath();
+  if(matched.axis==='y'){
+    var[_ax1,_ay1]=w2s(-1e9,matched.v);
+    var[_ax2,_ay2]=w2s(1e9,matched.v);
+    ctx.moveTo(_ax1,_ay1); ctx.lineTo(_ax2,_ay2);
+  } else {
+    var[_ax1,_ay1]=w2s(matched.v,-1e9);
+    var[_ax2,_ay2]=w2s(matched.v,1e9);
+    ctx.moveTo(_ax1,_ay1); ctx.lineTo(_ax2,_ay2);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+// ── snapDimPos の整列ガイドフィードバック ─────────────────
+var _origSnapDimPos=window.snapDimPos||snapDimPos;
+function snapDimPos(p3c, type){
+  var THRESH=12/scale;
+  if(type==='dx'){
+    for(var _dd of dims){
+      if(_dd.type==='dx' && _dd.lines && _dd.lines[2]){
+        var _ref=_dd.lines[2].y1;
+        if(Math.abs(p3c.y-_ref)<THRESH){
+          showGuide('整列中...', 600);
+          return{x:p3c.x,y:_ref};
+        }
+      }
+    }
+  } else if(type==='dy'){
+    for(var _dd of dims){
+      if(_dd.type==='dy' && _dd.lines && _dd.lines[2]){
+        var _ref=_dd.lines[2].x1;
+        if(Math.abs(p3c.x-_ref)<THRESH){
+          showGuide('整列中...', 600);
+          return{x:_ref,y:p3c.y};
+        }
+      }
+    }
+  }
+  return p3c;
+}
+
+// ── circDim: φ/R選択メニュー ──────────────────────────────
+(function(){
+  var _mn=document.getElementById('circTypeMenu');
+  var _bg=document.getElementById('circTypeBg');
+  if(!_mn||!_bg) return;
+
+  // circDimState に dimType プロパティを追加（デフォルト: 'R'）
+  // phase: 0=円待ち, 1=タイプ選択待ち, 2=位置ドラッグ中
+  circDimState={phase:0,ent:null,dimType:'R'};
+
+  function showCircTypeMenu(ent, sx, sy){
+    // 円弧（部分弧）は自動的に R モード
+    var isFullCircle=(Math.abs(ent.a2-ent.a1)>=359.9||Math.abs(ent.a1-ent.a2)<=0.1);
+    if(!isFullCircle){
+      // 部分弧: Rのみ
+      circDimState.ent=ent; circDimState.dimType='R'; circDimState.phase=2;
+      dimPendingDown=true;
+      showGuide('ペンを当てて移動→離して半径寸法を確定');
+      return;
+    }
+    circDimState.ent=ent; circDimState.phase=1;
+    var px=Math.min(sx,window.innerWidth-210);
+    var py=Math.min(sy+10,window.innerHeight-140);
+    _mn.style.left=px+'px'; _mn.style.top=py+'px';
+    _mn.style.display='block'; _bg.style.display='block';
+    showGuide('直径(φ)か半径(R)を選択してください');
+  }
+
+  document.getElementById('circTypePhi').addEventListener('click',function(){
+    circDimState.dimType='phi'; circDimState.phase=2;
+    dimPendingDown=true;
+    _mn.style.display='none'; _bg.style.display='none';
+    showGuide('ペンを当てて移動→離して直径寸法を確定');
+  });
+  document.getElementById('circTypeR').addEventListener('click',function(){
+    circDimState.dimType='R'; circDimState.phase=2;
+    dimPendingDown=true;
+    _mn.style.display='none'; _bg.style.display='none';
+    showGuide('ペンを当てて移動→離して半径寸法を確定');
+  });
+  _bg.addEventListener('click',function(){
+    _mn.style.display='none'; _bg.style.display='none';
+    circDimState={phase:0,ent:null,dimType:'R'};
+    showGuide('円または円弧をタップ');
+  });
+
+  // circDim PointerDown のオーバーライド（既存wrap をさらにwrap）
+  var _prevDown=window.handlePointerDown;
+  window.handlePointerDown=function(sx,sy,isPenInput){
+    if(currentTool==='circDim'){
+      var _wxy=s2w(sx,sy); var _wx=_wxy[0],_wy=_wxy[1];
+      if(circDimState.phase===0){
+        var _best=null,_bDist=Infinity;
+        if(doc&&doc.enko){
+          for(var _e of doc.enko){
+            if(hiddenLayers.has(_e.layer)) continue;
+            var _dc=Math.hypot(_wx-_e.cx,_wy-_e.cy);
+            if(_dc<_bDist){_bDist=_dc;_best=_e;}
+          }
+        }
+        if(_best && _bDist<80/scale){
+          showCircTypeMenu(_best,sx,sy);
+          scheduleOverlay(); return;
+        }
+        showGuide('円または円弧が見つかりません',1500);
+        return;
+      }
+      if(circDimState.phase===1){
+        // メニュー表示中のタップは無視
+        return;
+      }
+      if(circDimState.phase===2){
+        // phase2: ペン当て→ドラッグ待ち（既にdimPendingDown=true）
+        return;
+      }
+      return;
+    }
+    _prevDown(sx,sy,isPenInput);
+  };
+
+  // circDim PointerUp のオーバーライド
+  var _prevUp=window.handlePointerUp;
+  window.handlePointerUp=function(sx,sy,isPenInput){
+    if(currentTool==='circDim' && circDimState.phase===2 && dimPendingDown){
+      dimPendingDown=false;
+      var _wxy=s2w(sx,sy);
+      var _p3c={x:_wxy[0],y:_wxy[1]};
+      var _ent=circDimState.ent;
+      if(_ent){
+        snapshot();
+        dims.push(buildCircDim(_ent,_p3c,circDimState.dimType));
+        scheduleSave();
+        hideGuide();
+        showGuide('寸法を追加しました ↩ で取消',2000);
+      }
+      circDimState={phase:0,ent:null,dimType:'R'};
+      scheduleOverlay(); return;
+    }
+    _prevUp(sx,sy,isPenInput);
+  };
+})();
+
+// ── distDim: 線タップ時のガイド改善 ──────────────────────
+(function(){
+  var _prevDown2=window.handlePointerDown;
+  window.handlePointerDown=function(sx,sy,isPenInput){
+    if(currentTool==='distDim'){
+      var _wxy2=s2w(sx,sy); var _wx2=_wxy2[0],_wy2=_wxy2[1];
+      var _sp2=snapPt;
+      var _target;
+      if(_sp2&&_sp2.type==='on'&&_sp2.onLine){
+        _target={kind:'line',e:_sp2.onLine,pt:{x:_sp2.x,y:_sp2.y}};
+      } else {
+        _target={kind:'pt',pt:_sp2||{x:_wx2,y:_wy2}};
+      }
+      if(distDimState.phase===0){
+        distDimState.t1=_target;
+        distDimState.phase=1;
+        // タイプに応じたガイド
+        if(_target.kind==='line'){
+          showGuide('② 2つ目の線または点をタップ（線=平行距離、点=垂線距離）');
+        } else {
+          showGuide('② 2つ目の点または線をタップ');
+        }
+        scheduleOverlay(); return;
+      } else {
+        var _res=calcDistDim(distDimState.t1,_target);
+        if(_res){
+          snapshot();
+          var _dd2=buildDim(_res.p1,_res.p2,_res.p2,_res.type);
+          dims.push(_dd2);
+          scheduleSave();
+          hideGuide();
+          showGuide('距離寸法を追加しました ↩ で取消',2000);
+        } else {
+          showGuide('計測できません（平行でない線同士）',2000);
+        }
+        distDimState={phase:0,t1:null};
+        scheduleOverlay(); return;
+      }
+    }
+    _prevDown2(sx,sy,isPenInput);
+  };
+})();
+</script>
+
+
 <div id="widthPanel" style="display:none;position:fixed;z-index:8000;background:#1a2332;border:1.5px solid #00d4ff;border-radius:12px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.7);min-width:200px;">
   <div style="font-size:12px;color:#aab;margin-bottom:10px;text-align:center;">線の太さ</div>
   <div style="display:flex;flex-direction:column;gap:8px;">
@@ -2679,5 +2866,11 @@ applyPenLineWidth(); // 初期化
   </div>
 </div>
 <div id="widthPanelBg" style="display:none;position:fixed;inset:0;z-index:7999;"></div>
+<div id="circTypeMenu" style="display:none;position:fixed;z-index:9000;background:#1a2332;border:1.5px solid #00d4ff;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.8);">
+  <div style="font-size:11px;color:#6af;padding:8px 16px 4px;border-bottom:1px solid #243450;text-align:center;">寸法タイプを選択</div>
+  <div id="circTypePhi" style="padding:14px 24px;color:#e0eaf5;font-size:16px;cursor:pointer;border-bottom:1px solid #243450;display:flex;align-items:center;gap:10px;"><span style="font-size:20px;color:#00d4ff;">φ</span> 直径寸法</div>
+  <div id="circTypeR"   style="padding:14px 24px;color:#e0eaf5;font-size:16px;cursor:pointer;display:flex;align-items:center;gap:10px;"><span style="font-size:20px;color:#00d4ff;">R</span> 半径寸法</div>
+</div>
+<div id="circTypeBg" style="display:none;position:fixed;inset:0;z-index:8999;"></div>
 </body>
 </html>
