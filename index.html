@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -167,11 +168,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><span>↩</span></button>
   <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><span>↪</span></button>
   <button class="tb-btn" id="savePDFBtn" title="PDF保存">💾</button>
-  <button class="tb-btn" id="screenshotBtn" title="スクリーンショット保存">
-    <span class="tb-tool-label">保存</span>
-    <span style="font-size:16px">📷</span>
-  </button>
-  <button class="tb-btn" id="fullscreenBtn" title="全画面">⛶</button>
+  <button class="tb-btn" id="screenshotBtn" title="スクリーンショット">
+  <span class="tb-tool-label">📷</span>
+  <span style="font-size:13px">保存</span>
+</button>
 </div>
 
 <div class="stage" id="stage">
@@ -239,7 +239,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_12</div>
+  <div id="ver-label">DXF_View V0_13</div>
 </div>
 
 <div id="colorOverlay">
@@ -930,7 +930,7 @@ function drawOverlay(){
   }
   // Dims
   for(const d of dims) drawDimEntity(octx,d);
-  // Strokes（moveTo/lineTo直描画 - V0_12でsmoothPath廃止）
+  // Strokes（moveTo/lineTo直描画 - V0_13でsmoothPath廃止）
   for(const s of strokes){
     if(!s.pts || s.pts.length < 2) continue;
     octx.save();
@@ -1037,22 +1037,13 @@ function drawOverlay(){
       octx.fillText(sc.lbl,sx+19,sy-4);
     }
   }
-  // dxdyツールのP3選択中: 方向プレビュー（V0_12追加）
+  // dxdyツールのP3選択中: 方向プレビュー（V0_13改善）
   if((currentTool==='dxdy') && dimState.pts.length===2 && snapPt){
     const p1_=dimState.pts[0], p2_=dimState.pts[1];
     const midX=(p1_.x+p2_.x)/2, midY=(p1_.y+p2_.y)/2;
     const horizOfs=Math.abs(snapPt.x-midX);
     const vertOfs=Math.abs(snapPt.y-midY);
-    const typeLabel = vertOfs >= horizOfs ? '水平' : '鉛直';
-    const[px,py]=w2s(snapPt.x, snapPt.y);
-    octx.save();
-    octx.font='bold 14px sans-serif';
-    octx.fillStyle='#00d4ff';
-    octx.strokeStyle='rgba(0,0,0,0.7)';
-    octx.lineWidth=3;
-    octx.strokeText(typeLabel, px+12, py-8);
-    octx.fillText(typeLabel, px+12, py-8);
-    octx.restore();
+
   }
   // Eraser
   if(eraserPos&&currentTool==='eraser'){
@@ -1561,7 +1552,7 @@ ov.addEventListener('touchend',e=>{
   }
 },{passive:false});
 
-// ポインタ予測イベント: V0_12で廃止（描画品質改善のため）
+// ポインタ予測イベント: V0_13で廃止（描画品質改善のため）
 // getPredictedEventsはスケッチ追従を悪化させるため削除。将来の参照用としてコメントで残す。
 // ov.addEventListener('pointermove',e=>{ ... getPredictedEvents ... });
 
@@ -1686,54 +1677,81 @@ document.getElementById('clearBtn').addEventListener('click',()=>{
 });
 document.getElementById('savePDFBtn').addEventListener('click',savePDF);
 
-// スクリーンショット保存ボタン (V0_12追加)
+// スクリーンショット保存ボタン (V0_13改善)
 document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('screenshotBtn');
+  btn.disabled = true;
   try{
-    const cv2 = document.getElementById('cv');
-    const ov2 = document.getElementById('ov');
-    const W = cv2.width, H = cv2.height;
-    const comp = document.createElement('canvas');
-    comp.width = W; comp.height = H;
-    const cctx = comp.getContext('2d');
-    cctx.fillStyle = '#0b0f16';
-    cctx.fillRect(0,0,W,H);
-    cctx.drawImage(cv2,0,0);
-    cctx.drawImage(ov2,0,0);
-    const dataURL = comp.toDataURL('image/png');
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const scale = Math.max(2, dpr);
+
+    let imageBlob;
+
+    if(typeof html2canvas !== 'undefined'){
+      // html2canvas でアプリ全体（ヘッダー含む）をキャプチャ
+      const captureCanvas = await html2canvas(document.body, {
+        scale: scale,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#0b0f16',
+        logging: false,
+        imageTimeout: 0
+      });
+      imageBlob = await new Promise(res => captureCanvas.toBlob(res, 'image/png'));
+    } else {
+      // フォールバック: cv + ov の合成（ヘッダーなし）
+      const cv = document.getElementById('cv');
+      const ov = document.getElementById('ov');
+      const W = cv.width, H = cv.height;
+      const comp = document.createElement('canvas');
+      comp.width = W * scale; comp.height = H * scale;
+      const ctx2 = comp.getContext('2d');
+      ctx2.scale(scale, scale);
+      ctx2.fillStyle = '#0b0f16';
+      ctx2.fillRect(0, 0, W, H);
+      ctx2.drawImage(cv, 0, 0);
+      ctx2.drawImage(ov, 0, 0);
+      imageBlob = await new Promise(res => comp.toBlob(res, 'image/png'));
+    }
+
     const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
     const baseName = (currentFileName||'screenshot').replace(/\.[^.]+$/,'');
     const fileName = `${baseName}_${ts}.png`;
-    if(navigator.share && typeof navigator.canShare === 'function'){
-      const blob = await new Promise(res=>comp.toBlob(res,'image/png'));
-      const file = new File([blob], fileName, {type:'image/png'});
-      if(navigator.canShare({files:[file]})){
+    const file = new File([imageBlob], fileName, {type:'image/png'});
+
+    // 保存先: Web Share API（iOS共有ダイアログ）→ <a download>
+    let shared = false;
+    if(navigator.share && typeof navigator.canShare === 'function' && navigator.canShare({files:[file]})){
+      try{
         await navigator.share({files:[file], title:fileName});
-        return;
+        shared = true;
+      }catch(shareErr){
+        if(shareErr.name === 'AbortError'){ return; } // ユーザーキャンセル→何もしない
+        // Share失敗 → downloadにフォールバック
       }
     }
-    const a = document.createElement('a');
-    a.href = dataURL;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    if(!shared){
+      const url = URL.createObjectURL(imageBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    }
   }catch(err){
-    const cv2=document.getElementById('cv'),ov2=document.getElementById('ov');
-    const comp=document.createElement('canvas');
-    comp.width=cv2.width;comp.height=cv2.height;
-    const cctx=comp.getContext('2d');
-    cctx.fillStyle='#0b0f16';cctx.fillRect(0,0,comp.width,comp.height);
-    cctx.drawImage(cv2,0,0);cctx.drawImage(ov2,0,0);
-    window.open(comp.toDataURL('image/png'),'_blank');
+    if(err.name !== 'AbortError'){
+      console.error('Screenshot error:', err);
+    }
+  }finally{
+    btn.disabled = false;
   }
 });
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();});
-document.getElementById('fullscreenBtn').addEventListener('click',()=>{
-  if(!document.fullscreenElement) document.documentElement.requestFullscreen();
-  else document.exitFullscreen();
-});
+
 
 // 表示記憶
 function updateViewmemoState(i){
