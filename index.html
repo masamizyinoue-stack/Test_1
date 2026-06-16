@@ -123,8 +123,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #colorOverlay.open{display:flex}
 .co-label{font-size:11px;color:var(--text-dim);margin-bottom:8px;
   text-transform:uppercase;letter-spacing:.5px;font-weight:500}
-.co-colors{display:flex;gap:8px}
-.color-btn{width:38px;height:38px;border-radius:50%;border:3px solid transparent;cursor:pointer;
+.co-colors{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.color-btn{width:46px;height:46px;border-radius:50%;border:3px solid transparent;cursor:pointer;
   -webkit-tap-highlight-color:transparent}
 .color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
 .co-lw{display:flex;gap:8px}
@@ -148,6 +148,33 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 @supports (padding-bottom:env(safe-area-inset-bottom)){
   .btbar{bottom:calc(22px + env(safe-area-inset-bottom))}}
 .tb-btn svg, .tb-tool-btn svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
+.wp-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: 1.5px solid rgba(150,170,190,0.25);
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #ccd;
+  font-size: 13px;
+  transition: border-color .15s, background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.wp-btn:active, .wp-btn.wp-selected {
+  border-color: #00d4ff;
+  background: rgba(0,212,255,0.1);
+  color: #00d4ff;
+}
+.wp-preview {
+  display: block;
+  width: 80px;
+  background: currentColor;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.wp-label { flex: 1; text-align: left; }
 </style>
 </head>
 <body>
@@ -161,14 +188,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
-  <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span></button>
+  <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(229,57,53);border:1.5px solid #aaa;vertical-align:middle"></span></button>
+  <button class="tb-btn" id="widthBtn" title="線の太さ"><span class="tb-tool-label">太さ</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6" stroke-width="1"/><line x1="3" y1="12" x2="21" y2="12" stroke-width="2.5"/><line x1="3" y1="18" x2="21" y2="18" stroke-width="4.5"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="circDim" title="円・円弧寸法（φ/R）"><span class="tb-tool-label">φ/R</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="20"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="線間・線-点距離計測"><span class="tb-tool-label">距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="10" y1="10" x2="12" y2="8"/><line x1="14" y1="10" x2="12" y2="8"/><line x1="10" y1="14" x2="12" y2="16"/><line x1="14" y1="14" x2="12" y2="16"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="circDim" title="円/円弧 φ・R寸法"><span class="tb-tool-label">φ/R</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="7"/><line x1="12" y1="5" x2="12" y2="19"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="線-線/線-点 距離計測"><span class="tb-tool-label">距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="17" x2="20" y2="17"/><line x1="12" y1="7" x2="12" y2="17"/><polyline points="9,10 12,7 15,10"/><polyline points="9,14 12,17 15,14"/></svg></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
@@ -248,26 +276,23 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_22</div>
+  <div id="ver-label">DXF_View V0_26</div>
 </div>
 
 <div id="colorOverlay">
   <div>
-    <div class="co-label">カラー</div>
+    <div class="co-label">線の色</div>
     <div class="co-colors">
-      <button class="color-btn active" data-color="255,0,0" style="background:#f00" title="赤"></button>
-      <button class="color-btn" data-color="255,140,0" style="background:#f80" title="橙"></button>
-      <button class="color-btn" data-color="0,200,0" style="background:#0c8" title="緑"></button>
-      <button class="color-btn" data-color="0,120,255" style="background:#08f" title="青"></button>
-      <button class="color-btn" data-color="255,0,180" style="background:#f0b" title="ピンク"></button>
-    </div>
-  </div>
-  <div>
-    <div class="co-label">線幅</div>
-    <div class="co-lw">
-      <button class="lw-btn active" data-lw="1">細</button>
-      <button class="lw-btn" data-lw="2.5">中</button>
-      <button class="lw-btn" data-lw="5">太</button>
+      <button class="color-btn active" data-color="229,57,53" style="background:#e53935" title="赤"></button>
+      <button class="color-btn" data-color="245,124,0" style="background:#f57c00" title="橙"></button>
+      <button class="color-btn" data-color="253,216,53" style="background:#fdd835" title="黄"></button>
+      <button class="color-btn" data-color="67,160,71" style="background:#43a047" title="緑"></button>
+      <button class="color-btn" data-color="0,172,193" style="background:#00acc1" title="水色"></button>
+      <button class="color-btn" data-color="30,136,229" style="background:#1e88e5" title="青"></button>
+      <button class="color-btn" data-color="142,36,170" style="background:#8e24aa" title="紫"></button>
+      <button class="color-btn" data-color="255,255,255" style="background:#fff;border:2px solid #555" title="白"></button>
+      <button class="color-btn" data-color="128,128,128" style="background:#808080" title="グレー"></button>
+      <button class="color-btn" data-color="26,26,26" style="background:#1a1a1a;border:2px solid #555" title="黒"></button>
     </div>
   </div>
 </div>
@@ -283,7 +308,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_22';
+const APP_VERSION = 'V0_26';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -306,7 +331,7 @@ let tx=0,ty=0,scale=1;
 let bwMode=true;
 let scaleDenom=1;
 let currentTool='sketch';
-let currentColor={r:255,g:0,b:0};
+let currentColor={r:229,g:57,b:53};
 let currentLW=1;
 let dims=[];
 let strokes=[];
@@ -401,6 +426,174 @@ function decodeDXF(buf){
   try{return new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(e){}
   return new TextDecoder('shift_jis').decode(buf);
 }
+
+// =========================================================
+// TDF バイナリパーサー (実寸法師 .tdf)
+// =========================================================
+function parseTDF(buf){
+  const dv=new DataView(buf);
+  const u8=new Uint8Array(buf);
+  const len=buf.byteLength;
+
+  // magic確認
+  if(len<8||u8[0]!==0x54||u8[1]!==0x44||u8[2]!==0x46){
+    throw new Error('TDF magic mismatch');
+  }
+
+  const out={ver:'TDF',sen:[],enko:[],ten:[],moji:[],solid:[],sunpou:[],
+    usedLayers:{},layers:[],layerMap:{}};
+
+  // --- レイヤー名テーブルを読む (ヘッダー[240:] = 4バイト×N の offset table) ---
+  const LAYER_IDX_BASE=240;
+  const layerNames={};      // offset -> name
+  const layerOffsets=[];    // [layerIndex] -> offset
+  for(let li=0;li<64;li++){
+    const addr=LAYER_IDX_BASE+li*4;
+    if(addr+4>len) break;
+    const off=dv.getUint32(addr,true);
+    if(off<1000||off>len-20) break;
+    if(u8[off]!==3) break;   // type=3マーカー
+    // 名前は offset+4 から16バイト (null-padded)
+    let name='';
+    for(let k=0;k<16;k++){
+      const c=u8[off+4+k];
+      if(c===0) break;
+      name+=String.fromCharCode(c);
+    }
+    name=name.trim().replace(/[,(4$0]/g,'').trim()||('Layer'+li);
+    layerNames[off]=name;
+    layerOffsets.push(off);
+    out.layers.push({name,color:7,on:true});
+    out.layerMap[name]={color:7};
+  }
+
+  // attr2 -> レイヤー名 キャッシュ (初回解決のみ)
+  const attr2LayerCache={};
+  function resolveLayer(attr2){
+    if(attr2LayerCache[attr2]!==undefined) return attr2LayerCache[attr2];
+    // attr2 = 既知のlayer group offset -> linked list をたどる
+    // 簡易: attr2の値をレイヤーインデックス候補として使う
+    // fallback: attr2 0x000009f0=2544, 0x00000b00=2816 など
+    // -> ヘッダー[240:]の位置に最も近いlayer entry を探す
+    let best='';let bestDist=Infinity;
+    for(let i=0;i<layerOffsets.length;i++){
+      const d=Math.abs(layerOffsets[i]-attr2);
+      if(d<bestDist){bestDist=d;best=out.layers[i]?out.layers[i].name:'';}
+    }
+    // 距離が大きすぎる場合はデフォルト
+    if(bestDist>50000) best=out.layers[0]?out.layers[0].name:'0';
+    attr2LayerCache[attr2]=best;
+    return best;
+  }
+
+  // --- レコードをスキャン ---
+  // 全バイトを先頭から走査: 0x80000038 / 0x80000030 / 0x8000004c / 0x80000020 を探す
+  let i=0;
+  while(i<len-24){
+    const flag=dv.getUint32(i,true);
+    if((flag>>>24)!==0x80){i++;continue;}
+    const rsize=flag&0xFF;
+    if(rsize<24||i+rsize>len){i++;continue;}
+
+    const etype=dv.getUint32(i+4,true);
+    const attr2=dv.getUint32(i+12,true);
+    const layer=resolveLayer(attr2);
+
+    if(etype===1&&rsize===56){
+      // LINE: x1,y1,x2,y2 (各8バイトfloat64)
+      const x1=dv.getFloat64(i+24,true);
+      const y1=dv.getFloat64(i+32,true);
+      const x2=dv.getFloat64(i+40,true);
+      const y2=dv.getFloat64(i+48,true);
+      if(isFinite(x1)&&isFinite(y1)&&isFinite(x2)&&isFinite(y2)){
+        out.sen.push({x1,y1,x2,y2,layer,color:7,ltype:'CONTINUOUS'});
+        out.usedLayers[layer]=true;
+      }
+      i+=56;
+
+    } else if(etype===2&&rsize===48){
+      // CIRCLE or ARC
+      const cx=dv.getFloat64(i+24,true);
+      const cy=dv.getFloat64(i+32,true);
+      const r =dv.getFloat64(i+40,true);
+      if(isFinite(cx)&&isFinite(cy)&&isFinite(r)&&r>0){
+        // 次レコードが角度レコード(type=0x130000, size=32) なら ARC
+        let isArc=false;
+        const ni=i+48;
+        if(ni+8<len){
+          const nflag=dv.getUint32(ni,true);
+          const ntype=dv.getUint32(ni+4,true);
+          if(nflag===0x80000020&&ntype===0x00130000){
+            isArc=true;
+          }
+        }
+        // ARC/CIRCLE 共にenkoとして追加 (startAngle=0, endAngle=Math.PI*2 = 全円)
+        // TDFはARCの終端角度を格納しないため、全円として描画
+        out.enko.push({
+          cx,cy,r,
+          startAngle:0,endAngle:Math.PI*2,
+          layer,color:7
+        });
+        out.usedLayers[layer]=true;
+      }
+      i+=48;
+
+    } else if(etype===0x00130000&&rsize===32){
+      // ARC angle record (CIRCLEの後に続く): スキップ (CIRCLE処理時に判定済み)
+      i+=32;
+
+    } else if(etype===8&&rsize===76){
+      // TEXT
+      const x=dv.getFloat64(i+24,true);
+      const y=dv.getFloat64(i+32,true);
+      const h=dv.getFloat64(i+40,true);
+      const strOff=dv.getUint32(i+68,true);
+      let str='';
+      if(strOff+4<len){
+        // str_offset+4 から null終端文字列 (CP932/ASCII)
+        let k=strOff+4;
+        const bytes=[];
+        while(k<len&&u8[k]!==0&&k<strOff+200){bytes.push(u8[k]);k++;}
+        // CP932デコード試行 (ブラウザは直接CP932をサポートしないためShift-JIS互換)
+        try{
+          const decoder=new TextDecoder('shift-jis');
+          str=decoder.decode(new Uint8Array(bytes));
+        }catch(e){
+          str=bytes.filter(b=>b>=32&&b<127).map(b=>String.fromCharCode(b)).join('');
+        }
+      }
+      if(isFinite(x)&&isFinite(y)){
+        out.moji.push({
+          x,y,str:str||'',
+          height:isFinite(h)?h:3.5,
+          angle:0,layer,color:7,
+          alignH:'left',alignV:'baseline'
+        });
+        out.usedLayers[layer]=true;
+      }
+      i+=76;
+
+    } else {
+      i++;  // 未知レコードはスキップ
+    }
+  }
+
+  // extents
+  let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+  out.sen.forEach(e=>{
+    mnX=Math.min(mnX,e.x1,e.x2);mnY=Math.min(mnY,e.y1,e.y2);
+    mxX=Math.max(mxX,e.x1,e.x2);mxY=Math.max(mxY,e.y1,e.y2);
+  });
+  out.enko.forEach(e=>{
+    mnX=Math.min(mnX,e.cx-e.r);mnY=Math.min(mnY,e.cy-e.r);
+    mxX=Math.max(mxX,e.cx+e.r);mxY=Math.max(mxY,e.cy+e.r);
+  });
+  if(isFinite(mnX)) out.extents={minX:mnX,minY:mnY,maxX:mxX,maxY:mxY};
+
+  console.log('[TDF] parsed: LINE='+out.sen.length+' CIRCLE/ARC='+out.enko.length+' TEXT='+out.moji.length);
+  return out;
+}
+
 
 function parseDXF(buf){
   const text=decodeDXF(buf);
@@ -1028,7 +1221,6 @@ function drawOverlay(){
       end:{col:'#00ff7f',lbl:'端点'},
       cen:{col:'#00f0ff',lbl:'中心'},
       mid:{col:'#ffbb33',lbl:'中点'},
-      on:{col:'#cc88ff',lbl:'線上'},
     };
     const sc=STC[snapPt.type]||{col:'#f39c12',lbl:''};
     octx.strokeStyle=sc.col;octx.fillStyle=sc.col;
@@ -1062,7 +1254,7 @@ function drawOverlay(){
       octx.lineTo(sx,sy+10);octx.lineTo(sx-10,sy);
       octx.closePath();octx.stroke();
     } else if(snapPt.type==='on'){
-      // 線上: × マーカー
+      // ── ④ 線上スナップマーカー: X印
       octx.beginPath();
       octx.moveTo(sx-6,sy-6);octx.lineTo(sx+6,sy+6);
       octx.moveTo(sx+6,sy-6);octx.lineTo(sx-6,sy+6);
@@ -1111,11 +1303,11 @@ function drawOverlay(){
           const midX=(p1.x+p2.x)/2,midY=(p1.y+p2.y)/2;
           const pType=Math.abs(p3.y-midY)>=Math.abs(p3.x-midX)?'dx':'dy';
           prevDim=buildDim(p1,p2,p3,pType);
-        } else if(currentTool==='diag' && dimState.pts.length===1 && dimPendingDown===true){
-          // P2 選択中: 斜め寸法プレビュー（ペンドラッグ中のみ）
+        } else if(currentTool==='diag' && dimState.pts.length===1){
+          // P2 選択中: 斜め寸法プレビュー
           const[p1,p2]=[dimState.pts[0],curPt];
           prevDim=buildDim(p1,p2,p2,'diag');
-        } else if(currentTool==='dxdy' && dimState.pts.length===1 && dimPendingDown===true){
+        } else if((currentTool==='dxdy'||currentTool==='diag') && dimState.pts.length===1 && dimPendingDown===true){
           // P2 選択中: P1→カーソルの細線プレビュー
           const[sx0_,sy0_]=w2s(dimState.pts[0].x,dimState.pts[0].y);
           const[sx1_,sy1_]=w2s(curPt.x,curPt.y);
@@ -1127,30 +1319,6 @@ function drawOverlay(){
           octx.restore();
         }
       }catch(e){}
-      // ② circDim プレビュー（phase1 ドラッグ中）
-      if(currentTool==='circDim'&&circDimState.phase===1&&circDimState.entity){
-        try{
-          const pd=buildCircDim(circDimState.entity,curPt,circDimState.dimType);
-          if(pd){
-            octx.save();
-            octx.strokeStyle='rgba(0,212,255,0.6)';octx.fillStyle='rgba(0,212,255,0.85)';
-            octx.lineWidth=1.5;octx.setLineDash([5,3]);octx.lineCap='round';
-            for(const l of(pd.lines||[])){
-              const[sx1_,sy1_]=w2s(l.x1,l.y1);const[sx2_,sy2_]=w2s(l.x2,l.y2);
-              octx.beginPath();octx.moveTo(sx1_,sy1_);octx.lineTo(sx2_,sy2_);octx.stroke();
-            }
-            octx.setLineDash([]);
-            if(pd.text){
-              const[stx_,sty_]=w2s(pd.tx,pd.ty);
-              octx.font='bold 17px sans-serif';octx.textAlign='center';octx.textBaseline='middle';
-              const tw=octx.measureText(pd.text).width;
-              octx.fillStyle='rgba(0,20,40,0.65)';octx.fillRect(stx_-tw/2-3,sty_-10,tw+6,20);
-              octx.fillStyle='rgba(0,212,255,0.85)';octx.fillText(pd.text,stx_,sty_);
-            }
-            octx.restore();
-          }
-        }catch(e_){}
-      }
       if(prevDim){
         octx.save();
         octx.strokeStyle='rgba(0,212,255,0.75)';
@@ -1166,7 +1334,7 @@ function drawOverlay(){
         octx.setLineDash([]);
         const txt = prevDim.text||'';
         const ptx_ = prevDim.tx, pty_ = prevDim.ty;
-        if(txt && ptx_!=null && pty_!=null){
+        if(!dimPendingDown && txt && ptx_!=null && pty_!=null){
           const[stx_,sty_]=w2s(ptx_,pty_);
           octx.font='bold 17px sans-serif';
           octx.textAlign='center';
@@ -1272,21 +1440,19 @@ function snapAt(wx,wy){
       if(bestScore<-sr*0.2) break outer; // 非常に良い交点が見つかれば打ち切り
     }
   }
-  // ─ 線上スナップ（最低優先度）
-  if(!best){
-    const ON_THRESH=sr*1.3;
-    for(const e of (doc.sen||[])){
-      if(hiddenLayers.has(e.layer)) continue;
-      const ddx=e.x2-e.x1,ddy=e.y2-e.y1;
-      const len2=ddx*ddx+ddy*ddy;
-      if(len2<1e-10) continue;
-      const tt=((wx-e.x1)*ddx+(wy-e.y1)*ddy)/len2;
-      if(tt<=0.01||tt>=0.99) continue;
-      const ppx=e.x1+tt*ddx,ppy=e.y1+tt*ddy;
-      const dd=Math.hypot(wx-ppx,wy-ppy);
-      if(dd<ON_THRESH){
-        best={x:ppx,y:ppy,type:'on',onLine:e};
-        break;
+  // ── ④ 線上スナップ（最低優先度）
+  if(doc && doc.sen){
+    const ON_T=24/scale*1.3;
+    for(const _e4 of doc.sen){
+      if(hiddenLayers.has(_e4.layer)) continue;
+      const _dx4=_e4.x2-_e4.x1,_dy4=_e4.y2-_e4.y1,_len4=_dx4*_dx4+_dy4*_dy4;
+      if(_len4<1e-10) continue;
+      const _t4=((wx-_e4.x1)*_dx4+(wy-_e4.y1)*_dy4)/_len4;
+      if(_t4<=0.01||_t4>=0.99) continue;
+      const _px4=_e4.x1+_t4*_dx4,_py4=_e4.y1+_t4*_dy4;
+      const _d4=Math.hypot(wx-_px4,wy-_py4);
+      if(_d4<ON_T && (!best||_d4<bestScore-0.5)){
+        best={x:_px4,y:_py4,type:'on',onLine:_e4}; bestScore=_d4;
       }
     }
   }
@@ -1329,101 +1495,12 @@ function buildDim(p1,p2,pArrow,type){
   return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:'#f39c12'};
 }
 
-// =========================================================
-// ② 円・円弧寸法 buildCircDim
-// =========================================================
-let circDimState={phase:0,entity:null,dimType:'R'};
-let distDimState={phase:0,target1:null};
-
-function buildCircDim(ent,p3,type){
-  const cx=ent.cx,cy=ent.cy,r=ent.r;
-  const sd=parseFloat(document.getElementById('scaleDenom').value)||1;
-  const val=(type==='phi'?r*2:r)/sd;
-  const prefix=type==='phi'?'φ':'R';
-  const text=prefix+formatDim(val);
-  const ang=Math.atan2(p3.y-cy,p3.x-cx);
-  const px=cx+r*Math.cos(ang),py=cy+r*Math.sin(ang);
-  if(type==='R'){
-    const textOfs=20/scale;
-    return {
-      lines:[{x1:cx,y1:cy,x2:px,y2:py}],
-      arrows:[{x:px,y:py,angle:ang+Math.PI}],
-      text,
-      tx:cx+(r+textOfs)*Math.cos(ang),
-      ty:cy+(r+textOfs)*Math.sin(ang),
-      tangle:-ang,
-      color:'#00d4ff'
-    };
-  } else {
-    const p1x=cx-r*Math.cos(ang),p1y=cy-r*Math.sin(ang);
-    const p2x=cx+r*Math.cos(ang),p2y=cy+r*Math.sin(ang);
-    return {
-      lines:[{x1:p1x,y1:p1y,x2:p2x,y2:p2y}],
-      arrows:[{x:p1x,y:p1y,angle:ang},{x:p2x,y:p2y,angle:ang+Math.PI}],
-      text,
-      tx:(p1x+p2x)/2,
-      ty:(p1y+p2y)/2-20/scale,
-      tangle:-ang,
-      color:'#00d4ff'
-    };
-  }
-}
-
-// =========================================================
-// ⑦ 距離計測
-// =========================================================
-function projOnLine(px,py,line){
-  const dx=line.x2-line.x1,dy=line.y2-line.y1;
-  const len2=dx*dx+dy*dy;
-  if(len2<1e-12) return {x:line.x1,y:line.y1};
-  const t=((px-line.x1)*dx+(py-line.y1)*dy)/len2;
-  return {x:line.x1+t*dx,y:line.y1+t*dy};
-}
-function calcDistDim(t1,t2){
-  if(t1.type==='point'&&t2.type==='point'){
-    return {p1:t1.pt,p2:t2.pt,type:'direct'};
-  }
-  if(t1.type==='line'&&t2.type==='line'){
-    const a1=Math.atan2(t1.line.y2-t1.line.y1,t1.line.x2-t1.line.x1);
-    const a2=Math.atan2(t2.line.y2-t2.line.y1,t2.line.x2-t2.line.x1);
-    const adiff=Math.abs(a1-a2)%Math.PI;
-    if(adiff<0.087||adiff>Math.PI-0.087){
-      const mx=(t1.line.x1+t1.line.x2)/2,my=(t1.line.y1+t1.line.y2)/2;
-      const foot=projOnLine(mx,my,t2.line);
-      return {p1:{x:mx,y:my},p2:foot,type:'perp'};
-    }
-    return null;
-  }
-  const lineT=t1.type==='line'?t1:t2;
-  const ptT=t1.type==='line'?t2:t1;
-  const foot=projOnLine(ptT.pt.x,ptT.pt.y,lineT.line);
-  return {p1:ptT.pt,p2:foot,type:'perp'};
-}
-
 function formatDim(d){
+  // ── ⑥ 小数第1位統一（全範囲）
   return (Math.round(d*10)/10).toFixed(1);
 }
 
 function detectScale(){}
-
-// ─── 寸法線自動整列スナップ ─────────────────────────────────────────────
-function snapDimOffset(p1,p2,p3candidate,type){
-  const ALIGN_THRESH=8/scale; // screen 8px 相当
-  if(type==='dx'||type==='dxdy_dx'){
-    const offsets=dims.filter(d=>d.lines&&d.lines.length>=3&&Math.abs(d.lines[0].x1-d.lines[0].x2)<0.01)
-      .map(d=>d.lines[2].y1).filter(v=>isFinite(v));
-    for(const off of offsets){
-      if(Math.abs(p3candidate.y-off)<ALIGN_THRESH) return {x:p3candidate.x,y:off};
-    }
-  } else if(type==='dy'||type==='dxdy_dy'){
-    const offsets=dims.filter(d=>d.lines&&d.lines.length>=3&&Math.abs(d.lines[0].y1-d.lines[0].y2)<0.01)
-      .map(d=>d.lines[2].x1).filter(v=>isFinite(v));
-    for(const off of offsets){
-      if(Math.abs(p3candidate.x-off)<ALIGN_THRESH) return {x:off,y:p3candidate.y};
-    }
-  }
-  return p3candidate;
-}
 
 // =========================================================
 // 情報表示・レイヤモーダル
@@ -1538,97 +1615,28 @@ function getPos(e){const r=ov.getBoundingClientRect();return {x:e.clientX-r.left
 function handlePointerDown(sx,sy,isPenInput){
   const[wx,wy]=s2w(sx,sy);
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
-  if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'||currentTool==='circDim'||currentTool==='distDim'){
+  if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
     if(isPenInput){
-      // diag: 1ストローク（ペンDown=P1, ペンUp=P2）で確定させるため Down 時に P1 を登録
-      if(currentTool==='diag'){
-        const snapD=snapAt(wx,wy);const ptD=snapD||{x:wx,y:wy};
-        if(dimState.pts.length===0){
-          dimState.pts.push(ptD);
-          dimPendingDown=true;
-          showGuide('ペンをドラッグして2点目を確定');
-          scheduleOverlay();return;
-        }
+      // ── ⑤ diag: ペン操作時は1ストローク（P1→ドラッグ→P2）
+      if(currentTool==='diag' && dimState.pts.length===0){
+        const _snap5=snapAt(wx,wy);
+        const _pt5=_snap5||{x:wx,y:wy};
+        dimState.pts.push(_pt5);
+        dimPendingDown=true;
+        showGuide('P2: ドラッグして位置決定');
+        scheduleOverlay();
+        return;
       }
       dimPendingDown=true;return;
     }
     const snap=snapAt(wx,wy);const pt=snap||{x:wx,y:wy};
-    // ── ② circDim（非ペン・タッチ）──
-    if(currentTool==='circDim'){
-      if(circDimState.phase===0){
-        // 中心点スナップから円エンティティを特定
-        let ent=null;
-        if(snap&&snap.type==='cen'&&doc){
-          for(const e of doc.enko){if(Math.abs(e.cx-snap.x)<0.01&&Math.abs(e.cy-snap.y)<0.01){ent=e;break;}}
-        }
-        if(!ent&&doc){
-          // 線上スナップでも円弧を選択できるよう近傍探索
-          for(const e of doc.enko){
-            const d=Math.abs(Math.hypot(wx-e.cx,wy-e.cy)-e.r);
-            if(d<30/scale){ent=e;break;}
-          }
-        }
-        if(ent){
-          circDimState={phase:1,entity:ent,dimType:snap&&snap.type==='cen'&&Math.abs(ent.a2-ent.a1-360)<1?'phi':'R'};
-          showGuide('寸法テキスト位置をタップ（Rをタップで切替）');
-        } else {
-          showGuide('円または円弧をタップしてください',1500);
-        }
-      } else if(circDimState.phase===1){
-        // typeトグル: 中心付近タップでφ/R切替
-        const ent=circDimState.entity;
-        const distCenter=Math.hypot(wx-ent.cx,wy-ent.cy);
-        if(distCenter<ent.r*0.3){
-          circDimState.dimType=circDimState.dimType==='R'?'phi':'R';
-          showGuide(circDimState.dimType==='phi'?'φ(直径)モード':'R(半径)モード',1000);
-        } else {
-          snapshot();
-          dims.push(buildCircDim(ent,pt,circDimState.dimType));
-          circDimState={phase:0,entity:null,dimType:'R'};
-          hideGuide();showGuide('円寸法を追加しました ↩ で取消',2000);
-        }
-      }
-      scheduleOverlay();return;
-    }
-    // ── ⑦ distDim（非ペン・タッチ）──
-    if(currentTool==='distDim'){
-      const lineEnt=snap&&snap.type==='on'?snap.onLine:null;
-      if(distDimState.phase===0){
-        distDimState={phase:1,target1:{type:lineEnt?'line':'point',pt,line:lineEnt}};
-        showGuide('2点目（線または点）を選択してください');
-      } else {
-        const t2={type:lineEnt?'line':'point',pt,line:lineEnt};
-        const res=calcDistDim(distDimState.target1,t2);
-        if(res){
-          snapshot();
-          dims.push(buildDim(res.p1,res.p2,res.p2,'diag'));
-          showGuide('距離寸法を追加しました ↩ で取消',2000);
-        } else {
-          showGuide('非平行線は計測できません',1500);
-        }
-        distDimState={phase:0,target1:null};hideGuide();
-      }
-      scheduleOverlay();return;
-    }
-    // ── diag（非ペン・タッチ）──
-    if(currentTool==='diag'){
-      dimState.pts.push(pt);
-      if(dimState.pts.length===1) showGuide('2点目を選択してください');
-      if(dimState.pts.length>=2){
-        snapshot();
-        dims.push(buildDim(dimState.pts[0],dimState.pts[1],dimState.pts[1],'diag'));
-        dimState={pts:[]};hideGuide();
-        showGuide('斜め寸法を追加しました ↩ で取消',2000);
-      }
-      scheduleOverlay();return;
-    }
     dimState.pts.push(pt);
     // ガイドメッセージ更新
-    if(currentTool==='dxdy'){
+    if(currentTool==='dxdy'||currentTool==='diag'){
       if(dimState.pts.length===1) showGuide('2点目を選択してください');
       else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
     }
-    const need=3;
+    const need=currentTool==='diag'?2:3;
     if(dimState.pts.length>=need){
       const[p1,p2,p3]=dimState.pts;
       snapshot();
@@ -1640,11 +1648,9 @@ function handlePointerDown(sx,sy,isPenInput){
         const horizOfs=Math.abs(p3_.x-midX);
         const vertOfs=Math.abs(p3_.y-midY);
         dimType = vertOfs >= horizOfs ? 'dx' : 'dy';
-        // ③ 寸法線整列スナップ
-        const snapped3=snapDimOffset(p1_,p2_,dimState.pts[2],dimType);
-        dimState.pts[2]=snapped3;
       }
-      dims.push(buildDim(p1,p2,dimState.pts[2]||p2,dimType));
+      const _p3a=snapDimPos(p3||p2,dimType);
+      dims.push(buildDim(p1,p2,_p3a,dimType));
       dimState={pts:[]};
       hideGuide();
       showGuide('寸法を追加しました ↩ で取消', 2000);
@@ -1700,52 +1706,30 @@ function handlePointerMove(sx,sy,isPenInput){
 
 function handlePointerUp(sx,sy,isPenInput){
   if(dimPendingDown&&isPenInput){
+    // ── ⑤ diag ペン1ストローク確定
+    if(currentTool==='diag' && dimState.pts.length===1){
+      dimPendingDown=false;
+      const[_wx5,_wy5]=s2w(sx,sy);
+      const _p2_5=snapPt||{x:_wx5,y:_wy5};
+      snapshot();
+      dims.push(buildDim(dimState.pts[0],_p2_5,_p2_5,'diag'));
+      dimState={pts:[]};
+      scheduleSave();
+      hideGuide();
+      showGuide('寸法を追加しました ↩ で取消', 2000);
+      scheduleOverlay();return;
+    }
     dimPendingDown=false;
-    // ── diag: ペン1ストローク（P1→ペンアップ位置P2）で確定 ──
-    if(currentTool==='diag'&&dimState.pts.length===1){
-      const[wx2,wy2]=s2w(sx,sy);
-      const p2_=snapPt||{x:wx2,y:wy2};
-      snapshot();
-      dims.push(buildDim(dimState.pts[0],p2_,p2_,'diag'));
-      dimState={pts:[]};hideGuide();
-      showGuide('斜め寸法を追加しました ↩ で取消',2000);
-      scheduleOverlay();return;
-    }
-    // ── circDim: phase1 ペンアップで確定 ──
-    if(currentTool==='circDim'&&circDimState.phase===1&&circDimState.entity){
-      const[wx2,wy2]=s2w(sx,sy);
-      const p3_=snapPt||{x:wx2,y:wy2};
-      snapshot();
-      dims.push(buildCircDim(circDimState.entity,p3_,circDimState.dimType));
-      circDimState={phase:0,entity:null,dimType:'R'};
-      hideGuide();showGuide('円寸法を追加しました ↩ で取消',2000);
-      scheduleOverlay();return;
-    }
-    // ── distDim: phase1 ペンアップで2点目確定 ──
-    if(currentTool==='distDim'&&distDimState.phase===1){
-      const[wx2,wy2]=s2w(sx,sy);
-      const wp=snapPt||{x:wx2,y:wy2};
-      const lineEnt=snapPt&&snapPt.type==='on'?snapPt.onLine:null;
-      const t2={type:lineEnt?'line':'point',pt:wp,line:lineEnt};
-      const res=calcDistDim(distDimState.target1,t2);
-      if(res){
-        snapshot();
-        dims.push(buildDim(res.p1,res.p2,res.p2,'diag'));
-        showGuide('距離寸法を追加しました ↩ で取消',2000);
-      }
-      distDimState={phase:0,target1:null};hideGuide();
-      scheduleOverlay();return;
-    }
-    if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'){
+    if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
       const[wx2,wy2]=s2w(sx,sy);
       const pt=snapPt||{x:wx2,y:wy2};
       dimState.pts.push(pt);
       // ガイドメッセージ更新
-      if(currentTool==='dxdy'){
+      if(currentTool==='dxdy'||currentTool==='diag'){
         if(dimState.pts.length===1) showGuide('2点目を選択してください');
         else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
       }
-      const need=3;
+      const need=currentTool==='diag'?2:3;
       if(dimState.pts.length>=need){
         const[p1,p2,p3]=dimState.pts;
         snapshot();
@@ -1757,11 +1741,9 @@ function handlePointerUp(sx,sy,isPenInput){
           const horizOfs=Math.abs(p3_.x-midX);
           const vertOfs=Math.abs(p3_.y-midY);
           dimType = vertOfs >= horizOfs ? 'dx' : 'dy';
-          // ③ 寸法線整列スナップ
-          const snapped=snapDimOffset(p1_,p2_,p3_,dimType);
-          dimState.pts[2]=snapped;
         }
-        dims.push(buildDim(p1,p2,dimState.pts[2]||p2,dimType));
+        const _p3b=snapDimPos(p3||p2,dimType);
+        dims.push(buildDim(p1,p2,_p3b,dimType));
         dimState={pts:[]};
         hideGuide();
         showGuide('寸法を追加しました ↩ で取消', 2000);
@@ -1949,7 +1931,12 @@ fileInput.addEventListener('change',async e=>{
     document.body.classList.remove('settings-open');
   } else {
     try{
-      doc=parseDXF(buf);
+      const ext=f.name.split('.').pop().toLowerCase();
+      if(ext==='tdf'){
+        doc=parseTDF(buf);
+      } else {
+        doc=parseDXF(buf);
+      }
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null];[0,1,2].forEach(i=>updateViewmemoState(i));
       buildLayerModal();detectScale();fit();scheduleDraw();showInfo();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
       saveFile(buf,f.name);scheduleSave();updateFileNameDisplay();
@@ -1997,15 +1984,16 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
-    dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;circDimState={phase:0,entity:null,dimType:'R'};distDimState={phase:0,target1:null};scheduleOverlay();
+    dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
+    // ── 新ツールのステートリセット
+    if(typeof circDimState!=='undefined') circDimState={phase:0,ent:null};
+    if(typeof distDimState!=='undefined') distDimState={phase:0,t1:null};
     // ガイドメッセージ
     const guideMap={
       'sketch':'Apple Pencilまたは指でスケッチ',
       'eraser':'消去したい線をなぞってください',
       'dxdy':'1点目を選択してください',
-      'diag':'1点目を選択してください',
-      'circDim':'円または円弧をタップしてください',
-      'distDim':'1点目（線または点）を選択してください'
+      'diag':'1点目を選択してください'
     };
     if(currentTool==='sketch'||currentTool==='eraser'){
       showGuide(guideMap[currentTool]||'', 2000);
@@ -2256,6 +2244,7 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
   }
 });
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
+document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();});
 
 
@@ -2267,67 +2256,31 @@ function updateViewmemoState(i){
   if(sb) sb.classList.toggle('vm-saved',!!savedViews[i]);
 }
 document.querySelectorAll('.mem-btn').forEach(btn=>{
-  let _pressTimer=null;
-  let _longPressed=false;
   btn.addEventListener('click',()=>{
-    if(_longPressed){_longPressed=false;return;} // 長押し後のclickを無視
-    const i=parseInt(btn.dataset.vi);
-    if(savedViews[i]===null){
-      // 未登録: 保存
-      savedViews[i]={tx,ty,scale};
-      updateViewmemoState(i);scheduleSave();
-      btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
-      showGuide('記憶'+(i+1)+'を保存しました',1500);
-    } else {
-      // 登録済み: 復元
-      ({tx,ty,scale}=savedViews[i]);scheduleDraw();
-      showGuide('記憶'+(i+1)+'を復元しました',1200);
-    }
+    const i=parseInt(btn.dataset.vi);savedViews[i]={tx,ty,scale};
+    updateViewmemoState(i);scheduleSave();
+    btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
   });
-  // 長押し(600ms)でカスタムメニュー
+  // 長押し(600ms)でリセット
+  let _pressTimer=null;
   btn.addEventListener('pointerdown',()=>{
-    _longPressed=false;
     _pressTimer=setTimeout(()=>{
       _pressTimer=null;
       const i=parseInt(btn.dataset.vi);
       if(savedViews[i]===null)return;
-      _longPressed=true;
-      const menu=document.getElementById('memMenu');
-      const bg=document.getElementById('memMenuBg');
-      const rect=btn.getBoundingClientRect();
-      menu.style.left=Math.min(rect.left,window.innerWidth-200)+'px';
-      menu.style.top=(rect.bottom+4)+'px';
-      menu._targetIdx=i;
-      menu.style.display='block';
-      bg.style.display='block';
+      // ── ① カスタムメニュー表示（confirm置き換え）
+      document.getElementById('memMenu')._idx=i;
+      const r_=btn.getBoundingClientRect();
+      const mn_=document.getElementById('memMenu');
+      mn_.style.left=Math.min(r_.left,window.innerWidth-180)+'px';
+      mn_.style.top=(r_.bottom+4)+'px';
+      mn_.style.display='block';
+      document.getElementById('memMenuBg').style.display='block';
     },600);
   });
   btn.addEventListener('pointerup',()=>{clearTimeout(_pressTimer);_pressTimer=null;});
   btn.addEventListener('pointercancel',()=>{clearTimeout(_pressTimer);_pressTimer=null;});
   btn.addEventListener('pointermove',()=>{clearTimeout(_pressTimer);_pressTimer=null;});
-});
-// カスタムメニューハンドラ（一度のみ定義）
-document.getElementById('memMenuOverwrite').addEventListener('click',()=>{
-  const i=document.getElementById('memMenu')._targetIdx;
-  if(i!==undefined){
-    savedViews[i]={tx,ty,scale};
-    updateViewmemoState(i);scheduleSave();
-    showGuide('記憶'+(i+1)+'を上書き保存しました',1500);
-  }
-  document.getElementById('memMenu').style.display='none';
-  document.getElementById('memMenuBg').style.display='none';
-});
-document.getElementById('memMenuReset').addEventListener('click',()=>{
-  const i=document.getElementById('memMenu')._targetIdx;
-  document.getElementById('memMenu').style.display='none';
-  document.getElementById('memMenuBg').style.display='none';
-  if(i!==undefined && confirm('記憶'+(i+1)+'の登録をリセットしますか？')){
-    savedViews[i]=null;updateViewmemoState(i);scheduleSave();
-  }
-});
-document.getElementById('memMenuBg').addEventListener('click',()=>{
-  document.getElementById('memMenu').style.display='none';
-  document.getElementById('memMenuBg').style.display='none';
 });
 document.querySelectorAll('.show-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -2340,6 +2293,8 @@ document.querySelectorAll('.show-btn').forEach(btn=>{
 // カラーピッカー開閉
 document.getElementById('colorIndicatorBtn').addEventListener('click',function(e){
   e.stopPropagation();
+  document.getElementById('widthPanel').style.display='none';
+  document.getElementById('widthPanelBg').style.display='none';
   document.getElementById('colorOverlay').classList.toggle('open');
 });
 document.addEventListener('click',function(e){
@@ -2394,7 +2349,13 @@ async function tryRestore(){
       if(name.toLowerCase().endsWith('.pdf')){
         await loadPDF(buf);
       } else {
-        doc=parseDXF(buf);buildLayerModal();detectScale();
+        const ext=name.split('.').pop().toLowerCase();
+        if(ext==='tdf'){
+          doc=parseTDF(buf);
+        } else {
+          doc=parseDXF(buf);
+        }
+        buildLayerModal();detectScale();
       }
       const nd=document.getElementById('noDrawingMsg');if(nd)nd.style.display='none';
       updateFileNameDisplay();
@@ -2457,10 +2418,266 @@ if(vd) vd.textContent = APP_VERSION;
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<div id="memMenu" style="display:none;position:fixed;z-index:9999;background:#1a2332;border:1.5px solid #00d4ff;border-radius:8px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.6);">
-  <div id="memMenuOverwrite" style="padding:14px 24px;color:#e0eaf5;font-size:15px;cursor:pointer;border-bottom:1px solid #243450;">上書き保存</div>
-  <div id="memMenuReset" style="padding:14px 24px;color:#ff6b6b;font-size:15px;cursor:pointer;">記憶リセット</div>
-</div>
 <div id="memMenuBg" style="display:none;position:fixed;inset:0;z-index:9998;"></div>
+<div id="memMenu" style="display:none;position:fixed;z-index:9999;background:#1a2332;border:1.5px solid #00d4ff;border-radius:8px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.7);min-width:160px;">
+  <div id="memMenuSave" style="padding:13px 20px;color:#e0eaf5;font-size:15px;cursor:pointer;border-bottom:1px solid #243450;">上書き保存</div>
+  <div id="memMenuReset" style="padding:13px 20px;color:#ff6b6b;font-size:15px;cursor:pointer;">記憶リセット</div>
+</div>
+<script>
+// ── V0_26 追加機能スクリプト ─────────────────────────────
+
+// ── ③ 寸法自動整列 snapDimPos ──────────────────────────
+function snapDimPos(p3c, type){
+  var THRESH=12/scale;
+  if(type==='dx'){
+    for(var _dd of dims){
+      if(_dd.type==='dx' && _dd.lines && _dd.lines[2]){
+        var _ref=_dd.lines[2].y1;
+        if(Math.abs(p3c.y-_ref)<THRESH) return{x:p3c.x,y:_ref};
+      }
+    }
+  } else if(type==='dy'){
+    for(var _dd of dims){
+      if(_dd.type==='dy' && _dd.lines && _dd.lines[2]){
+        var _ref=_dd.lines[2].x1;
+        if(Math.abs(p3c.x-_ref)<THRESH) return{x:_ref,y:p3c.y};
+      }
+    }
+  }
+  return p3c;
+}
+
+// ── ① 記憶VIEW カスタムメニュー ──────────────────────────
+(function(){
+  var mn=document.getElementById('memMenu');
+  var bg=document.getElementById('memMenuBg');
+  function closeMenu(){ mn.style.display='none'; bg.style.display='none'; }
+  bg.addEventListener('click', closeMenu);
+  document.getElementById('memMenuSave').addEventListener('click',function(){
+    var idx=mn._idx;
+    if(idx!=null){ savedViews[idx]={tx:tx,ty:ty,scale:scale}; updateViewmemoState(idx); scheduleSave(); showGuide('記憶'+(idx+1)+'を上書きしました',1500); }
+    closeMenu();
+  });
+  document.getElementById('memMenuReset').addEventListener('click',function(){
+    var idx=mn._idx; closeMenu();
+    if(idx!=null && confirm('記憶'+(idx+1)+'の登録をリセットしますか？')){
+      savedViews[idx]=null; updateViewmemoState(idx); scheduleSave();
+    }
+  });
+})();
+
+// ── ② 円・円弧寸法 ─────────────────────────────────────
+var circDimState={phase:0,ent:null};
+
+function buildCircDim(ent,p3,type){
+  var cx=ent.cx,cy=ent.cy,r=ent.r;
+  var sd=parseFloat(document.getElementById('scaleDenom').value)||1;
+  var val=(type==='phi'?r*2:r)/sd;
+  var prefix=type==='phi'?'φ':'R';
+  var text=prefix+formatDim(val);
+  var ang=Math.atan2(p3.y-cy,p3.x-cx);
+  if(type==='R'){
+    var px=cx+r*Math.cos(ang),py=cy+r*Math.sin(ang);
+    var off=20/scale;
+    return{lines:[{x1:cx,y1:cy,x2:px,y2:py}],
+           arrows:[{x:px,y:py,angle:ang+Math.PI}],
+           text:text,tx:cx+(r+off)*Math.cos(ang),ty:cy+(r+off)*Math.sin(ang),
+           tangle:0,type:'circR',color:'#00d4ff'};
+  } else {
+    var p1x=cx-r*Math.cos(ang),p1y=cy-r*Math.sin(ang);
+    var p2x=cx+r*Math.cos(ang),p2y=cy+r*Math.sin(ang);
+    return{lines:[{x1:p1x,y1:p1y,x2:p2x,y2:p2y}],
+           arrows:[{x:p1x,y:p1y,angle:ang+Math.PI},{x:p2x,y:p2y,angle:ang}],
+           text:text,tx:p3.x,ty:p3.y,tangle:0,type:'circPhi',color:'#00d4ff'};
+  }
+}
+
+// ── ⑦ 距離計測ツール ────────────────────────────────────
+var distDimState={phase:0,t1:null};
+
+function projOnSeg(px,py,e){
+  var dx=e.x2-e.x1,dy=e.y2-e.y1,len2=dx*dx+dy*dy;
+  if(len2<1e-10) return{x:e.x1,y:e.y1};
+  var t=((px-e.x1)*dx+(py-e.y1)*dy)/len2;
+  return{x:e.x1+t*dx,y:e.y1+t*dy};
+}
+
+function calcDistDim(t1,t2){
+  if(t1.kind==='pt'&&t2.kind==='pt'){
+    return{p1:t1.pt,p2:t2.pt,type:'diag'};
+  }
+  if(t1.kind==='line'&&t2.kind==='line'){
+    var a1=Math.atan2(t1.e.y2-t1.e.y1,t1.e.x2-t1.e.x1);
+    var a2=Math.atan2(t2.e.y2-t2.e.y1,t2.e.x2-t2.e.x1);
+    var diff=Math.abs((a1-a2+Math.PI*2)%(Math.PI));
+    if(diff<0.09||diff>Math.PI-0.09){
+      var mp={x:(t1.e.x1+t1.e.x2)/2,y:(t1.e.y1+t1.e.y2)/2};
+      var ft=projOnSeg(mp.x,mp.y,t2.e);
+      return{p1:mp,p2:ft,type:'diag'};
+    }
+    return null;
+  }
+  var lineT=t1.kind==='line'?t1:t2;
+  var ptT=t1.kind==='line'?t2:t1;
+  var ft=projOnSeg(ptT.pt.x,ptT.pt.y,lineT.e);
+  return{p1:ptT.pt,p2:ft,type:'diag'};
+}
+
+// ── circDim / distDim ポインターハンドリング（関数 wrap）──
+(function(){
+  var _origDown=window.handlePointerDown;
+  var _origUp=window.handlePointerUp;
+
+  window.handlePointerDown=function(sx,sy,isPenInput){
+    // ── ② circDim ──
+    if(currentTool==='circDim'){
+      var _wxy=s2w(sx,sy);var _wx=_wxy[0],_wy=_wxy[1];
+      if(circDimState.phase===0){
+        // 最近の円/円弧エンティティを探す
+        var _best=null,_bDist=Infinity;
+        if(doc&&doc.enko){
+          for(var _e of doc.enko){
+            if(hiddenLayers.has(_e.layer)) continue;
+            var _dc=Math.hypot(_wx-_e.cx,_wy-_e.cy);
+            if(_dc<_bDist){_bDist=_dc;_best=_e;}
+          }
+        }
+        if(_best && _bDist<60/scale){
+          circDimState.ent=_best;
+          circDimState.phase=1;
+          dimPendingDown=true;
+          showGuide('ドラッグして寸法位置を決定（φ: 中心付近、R: 外側）');
+          scheduleOverlay();
+          return;
+        }
+        return;
+      }
+      return;
+    }
+    // ── ⑦ distDim ──
+    if(currentTool==='distDim'){
+      var _wxy2=s2w(sx,sy);var _wx2=_wxy2[0],_wy2=_wxy2[1];
+      var _sp2=snapPt;
+      var _target;
+      if(_sp2&&_sp2.type==='on'&&_sp2.onLine){
+        _target={kind:'line',e:_sp2.onLine,pt:{x:_sp2.x,y:_sp2.y}};
+      } else {
+        _target={kind:'pt',pt:_sp2||{x:_wx2,y:_wy2}};
+      }
+      if(distDimState.phase===0){
+        distDimState.t1=_target;
+        distDimState.phase=1;
+        showGuide('2点目を選択（線または点）');
+        scheduleOverlay();
+        return;
+      } else {
+        var _res=calcDistDim(distDimState.t1,_target);
+        if(_res){
+          snapshot();
+          var _dd=buildDim(_res.p1,_res.p2,_res.p2,_res.type);
+          dims.push(_dd);
+          scheduleSave();
+          hideGuide();
+          showGuide('距離寸法を追加しました ↩ で取消',2000);
+        }
+        distDimState={phase:0,t1:null};
+        scheduleOverlay();
+        return;
+      }
+    }
+    _origDown(sx,sy,isPenInput);
+  };
+
+  window.handlePointerUp=function(sx,sy,isPenInput){
+    // ── ② circDim フェーズ1 ペンアップで確定 ──
+    if(currentTool==='circDim' && circDimState.phase===1 && dimPendingDown){
+      dimPendingDown=false;
+      var _wxy=s2w(sx,sy);
+      var _p3c={x:_wxy[0],y:_wxy[1]};
+      var _ent=circDimState.ent;
+      if(_ent){
+        var _dc2=Math.hypot(_p3c.x-_ent.cx,_p3c.y-_ent.cy);
+        var _type=_dc2<_ent.r*0.5?'phi':'R';
+        snapshot();
+        dims.push(buildCircDim(_ent,_p3c,_type));
+        scheduleSave();
+        hideGuide();
+        showGuide('寸法を追加しました ↩ で取消',2000);
+      }
+      circDimState={phase:0,ent:null};
+      scheduleOverlay();
+      return;
+    }
+    _origUp(sx,sy,isPenInput);
+  };
+})();
+
+// ── 線幅管理 ─────────────────────────────────────────────
+var penLineWidth = 2; // デフォルト: 中
+
+function applyPenLineWidth(){
+  document.querySelectorAll('.wp-btn').forEach(function(b){
+    b.classList.toggle('wp-selected', parseFloat(b.dataset.width)===penLineWidth);
+  });
+}
+
+// 太さボタン
+document.getElementById('widthBtn').addEventListener('click',function(e){
+  var panel=document.getElementById('widthPanel');
+  var co=document.getElementById('colorOverlay');
+  if(co) co.classList.remove('open');
+  if(panel.style.display==='none'){
+    var r=this.getBoundingClientRect();
+    panel.style.left=Math.min(r.left,window.innerWidth-220)+'px';
+    panel.style.top=(r.bottom+4)+'px';
+    panel.style.display='block';
+    document.getElementById('widthPanelBg').style.display='block';
+    applyPenLineWidth();
+  } else {
+    panel.style.display='none';
+    document.getElementById('widthPanelBg').style.display='none';
+  }
+  e.stopPropagation();
+});
+
+document.getElementById('widthPanelBg').addEventListener('click',function(){
+  document.getElementById('widthPanel').style.display='none';
+  this.style.display='none';
+});
+
+document.querySelectorAll('.wp-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    penLineWidth=parseFloat(this.dataset.width);
+    currentLW=penLineWidth;
+    applyPenLineWidth();
+    document.getElementById('widthPanel').style.display='none';
+    document.getElementById('widthPanelBg').style.display='none';
+  });
+});
+
+applyPenLineWidth(); // 初期化
+</script>
+
+<div id="widthPanel" style="display:none;position:fixed;z-index:8000;background:#1a2332;border:1.5px solid #00d4ff;border-radius:12px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.7);min-width:200px;">
+  <div style="font-size:12px;color:#aab;margin-bottom:10px;text-align:center;">線の太さ</div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <button class="wp-btn" data-width="0.5">
+      <span class="wp-preview" style="height:1px;"></span><span class="wp-label">極細</span>
+    </button>
+    <button class="wp-btn" data-width="1">
+      <span class="wp-preview" style="height:2px;"></span><span class="wp-label">細</span>
+    </button>
+    <button class="wp-btn" data-width="2">
+      <span class="wp-preview" style="height:3px;"></span><span class="wp-label">中</span>
+    </button>
+    <button class="wp-btn" data-width="4">
+      <span class="wp-preview" style="height:5px;"></span><span class="wp-label">太</span>
+    </button>
+    <button class="wp-btn" data-width="8">
+      <span class="wp-preview" style="height:9px;"></span><span class="wp-label">極太</span>
+    </button>
+  </div>
+</div>
+<div id="widthPanelBg" style="display:none;position:fixed;inset:0;z-index:7999;"></div>
 </body>
 </html>
