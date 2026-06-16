@@ -243,7 +243,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_16</div>
+  <div id="ver-label">DXF_View V0_17</div>
 </div>
 
 <div id="colorOverlay">
@@ -278,7 +278,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_16';
+const APP_VERSION = 'V0_17';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -841,9 +841,14 @@ function rafLoop(){
 }
 
 function draw(){
-  const W=cv.width,H=cv.height;
+  const dpr=window.devicePixelRatio||1;
+  // 物理ピクセルサイズで全クリア
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // dprスケールを設定（以降の描画はCSSピクセル座標で行う）
+  ctx.save();
+  ctx.scale(dpr,dpr);
+  const W=cv.width/dpr, H=cv.height/dpr;
   const darkBg=!bwMode;
-  ctx.clearRect(0,0,W,H);
   ctx.fillStyle=bwMode?'#ffffff':'#1e2430';
   ctx.fillRect(0,0,W,H);
   if(!doc&&!pdfImage) return;
@@ -895,6 +900,7 @@ function draw(){
     if(hiddenLayers.has(e.layer)) continue;
     drawText(ctx,e,darkBg);
   }
+  ctx.restore();
 }
 
 function drawArc(ctx,e){
@@ -936,8 +942,13 @@ function drawText(ctx,e,darkBg){
 // オーバーレイ描画
 // =========================================================
 function drawOverlay(){
-  const W=ov.width,H=ov.height;
-  octx.clearRect(0,0,W,H);
+  const dpr=window.devicePixelRatio||1;
+  // 物理ピクセルサイズで全クリア
+  octx.clearRect(0,0,ov.width,ov.height);
+  // dprスケールを設定
+  octx.save();
+  octx.scale(dpr,dpr);
+  const W=ov.width/dpr, H=ov.height/dpr;
   // Images
   for(const img of images){
     const[sx,sy]=w2s(img.wx,img.wy);
@@ -1075,6 +1086,7 @@ function drawOverlay(){
     octx.strokeStyle='rgba(255,100,100,0.7)';octx.lineWidth=2;
     octx.beginPath();octx.arc(sx,sy,ERASER_RADIUS_PX,0,Math.PI*2);octx.stroke();
   }
+  octx.restore();
 }
 
 function drawDimEntity(ctx,d){
@@ -1092,7 +1104,7 @@ function drawDimEntity(ctx,d){
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
-    ctx.font='bold 13px sans-serif';ctx.fillStyle=d.color||'#f39c12';
+    ctx.font='bold 17px sans-serif';ctx.fillStyle=d.color||'#f39c12';
     ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(d.text,0,0);ctx.restore();
   }
 }
@@ -1453,9 +1465,15 @@ function eraseAt(wx,wy){
 }
 
 function resizeCanvas(){
+  const dpr=window.devicePixelRatio||1;
   const r=stage.getBoundingClientRect();
-  cv.width=r.width;cv.height=r.height;
-  ov.width=r.width;ov.height=r.height;
+  const W=r.width, H=r.height;
+  // CSSサイズは変えない（layout崩れを防ぐ）
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  ov.style.width=W+'px'; ov.style.height=H+'px';
+  // 内部解像度だけdpr倍にする
+  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  ov.width=Math.round(W*dpr); ov.height=Math.round(H*dpr);
   scheduleDraw();
 }
 
@@ -1839,16 +1857,46 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
         }
       }
 
-      // 6. テキスト描画
+      // 6. テキスト描画（pdfDrawText: 日本語/回転対応）
+      function pdfDrawText(pdf,str,xmm,ymm,hMM,angleRad){
+        if(!str) return;
+        const hasJP=/[^\x00-\x7F]/.test(str);
+        const angleDeg=angleRad*180/Math.PI;
+        if(!hasJP&&Math.abs(angleDeg)<0.5){
+          // ASCII・回転なし → jsPDF ネイティブ
+          pdf.setFontSize(Math.max(3,Math.min(18,hMM*2.835)));
+          pdf.setTextColor(0,0,0);
+          pdf.text(str,xmm,ymm,{baseline:'middle'});
+          return;
+        }
+        // 日本語または回転あり → canvasに描画して埋め込み
+        const px_per_mm=4;
+        const fsPx=Math.max(10,hMM*px_per_mm);
+        const tw=fsPx*str.length*0.65;
+        const th=fsPx*1.4;
+        const diagLen=Math.ceil(Math.sqrt(tw*tw+th*th))+8;
+        const tc=document.createElement('canvas');
+        tc.width=diagLen; tc.height=diagLen;
+        const tctx=tc.getContext('2d');
+        tctx.translate(diagLen/2,diagLen/2);
+        tctx.rotate(-angleRad);
+        tctx.font=`${fsPx}px "Hiragino Sans","Yu Gothic",sans-serif`;
+        tctx.fillStyle='#000000';
+        tctx.textAlign='center';
+        tctx.textBaseline='middle';
+        tctx.fillText(str,0,0);
+        const imgData=tc.toDataURL('image/png');
+        const sizeMM=diagLen/px_per_mm;
+        pdf.addImage(imgData,'PNG',xmm-sizeMM/2,ymm-sizeMM/2,sizeMM,sizeMM,undefined,'FAST');
+      }
       for(const e of (doc.moji||[])){
         if(hiddenLayers.has(e.layer))continue;
         if(!e.text||!e.text.trim())continue;
-        const h_mm=Math.max(1.5,Math.min(10,(e.h||2)*sc));
-        pdf.setFontSize(h_mm*2.835);
-        pdf.setTextColor(0,0,0);
+        const h_mm=Math.max(1.5,Math.min(15,(e.h||2)*sc));
+        const angleRad=(e.angle||0)*Math.PI/180;
         const lines2=e.text.split('\n');
         for(let i=0;i<lines2.length;i++){
-          pdf.text(lines2[i]||'', wx_(e.x), wy_(e.y)+h_mm*i);
+          pdfDrawText(pdf,lines2[i]||'',wx_(e.x),wy_(e.y)+h_mm*i,h_mm,angleRad);
         }
       }
 
@@ -1872,9 +1920,8 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
         }
         if(d.text){
           const dimH=Math.max(2,Math.min(6,eH*sc*0.012));
-          pdf.setFontSize(dimH*2.835);
           pdf.setTextColor(30,100,200);
-          pdf.text(String(d.text), wx_(d.tx), wy_(d.ty), {align:'center'});
+          pdfDrawText(pdf,String(d.text),wx_(d.tx),wy_(d.ty),dimH,0);
         }
       }
 
