@@ -232,7 +232,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_07</div>
+  <div id="ver-label">DXF_View V0_08</div>
 </div>
 
 <div id="colorOverlay">
@@ -917,12 +917,63 @@ function drawOverlay(){
       octx.beginPath();octx.arc(sx,sy,5,0,Math.PI*2);octx.fillStyle='#2ecc71';octx.fill();
     }
   }
-  // Snap indicator
+  // Snap indicator (タイプ別マーカー)
   if(snapPt){
     const[sx,sy]=w2s(snapPt.x,snapPt.y);
-    octx.strokeStyle='#f39c12';octx.lineWidth=2;octx.setLineDash([]);
-    octx.beginPath();octx.arc(sx,sy,8,0,Math.PI*2);octx.stroke();
-    octx.beginPath();octx.moveTo(sx-11,sy);octx.lineTo(sx+11,sy);octx.moveTo(sx,sy-11);octx.lineTo(sx,sy+11);octx.stroke();
+    const STC={
+      int:{col:'#ffee00',lbl:'交点'},
+      end:{col:'#00ff88',lbl:'端点'},
+      cen:{col:'#00d4ff',lbl:'中心'},
+      mid:{col:'#ff9900',lbl:'中点'},
+    };
+    const sc=STC[snapPt.type]||{col:'#f39c12',lbl:''};
+    octx.strokeStyle=sc.col;octx.fillStyle=sc.col;
+    octx.lineWidth=2;octx.setLineDash([]);
+    if(snapPt.type==='int'){
+      // 交点: X + 中心点
+      octx.beginPath();
+      octx.moveTo(sx-10,sy-10);octx.lineTo(sx+10,sy+10);
+      octx.moveTo(sx+10,sy-10);octx.lineTo(sx-10,sy+10);
+      octx.stroke();
+      octx.beginPath();octx.arc(sx,sy,3,0,Math.PI*2);octx.fill();
+    } else if(snapPt.type==='end'){
+      // 端点: 正方形 + クロスヘア
+      octx.strokeRect(sx-7,sy-7,14,14);
+      octx.beginPath();
+      octx.moveTo(sx-12,sy);octx.lineTo(sx+12,sy);
+      octx.moveTo(sx,sy-12);octx.lineTo(sx,sy+12);
+      octx.stroke();
+    } else if(snapPt.type==='cen'){
+      // 中心: 円 + 内点 + クロスヘア
+      octx.beginPath();octx.arc(sx,sy,9,0,Math.PI*2);octx.stroke();
+      octx.beginPath();octx.arc(sx,sy,3,0,Math.PI*2);octx.fill();
+      octx.beginPath();
+      octx.moveTo(sx-13,sy);octx.lineTo(sx+13,sy);
+      octx.moveTo(sx,sy-13);octx.lineTo(sx,sy+13);
+      octx.stroke();
+    } else if(snapPt.type==='mid'){
+      // 中点: ひし形
+      octx.beginPath();
+      octx.moveTo(sx,sy-10);octx.lineTo(sx+10,sy);
+      octx.lineTo(sx,sy+10);octx.lineTo(sx-10,sy);
+      octx.closePath();octx.stroke();
+    } else {
+      octx.beginPath();octx.arc(sx,sy,8,0,Math.PI*2);octx.stroke();
+      octx.beginPath();
+      octx.moveTo(sx-11,sy);octx.lineTo(sx+11,sy);
+      octx.moveTo(sx,sy-11);octx.lineTo(sx,sy+11);
+      octx.stroke();
+    }
+    // ラベル
+    if(sc.lbl){
+      octx.font='bold 11px sans-serif';
+      const tw=octx.measureText(sc.lbl).width;
+      octx.fillStyle='rgba(0,0,0,0.72)';
+      octx.fillRect(sx+15,sy-19,tw+8,17);
+      octx.fillStyle=sc.col;
+      octx.textAlign='left';octx.textBaseline='bottom';
+      octx.fillText(sc.lbl,sx+19,sy-4);
+    }
   }
   // Eraser
   if(eraserPos&&currentTool==='eraser'){
@@ -953,7 +1004,7 @@ function drawDimEntity(ctx,d){
 }
 
 // =========================================================
-// スナップ
+// スナップ (優先度付き: 交点>端点>中心>中点)
 // =========================================================
 function lineIntersect(x1,y1,x2,y2,x3,y3,x4,y4){
   const d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
@@ -964,16 +1015,27 @@ function lineIntersect(x1,y1,x2,y2,x3,y3,x4,y4){
     return{x:x1+t*(x2-x1),y:y1+t*(y2-y1)};
   return null;
 }
+function distToSeg(px,py,x1,y1,x2,y2){
+  const dx=x2-x1,dy=y2-y1,len2=dx*dx+dy*dy;
+  if(len2<1e-12) return Math.hypot(px-x1,py-y1);
+  const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/len2));
+  return Math.hypot(px-(x1+t*dx),py-(y1+t*dy));
+}
 function snapAt(wx,wy){
   if(!doc) return null;
-  const sr=18/scale;
-  let best=null,bestD=sr;
+  const sr=24/scale;   // 判定半径（画面24px相当）
+  // 優先度ボーナス: スコア=距離-ボーナス → 低いほど優先
+  // 交点は同距離なら必ず端点より優先、端点は中心より優先
+  const BN={int:sr*0.55,end:sr*0.35,cen:sr*0.20,mid:sr*0.05};
+  let best=null,bestScore=sr;
   function check(x,y,type){
     if(!isFinite(x)||!isFinite(y)) return;
     const d=Math.hypot(x-wx,y-wy);
-    if(d<bestD){bestD=d;best={x,y,type};}
+    if(d>sr) return;
+    const score=d-(BN[type]||0);
+    if(score<bestScore){bestScore=score;best={x,y,type};}
   }
-  // 端点（最優先）
+  // ─ 端点（端部・コーナー）
   for(const e of doc.sen){
     if(hiddenLayers.has(e.layer)) continue;
     check(e.x1,e.y1,'end');check(e.x2,e.y2,'end');
@@ -983,12 +1045,12 @@ function snapAt(wx,wy){
     check(e.cx+e.r*Math.cos(e.a1*Math.PI/180),e.cy+e.r*Math.sin(e.a1*Math.PI/180),'end');
     check(e.cx+e.r*Math.cos(e.a2*Math.PI/180),e.cy+e.r*Math.sin(e.a2*Math.PI/180),'end');
   }
-  // 中心
+  // ─ 中心
   for(const e of doc.enko){
     if(hiddenLayers.has(e.layer)) continue;
     check(e.cx,e.cy,'cen');
   }
-  // 中点
+  // ─ 中点
   for(const e of doc.sen){
     if(hiddenLayers.has(e.layer)) continue;
     check((e.x1+e.x2)/2,(e.y1+e.y2)/2,'mid');
@@ -998,17 +1060,15 @@ function snapAt(wx,wy){
     const am=(e.a1+e.a2)/2;
     check(e.cx+e.r*Math.cos(am*Math.PI/180),e.cy+e.r*Math.sin(am*Math.PI/180),'mid');
   }
-  // 交点（線分同士 - 処理数制限付き）
-  if(bestD>sr*0.5){
-    const lim=Math.min(doc.sen.length,250);
-    outer:for(let i=0;i<lim;i++){
-      const a=doc.sen[i];if(hiddenLayers.has(a.layer)) continue;
-      for(let j=i+1;j<lim;j++){
-        const b=doc.sen[j];if(hiddenLayers.has(b.layer)) continue;
-        const ix=lineIntersect(a.x1,a.y1,a.x2,a.y2,b.x1,b.y1,b.x2,b.y2);
-        if(ix) check(ix.x,ix.y,'int');
-        if(bestD<sr*0.3) break outer;
-      }
+  // ─ 交点: カーソル付近の線分のみに限定して高速化
+  const near=doc.sen.filter(e=>!hiddenLayers.has(e.layer)&&distToSeg(wx,wy,e.x1,e.y1,e.x2,e.y2)<sr*1.5);
+  const lim=Math.min(near.length,120);
+  outer:for(let i=0;i<lim;i++){
+    for(let j=i+1;j<lim;j++){
+      const a=near[i],b=near[j];
+      const ix=lineIntersect(a.x1,a.y1,a.x2,a.y2,b.x1,b.y1,b.x2,b.y2);
+      if(ix) check(ix.x,ix.y,'int');
+      if(bestScore<-sr*0.2) break outer; // 非常に良い交点が見つかれば打ち切り
     }
   }
   return best;
