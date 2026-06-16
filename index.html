@@ -63,15 +63,17 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 .bt-btn.active .bt-label,.bt-btn.active .bt-icon{color:var(--accent)}
 .viewmemo{position:absolute;top:10px;right:10px;z-index:100;
   display:grid;grid-template-columns:auto auto;gap:4px}
-.viewmemo button{height:38px;padding:0 12px;font-size:12px;border:1px solid var(--border);
+.viewmemo button{min-height:48px;min-width:52px;padding:4px 10px;font-size:12px;border:1px solid var(--border);
   border-radius:8px;background:rgba(10,14,20,.88);color:var(--text);cursor:pointer;
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  -webkit-tap-highlight-color:transparent;white-space:nowrap}
-.viewmemo .mem-btn{background:transparent;border:1.5px solid rgba(150,170,190,0.3);color:rgba(150,170,190,0.45);opacity:1;font-weight:normal}
-.viewmemo .show-btn{background:transparent;border:1.5px solid rgba(150,170,190,0.3);color:rgba(150,170,190,0.45);opacity:1;font-weight:normal}
-.viewmemo .mem-btn.vm-saved{background:rgba(0,212,255,0.12);border-color:#00d4ff;color:#00d4ff;font-weight:600;box-shadow:0 0 6px rgba(0,212,255,0.3)}
-.viewmemo .show-btn.vm-saved{background:rgba(0,212,255,0.12);border-color:#00d4ff;color:#00d4ff;font-weight:600;box-shadow:0 0 6px rgba(0,212,255,0.3)}
-.viewmemo .full-row{grid-column:1/-1;text-align:center}
+  -webkit-tap-highlight-color:transparent;white-space:nowrap;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  transition:all .15s ease}
+.viewmemo .mem-btn{background:transparent;border:1.5px solid rgba(140,160,180,0.3);color:rgba(170,190,210,0.5);opacity:1;font-weight:normal}
+.viewmemo .show-btn{background:transparent;border:1.5px solid rgba(140,160,180,0.3);color:rgba(170,190,210,0.5);opacity:1;font-weight:normal}
+.viewmemo .mem-btn.vm-saved{background:rgba(0,212,255,0.12);border-color:#00d4ff;color:#00d4ff;font-weight:600;box-shadow:0 0 8px rgba(0,212,255,0.25)}
+.viewmemo .show-btn.vm-saved{background:rgba(0,212,255,0.12);border-color:#00d4ff;color:#00d4ff;font-weight:600;box-shadow:0 0 8px rgba(0,212,255,0.25)}
+.viewmemo .full-row{grid-column:1/-1;text-align:center;opacity:0;pointer-events:none;position:absolute}
 #snap-hint{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.82);color:var(--accent);font-size:12px;
   padding:6px 14px;border-radius:8px;pointer-events:none;display:none}
@@ -244,7 +246,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_19</div>
+  <div id="ver-label">DXF_View V0_20</div>
 </div>
 
 <div id="colorOverlay">
@@ -279,7 +281,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_19';
+const APP_VERSION = 'V0_20';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1094,7 +1096,7 @@ function drawOverlay(){
     if(curPt){
       let prevDim = null;
       try{
-        if((currentTool==='dxdy') && dimState.pts.length===2){
+        if((currentTool==='dxdy') && dimState.pts.length===2 && dimPendingDown===true){
           // P3 選択中: 完全な寸法プレビュー
           const[p1,p2,p3]=[dimState.pts[0],dimState.pts[1],curPt];
           const midX=(p1.x+p2.x)/2,midY=(p1.y+p2.y)/2;
@@ -1104,7 +1106,7 @@ function drawOverlay(){
           // P2 選択中: 斜め寸法プレビュー
           const[p1,p2]=[dimState.pts[0],curPt];
           prevDim=buildDim(p1,p2,p2,'diag');
-        } else if((currentTool==='dxdy'||currentTool==='diag') && dimState.pts.length===1){
+        } else if((currentTool==='dxdy'||currentTool==='diag') && dimState.pts.length===1 && dimPendingDown===true){
           // P2 選択中: P1→カーソルの細線プレビュー
           const[sx0_,sy0_]=w2s(dimState.pts[0].x,dimState.pts[0].y);
           const[sx1_,sy1_]=w2s(curPt.x,curPt.y);
@@ -1131,7 +1133,7 @@ function drawOverlay(){
         octx.setLineDash([]);
         const txt = prevDim.text||'';
         const ptx_ = prevDim.tx, pty_ = prevDim.ty;
-        if(txt && ptx_!=null && pty_!=null){
+        if(!dimPendingDown && txt && ptx_!=null && pty_!=null){
           const[stx_,sty_]=w2s(ptx_,pty_);
           octx.font='bold 17px sans-serif';
           octx.textAlign='center';
