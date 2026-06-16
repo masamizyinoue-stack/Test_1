@@ -29,6 +29,11 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tb-btn:active{background:rgba(255,255,255,.1)}
 #settingsBtn{border-color:var(--accent);color:var(--accent);font-size:22px}
+.tb-sep{width:1px;height:26px;background:var(--border);margin:0 3px;flex-shrink:0}
+.tb-tool-btn{width:44px;height:44px;border-radius:9px;flex-shrink:0;border:1.5px solid transparent;background:transparent;color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tb-tool-btn:active{background:rgba(255,255,255,.1)}
+.tb-tool-btn.active{background:rgba(46,204,113,.15);border-color:var(--accent);color:var(--accent)}
+
 .color-dot{width:22px;height:22px;border-radius:50%;display:block;border:2.5px solid rgba(255,255,255,.45)}
 .stage{flex:1;position:relative;overflow:hidden;background:#000;min-height:0}
 #cv,#ov{position:absolute;top:0;left:0;width:100%;height:100%}
@@ -37,7 +42,7 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   align-items:center;justify-content:center;pointer-events:none;gap:14px}
 #noDrawingMsg svg{opacity:.22}
 .nd-text{color:#2e3f56;font-family:monospace;font-size:13px;letter-spacing:3px;font-weight:bold}
-.btbar{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+.btbar{display:none;position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
   display:flex;align-items:stretch;gap:4px;
   background:rgba(10,14,20,.92);border:1px solid rgba(42,48,64,.9);border-radius:20px;
   padding:8px 10px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
@@ -59,8 +64,10 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   border-radius:8px;background:rgba(10,14,20,.88);color:var(--text);cursor:pointer;
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   -webkit-tap-highlight-color:transparent;white-space:nowrap}
-.viewmemo .mem-btn{background:rgba(243,156,18,.82);color:#000;border-color:var(--accent-2);font-weight:600}
-.viewmemo .show-btn{background:rgba(46,204,113,.82);color:#000;border-color:var(--accent);font-weight:600}
+.viewmemo .mem-btn{background:rgba(30,36,50,.75);color:#555;border-color:#333;font-weight:normal}
+.viewmemo .show-btn{background:rgba(30,36,50,.75);color:#555;border-color:#333;font-weight:normal}
+.viewmemo .mem-btn.vm-saved{background:rgba(243,156,18,.88);color:#000;border-color:var(--accent-2);font-weight:600;box-shadow:0 0 8px rgba(243,156,18,.35)}
+.viewmemo .show-btn.vm-saved{background:rgba(46,204,113,.88);color:#000;border-color:var(--accent);font-weight:600;box-shadow:0 0 7px rgba(46,204,113,.3)}
 .viewmemo .full-row{grid-column:1/-1;text-align:center}
 #snap-hint{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.82);color:var(--accent);font-size:12px;
@@ -145,6 +152,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <span class="lb-name">DXF_View</span>
     <span class="lb-sub">DXF / PDF をブラウザで閲覧</span>
   </div>
+  <div class="tb-sep"></div>
+  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ">✏</button>
+  <button class="tb-tool-btn tool-btn" data-tool="dx" title="水平寸法">←→</button>
+  <button class="tb-tool-btn tool-btn" data-tool="dy" title="垂直寸法">↕</button>
+  <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法">↗</button>
+  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム">⌫</button>
+  <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="戻す（2本指タップでも可）" style="font-size:18px">↩</button>
   <button class="tb-btn" id="colorIndicatorBtn" title="カラー・線幅">
     <span class="color-dot" id="colorDot" style="background:#f00"></span>
@@ -240,7 +254,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_04</div>
+  <div id="ver-label">DXF_View V0_05</div>
 </div>
 
 <div id="colorOverlay">
@@ -1306,7 +1320,7 @@ fileInput.addEventListener('change',async e=>{
   } else {
     try{
       doc=parseDXF(buf);
-      hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null];
+      hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null];[0,1,2].forEach(i=>updateViewmemoState(i));
       buildLayerModal();detectScale();fit();scheduleDraw();showInfo();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
     }catch(err){alert('ファイルを開けません: '+err.message);}
   }
@@ -1386,10 +1400,17 @@ document.getElementById('fullscreenBtn').addEventListener('click',()=>{
 });
 
 // 表示記憶
+function updateViewmemoState(i){
+  const mb=document.querySelector('.mem-btn[data-vi="'+i+'"]');
+  const sb=document.querySelector('.show-btn[data-vs="'+i+'"]');
+  if(mb) mb.classList.toggle('vm-saved',!!savedViews[i]);
+  if(sb) sb.classList.toggle('vm-saved',!!savedViews[i]);
+}
 document.querySelectorAll('.mem-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const i=parseInt(btn.dataset.vi);savedViews[i]={tx,ty,scale};
-    btn.style.outline='2px solid #fff';setTimeout(()=>btn.style.outline='',500);
+    updateViewmemoState(i);
+    btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
   });
 });
 document.querySelectorAll('.show-btn').forEach(btn=>{
@@ -1429,6 +1450,8 @@ ov.addEventListener('touchend',function(e){
     scheduleOverlay();
   }
 },{passive:false});
+// viewmemo初期状態
+[0,1,2].forEach(i=>updateViewmemoState(i));
 // リサイズ
 const ro=new ResizeObserver(resizeCanvas);ro.observe(stage);
 resizeCanvas();scheduleDraw();
