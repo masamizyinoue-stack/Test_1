@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -167,10 +168,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><span>↩</span></button>
   <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><span>↪</span></button>
-  <button class="tb-btn" id="savePDFBtn" title="PDF保存">💾</button>
+  <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
+  <span class="tb-tool-label">PDF</span>
+  <span style="font-size:16px">📄</span>
+</button>
   <button class="tb-btn" id="screenshotBtn" title="スクリーンショット">
-  <span class="tb-tool-label">📷</span>
-  <span style="font-size:13px">保存</span>
+  <span class="tb-tool-label">スクショ</span>
+  <span style="font-size:16px">📷</span>
 </button>
 </div>
 
@@ -239,7 +243,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_13</div>
+  <div id="ver-label">DXF_View V0_14</div>
 </div>
 
 <div id="colorOverlay">
@@ -274,6 +278,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
+const APP_VERSION = 'V0_14';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1675,7 +1680,111 @@ document.getElementById('clearDimsBtn').addEventListener('click',()=>{
 document.getElementById('clearBtn').addEventListener('click',()=>{
   if(confirm('全てのスケッチと寸法を消去しますか？')){snapshot();dims=[];strokes=[];scheduleOverlay();scheduleSave();}
 });
-document.getElementById('savePDFBtn').addEventListener('click',savePDF);
+document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
+  if(!doc && typeof pdfDoc==='undefined'){
+    alert('図面ファイルを読み込んでください');return;
+  }
+  const btn=document.getElementById('savePDFBtn');
+  btn.disabled=true;
+  try{
+    // ─── 1. 描画範囲の計算 ───────────────────────────
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    function _upd(x,y){
+      if(!isFinite(x)||!isFinite(y))return;
+      if(x<minX)minX=x;if(x>maxX)maxX=x;
+      if(y<minY)minY=y;if(y>maxY)maxY=y;
+    }
+    // DXFエンティティ（doc.sen/enko/ten/moji/solid 構造）
+    if(doc){
+      for(const e of (doc.sen||[])){if(hiddenLayers.has(e.layer))continue;_upd(e.x1,e.y1);_upd(e.x2,e.y2);}
+      for(const e of (doc.enko||[])){if(hiddenLayers.has(e.layer))continue;const rx=e.rx||e.r||0,ry=e.ry||e.r||0;_upd(e.cx-rx,e.cy-ry);_upd(e.cx+rx,e.cy+ry);}
+      for(const e of (doc.ten||[])){if(hiddenLayers.has(e.layer))continue;_upd(e.x,e.y);}
+      for(const e of (doc.moji||[])){if(hiddenLayers.has(e.layer))continue;_upd(e.x,e.y);}
+      for(const e of (doc.solid||[])){if(hiddenLayers.has(e.layer))continue;for(const p of (e.pts||[]))_upd(p.x,p.y);}
+    }
+    // ストロークと寸法も含める（world座標）
+    for(const s of strokes)for(const p of s.pts)_upd(p.x,p.y);
+    for(const d of dims){
+      for(const l of(d.lines||[]))_upd(l.x1,l.y1),_upd(l.x2,l.y2);
+      if(d.text)_upd(d.text.x,d.text.y);
+    }
+    if(!isFinite(minX)){alert('描画データが見つかりません');btn.disabled=false;return;}
+
+    const dW=maxX-minX, dH=maxY-minY;
+    const PAD=0.06;
+    const eMinX=minX-dW*PAD,eMinY=minY-dH*PAD;
+    const eW=dW*(1+2*PAD),eH=dH*(1+2*PAD);
+
+    // ─── 2. 出力サイズ決定（A3相当 300dpi）─────────────
+    const PDF_MAX=4200;
+    const aspect=eW/eH;
+    let CW,CH;
+    if(aspect>=1){CW=PDF_MAX;CH=Math.round(PDF_MAX/aspect);}
+    else{CH=PDF_MAX;CW=Math.round(PDF_MAX*aspect);}
+    CW=Math.max(CW,100);CH=Math.max(CH,100);
+
+    // ─── 3. グローバル状態を退避して PDF 用に上書き ──────
+    const sv={tx,ty,scale};
+    const cvEl=document.getElementById('cv');
+    const ovEl=document.getElementById('ov');
+    const sv_cw=cvEl.width,sv_ch=cvEl.height;
+    const sv_ow=ovEl.width,sv_oh=ovEl.height;
+
+    const pdfScale=Math.min(CW/eW,CH/eH);
+    tx=-eMinX*pdfScale;
+    ty=CH+eMinY*pdfScale;  // Y反転
+    scale=pdfScale;
+
+    cvEl.width=CW;cvEl.height=CH;
+    ovEl.width=CW;ovEl.height=CH;
+
+    // ─── 4. 描画（draw/drawOverlay を直接呼ぶ）─
+    if(typeof draw==='function')draw();
+    if(typeof drawOverlay==='function')drawOverlay();
+
+    // ─── 5. 合成 ────────────────────────────────────
+    const comp=document.createElement('canvas');
+    comp.width=CW;comp.height=CH;
+    const cctx=comp.getContext('2d');
+    cctx.fillStyle=bwMode?'#fff':'#0b0f16';
+    cctx.fillRect(0,0,CW,CH);
+    cctx.drawImage(cvEl,0,0);
+    cctx.drawImage(ovEl,0,0);
+
+    // ─── 6. グローバル状態を復元 ─────────────────────
+    tx=sv.tx;ty=sv.ty;scale=sv.scale;
+    cvEl.width=sv_cw;cvEl.height=sv_ch;
+    ovEl.width=sv_ow;ovEl.height=sv_oh;
+    if(typeof scheduleDraw==='function')scheduleDraw();
+    if(typeof scheduleOverlay==='function')scheduleOverlay();
+
+    // ─── 7. PDF生成 ──────────────────────────────────
+    if(typeof window.jspdf==='undefined'){
+      // jsPDF未ロード時: PNG として保存
+      const url=URL.createObjectURL(await new Promise(r=>comp.toBlob(r,'image/png')));
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_export_${new Date().toISOString().slice(0,10)}.png`;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      return;
+    }
+    const {jsPDF}=window.jspdf;
+    const orient=CW>=CH?'l':'p';
+    const A3W=orient==='l'?420:297, A3H=orient==='l'?297:420;
+    const pdf=new jsPDF({orientation:orient,unit:'mm',format:'a3',compress:true});
+    const dataURL=comp.toDataURL('image/jpeg',0.96);
+    pdf.addImage(dataURL,'JPEG',0,0,A3W,A3H,undefined,'FAST');
+    const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_export_${new Date().toISOString().slice(0,10)}.pdf`;
+    pdf.save(fname);
+
+  }catch(e){
+    console.error('PDF export error:',e);
+    alert('PDF出力でエラーが発生しました: '+e.message);
+  }finally{
+    document.getElementById('savePDFBtn').disabled=false;
+  }
+});
 
 // スクリーンショット保存ボタン (V0_13改善)
 document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
@@ -1683,7 +1792,7 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
   btn.disabled = true;
   try{
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const scale = Math.max(2, dpr);
+    const scale = Math.max(4, dpr * 2);  // 約2倍の解像度
 
     let imageBlob;
 
@@ -1882,6 +1991,9 @@ async function tryRestore(){
 const ro=new ResizeObserver(resizeCanvas);ro.observe(stage);
 tryRestore();
 resizeCanvas();scheduleDraw();
+const vd = document.getElementById('versionDisplay');
+if(vd) vd.textContent = APP_VERSION;
 </script>
+<div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
 </body>
 </html>
