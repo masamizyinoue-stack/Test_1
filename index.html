@@ -19,18 +19,19 @@
 body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden;
   background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;font-size:14px}
-.topbar{height:54px;min-height:54px;background:var(--topbar-bg);border-bottom:1px solid var(--border);
+.topbar{height:62px;min-height:62px;background:var(--topbar-bg);border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:6px;padding:0 10px;position:relative;z-index:10;flex-shrink:0}
 .logo-block{display:flex;align-items:baseline;gap:4px;flex-shrink:0;padding:0 4px}
 .logo-text{font-size:17px;font-weight:700;color:var(--accent);line-height:1.2;white-space:nowrap}
 .logo-sub{font-size:10px;color:var(--text-dim);white-space:nowrap}
-.tb-btn{width:44px;height:44px;border-radius:10px;flex-shrink:0;border:1px solid var(--border);
-  background:transparent;color:var(--text);font-size:20px;display:flex;align-items:center;
-  justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tb-btn{width:44px;height:52px;border-radius:10px;flex-shrink:0;border:1px solid var(--border);
+  background:transparent;color:var(--text);font-size:20px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tb-btn:active{background:rgba(255,255,255,.1)}
 #settingsBtn{border-color:var(--accent);color:var(--accent);font-size:22px}
 .tb-sep{width:1px;height:26px;background:var(--border);margin:0 3px;flex-shrink:0}
-.tb-tool-btn{width:44px;height:44px;border-radius:9px;flex-shrink:0;border:1.5px solid transparent;background:transparent;color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tb-tool-btn{width:44px;height:52px;border-radius:9px;flex-shrink:0;border:1.5px solid transparent;background:transparent;color:var(--text);font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tb-tool-label{font-size:9px;line-height:1;opacity:0.75;letter-spacing:0.02em;pointer-events:none}
 .tb-tool-btn:active{background:rgba(255,255,255,.1)}
 .tb-tool-btn.active{background:rgba(0,212,255,0.22);border-color:#00d4ff;color:#00d4ff}
 
@@ -154,18 +155,17 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
-  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ">✏</button>
-  <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span></button>
+  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><span>✏</span></button>
+  <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span></button>
   <div class="tb-sep"></div>
-  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="9" rx="2"/><rect x="2" y="7" width="6" height="9" rx="2" fill="white" stroke="none"/><line x1="8" y1="7" x2="8" y2="16"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="9" rx="2"/><rect x="2" y="7" width="6" height="9" rx="2" fill="white" stroke="none"/><line x1="8" y1="7" x2="8" y2="16"/></svg></button>
   <div class="tb-sep"></div>
-  <button class="tb-tool-btn tool-btn" data-tool="dx" title="水平寸法"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="7" x2="3" y2="15"/><line x1="19" y1="7" x2="19" y2="15"/><line x1="11" y1="7" x2="11" y2="9" stroke-width="1"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="dy" title="垂直寸法"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="11" y1="3" x2="11" y2="19"/><line x1="7" y1="3" x2="15" y2="3"/><line x1="7" y1="19" x2="15" y2="19"/><line x1="7" y1="11" x2="9" y2="11" stroke-width="1"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="18" x2="18" y2="4"/><line x1="4" y1="14" x2="8" y2="18"/><line x1="14" y1="4" x2="18" y2="8"/></svg></button>
-  <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;">✕D</button>
+  <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">計測</span><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="7" x2="3" y2="15"/><line x1="19" y1="7" x2="19" y2="15"/><line x1="11" y1="3" x2="11" y2="19" stroke-width="1" stroke-dasharray="2,2"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="18" x2="18" y2="4"/><line x1="4" y1="14" x2="8" y2="18"/><line x1="14" y1="4" x2="18" y2="8"/></svg></button>
+  <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><span>✕D</span></button>
   <div class="tb-sep"></div>
-  <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35">↩</button>
-  <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35">↪</button>
+  <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><span>↩</span></button>
+  <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><span>↪</span></button>
   <button class="tb-btn" id="savePDFBtn" title="PDF保存">💾</button>
   <button class="tb-btn" id="fullscreenBtn" title="全画面">⛶</button>
 </div>
@@ -235,7 +235,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_10</div>
+  <div id="ver-label">DXF_View V0_11</div>
 </div>
 
 <div id="colorOverlay">
@@ -841,7 +841,7 @@ function draw(){
     const[sx1,sy1]=w2s(e.x1,e.y1);const[sx2,sy2]=w2s(e.x2,e.y2);
     ctx.beginPath();
     ctx.strokeStyle=bwMode?'#000000':rgbCss(e.color,darkBg);
-    ctx.lineWidth=Math.max(0.5,e.lw*scale);
+    ctx.lineWidth=Math.max(0.8,e.lw*scale*1.4);
     ctx.setLineDash(e.dash&&e.dash.length>0?e.dash.map(d=>d*scale):[]);
     ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
   }
@@ -850,7 +850,7 @@ function draw(){
     if(hiddenLayers.has(e.layer)) continue;
     ctx.beginPath();
     ctx.strokeStyle=bwMode?'#000000':rgbCss(e.color,darkBg);
-    ctx.lineWidth=Math.max(0.5,e.lw*scale);
+    ctx.lineWidth=Math.max(0.8,e.lw*scale*1.4);
     ctx.setLineDash(e.dash&&e.dash.length>0?e.dash.map(d=>d*scale):[]);
     drawArc(ctx,e);ctx.stroke();
   }
@@ -944,7 +944,7 @@ function drawOverlay(){
     octx.lineWidth=currentLW;octx.lineJoin='round';octx.lineCap='round';octx.setLineDash([]);octx.stroke();
   }
   // Dim guide
-  if((currentTool==='dx'||currentTool==='dy'||currentTool==='diag')&&dimState.pts.length>0){
+  if((currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag')&&dimState.pts.length>0){
     octx.strokeStyle='#2ecc71';octx.lineWidth=1;octx.setLineDash([4,4]);
     for(let i=0;i<dimState.pts.length-1;i++){
       const[sx1,sy1]=w2s(dimState.pts[i].x,dimState.pts[i].y);
@@ -1271,7 +1271,7 @@ function getPos(e){const r=ov.getBoundingClientRect();return {x:e.clientX-r.left
 function handlePointerDown(sx,sy,isPenInput){
   const[wx,wy]=s2w(sx,sy);
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
-  if(currentTool==='dx'||currentTool==='dy'||currentTool==='diag'){
+  if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
     if(isPenInput){
       dimPendingDown=true;return;
     }
@@ -1281,7 +1281,11 @@ function handlePointerDown(sx,sy,isPenInput){
     if(dimState.pts.length>=need){
       const[p1,p2,p3]=dimState.pts;
       snapshot();
-      dims.push(buildDim(p1,p2,p3||p2,currentTool));
+      let dimType=currentTool;
+      if(currentTool==='dxdy'&&p2){
+        dimType=Math.abs(p2.x-p1.x)>=Math.abs(p2.y-p1.y)?'dx':'dy';
+      }
+      dims.push(buildDim(p1,p2,p3||p2,dimType));
       dimState={pts:[]};
     }
     scheduleOverlay();return;
@@ -1311,7 +1315,7 @@ function handlePointerDown(sx,sy,isPenInput){
 function handlePointerMove(sx,sy,isPenInput){
   const[wx,wy]=s2w(sx,sy);
   // 寸法ツール: ペン・指どちらでもスナップ更新
-  if(currentTool==='dx'||currentTool==='dy'||currentTool==='diag'){
+  if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
     snapPt=snapAt(wx,wy);scheduleOverlay();return;
   }
   snapPt=null;
@@ -1335,7 +1339,7 @@ function handlePointerMove(sx,sy,isPenInput){
 function handlePointerUp(sx,sy,isPenInput){
   if(dimPendingDown&&isPenInput){
     dimPendingDown=false;
-    if(currentTool==='dx'||currentTool==='dy'||currentTool==='diag'){
+    if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
       const[wx2,wy2]=s2w(sx,sy);
       const pt=snapPt||{x:wx2,y:wy2};
       dimState.pts.push(pt);
@@ -1343,7 +1347,11 @@ function handlePointerUp(sx,sy,isPenInput){
       if(dimState.pts.length>=need){
         const[p1,p2,p3]=dimState.pts;
         snapshot();
-        dims.push(buildDim(p1,p2,p3||p2,currentTool));
+        let dimType=currentTool;
+        if(currentTool==='dxdy'&&p2){
+          dimType=Math.abs(p2.x-p1.x)>=Math.abs(p2.y-p1.y)?'dx':'dy';
+        }
+        dims.push(buildDim(p1,p2,p3||p2,dimType));
         dimState={pts:[]};
       }
       scheduleOverlay();return;
@@ -1511,7 +1519,8 @@ ov.addEventListener('pointermove',e=>{
     const predicted=e.getPredictedEvents();
     for(const pe of predicted){
       const psx=pe.clientX-r2.left,psy=pe.clientY-r2.top;
-      sketchPts.push(s2w(psx,psy));
+      const[pwx,pwy]=s2w(psx,psy);
+      sketchPts.push({x:pwx,y:pwy});
     }
   }
 });
@@ -1657,6 +1666,21 @@ document.querySelectorAll('.mem-btn').forEach(btn=>{
     updateViewmemoState(i);scheduleSave();
     btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
   });
+  // 長押し(600ms)でリセット
+  let _pressTimer=null;
+  btn.addEventListener('pointerdown',()=>{
+    _pressTimer=setTimeout(()=>{
+      _pressTimer=null;
+      const i=parseInt(btn.dataset.vi);
+      if(savedViews[i]===null)return;
+      if(confirm('記憶'+(i+1)+'の登録をリセットしますか？')){
+        savedViews[i]=null;updateViewmemoState(i);scheduleSave();
+      }
+    },600);
+  });
+  btn.addEventListener('pointerup',()=>{clearTimeout(_pressTimer);_pressTimer=null;});
+  btn.addEventListener('pointercancel',()=>{clearTimeout(_pressTimer);_pressTimer=null;});
+  btn.addEventListener('pointermove',()=>{clearTimeout(_pressTimer);_pressTimer=null;});
 });
 document.querySelectorAll('.show-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -1736,6 +1760,7 @@ async function tryRestore(){
     bwMode=!!d.bwMode;
     if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
     currentTool=d.currentTool||'sketch';
+    if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
     if(d.currentColor)currentColor=d.currentColor;
     if(d.currentLW)currentLW=d.currentLW;
     if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
