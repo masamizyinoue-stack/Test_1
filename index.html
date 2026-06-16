@@ -145,36 +145,37 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 @media (max-width:768px){.bt-btn{width:54px;height:50px}.lb-sub{display:none}}
 @supports (padding-bottom:env(safe-area-inset-bottom)){
   .btbar{bottom:calc(22px + env(safe-area-inset-bottom))}}
+.tb-btn svg, .tb-tool-btn svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <button class="tb-btn" id="settingsBtn">☰</button>
+  <button class="tb-btn" id="settingsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
   <div class="logo-block">
     <span class="logo-text">DXF</span>
     <span class="logo-sub">Viewer</span>
   </div>
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
-  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><span>✏</span></button>
+  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
   <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span></button>
   <div class="tb-sep"></div>
-  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="9" rx="2"/><rect x="2" y="7" width="6" height="9" rx="2" fill="white" stroke="none"/><line x1="8" y1="7" x2="8" y2="16"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
-  <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="7" x2="3" y2="15"/><line x1="19" y1="7" x2="19" y2="15"/><line x1="11" y1="3" x2="11" y2="19" stroke-width="1" stroke-dasharray="2,2"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="18" x2="18" y2="4"/><line x1="4" y1="14" x2="8" y2="18"/><line x1="14" y1="4" x2="18" y2="8"/></svg></button>
-  <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><span>✕D</span></button>
+  <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
+  <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <div class="tb-sep"></div>
-  <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><span>↩</span></button>
-  <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><span>↪</span></button>
+  <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
+  <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.95"/></svg></button>
   <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
   <span class="tb-tool-label">PDF</span>
-  <span style="font-size:16px">📄</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
 </button>
   <button class="tb-btn" id="screenshotBtn" title="スクリーンショット">
   <span class="tb-tool-label">スクショ</span>
-  <span style="font-size:16px">📷</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
 </button>
 </div>
 
@@ -195,10 +196,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <span class="nd-text">NO DRAWING LOADED</span>
   </div>
   <div class="viewmemo" id="viewmemo">
-    <button class="full-row" id="fitBtn">全体</button>
-    <button class="mem-btn" data-vi="0">記憶</button><button class="show-btn" data-vs="0">表示</button>
-    <button class="mem-btn" data-vi="1">記憶</button><button class="show-btn" data-vs="1">表示</button>
-    <button class="mem-btn" data-vi="2">記憶</button><button class="show-btn" data-vs="2">表示</button>
+    <button class="full-row" id="fitBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg> 全体</button>
+    <button class="mem-btn" data-vi="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
+    <button class="mem-btn" data-vi="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
+    <button class="mem-btn" data-vi="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
   </div>
   <div id="snap-hint"></div>
 </div>
@@ -210,7 +211,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
-    <span class="sp-file-icon">📂</span>
+    <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
     <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF / PDF 対応</small></span>
   </button>
   <div class="sp-section">
@@ -233,7 +234,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     </div>
   </div>
   <div class="sp-section">
-    <button id="layerBtn" class="sp-action-btn">レイヤ設定</button>
+    <button id="layerBtn" class="sp-action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> レイヤ設定</button>
   </div>
   <div class="sp-section">
     <div class="sp-label">DXF情報</div>
@@ -241,9 +242,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
-    <button id="clearBtn" class="sp-danger-btn">全消去</button>
+    <button id="clearBtn" class="sp-danger-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> 全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_17</div>
+  <div id="ver-label">DXF_View V0_18</div>
 </div>
 
 <div id="colorOverlay">
@@ -278,7 +279,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_17';
+const APP_VERSION = 'V0_18';
 // =========================================================
 // PDF.js worker
 // =========================================================
