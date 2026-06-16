@@ -243,7 +243,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_15</div>
+  <div id="ver-label">DXF_View V0_16</div>
 </div>
 
 <div id="colorOverlay">
@@ -278,7 +278,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_15';
+const APP_VERSION = 'V0_16';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1846,8 +1846,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
         const h_mm=Math.max(1.5,Math.min(10,(e.h||2)*sc));
         pdf.setFontSize(h_mm*2.835);
         pdf.setTextColor(0,0,0);
-        const lines2=e.text.split('
-');
+        const lines2=e.text.split('\n');
         for(let i=0;i<lines2.length;i++){
           pdf.text(lines2[i]||'', wx_(e.x), wy_(e.y)+h_mm*i);
         }
