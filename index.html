@@ -157,9 +157,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-tool-btn tool-btn" data-tool="dx" title="水平寸法"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="4" x2="2" y2="16"/><line x1="18" y1="4" x2="18" y2="16"/><line x1="2" y1="10" x2="18" y2="10"/><polyline points="6,7 2,10 6,13"/><polyline points="14,7 18,10 14,13"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="dy" title="垂直寸法"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="2" x2="16" y2="2"/><line x1="4" y1="18" x2="16" y2="18"/><line x1="10" y1="2" x2="10" y2="18"/><polyline points="7,6 10,2 13,6"/><polyline points="7,14 10,18 13,14"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="16" x2="16" y2="4"/><polyline points="4,10 4,16 10,16"/><polyline points="10,4 16,4 16,10"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="9" rx="2"/><rect x="2" y="7" width="8" height="9" rx="2" fill="currentColor" fill-opacity="0.25" stroke="none"/><line x1="10" y1="7" x2="10" y2="16"/><line x1="2" y1="16" x2="18" y2="16" stroke-opacity="0.5"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="16" height="9" rx="2"/><rect x="2" y="7" width="6" height="9" rx="2" fill="white" stroke="none"/><line x1="8" y1="7" x2="8" y2="16"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="戻す（2本指タップでも可）" style="font-size:18px">↩</button>
+  <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35">↪</button>
   <button class="tb-btn" id="colorIndicatorBtn" title="カラー・線幅">
     <span class="color-dot" id="colorDot" style="background:#f00"></span>
   </button>
@@ -230,9 +231,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
+    <button id="clearDimsBtn" class="sp-action-btn" style="color:#e67e22;border-color:#e67e22">寸法を全消去</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_08</div>
+  <div id="ver-label">DXF_View V0_09</div>
 </div>
 
 <div id="colorOverlay">
@@ -298,6 +300,13 @@ let savedViews=[null,null,null];
 let hiddenLayers=new Set();
 let pdfDoc=null,pdfPageNum=1;
 let pdfImage=null;
+let history=[];    // [{strokes,dims}]
+let redoStack=[];  // [{strokes,dims}]
+const MAX_HISTORY=30;
+let dimPendingDown=false;
+let saveTimer=null;
+const SAVE_KEY='dxfview_v1';
+const FILE_KEY='dxfview_v1_file';
 let snapPt=null;
 let dimState={pts:[]};
 let sketching=false,sketchPts=[];
@@ -837,14 +846,14 @@ function drawArc(ctx,e){
       ctx.arc(sx,sy,rs,0,Math.PI*2);
     } else {
       const a1=e.a1*Math.PI/180,a2=e.a2*Math.PI/180;
-      ctx.arc(sx,sy,rs,-a1,-a2,e.a1>e.a2);
+      ctx.arc(sx,sy,rs,-a1,-a2,true);
     }
   } else {
     ctx.save();ctx.translate(sx,sy);ctx.rotate(-e.tilt*Math.PI/180);
     const rx=e.rx*scale,ry=e.ry*scale;
     let a1=e.a1*Math.PI/180,a2=e.a2*Math.PI/180;
     if(Math.abs(e.a2-e.a1-360)<0.01) a2=a1+Math.PI*2;
-    ctx.ellipse(0,0,rx,ry,0,-a1,-a2,a1>a2);
+    ctx.ellipse(0,0,rx,ry,0,-a1,-a2,true);
     ctx.restore();
   }
 }
@@ -1135,7 +1144,7 @@ function buildLayerModal(){
     const c=aci(info.color||7);
     const row=document.createElement('div');row.className='layer-row';
     const cb=document.createElement('input');cb.type='checkbox';cb.checked=!hiddenLayers.has(lname);
-    cb.addEventListener('change',()=>{if(cb.checked)hiddenLayers.delete(lname);else hiddenLayers.add(lname);scheduleDraw();});
+    cb.addEventListener('change',()=>{if(cb.checked)hiddenLayers.delete(lname);else hiddenLayers.add(lname);scheduleDraw();scheduleSave();});
     const box=document.createElement('div');box.className='layer-color-box';box.style.background=`rgb(${c.r},${c.g},${c.b})`;
     const label=document.createElement('span');label.textContent=lname;
     row.append(cb,box,label);ll.appendChild(row);
@@ -1232,11 +1241,15 @@ function handlePointerDown(sx,sy,isPenInput){
   const[wx,wy]=s2w(sx,sy);
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='diag'){
+    if(isPenInput){
+      dimPendingDown=true;return;
+    }
     const snap=snapAt(wx,wy);const pt=snap||{x:wx,y:wy};
     dimState.pts.push(pt);
     const need=currentTool==='diag'?2:3;
     if(dimState.pts.length>=need){
       const[p1,p2,p3]=dimState.pts;
+      snapshot();
       dims.push(buildDim(p1,p2,p3||p2,currentTool));
       dimState={pts:[]};
     }
@@ -1244,7 +1257,7 @@ function handlePointerDown(sx,sy,isPenInput){
   }
   // 消しゴム
   if(currentTool==='eraser'){
-    eraserPos={x:wx,y:wy};eraseAt(wx,wy);scheduleOverlay();return;
+    snapshot();eraserPos={x:wx,y:wy};eraseAt(wx,wy);scheduleOverlay();return;
   }
   // スケッチ: ペンは常に描画（マウス時はsketchツール時のみ）
   if(isPenInput||currentTool==='sketch'){
@@ -1289,11 +1302,28 @@ function handlePointerMove(sx,sy,isPenInput){
 }
 
 function handlePointerUp(sx,sy,isPenInput){
+  if(dimPendingDown&&isPenInput){
+    dimPendingDown=false;
+    if(currentTool==='dx'||currentTool==='dy'||currentTool==='diag'){
+      const[wx2,wy2]=s2w(sx,sy);
+      const pt=snapPt||{x:wx2,y:wy2};
+      dimState.pts.push(pt);
+      const need=currentTool==='diag'?2:3;
+      if(dimState.pts.length>=need){
+        const[p1,p2,p3]=dimState.pts;
+        snapshot();
+        dims.push(buildDim(p1,p2,p3||p2,currentTool));
+        dimState={pts:[]};
+      }
+      scheduleOverlay();return;
+    }
+  }
   if(currentTool==='eraser'){eraserPos=null;scheduleOverlay();return;}
   if(isPenInput||currentTool==='sketch'){
     if(sketching&&sketchPts.length>1){
+      snapshot();
       strokes.push({pts:[...sketchPts],color:{...currentColor},lw:currentLW/scale});
-      sketching=false;sketchPts=[];scheduleOverlay();
+      sketching=false;sketchPts=[];scheduleOverlay();scheduleSave();
     }return;
   }
   panning=false;dragImageStart=null;selectedImage=null;
@@ -1454,11 +1484,15 @@ fileInput.addEventListener('change',async e=>{
   document.getElementById('pdfPageCtrl').style.display='none';
   if(f.name.toLowerCase().endsWith('.pdf')){
     await loadPDF(buf);{const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
+    saveFile(buf,f.name);scheduleSave();
+    document.body.classList.remove('settings-open');
   } else {
     try{
       doc=parseDXF(buf);
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null];[0,1,2].forEach(i=>updateViewmemoState(i));
       buildLayerModal();detectScale();fit();scheduleDraw();showInfo();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
+      saveFile(buf,f.name);scheduleSave();
+      document.body.classList.remove('settings-open');
     }catch(err){alert('ファイルを開けません: '+err.message);}
   }
   e.target.value='';
@@ -1475,15 +1509,15 @@ document.getElementById('bwBlack').addEventListener('click',()=>{
   bwMode=false;
   document.getElementById('bwBlack').classList.add('active');
   document.getElementById('bwWhite').classList.remove('active');
-  scheduleDraw();
+  scheduleDraw();scheduleSave();
 });
 document.getElementById('bwWhite').addEventListener('click',()=>{
   bwMode=true;
   document.getElementById('bwWhite').classList.add('active');
   document.getElementById('bwBlack').classList.remove('active');
-  scheduleDraw();
+  scheduleDraw();scheduleSave();
 });
-document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;});
+document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 
 // PDFページ
 document.getElementById('prevPage').addEventListener('click',async()=>{
@@ -1502,7 +1536,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
-    dimState={pts:[]};sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
+    dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
   });
 });
 document.querySelectorAll('.color-btn').forEach(btn=>{
@@ -1519,13 +1553,44 @@ document.querySelectorAll('.lw-btn').forEach(btn=>{
   });
 });
 
-document.getElementById('undoBtn').addEventListener('click',()=>{
-  if(strokes.length>0) strokes.pop();
-  else if(dims.length>0) dims.pop();
-  scheduleOverlay();
+// Undo/Redo スナップショット
+function snapshot(){
+  history.push({
+    strokes:strokes.map(s=>({...s,pts:[...s.pts]})),
+    dims:[...dims]
+  });
+  if(history.length>MAX_HISTORY)history.shift();
+  redoStack=[];
+  updateUndoRedo();
+}
+function undo(){
+  if(!history.length)return;
+  redoStack.push({strokes:strokes.map(s=>({...s,pts:[...s.pts]})),dims:[...dims]});
+  const st=history.pop();strokes=st.strokes;dims=st.dims;
+  scheduleOverlay();updateUndoRedo();scheduleSave();
+}
+function redo(){
+  if(!redoStack.length)return;
+  history.push({strokes:strokes.map(s=>({...s,pts:[...s.pts]})),dims:[...dims]});
+  const st=redoStack.pop();strokes=st.strokes;dims=st.dims;
+  scheduleOverlay();updateUndoRedo();scheduleSave();
+}
+function updateUndoRedo(){
+  const ub=document.getElementById('undoBtn');
+  const rb=document.getElementById('redoBtn');
+  if(ub)ub.style.opacity=history.length?'1':'0.35';
+  if(rb)rb.style.opacity=redoStack.length?'1':'0.35';
+}
+document.getElementById('undoBtn').addEventListener('click',undo);
+document.getElementById('redoBtn').addEventListener('click',redo);
+document.getElementById('clearDimsBtn').addEventListener('click',()=>{
+  if(!dims.length)return;
+  if(confirm('すべての寸法を削除しますか？')){
+    snapshot();dims=[];scheduleOverlay();scheduleSave();
+  }
 });
 document.getElementById('clearBtn').addEventListener('click',()=>{
-  if(confirm('全てのスケッチと寸法を消去しますか？')){dims=[];strokes=[];scheduleOverlay();}
+  if(confirm('全てのスケッチと寸法を消去しますか？')){snapshot();dims=[];strokes=[];scheduleOverlay();scheduleSave();}
 });
 document.getElementById('savePDFBtn').addEventListener('click',savePDF);
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
@@ -1546,7 +1611,7 @@ function updateViewmemoState(i){
 document.querySelectorAll('.mem-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const i=parseInt(btn.dataset.vi);savedViews[i]={tx,ty,scale};
-    updateViewmemoState(i);
+    updateViewmemoState(i);scheduleSave();
     btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
   });
 });
@@ -1582,8 +1647,71 @@ ov.addEventListener('touchend',function(e){
 // 2本指パンと競合するため2本指タップUndoは廃止 → ↩ボタンで操作
 // viewmemo初期状態
 [0,1,2].forEach(i=>updateViewmemoState(i));
+// localStorage 保存・復元
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(doSave,800);}
+function arrayBufferToB64(buf){
+  const bytes=new Uint8Array(buf);let bin='';const CH=8192;
+  for(let i=0;i<bytes.length;i+=CH)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(bin);
+}
+function doSave(){
+  try{
+    const sd=parseFloat(document.getElementById('scaleDenom').value)||1;
+    localStorage.setItem(SAVE_KEY,JSON.stringify({
+      strokes,dims,savedViews,tx,ty,scale,
+      bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
+      currentTool,currentColor,currentLW,currentFileName
+    }));
+  }catch(e){}
+}
+function saveFile(buf,name){
+  if(!buf||buf.byteLength>1.5*1024*1024){localStorage.removeItem(FILE_KEY);return;}
+  try{localStorage.setItem(FILE_KEY,JSON.stringify({name,b64:arrayBufferToB64(buf)}));}
+  catch(e){localStorage.removeItem(FILE_KEY);}
+}
+async function tryRestore(){
+  try{
+    const fr=localStorage.getItem(FILE_KEY);
+    if(fr){
+      const{name,b64}=JSON.parse(fr);
+      const bin=atob(b64);const buf=new ArrayBuffer(bin.length);const arr=new Uint8Array(buf);
+      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+      currentFileName=name;
+      if(name.toLowerCase().endsWith('.pdf')){
+        await loadPDF(buf);
+      } else {
+        doc=parseDXF(buf);buildLayerModal();detectScale();
+      }
+      const nd=document.getElementById('noDrawingMsg');if(nd)nd.style.display='none';
+    }
+    const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
+    const d=JSON.parse(raw);
+    strokes=d.strokes||[];dims=d.dims||[];
+    savedViews=d.savedViews||[null,null,null];
+    tx=d.tx||0;ty=d.ty||0;scale=d.scale||1;
+    bwMode=!!d.bwMode;
+    if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
+    currentTool=d.currentTool||'sketch';
+    if(d.currentColor)currentColor=d.currentColor;
+    if(d.currentLW)currentLW=d.currentLW;
+    if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
+    if(bwMode){
+      document.getElementById('bwWhite').classList.add('active');
+      document.getElementById('bwBlack').classList.remove('active');
+    }
+    document.querySelectorAll('.tool-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.tool===currentTool);
+    });
+    const dot=document.getElementById('colorDot');
+    if(dot&&currentColor)dot.style.background=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
+    [0,1,2].forEach(i=>updateViewmemoState(i));
+    scheduleDraw();scheduleOverlay();updateUndoRedo();
+  }catch(e){console.warn('restore:',e);}
+}
+
 // リサイズ
 const ro=new ResizeObserver(resizeCanvas);ro.observe(stage);
+tryRestore();
 resizeCanvas();scheduleDraw();
 </script>
 </body>
