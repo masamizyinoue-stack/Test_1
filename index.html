@@ -67,10 +67,10 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   border-radius:8px;background:rgba(10,14,20,.88);color:var(--text);cursor:pointer;
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   -webkit-tap-highlight-color:transparent;white-space:nowrap}
-.viewmemo .mem-btn{background:rgba(30,36,50,.75);color:#555;border-color:#333;font-weight:normal}
-.viewmemo .show-btn{background:rgba(30,36,50,.75);color:#555;border-color:#333;font-weight:normal}
-.viewmemo .mem-btn.vm-saved{background:rgba(243,156,18,.88);color:#000;border-color:var(--accent-2);font-weight:600;box-shadow:0 0 8px rgba(243,156,18,.35)}
-.viewmemo .show-btn.vm-saved{background:rgba(46,204,113,.88);color:#000;border-color:var(--accent);font-weight:600;box-shadow:0 0 7px rgba(46,204,113,.3)}
+.viewmemo .mem-btn{background:transparent;border:1.5px solid rgba(150,170,190,0.3);color:rgba(150,170,190,0.45);opacity:1;font-weight:normal}
+.viewmemo .show-btn{background:transparent;border:1.5px solid rgba(150,170,190,0.3);color:rgba(150,170,190,0.45);opacity:1;font-weight:normal}
+.viewmemo .mem-btn.vm-saved{background:rgba(0,212,255,0.12);border-color:#00d4ff;color:#00d4ff;font-weight:600;box-shadow:0 0 6px rgba(0,212,255,0.3)}
+.viewmemo .show-btn.vm-saved{background:rgba(0,212,255,0.12);border-color:#00d4ff;color:#00d4ff;font-weight:600;box-shadow:0 0 6px rgba(0,212,255,0.3)}
 .viewmemo .full-row{grid-column:1/-1;text-align:center}
 #snap-hint{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.82);color:var(--accent);font-size:12px;
@@ -234,7 +234,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     </div>
   </div>
   <div class="sp-section">
-    <button id="layerBtn" class="sp-action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> レイヤ設定</button>
+    <button id="layerBtn" class="sp-action-btn">レイヤ設定</button>
   </div>
   <div class="sp-section">
     <div class="sp-label">DXF情報</div>
@@ -242,9 +242,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
-    <button id="clearBtn" class="sp-danger-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> 全消去</button>
+    <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_18</div>
+  <div id="ver-label">DXF_View V0_19</div>
 </div>
 
 <div id="colorOverlay">
@@ -279,7 +279,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_18';
+const APP_VERSION = 'V0_19';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -319,6 +319,7 @@ let saveTimer=null;
 const SAVE_KEY='dxfview_v1';
 const FILE_KEY='dxfview_v1_file';
 let snapPt=null;
+let currentCursorWorld=null; // 現在のカーソル世界座標（寸法プレビュー用）
 let dimState={pts:[]};
 let sketching=false,sketchPts=[];
 let eraserPos=null;
@@ -1087,6 +1088,64 @@ function drawOverlay(){
     octx.strokeStyle='rgba(255,100,100,0.7)';octx.lineWidth=2;
     octx.beginPath();octx.arc(sx,sy,ERASER_RADIUS_PX,0,Math.PI*2);octx.stroke();
   }
+  // ── 寸法プレビュー（点線でリアルタイム表示）────────────────────────────
+  if(dimState && dimState.pts && dimState.pts.length>=1){
+    const curPt = snapPt || currentCursorWorld;
+    if(curPt){
+      let prevDim = null;
+      try{
+        if((currentTool==='dxdy') && dimState.pts.length===2){
+          // P3 選択中: 完全な寸法プレビュー
+          const[p1,p2,p3]=[dimState.pts[0],dimState.pts[1],curPt];
+          const midX=(p1.x+p2.x)/2,midY=(p1.y+p2.y)/2;
+          const pType=Math.abs(p3.y-midY)>=Math.abs(p3.x-midX)?'dx':'dy';
+          prevDim=buildDim(p1,p2,p3,pType);
+        } else if(currentTool==='diag' && dimState.pts.length===1){
+          // P2 選択中: 斜め寸法プレビュー
+          const[p1,p2]=[dimState.pts[0],curPt];
+          prevDim=buildDim(p1,p2,p2,'diag');
+        } else if((currentTool==='dxdy'||currentTool==='diag') && dimState.pts.length===1){
+          // P2 選択中: P1→カーソルの細線プレビュー
+          const[sx0_,sy0_]=w2s(dimState.pts[0].x,dimState.pts[0].y);
+          const[sx1_,sy1_]=w2s(curPt.x,curPt.y);
+          octx.save();
+          octx.strokeStyle='rgba(0,212,255,0.6)';
+          octx.lineWidth=1;
+          octx.setLineDash([4,3]);
+          octx.beginPath();octx.moveTo(sx0_,sy0_);octx.lineTo(sx1_,sy1_);octx.stroke();
+          octx.restore();
+        }
+      }catch(e){}
+      if(prevDim){
+        octx.save();
+        octx.strokeStyle='rgba(0,212,255,0.75)';
+        octx.fillStyle='rgba(0,212,255,0.85)';
+        octx.lineWidth=1.5;
+        octx.setLineDash([5,3]);
+        octx.lineCap='round';
+        for(const l of(prevDim.lines||[])){
+          const[sx1_,sy1_]=w2s(l.x1,l.y1);
+          const[sx2_,sy2_]=w2s(l.x2,l.y2);
+          octx.beginPath();octx.moveTo(sx1_,sy1_);octx.lineTo(sx2_,sy2_);octx.stroke();
+        }
+        octx.setLineDash([]);
+        const txt = prevDim.text||'';
+        const ptx_ = prevDim.tx, pty_ = prevDim.ty;
+        if(txt && ptx_!=null && pty_!=null){
+          const[stx_,sty_]=w2s(ptx_,pty_);
+          octx.font='bold 17px sans-serif';
+          octx.textAlign='center';
+          octx.textBaseline='middle';
+          const tw=octx.measureText(txt).width;
+          octx.fillStyle='rgba(0,20,40,0.65)';
+          octx.fillRect(stx_-tw/2-3,sty_-10,tw+6,20);
+          octx.fillStyle='rgba(0,212,255,0.85)';
+          octx.fillText(txt,stx_,sty_);
+        }
+        octx.restore();
+      }
+    }
+  }
   octx.restore();
 }
 
@@ -1393,6 +1452,7 @@ function handlePointerDown(sx,sy,isPenInput){
 
 function handlePointerMove(sx,sy,isPenInput){
   const[wx,wy]=s2w(sx,sy);
+  currentCursorWorld={x:wx,y:wy}; // 寸法プレビュー用カーソル世界座標を更新
   // 寸法ツール: ペン・指どちらでもスナップ更新
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
     snapPt=snapAt(wx,wy);scheduleOverlay();return;
@@ -1748,299 +1808,109 @@ document.getElementById('clearBtn').addEventListener('click',()=>{
   if(confirm('全てのスケッチと寸法を消去しますか？')){snapshot();dims=[];strokes=[];scheduleOverlay();scheduleSave();}
 });
 document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
-  if(!doc && !pdfDoc){
-    alert('図面ファイルを読み込んでください');return;
-  }
-  const btn=document.getElementById('savePDFBtn');
-  btn.disabled=true;
+  const btn = document.getElementById('savePDFBtn');
+  btn.disabled = true;
   showGuide('PDFを生成中...');
   try{
-    // ─── DXFファイル読込時: jsPDF ベクター方式 ────────────
-    if(doc && typeof window.jspdf !== 'undefined'){
-      // 1. 描画範囲の計算
-      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      function _upd(x,y){
-        if(!isFinite(x)||!isFinite(y))return;
-        if(x<minX)minX=x;if(x>maxX)maxX=x;
-        if(y<minY)minY=y;if(y>maxY)maxY=y;
-      }
-      for(const e of (doc.sen||[])){if(hiddenLayers.has(e.layer))continue;_upd(e.x1,e.y1);_upd(e.x2,e.y2);}
-      for(const e of (doc.enko||[])){if(hiddenLayers.has(e.layer))continue;const rx=e.rx||e.r||0,ry=e.ry||e.r||0;_upd(e.cx-rx,e.cy-ry);_upd(e.cx+rx,e.cy+ry);}
-      for(const e of (doc.ten||[])){if(hiddenLayers.has(e.layer))continue;_upd(e.x,e.y);}
-      for(const e of (doc.moji||[])){if(hiddenLayers.has(e.layer))continue;_upd(e.x,e.y);}
-      for(const e of (doc.solid||[])){if(hiddenLayers.has(e.layer))continue;for(const p of (e.pts||[]))_upd(p.x,p.y);}
-      for(const s of strokes)for(const p of s.pts)_upd(p.x,p.y);
-      for(const d of dims){for(const l of(d.lines||[]))_upd(l.x1,l.y1),_upd(l.x2,l.y2);_upd(d.tx,d.ty);}
-      if(!isFinite(minX)){alert('描画データが見つかりません');btn.disabled=false;hideGuide();return;}
-
-      const dW=maxX-minX, dH=maxY-minY;
-      const PAD=0.06;
-      const eMinX=minX-dW*PAD, eMinY=minY-dH*PAD;
-      const eW=dW*(1+2*PAD), eH=dH*(1+2*PAD);
-
-      // 2. jsPDF ドキュメント初期化 (A3横)
-      const PAGE_W=420, PAGE_H=297;
-      const scX=PAGE_W/eW, scY=PAGE_H/eH;
-      const sc=Math.min(scX,scY)*0.92;
-      const offX=(PAGE_W-eW*sc)/2;
-      const offY=(PAGE_H-eH*sc)/2;
-
-      function wx_(x){ return offX+(x-eMinX)*sc; }
-      function wy_(y){ return PAGE_H-offY-(y-eMinY)*sc; }
-      function wlw_(lw){ return Math.min(0.8,Math.max(0.1,(lw||0.5)*sc*0.3)); }
-
-      const {jsPDF}=window.jspdf;
-      const pdf=new jsPDF({orientation:'l',unit:'mm',format:'a3',compress:true});
-      pdf.setFillColor(255,255,255);
-      pdf.rect(0,0,PAGE_W,PAGE_H,'F');
-
-      // 3. ソリッド描画
-      for(const e of (doc.solid||[])){
-        if(hiddenLayers.has(e.layer))continue;
-        const pts2=e.pts.filter(p=>isFinite(p.x)&&isFinite(p.y));
-        if(pts2.length<3)continue;
-        pdf.setFillColor(200,200,200);
-        pdf.setDrawColor(0,0,0);
-        pdf.setLineWidth(0.1);
-        // 多角形を三角形分割で描画
-        const p0=pts2[0];
-        for(let i=1;i<pts2.length-1;i++){
-          const tri=[
-            wx_(p0.x),wy_(p0.y),
-            wx_(pts2[i].x),wy_(pts2[i].y),
-            wx_(pts2[i+1].x),wy_(pts2[i+1].y)
-          ];
-          pdf.triangle(tri[0],tri[1],tri[2],tri[3],tri[4],tri[5],'F');
-        }
-      }
-
-      // 4. 線分描画
-      for(const e of (doc.sen||[])){
-        if(hiddenLayers.has(e.layer))continue;
-        pdf.setLineWidth(wlw_(e.lw));
-        pdf.setDrawColor(0,0,0);
-        pdf.line(wx_(e.x1),wy_(e.y1),wx_(e.x2),wy_(e.y2));
-      }
-
-      // 5. 円・円弧描画
-      for(const e of (doc.enko||[])){
-        if(hiddenLayers.has(e.layer))continue;
-        pdf.setLineWidth(wlw_(e.lw));
-        pdf.setDrawColor(0,0,0);
-        const isFull=Math.abs((e.a2||360)-(e.a1||0)-360)<0.5||(e.a1===0&&e.a2===360)||Math.abs((e.a2-e.a1)%360)<0.5;
-        const r_mm=(e.rx||e.r||0)*sc;
-        const cxp=wx_(e.cx), cyp=wy_(e.cy);
-        if(isFull && Math.abs((e.rx||e.r||0)-(e.ry||e.r||0))<0.01){
-          pdf.circle(cxp, cyp, r_mm, 'S');
-        } else {
-          // 円弧: 多分割折れ線で近似
-          const a1r=e.a1*Math.PI/180;
-          let a2r=e.a2*Math.PI/180;
-          if(e.a2<=e.a1) a2r=(e.a2+360)*Math.PI/180;
-          const spanDeg=Math.abs(a2r-a1r)*180/Math.PI;
-          const steps=Math.max(24,Math.round(spanDeg/3));
-          const rx_mm=(e.rx||e.r||0)*sc;
-          const ry_mm=(e.ry||e.r||0)*sc;
-          const tiltR=(e.tilt||0)*Math.PI/180;
-          const cosT=Math.cos(tiltR), sinT=Math.sin(tiltR);
-          // 開始点
-          const cos0=Math.cos(a1r), sin0=Math.sin(a1r);
-          let px0=cxp+rx_mm*(cos0*cosT-sin0*sinT);
-          let py0=cyp-ry_mm*(cos0*sinT+sin0*cosT);
-          for(let i=1;i<=steps;i++){
-            const a=a1r+(a2r-a1r)*i/steps;
-            const cosA=Math.cos(a), sinA=Math.sin(a);
-            const px1=cxp+rx_mm*(cosA*cosT-sinA*sinT);
-            const py1=cyp-ry_mm*(cosA*sinT+sinA*cosT);
-            pdf.line(px0,py0,px1,py1);
-            px0=px1; py0=py1;
-          }
-        }
-      }
-
-      // 6. テキスト描画（pdfDrawText: 日本語/回転対応）
-      function pdfDrawText(pdf,str,xmm,ymm,hMM,angleRad){
-        if(!str) return;
-        const hasJP=/[^\x00-\x7F]/.test(str);
-        const angleDeg=angleRad*180/Math.PI;
-        if(!hasJP&&Math.abs(angleDeg)<0.5){
-          // ASCII・回転なし → jsPDF ネイティブ
-          pdf.setFontSize(Math.max(3,Math.min(18,hMM*2.835)));
-          pdf.setTextColor(0,0,0);
-          pdf.text(str,xmm,ymm,{baseline:'middle'});
-          return;
-        }
-        // 日本語または回転あり → canvasに描画して埋め込み
-        const px_per_mm=4;
-        const fsPx=Math.max(10,hMM*px_per_mm);
-        const tw=fsPx*str.length*0.65;
-        const th=fsPx*1.4;
-        const diagLen=Math.ceil(Math.sqrt(tw*tw+th*th))+8;
-        const tc=document.createElement('canvas');
-        tc.width=diagLen; tc.height=diagLen;
-        const tctx=tc.getContext('2d');
-        tctx.translate(diagLen/2,diagLen/2);
-        tctx.rotate(-angleRad);
-        tctx.font=`${fsPx}px "Hiragino Sans","Yu Gothic",sans-serif`;
-        tctx.fillStyle='#000000';
-        tctx.textAlign='center';
-        tctx.textBaseline='middle';
-        tctx.fillText(str,0,0);
-        const imgData=tc.toDataURL('image/png');
-        const sizeMM=diagLen/px_per_mm;
-        pdf.addImage(imgData,'PNG',xmm-sizeMM/2,ymm-sizeMM/2,sizeMM,sizeMM,undefined,'FAST');
-      }
-      for(const e of (doc.moji||[])){
-        if(hiddenLayers.has(e.layer))continue;
-        if(!e.text||!e.text.trim())continue;
-        const h_mm=Math.max(1.5,Math.min(15,(e.h||2)*sc));
-        const angleRad=(e.angle||0)*Math.PI/180;
-        const lines2=e.text.split('\n');
-        for(let i=0;i<lines2.length;i++){
-          pdfDrawText(pdf,lines2[i]||'',wx_(e.x),wy_(e.y)+h_mm*i,h_mm,angleRad);
-        }
-      }
-
-      // 7. 寸法線描画
-      pdf.setLineWidth(0.15);
-      pdf.setDrawColor(30,100,200);
-      for(const d of dims){
-        for(const l of (d.lines||[])){
-          pdf.line(wx_(l.x1),wy_(l.y1),wx_(l.x2),wy_(l.y2));
-        }
-        for(const arr of (d.arrows||[])){
-          // 矢印を小さな三角形で描画
-          const ax=wx_(arr.x), ay=wy_(arr.y);
-          const ang=arr.angle;
-          const L=2.5;
-          const p1x=ax+L*Math.cos(ang), p1y=ay-L*Math.sin(ang);
-          const p2x=ax+L*Math.cos(ang+2.4), p2y=ay-L*Math.sin(ang+2.4);
-          const p3x=ax+L*Math.cos(ang-2.4), p3y=ay-L*Math.sin(ang-2.4);
-          pdf.setFillColor(30,100,200);
-          pdf.triangle(ax,ay,p2x,p2y,p3x,p3y,'F');
-        }
-        if(d.text){
-          const dimH=Math.max(2,Math.min(6,eH*sc*0.012));
-          pdf.setTextColor(30,100,200);
-          pdfDrawText(pdf,String(d.text),wx_(d.tx),wy_(d.ty),dimH,0);
-        }
-      }
-
-      // 8. スケッチ: 高解像度ラスター画像として埋め込み
-      if(strokes.length>0){
-        const SK_W=Math.round(PAGE_W*10), SK_H=Math.round(PAGE_H*10);
-        const skc=document.createElement('canvas');
-        skc.width=SK_W; skc.height=SK_H;
-        const skctx=skc.getContext('2d');
-        for(const s of strokes){
-          if(!s.pts||s.pts.length<2)continue;
-          skctx.strokeStyle=`rgba(${s.color.r},${s.color.g},${s.color.b},0.9)`;
-          skctx.lineWidth=Math.max(1.5,s.lw*sc*10*0.5);
-          skctx.lineCap='round'; skctx.lineJoin='round';
-          skctx.beginPath();
-          skctx.moveTo(offX*10+(s.pts[0].x-eMinX)*sc*10,(PAGE_H-offY)*10-(s.pts[0].y-eMinY)*sc*10);
-          for(let i=1;i<s.pts.length;i++){
-            skctx.lineTo(offX*10+(s.pts[i].x-eMinX)*sc*10,(PAGE_H-offY)*10-(s.pts[i].y-eMinY)*sc*10);
-          }
-          skctx.stroke();
-        }
-        const skDataURL=skc.toDataURL('image/png');
-        pdf.addImage(skDataURL,'PNG',0,0,PAGE_W,PAGE_H,undefined,'FAST');
-      }
-
-      // 9. 保存
-      const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_export_${new Date().toISOString().slice(0,10)}.pdf`;
-      pdf.save(fname);
-      showGuide('PDFを保存しました', 2000);
-
-    } else {
-      // ─── PDF ファイル閲覧時: 既存のラスター方式 (フォールバック) ────
-      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      function _upd2(x,y){
-        if(!isFinite(x)||!isFinite(y))return;
-        if(x<minX)minX=x;if(x>maxX)maxX=x;
-        if(y<minY)minY=y;if(y>maxY)maxY=y;
-      }
-      for(const s of strokes)for(const p of s.pts)_upd2(p.x,p.y);
-      for(const d of dims){
-        for(const l of(d.lines||[]))_upd2(l.x1,l.y1),_upd2(l.x2,l.y2);
-        _upd2(d.tx,d.ty);
-      }
-      if(pdfImage){_upd2(pdfImage.wx,pdfImage.wy);_upd2(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
-      if(!isFinite(minX)){
-        // pdfImageのみの場合はそのまま使う
-        if(pdfImage){minX=pdfImage.wx;minY=pdfImage.wy-pdfImage.wh;maxX=pdfImage.wx+pdfImage.ww;maxY=pdfImage.wy;}
-        else{alert('描画データが見つかりません');btn.disabled=false;hideGuide();return;}
-      }
-
-      const dW=maxX-minX, dH=maxY-minY;
-      const PAD=0.06;
-      const eMinX2=minX-dW*PAD,eMinY2=minY-dH*PAD;
-      const eW2=dW*(1+2*PAD),eH2=dH*(1+2*PAD);
-
-      const PDF_MAX=4200;
-      const aspect=eW2/eH2;
-      let CW,CH;
-      if(aspect>=1){CW=PDF_MAX;CH=Math.round(PDF_MAX/aspect);}
-      else{CH=PDF_MAX;CW=Math.round(PDF_MAX*aspect);}
-      CW=Math.max(CW,100);CH=Math.max(CH,100);
-
-      const sv={tx,ty,scale:scale};
-      const cvEl=document.getElementById('cv');
-      const ovEl=document.getElementById('ov');
-      const sv_cw=cvEl.width,sv_ch=cvEl.height;
-      const sv_ow=ovEl.width,sv_oh=ovEl.height;
-
-      const pdfScale=Math.min(CW/eW2,CH/eH2);
-      tx=-eMinX2*pdfScale;
-      ty=CH+eMinY2*pdfScale;
-      scale=pdfScale;
-
-      cvEl.width=CW;cvEl.height=CH;
-      ovEl.width=CW;ovEl.height=CH;
-
-      if(typeof draw==='function')draw();
-      if(typeof drawOverlay==='function')drawOverlay();
-
-      const comp=document.createElement('canvas');
-      comp.width=CW;comp.height=CH;
-      const cctx=comp.getContext('2d');
-      cctx.fillStyle=bwMode?'#fff':'#0b0f16';
-      cctx.fillRect(0,0,CW,CH);
-      cctx.drawImage(cvEl,0,0);
-      cctx.drawImage(ovEl,0,0);
-
-      tx=sv.tx;ty=sv.ty;scale=sv.scale;
-      cvEl.width=sv_cw;cvEl.height=sv_ch;
-      ovEl.width=sv_ow;ovEl.height=sv_oh;
-      if(typeof scheduleDraw==='function')scheduleDraw();
-      if(typeof scheduleOverlay==='function')scheduleOverlay();
-
-      if(typeof window.jspdf==='undefined'){
-        const url=URL.createObjectURL(await new Promise(r=>comp.toBlob(r,'image/png')));
-        const a=document.createElement('a');
-        a.href=url;
-        a.download=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_export_${new Date().toISOString().slice(0,10)}.png`;
-        document.body.appendChild(a);a.click();document.body.removeChild(a);
-        setTimeout(()=>URL.revokeObjectURL(url),2000);
-        showGuide('PNGを保存しました', 2000);
-        return;
-      }
-      const {jsPDF}=window.jspdf;
-      const orient=CW>=CH?'l':'p';
-      const A3W=orient==='l'?420:297, A3H=orient==='l'?297:420;
-      const pdf=new jsPDF({orientation:orient,unit:'mm',format:'a3',compress:true});
-      const dataURL=comp.toDataURL('image/jpeg',0.96);
-      pdf.addImage(dataURL,'JPEG',0,0,A3W,A3H,undefined,'FAST');
-      const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_export_${new Date().toISOString().slice(0,10)}.pdf`;
-      pdf.save(fname);
-      showGuide('PDFを保存しました', 2000);
+    // ── 1. バウンディングボックス計算 ────────────────────
+    let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+    function upd(x,y){if(!isFinite(x)||!isFinite(y))return;mnX=Math.min(mnX,x);mxX=Math.max(mxX,x);mnY=Math.min(mnY,y);mxY=Math.max(mxY,y);}
+    const allEnts=[...(doc?.sen||[]),...(doc?.enko||[]),...(doc?.ten||[]),...(doc?.moji||[]),...(doc?.solid||[])];
+    for(const e of allEnts){
+      if(hiddenLayers.has(e.layer))continue;
+      if(e.x1!=null){upd(e.x1,e.y1);upd(e.x2!=null?e.x2:e.x1,e.y2!=null?e.y2:e.y1);}
+      if(e.cx!=null){const r=e.r||Math.max(e.rx||0,e.ry||0)||0;upd(e.cx-r,e.cy-r);upd(e.cx+r,e.cy+r);}
+      if(e.pts){for(const p of e.pts)upd(p.x,p.y);}
+      if(e.x!=null&&e.y!=null)upd(e.x,e.y);
     }
+    if(pdfImage){upd(pdfImage.wx,pdfImage.wy);upd(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
+    for(const s of strokes)for(const p of s.pts)upd(p.x,p.y);
+    for(const d of dims){
+      for(const l of(d.lines||[]))upd(l.x1,l.y1),upd(l.x2,l.y2);
+      if(d.tx!=null&&d.ty!=null)upd(d.tx,d.ty);
+    }
+    if(!isFinite(mnX)){showGuide('描画データがありません',2000);return;}
 
-  }catch(e){
-    console.error('PDF export error:',e);
-    alert('PDF出力でエラーが発生しました: '+e.message);
-    hideGuide();
+    // ── 2. キャンバスサイズ決定（約450DPI相当）───────────────
+    const PAD=0.03;
+    const eW=mxX-mnX, eH=mxY-mnY;
+    const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
+    const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
+
+    // 長辺を5000pxに（約450DPI相当）
+    const LONG_PX=5000;
+    const aspect=extW/extH;
+    const CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);
+    const CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;
+
+    // PDF ページサイズ（長辺=297mm → ~427DPI）
+    const PDF_LONG_MM=297;
+    const pageMM_W=aspect>=1?PDF_LONG_MM:Math.round(PDF_LONG_MM*aspect);
+    const pageMM_H=aspect>=1?Math.round(PDF_LONG_MM/aspect):PDF_LONG_MM;
+
+    // ── 3. グローバル状態を退避してPDF用に上書き ──────────
+    const sv={tx,ty,scale};
+    const cvEl=document.getElementById('cv');
+    const ovEl=document.getElementById('ov');
+    const sv_cw=cvEl.width,sv_ch=cvEl.height;
+    const sv_ow=ovEl.width,sv_oh=ovEl.height;
+
+    const pdfScale=Math.min(CW/extW,CH/extH);
+    tx=-extMinX*pdfScale;
+    ty=CH+extMinY*pdfScale;  // Y反転: w2s(wx,wy)=[wx*scale+tx, -wy*scale+ty]
+    scale=pdfScale;
+
+    // draw()はctx.scale(dpr,dpr)を内部で呼ぶため、PDF用は物理=CSSに統一するためdprを1に
+    const dprSave=window.devicePixelRatio||1;
+    Object.defineProperty(window,'devicePixelRatio',{get:()=>1,configurable:true});
+
+    cvEl.width=CW; cvEl.height=CH;
+    ovEl.width=CW; ovEl.height=CH;
+
+    // ── 4. 描画実行 ────────────────────────────────────
+    if(typeof draw==='function') draw();
+    if(typeof drawOverlay==='function') drawOverlay();
+
+    // ── 5. 合成 ────────────────────────────────────────
+    const comp=document.createElement('canvas');
+    comp.width=CW; comp.height=CH;
+    const cctx=comp.getContext('2d');
+    cctx.fillStyle=bwMode?'#fff':'#1e2430';
+    cctx.fillRect(0,0,CW,CH);
+    cctx.drawImage(cvEl,0,0);
+    cctx.drawImage(ovEl,0,0);
+
+    // ── 6. グローバル状態を復元 ────────────────────────
+    Object.defineProperty(window,'devicePixelRatio',{get:()=>dprSave,configurable:true});
+    tx=sv.tx; ty=sv.ty; scale=sv.scale;
+    cvEl.width=sv_cw; cvEl.height=sv_ch;
+    ovEl.width=sv_ow; ovEl.height=sv_oh;
+    if(typeof scheduleDraw==='function')scheduleDraw();
+    if(typeof scheduleOverlay==='function')scheduleOverlay();
+
+    // ── 7. jsPDF でカスタムサイズ PDF 生成 ──────────────
+    if(typeof window.jspdf==='undefined'){
+      // フォールバック: PNG として保存
+      const url=URL.createObjectURL(await new Promise(r=>comp.toBlob(r,'image/png')));
+      const a=document.createElement('a');
+      a.href=url; a.download=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_${new Date().toISOString().slice(0,10)}.png`;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      showGuide('画像として保存しました',2000); return;
+    }
+    const {jsPDF}=window.jspdf;
+    const orient=pageMM_W>=pageMM_H?'l':'p';
+    const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
+    const imgData=comp.toDataURL('image/jpeg',0.96);
+    pdf.addImage(imgData,'JPEG',0,0,pageMM_W,pageMM_H,undefined,'FAST');
+    const ts=new Date().toISOString().slice(0,10);
+    const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_${ts}.pdf`;
+    pdf.save(fname);
+    showGuide('PDFを保存しました',2000);
+
+  }catch(err){
+    console.error('PDF export error:',err);
+    showGuide('PDF出力に失敗しました: '+err.message,3000);
   }finally{
     document.getElementById('savePDFBtn').disabled=false;
   }
