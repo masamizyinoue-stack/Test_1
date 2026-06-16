@@ -232,7 +232,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_06</div>
+  <div id="ver-label">DXF_View V0_07</div>
 </div>
 
 <div id="colorOverlay">
@@ -1170,7 +1170,7 @@ function getPos(e){const r=ov.getBoundingClientRect();return {x:e.clientX-r.left
 
 function handlePointerDown(sx,sy,isPenInput){
   const[wx,wy]=s2w(sx,sy);
-  // 寸法ツール: ペン・指どちらでも動作
+  // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='diag'){
     const snap=snapAt(wx,wy);const pt=snap||{x:wx,y:wy};
     dimState.pts.push(pt);
@@ -1186,7 +1186,7 @@ function handlePointerDown(sx,sy,isPenInput){
   if(currentTool==='eraser'){
     eraserPos={x:wx,y:wy};eraseAt(wx,wy);scheduleOverlay();return;
   }
-  // スケッチ: ペンは常に描画、指はsketchツール時のみ
+  // スケッチ: ペンは常に描画（マウス時はsketchツール時のみ）
   if(isPenInput||currentTool==='sketch'){
     sketchPts=[{x:wx,y:wy}];sketching=true;scheduleOverlay();return;
   }
@@ -1275,55 +1275,111 @@ ov.addEventListener('wheel',e=>{
   const p=getPos(e);zoomAt(p.x,p.y,e.deltaY<0?1.15:1/1.15);scheduleDraw();
 },{passive:false});
 
-// タッチ
+// タッチ (ペン/指 完全分離設計)
 ov.addEventListener('touchstart',e=>{
   e.preventDefault();
-  if(e.touches.length===1){
-    const t=e.touches[0];const r=ov.getBoundingClientRect();
-    const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    isPen=(t.touchType==='stylus');
-    mouseDown=true;lastMX=sx;lastMY=sy;
-    handlePointerDown(sx,sy,isPen);
-  } else if(e.touches.length===2){
+  const r=ov.getBoundingClientRect();
+  const all=Array.from(e.touches);
+  const styli=all.filter(t=>t.touchType==='stylus');
+  const fingers=all.filter(t=>t.touchType!=='stylus');
+  if(styli.length>0){
+    // Apple Pencil: ペン入力を優先、指は無視（パームリジェクション）
+    if(!isPen||!mouseDown){
+      const t=styli[0];
+      const sx=t.clientX-r.left,sy=t.clientY-r.top;
+      isPen=true;mouseDown=true;lastMX=sx;lastMY=sy;
+      panning=false;
+      handlePointerDown(sx,sy,true);
+    }
+  } else if(fingers.length>=2){
+    // 2本指: ピンチズーム+パン
     if(sketching){sketching=false;sketchPts=[];}
-    const r=ov.getBoundingClientRect();
-    const t0=e.touches[0],t1=e.touches[1];
+    mouseDown=false;panning=false;
+    const t0=fingers[0],t1=fingers[1];
     const x0=t0.clientX-r.left,y0=t0.clientY-r.top;
     const x1=t1.clientX-r.left,y1=t1.clientY-r.top;
     pinchDist=Math.hypot(x1-x0,y1-y0);
     pinchMid={x:(x0+x1)/2,y:(y0+y1)/2};
-    mouseDown=false;
+  } else if(fingers.length===1){
+    // 指1本: パンのみ（描画しない）
+    if(sketching){sketching=false;sketchPts=[];}
+    const t=fingers[0];
+    const sx=t.clientX-r.left,sy=t.clientY-r.top;
+    isPen=false;mouseDown=true;lastMX=sx;lastMY=sy;
+    panning=true;
   }
 },{passive:false});
 
 ov.addEventListener('touchmove',e=>{
   e.preventDefault();
-  if(e.touches.length===1&&mouseDown){
-    const t=e.touches[0];const r=ov.getBoundingClientRect();
+  const r=ov.getBoundingClientRect();
+  const all=Array.from(e.touches);
+  const styli=all.filter(t=>t.touchType==='stylus');
+  const fingers=all.filter(t=>t.touchType!=='stylus');
+  if(styli.length>0&&mouseDown&&isPen){
+    // Apple Pencil移動: ツール操作
+    const t=styli[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    handlePointerMove(sx,sy,isPen);lastMX=sx;lastMY=sy;
-  } else if(e.touches.length===2&&pinchDist!==null){
-    const r=ov.getBoundingClientRect();
-    const t0=e.touches[0],t1=e.touches[1];
+    handlePointerMove(sx,sy,true);lastMX=sx;lastMY=sy;
+  } else if(fingers.length>=2&&pinchDist!==null){
+    // 2本指: 正確なパン+ピンチ（世界座標ピボット）
+    const t0=fingers[0],t1=fingers[1];
     const x0=t0.clientX-r.left,y0=t0.clientY-r.top;
     const x1=t1.clientX-r.left,y1=t1.clientY-r.top;
     const dist=Math.hypot(x1-x0,y1-y0);
     const mid={x:(x0+x1)/2,y:(y0+y1)/2};
-    if(pinchDist>0) zoomAt(mid.x,mid.y,dist/pinchDist);
+    // 旧中点の世界座標を新しい中点スクリーン位置に移動（パン+ズーム統合）
+    const[wx,wy]=s2w(pinchMid.x,pinchMid.y);
+    if(pinchDist>5){
+      const f=dist/pinchDist;
+      if(f>0.5&&f<2.0) scale*=f;
+    }
+    tx=mid.x-wx*scale;ty=mid.y+wy*scale;
     pinchDist=dist;pinchMid=mid;scheduleDraw();
+  } else if(fingers.length===1&&mouseDown&&panning){
+    // 1本指パン
+    const t=fingers[0];
+    const sx=t.clientX-r.left,sy=t.clientY-r.top;
+    tx+=sx-lastMX;ty+=sy-lastMY;scheduleDraw();
+    lastMX=sx;lastMY=sy;
   }
 },{passive:false});
 
 ov.addEventListener('touchend',e=>{
   e.preventDefault();
-  if(e.touches.length===0){
-    if(mouseDown){handlePointerUp(lastMX,lastMY,isPen);mouseDown=false;}
+  const r=ov.getBoundingClientRect();
+  const remaining=Array.from(e.touches);
+  const changed=Array.from(e.changedTouches);
+  const remFing=remaining.filter(t=>t.touchType!=='stylus');
+  const liftedStylus=changed.filter(t=>t.touchType==='stylus');
+  // Apple Pencilが離れた
+  if(liftedStylus.length>0&&isPen&&mouseDown){
+    handlePointerUp(lastMX,lastMY,true);
+    mouseDown=false;isPen=false;
+    if(remFing.length>=2){
+      const t0=remFing[0],t1=remFing[1];
+      const x0=t0.clientX-r.left,y0=t0.clientY-r.top;
+      const x1=t1.clientX-r.left,y1=t1.clientY-r.top;
+      pinchDist=Math.hypot(x1-x0,y1-y0);
+      pinchMid={x:(x0+x1)/2,y:(y0+y1)/2};
+    } else if(remFing.length===1){
+      const t=remFing[0];
+      const sx=t.clientX-r.left,sy=t.clientY-r.top;
+      mouseDown=true;lastMX=sx;lastMY=sy;panning=true;
+    }
+    return;
+  }
+  // 全タッチ終了
+  if(remaining.length===0){
+    if(!isPen){panning=false;mouseDown=false;}
+    pinchDist=null;pinchMid=null;return;
+  }
+  // 2本指→1本指への移行
+  if(remFing.length===1&&pinchDist!==null&&!isPen){
     pinchDist=null;pinchMid=null;
-  } else if(e.touches.length===1){
-    pinchDist=null;pinchMid=null;
-    const t=e.touches[0];const r=ov.getBoundingClientRect();
+    const t=remFing[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    mouseDown=true;lastMX=sx;lastMY=sy;
+    mouseDown=true;lastMX=sx;lastMY=sy;panning=true;
   }
 },{passive:false});
 
@@ -1463,14 +1519,7 @@ ov.addEventListener('touchend',function(e){
     else if(_dtCount>=2){clearTimeout(_dtTimer);_dtCount=0;fit();scheduleDraw();}
   }
 },{passive:false});
-// 2本指タップ → Undo
-ov.addEventListener('touchend',function(e){
-  if(e.changedTouches.length===2&&e.touches.length===0){
-    if(strokes.length>0)strokes.pop();
-    else if(dims.length>0)dims.pop();
-    scheduleOverlay();
-  }
-},{passive:false});
+// 2本指パンと競合するため2本指タップUndoは廃止 → ↩ボタンで操作
 // viewmemo初期状態
 [0,1,2].forEach(i=>updateViewmemoState(i));
 // リサイズ
