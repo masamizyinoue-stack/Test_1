@@ -248,7 +248,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_21</div>
+  <div id="ver-label">DXF_View V0_22</div>
 </div>
 
 <div id="colorOverlay">
@@ -283,7 +283,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_21';
+const APP_VERSION = 'V0_22';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1166,7 +1166,7 @@ function drawOverlay(){
         octx.setLineDash([]);
         const txt = prevDim.text||'';
         const ptx_ = prevDim.tx, pty_ = prevDim.ty;
-        if(!dimPendingDown && txt && ptx_!=null && pty_!=null){
+        if(txt && ptx_!=null && pty_!=null){
           const[stx_,sty_]=w2s(ptx_,pty_);
           octx.font='bold 17px sans-serif';
           octx.textAlign='center';
@@ -1540,6 +1540,16 @@ function handlePointerDown(sx,sy,isPenInput){
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'||currentTool==='circDim'||currentTool==='distDim'){
     if(isPenInput){
+      // diag: 1ストローク（ペンDown=P1, ペンUp=P2）で確定させるため Down 時に P1 を登録
+      if(currentTool==='diag'){
+        const snapD=snapAt(wx,wy);const ptD=snapD||{x:wx,y:wy};
+        if(dimState.pts.length===0){
+          dimState.pts.push(ptD);
+          dimPendingDown=true;
+          showGuide('ペンをドラッグして2点目を確定');
+          scheduleOverlay();return;
+        }
+      }
       dimPendingDown=true;return;
     }
     const snap=snapAt(wx,wy);const pt=snap||{x:wx,y:wy};
@@ -2245,7 +2255,6 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
     btn.disabled = false;
   }
 });
-document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();});
 
