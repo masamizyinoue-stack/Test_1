@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
 // ════════════════════════════════════════════════════
-// V0_29 拡張コード
+// V0_30 拡張コード
 // ════════════════════════════════════════════════════
 
 // ── A. 線幅ボタン（「太さ」ボタン）フリーズなし実装 ──────────────────
@@ -742,7 +742,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_29</div>
+  <div id="ver-label">DXF_View V0_30</div>
 </div>
 
 <div id="colorOverlay">
@@ -777,7 +777,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_29';
+const APP_VERSION = 'V0_30';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1764,12 +1764,17 @@ function buildDim(p1,p2,pArrow,type){
     arrows.push({x,y:p1.y,angle:-dir+Math.PI});arrows.push({x,y:p2.y,angle:-dir});
     tx2=x;ty2=(p1.y+p2.y)/2;tangle=-Math.PI/2;
   } else {
+    // diag: 斜め距離寸法。pArrow(p3)を寸法テキスト位置として使用
     const dx=p2.x-p1.x,dy=p2.y-p1.y;
     text=formatDim(Math.hypot(dx,dy)/sd);
     const ang=Math.atan2(dy,dx);
+    // pArrow が p2 と異なる場合(位置指定あり)はそこをテキスト中心として使う
+    const _useArrow=(pArrow&&(pArrow.x!==p2.x||pArrow.y!==p2.y));
+    const _midX=_useArrow?pArrow.x:(p1.x+p2.x)/2;
+    const _midY=_useArrow?pArrow.y:(p1.y+p2.y)/2;
     lines.push({x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y});
     arrows.push({x:p1.x,y:p1.y,angle:Math.PI+ang});arrows.push({x:p2.x,y:p2.y,angle:ang});
-    tx2=(p1.x+p2.x)/2;ty2=(p1.y+p2.y)/2;tangle=-ang;
+    tx2=_midX;ty2=_midY;tangle=-ang;
   }
   return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:'#f39c12'};
 }
@@ -1893,6 +1898,8 @@ function buildPDF(jpegB64,pw,ph){
 function getPos(e){const r=ov.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
 
 function handlePointerDown(sx,sy,isPenInput){
+  // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
+  if(window.DIM&&window.DIM.active)return;
   const[wx,wy]=s2w(sx,sy);
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
@@ -1949,6 +1956,8 @@ function handlePointerDown(sx,sy,isPenInput){
 }
 
 function handlePointerMove(sx,sy,isPenInput){
+  // DIMシステムがアクティブな場合は DIM の pointermove ハンドラに任せる
+  if(window.DIM&&window.DIM.active)return;
   const[wx,wy]=s2w(sx,sy);
   currentCursorWorld={x:wx,y:wy}; // 寸法プレビュー用カーソル世界座標を更新
   // 寸法ツール: ペン・指どちらでもスナップ更新
@@ -1974,6 +1983,8 @@ function handlePointerMove(sx,sy,isPenInput){
 }
 
 function handlePointerUp(sx,sy,isPenInput){
+  // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
+  if(window.DIM&&window.DIM.active)return;
   if(dimPendingDown&&isPenInput){
     dimPendingDown=false;
     if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
@@ -2043,7 +2054,7 @@ function resizeCanvas(){
 ov.addEventListener('mousedown',e=>{
   if(e.button!==0)return;
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
-  handlePointerDown(p.x,p.y,false);
+  if(!window.DIM||!window.DIM.active){ handlePointerDown(p.x,p.y,false); }
 });
 window.addEventListener('mousemove',e=>{
   const p=getPos(e);
@@ -2073,7 +2084,7 @@ ov.addEventListener('touchstart',e=>{
       const sx=t.clientX-r.left,sy=t.clientY-r.top;
       isPen=true;mouseDown=true;lastMX=sx;lastMY=sy;
       panning=false;
-      handlePointerDown(sx,sy,true);
+      if(!window.DIM||!window.DIM.active){ handlePointerDown(sx,sy,true); }
     }
   } else if(fingers.length>=2){
     // 2本指: ピンチズーム+パン
@@ -2104,7 +2115,8 @@ ov.addEventListener('touchmove',e=>{
     // Apple Pencil移動: ツール操作
     const t=styli[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    handlePointerMove(sx,sy,true);lastMX=sx;lastMY=sy;
+    if(!window.DIM||!window.DIM.active){ handlePointerMove(sx,sy,true); }
+    lastMX=sx;lastMY=sy;
   } else if(fingers.length>=2&&pinchDist!==null){
     // 2本指: 正確なパン+ピンチ（世界座標ピボット）
     const t0=fingers[0],t1=fingers[1];
@@ -2138,7 +2150,7 @@ ov.addEventListener('touchend',e=>{
   const liftedStylus=changed.filter(t=>t.touchType==='stylus');
   // Apple Pencilが離れた
   if(liftedStylus.length>0&&isPen&&mouseDown){
-    handlePointerUp(lastMX,lastMY,true);
+    if(!window.DIM||!window.DIM.active){ handlePointerUp(lastMX,lastMY,true); }
     mouseDown=false;isPen=false;
     if(remFing.length>=2){
       const t0=remFing[0],t1=remFing[1];
@@ -2654,7 +2666,7 @@ if(vd) vd.textContent = APP_VERSION;
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル (V0_29) -->
+<!-- 太さパネル (V0_30) -->
 <div id="wPanel" style="display:none;position:fixed;z-index:8500;background:#1a2332;border:1.5px solid #00d4ff;border-radius:12px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.7);min-width:180px;">
   <div style="font-size:12px;color:#aab;margin-bottom:10px;text-align:center;">線の太さ</div>
   <div id="wPanelList" style="display:flex;flex-direction:column;gap:8px;"></div>
