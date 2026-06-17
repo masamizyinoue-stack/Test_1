@@ -170,7 +170,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="linePt" title="線から点への距離寸法"><span class="tb-tool-label">線から点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="12" y1="6" x2="12" y2="18"/><circle cx="12" cy="18" r="2" fill="currentColor" stroke="none"/><line x1="9" y1="9" x2="12" y2="6"/><line x1="15" y1="9" x2="12" y2="6"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="最短距離寸法"><span class="tb-tool-label">最短距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><polyline points="9,11 12,8 15,11"/><polyline points="9,13 12,16 15,13"/></svg></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
@@ -250,7 +250,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_39</div>
+  <div id="ver-label">DXF_View V0_35</div>
 </div>
 
 <div id="colorOverlay">
@@ -285,7 +285,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_39';
+const APP_VERSION = 'V0_35';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1583,6 +1583,7 @@ ov.addEventListener('mousedown',e=>{
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
   if(window.DIM&&window.DIM.active){
     window.DIM.handleDown(p.x,p.y);
+    console.log('[DIM] mousedown → handleDown');
   } else { handlePointerDown(p.x,p.y,false); }
 });
 window.addEventListener('mousemove',e=>{
@@ -1597,6 +1598,7 @@ window.addEventListener('mouseup',e=>{
   const p=getPos(e);
   if(window.DIM&&window.DIM.active){
     window.DIM.handleUp(p.x,p.y);
+    console.log('[DIM] mouseup → handleUp');
   } else { handlePointerUp(p.x,p.y,false); }
 });
 ov.addEventListener('wheel',e=>{
@@ -1620,6 +1622,7 @@ ov.addEventListener('touchstart',e=>{
       panning=false;
       if(window.DIM&&window.DIM.active){
         window.DIM.handleDown(sx,sy);
+        console.log('[DIM] touchstart(pencil) → handleDown');
       } else { handlePointerDown(sx,sy,true); }
     }
   } else if(fingers.length>=2){
@@ -1690,6 +1693,7 @@ ov.addEventListener('touchend',e=>{
   if(liftedStylus.length>0&&isPen&&mouseDown){
     if(window.DIM&&window.DIM.active){
       window.DIM.handleUp(lastMX,lastMY);
+      console.log('[DIM] touchend(pencil) → handleUp');
     } else { handlePointerUp(lastMX,lastMY,true); }
     mouseDown=false;isPen=false;
     if(remFing.length>=2){
@@ -1787,6 +1791,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
+    console.log('[Tool] switched to:', currentTool, 'DIM.active=', window.DIM&&window.DIM.active);
     // ガイドメッセージ
     const guideMap={
       'sketch':'Apple Pencilまたは指でスケッチ',
@@ -1795,8 +1800,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
       'diag':'1点目を選択してください',
       'circDim':'円の円周にペンを近づける→離して確定→位置を指定',
       'distDim':'1つ目の線を選択してください（線上をタップ→離して確定）',
-      'radDim':'円または円弧を選択→離して確定→半径線の位置を指定',
-      'linePt':'線をApple Pencilで選択してください（線に近づける→離す）'
+      'radDim':'円または円弧を選択→離して確定→半径線の位置を指定'
     };
     if(currentTool==='sketch'||currentTool==='eraser'){
       showGuide(guideMap[currentTool]||'', 2000);
@@ -2047,6 +2051,7 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
   }
 });
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
+document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();});
 
 
@@ -2088,11 +2093,17 @@ function _showMemMenu(idx,anchorBtn){
   menu.style.top=(r.bottom+6)+'px';
   menu.style.left=Math.max(4,r.left-60)+'px';
   menu.innerHTML='<div style="color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;margin-bottom:4px;">記憶'+(idx+1)+'</div>'
+    +'<button id="_memGoto" style="background:#2a6aad;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">表示VIEWへ移動</button>'
     +'<button id="_memOvr" style="background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">上書き保存</button>'
     +'<button id="_memRst" style="background:#8B0000;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">記憶リセット</button>'
     +'<button id="_memCnl" style="background:#333;color:#aaa;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;">キャンセル</button>';
   document.body.appendChild(menu);
   function closeMenu(){if(document.getElementById('_memMenu'))menu.remove();}
+  document.getElementById('_memGoto').onclick=function(){
+    var sv=savedViews[idx];if(!sv)return;
+    tx=sv.tx;ty=sv.ty;scale=sv.scale;scheduleDraw();
+    closeMenu();showGuide('記憶'+(idx+1)+'の位置へ移動しました',1500);
+  };
   document.getElementById('_memOvr').onclick=function(){
     savedViews[idx]={tx:tx,ty:ty,scale:scale};updateViewmemoState(idx);scheduleSave();
     closeMenu();showGuide('記憶'+(idx+1)+'を上書き保存しました',1500);
@@ -2215,14 +2226,14 @@ const vd = document.getElementById('versionDisplay');
 if(vd) vd.textContent = APP_VERSION;
 
 // ════════════════════════════════════════════════════
-// V0_39 拡張コード（メインスクリプト末尾に統合）
+// V0_35 拡張コード（メインスクリプト末尾に統合）
 // ── 旧 script[src=pdf.min.js] インラインコードを移動 ──
 // ════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════
 // V0_31 拡張コード
 // ════════════════════════════════════════════════════
 
-// ── A. 線幅ボタン削除済み（V0_39: UIシンプル化） ──────────────────
+// ── A. 線幅ボタン削除済み（V0_35: UIシンプル化） ──────────────────
 
 // ── B. 拡張スナップ（円-直線交点・円-円交点） ──────────────────────────
 ;(function(){
@@ -2295,916 +2306,583 @@ if(vd) vd.textContent = APP_VERSION;
   }
 })();
 
-// ── C. 統一計測システム V0_39 ──────────────────────────────────
+// ── C. 統一計測UX（circDim / distDim） ──────────────────────────────
 ;(function(){
-'use strict';
-
-// ─ State ─────────────────────────────────────────────────────
-// tool: 'dxdy'|'diag'|'circDim'|'radDim'|'distDim'
-// phase:
-//   dxdy/diag  : 0=P1, 1=P2, 2=位置指定
-//   circDim    : 0=円選択, 1=位置指定
-//   radDim     : 0=円選択, 1=位置指定
-//   distDim    : 0=対象①, 1=対象②, 2=位置指定
-var DIM = {
-  active: false, tool: '', phase: 0,
-  pts: [], cur: null, penDown: false,
-  _hoverPos: null
+// ─ 状態 ────────────────────────────────────────────
+var DIM={
+  active:false, tool:'', phase:0,
+  pts:[], penDown:false, cur:null, downSnapPt:null
 };
 
-var GUIDES = {
-  'dxdy':    ['1点目を選択（ペン当て→離して確定）',
-               '2点目を選択（ペン当て→離して確定）',
-               '寸法位置を指定（移動→離して確定）'],
-  'diag':    ['1点目を選択（ペン当て→離して確定）',
-               '2点目を選択（ペン当て→離して確定）',
-               '寸法位置を指定（移動→離して確定）'],
-  'circDim': ['円の円周にペンを近づける→離して確定',
-               '寸法位置を指定（移動→離して確定）'],
-  'radDim':  ['円または円弧を選択→離して確定',
-               '半径線の位置を指定（移動→離して確定）'],
-  'distDim': ['1つ目の対象を選択（線または点）→離して確定',
-               '2つ目の対象を選択（線または点）→離して確定',
-               '寸法位置を指定（移動→離して確定）'],
-  'linePt':  ['線をApple Pencilで選択してください（線に近づける→離す）',
-               '点を選択してください（スナップ確認→離す）',
-               '寸法位置を指定（移動→離して確定）']
+var GUIDES={
+  P1:'1点目を選択（ペンを当てて探索→離して確定）',
+  P2:'2点目を選択（ペンを当てて探索→離して確定）',
+  POS:'寸法位置を指定（ペンを移動→離して確定）',
+  CIRC:'円の円周にペンを近づける→離して確定→位置を指定',
+  DIST_L1:'1つ目の線を選択（線上をタップ→離して確定）',
+  DIST_L2:'2つ目の線を選択（線上をタップ→離して確定）',
+  RAD:'円または円弧を選択→離して確定→半径線の位置を指定',
 };
 
-function updateGuide() {
-  if (!DIM.active) { hideGuide(); return; }
-  var msgs = GUIDES[DIM.tool];
-  if (msgs && msgs[DIM.phase] !== undefined) showGuide(msgs[DIM.phase]);
+function resetDIM(){
+  DIM.active=false; DIM.tool=''; DIM.phase=0;
+  DIM.pts=[]; DIM.penDown=false; DIM.cur=null; DIM.downSnapPt=null;
+  DIM._hoverPos=null;
 }
 
-function resetDIM() {
-  DIM.active = false; DIM.tool = ''; DIM.phase = 0;
-  DIM.pts = []; DIM.cur = null; DIM.penDown = false; DIM._hoverPos = null;
-  DIM.linePtLine = null; DIM.linePtPt = null;
-}
-
-// ─ ツール切り替えフック ──────────────────────────────────────
-// 既存の .tool-btn click ハンドラの後に発火（capture=falseで後乗り）
-document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var t = this.dataset.tool;
+// ─ ツール切り替えのフック ────────────────────────
+// 既存ツール切り替え(.tool-btn click)の後に発火するよう遅延登録
+document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var t=this.dataset.tool;
     resetDIM();
-    var MEASURE_TOOLS = ['dxdy','diag','circDim','radDim','distDim','linePt'];
-    if (MEASURE_TOOLS.indexOf(t) >= 0) {
-      DIM.active = true; DIM.tool = t; DIM.phase = 0;
-      // 既存ツールのdimState/dimPendingDownもリセット（二重処理防止）
-      if (typeof dimState !== 'undefined') dimState = {pts:[]};
-      if (typeof dimPendingDown !== 'undefined') dimPendingDown = false;
-      updateGuide();
+    if(t==='circDim'||t==='distDim'||t==='radDim'){
+      DIM.active=true; DIM.tool=t; DIM.phase=0;
+      if(t==='circDim'){ showGuide(GUIDES.CIRC); console.log('Diameter Mode'); }
+      else if(t==='distDim'){ showGuide(GUIDES.DIST_L1); console.log('Shortest Distance Mode'); }
+      else if(t==='radDim'){ showGuide(GUIDES.RAD); console.log('Radius Mode'); }
     }
   });
 });
 
-// ─ スナップ ──────────────────────────────────────────────────
-var SNAP_COLORS = {
-  'end':'#00ff7f','int':'#ffd700','cen':'#00f0ff','mid':'#ffbb33',
-  'cxl':'#ff88cc','cxc':'#ffcc44','on':'#FF8C00','default':'#f39c12'
-};
-
-function msSnap(wx, wy) {
-  // 既存snapAt（端点・中点・中心・交点）を優先利用
-  var sp = (typeof snapAt === 'function') ? snapAt(wx, wy) : null;
-  if (sp) return {x: sp.x, y: sp.y, type: sp.type, kind: 'snap', ent: null};
-
-  var THRESH = 28 / scale;
-  var best = null, bd = Infinity;
-
-  // 線分上最近傍点
-  if (doc && doc.sen) {
-    doc.sen.forEach(function(s) {
-      if (hiddenLayers && hiddenLayers.has(s.layer)) return;
-      var dx = s.x2 - s.x1, dy = s.y2 - s.y1, len2 = dx*dx + dy*dy;
-      if (len2 < 1e-12) return;
-      var t = ((wx - s.x1)*dx + (wy - s.y1)*dy) / len2;
-      t = Math.max(0, Math.min(1, t));
-      var px = s.x1 + t*dx, py = s.y1 + t*dy;
-      var d = Math.hypot(wx - px, wy - py);
-      if (d < THRESH && d < bd) { bd = d; best = {x:px, y:py, kind:'on', type:'on', ent:s}; }
-    });
-  }
-  // 円弧円周上最近傍点・中心
-  if (doc && doc.enko) {
-    doc.enko.forEach(function(e) {
-      if (hiddenLayers && hiddenLayers.has(e.layer)) return;
-      var dc = Math.hypot(wx - e.cx, wy - e.cy);
-      var d = Math.abs(dc - e.r);
-      if (d < THRESH && d < bd) {
-        var ang = Math.atan2(wy - e.cy, wx - e.cx);
-        bd = d; best = {x: e.cx + e.r*Math.cos(ang), y: e.cy + e.r*Math.sin(ang), kind:'on', type:'on', ent:e};
-      }
-      if (dc < THRESH && dc < bd) { bd = dc; best = {x:e.cx, y:e.cy, kind:'cen', type:'cen', ent:e}; }
-    });
-  }
-  return best || {x:wx, y:wy, kind:'pt', type:'default', ent:null};
-}
-
-function msSnapCircle(wx, wy) {
-  if (!doc || !doc.enko) return null;
-  var THRESH = 35 / scale;
-  var best = null, bd = Infinity;
-  doc.enko.forEach(function(e) {
-    if (hiddenLayers && hiddenLayers.has(e.layer)) return;
-    var d = Math.abs(Math.hypot(wx - e.cx, wy - e.cy) - e.r);
-    if (d < THRESH && d < bd) { bd = d; best = e; }
-  });
-  return best;
-}
-
-function msSnapDistDim(wx, wy) {
-  // distDim: まず既存snapAt、なければ線分/円周上最近傍点
-  var sp = (typeof snapAt === 'function') ? snapAt(wx, wy) : null;
-  if (sp) return {x:sp.x, y:sp.y, kind:'snap', type:sp.type, ent:null, onLine:null};
-  var THRESH = 25 / scale;
-  var best = null, bd = Infinity;
-  if (doc && doc.sen) {
-    doc.sen.forEach(function(s) {
-      if (hiddenLayers && hiddenLayers.has(s.layer)) return;
-      var dx = s.x2-s.x1, dy = s.y2-s.y1, len2 = dx*dx+dy*dy;
-      if (len2 < 1e-12) return;
-      var t = ((wx-s.x1)*dx+(wy-s.y1)*dy)/len2;
-      t = Math.max(0, Math.min(1, t));
-      var px = s.x1+t*dx, py = s.y1+t*dy;
-      var d = Math.hypot(wx-px, wy-py);
-      if (d < THRESH && d < bd) { bd=d; best={x:px,y:py,kind:'line',type:'on',ent:s,onLine:s}; }
-    });
-  }
-  if (doc && doc.enko) {
-    doc.enko.forEach(function(e) {
-      if (hiddenLayers && hiddenLayers.has(e.layer)) return;
-      var d = Math.abs(Math.hypot(wx-e.cx,wy-e.cy)-e.r);
-      if (d < THRESH && d < bd) {
-        var ang = Math.atan2(wy-e.cy,wx-e.cx);
-        bd=d; best={x:e.cx+e.r*Math.cos(ang),y:e.cy+e.r*Math.sin(ang),kind:'arc',type:'on',ent:e,onLine:null};
-      }
-    });
-  }
-  return best || {x:wx, y:wy, kind:'pt', type:'default', ent:null, onLine:null};
-}
-
-// ─ 距離計算 (distDim) ────────────────────────────────────────
-function calcDistDim(t1, t2) {
-  if (t1.kind === 'line' && t2.kind === 'line') {
-    var mp = {x:(t1.ent.x1+t1.ent.x2)/2, y:(t1.ent.y1+t1.ent.y2)/2};
-    var ft = projOnLine(mp.x, mp.y, t2.ent);
-    return {p1:mp, p2:ft, type:'diag'};
-  }
-  if (t1.kind === 'line' || t2.kind === 'line') {
-    var lineT = t1.kind==='line'?t1:t2;
-    var ptT = t1.kind==='line'?t2:t1;
-    var ft2 = projOnLine(ptT.x, ptT.y, lineT.ent);
-    return {p1:{x:ptT.x,y:ptT.y}, p2:ft2, type:'diag'};
-  }
-  return {p1:{x:t1.x,y:t1.y}, p2:{x:t2.x,y:t2.y}, type:'diag'};
-}
-
-function projOnLine(px, py, e) {
-  var dx=e.x2-e.x1, dy=e.y2-e.y1, len2=dx*dx+dy*dy;
-  if (len2<1e-10) return {x:e.x1,y:e.y1};
-  var t=((px-e.x1)*dx+(py-e.y1)*dy)/len2;
-  return {x:e.x1+t*dx, y:e.y1+t*dy};
-}
-
-function findNearestCircleEdge(wx, wy) {
-  if (!doc || !doc.enko) return null;
-  var THRESH = 24 / scale;
-  var best = null, bd = Infinity;
-  doc.enko.forEach(function(e) {
-    if (hiddenLayers && hiddenLayers.has(e.layer)) return;
-    var d = Math.abs(Math.hypot(wx-e.cx,wy-e.cy)-e.r);
-    if (d < THRESH && d < bd) { bd=d; best=e; }
-  });
-  return best;
-}
-
-function findNearestLine(wx, wy) {
-  if (!doc || !doc.sen) return null;
-  var THRESH = 24 / scale;
-  var best = null, bd = Infinity;
-  doc.sen.forEach(function(e) {
-    if (hiddenLayers && hiddenLayers.has(e.layer)) return;
-    var d = distToSeg(wx,wy,e.x1,e.y1,e.x2,e.y2);
-    if (d < THRESH && d < bd) { bd=d; best=e; }
-  });
-  return best;
-}
-
-function buildLinePtDim(sen, pt, p3) {
-  var sd = parseFloat(document.getElementById('scaleDenom').value) || 1;
-  var dx = sen.x2 - sen.x1, dy = sen.y2 - sen.y1;
-  var len2 = dx*dx + dy*dy;
-  if (len2 < 1e-12) return null;
-  var t = ((pt.x - sen.x1)*dx + (pt.y - sen.y1)*dy) / len2;
-  var footX = sen.x1 + t*dx, footY = sen.y1 + t*dy;
-  var dist = Math.hypot(pt.x - footX, pt.y - footY);
-  if (dist < 1e-6) return null;
-  var len = Math.sqrt(len2);
-  var ux = dx/len, uy = dy/len;
-  var nx = pt.x - footX, ny = pt.y - footY;
-  var nlen = Math.hypot(nx, ny);
-  nx /= nlen; ny /= nlen;
-  var midX = (pt.x + footX)/2, midY = (pt.y + footY)/2;
-  var offset = (p3.x - midX)*(-uy) + (p3.y - midY)*ux;
-  var ep1x = footX - uy*offset, ep1y = footY + ux*offset;
-  var ep2x = pt.x  - uy*offset, ep2y = pt.y  + ux*offset;
-  var ext = 8/scale;
-  var sig = offset >= 0 ? 1 : -1;
-  var ang = Math.atan2(ny, nx);
-  var textAng = (ang > Math.PI/2) ? ang - Math.PI : (ang < -Math.PI/2) ? ang + Math.PI : ang;
-  return {
-    lines: [
-      {x1:ep1x, y1:ep1y, x2:ep2x, y2:ep2y},
-      {x1:footX, y1:footY, x2:ep1x + (-uy)*sig*ext, y2:ep1y + ux*sig*ext},
-      {x1:pt.x,  y1:pt.y,  x2:ep2x + (-uy)*sig*ext, y2:ep2y + ux*sig*ext}
-    ],
-    arrows: [
-      {x:ep1x, y:ep1y, angle: ang + Math.PI},
-      {x:ep2x, y:ep2y, angle: ang}
-    ],
-    text: formatDim(dist / sd),
-    tx: p3.x, ty: p3.y,
-    tangle: textAng,
-    type: 'linePt', color: '#f39c12'
-  };
-}
-
-// ─ handleDown/Move/Up（タッチハンドラから呼ぶ） ───────────────
-DIM.handleDown = function(sx, sy) {
-  if (!DIM.active) return;
-  var wp = s2w(sx, sy);
-  var wx = wp[0], wy = wp[1];
-  DIM.penDown = true;
-  DIM._hoverPos = {x:wx, y:wy};
-
-  if ((DIM.tool==='circDim'||DIM.tool==='radDim') && DIM.phase===0) {
-    // 円選択フェーズ: ホバーのみ更新、確定はUPで
-    DIM.cur = null;
-  } else if (DIM.tool==='linePt') {
-    if (DIM.phase===0) {
-      DIM.linePtLine = findNearestLine(wx, wy);
-      DIM.cur = null;
-    } else if (DIM.phase===1) {
-      DIM.cur = msSnap(wx, wy);
-    } else if (DIM.phase===2) {
-      DIM.cur = {x:wx, y:wy, kind:'pt', type:'default', ent:null};
-    }
-  } else if (DIM.tool==='distDim') {
-    DIM.cur = msSnapDistDim(wx, wy);
-  } else {
-    DIM.cur = msSnap(wx, wy);
-  }
-  scheduleOverlay();
-};
-
-DIM.handleMove = function(sx, sy) {
-  if (!DIM.active) return;
-  var wp = s2w(sx, sy);
-  var wx = wp[0], wy = wp[1];
-  DIM._hoverPos = {x:wx, y:wy};
-
-  if ((DIM.tool==='circDim'||DIM.tool==='radDim') && DIM.phase===0) {
-    DIM.cur = null; // ホバーはdrawDIMOverlayで_hoverPosから描画
-  } else if ((DIM.tool==='circDim'||DIM.tool==='radDim') && DIM.phase===1) {
-    DIM.cur = {x:wx, y:wy, kind:'pt', type:'default', ent:null};
-  } else if (DIM.tool==='linePt') {
-    if (DIM.phase===0) {
-      DIM.linePtLine = findNearestLine(wx, wy);
-      DIM.cur = null;
-    } else if (DIM.phase===1) {
-      DIM.cur = msSnap(wx, wy);
-    } else if (DIM.phase===2) {
-      DIM.cur = {x:wx, y:wy, kind:'pt', type:'default', ent:null};
-    }
-  } else if (DIM.tool==='distDim') {
-    DIM.cur = msSnapDistDim(wx, wy);
-  } else {
-    DIM.cur = msSnap(wx, wy);
-  }
-  scheduleOverlay();
-};
-
-DIM.handleUp = function(sx, sy) {
-  if (!DIM.active || !DIM.penDown) return;
-  DIM.penDown = false;
-  var wp = s2w(sx, sy);
-  var wx = wp[0], wy = wp[1];
-
-
-  // ── phase 0: 最初の点/対象を確定 ──
-  if (DIM.phase === 0) {
-    if (DIM.tool === 'circDim' || DIM.tool === 'radDim') {
-      var ent = findNearestCircleEdge(wx, wy);
-      if (!ent && DIM._hoverPos) ent = findNearestCircleEdge(DIM._hoverPos.x, DIM._hoverPos.y);
-      if (ent) {
-        DIM.pts = [{x:ent.cx, y:ent.cy, kind:'circ', ent:ent}];
-        DIM.phase = 1;
-        DIM.cur = null;
-        updateGuide();
-        scheduleOverlay(); return;
-      } else {
-        showGuide('円の近くにペンを当ててください', 1500);
-        DIM.cur = null; scheduleOverlay(); return;
-      }
-    }
-    if (DIM.tool === 'distDim') {
-      var snap1 = msSnapDistDim(wx, wy);
-      var entry1 = {x:snap1.x, y:snap1.y, kind:snap1.kind, ent:snap1.ent, onLine:snap1.onLine||null};
-      if (entry1.kind !== 'line' && entry1.kind !== 'arc') {
-        var nl1 = findNearestLine(wx, wy);
-        if (nl1) { entry1.kind='line'; entry1.ent=nl1; entry1.onLine=nl1; }
-      }
-      DIM.pts = [entry1]; DIM.phase = 1;
-      DIM.cur = null; updateGuide();
-      scheduleOverlay(); return;
-    }
-    if (DIM.tool === 'linePt') {
-      var ln0 = DIM.linePtLine || findNearestLine(wx, wy);
-      if (ln0) {
-        DIM.linePtLine = ln0;
-        DIM.pts = [{x:(ln0.x1+ln0.x2)/2, y:(ln0.y1+ln0.y2)/2, kind:'line', ent:ln0}];
-        DIM.phase = 1; DIM.cur = null; DIM.linePtPt = null;
-        updateGuide(); scheduleOverlay(); return;
-      } else {
-        showGuide('線の近くにペンを当ててください', 1500);
-        DIM.cur = null; scheduleOverlay(); return;
-      }
-    }
-    // dxdy / diag
-    var pt1 = msSnap(wx, wy);
-    DIM.pts = [{x:pt1.x, y:pt1.y, kind:'pt', ent:null}];
-    DIM.phase = 1; DIM.cur = null; updateGuide();
-    scheduleOverlay(); return;
-  }
-
-  // ── phase 1: 2点目/位置指定 ──
-  if (DIM.phase === 1) {
-    if (DIM.tool === 'circDim' || DIM.tool === 'radDim') {
-      // 位置確定
-      confirmDIM({x:wx, y:wy}); return;
-    }
-    if (DIM.tool === 'distDim') {
-      var snap2 = msSnapDistDim(wx, wy);
-      var entry2 = {x:snap2.x, y:snap2.y, kind:snap2.kind, ent:snap2.ent, onLine:snap2.onLine||null};
-      if (entry2.kind !== 'line' && entry2.kind !== 'arc') {
-        var nl2 = findNearestLine(wx, wy);
-        if (nl2) { entry2.kind='line'; entry2.ent=nl2; entry2.onLine=nl2; }
-      }
-      DIM.pts.push(entry2); DIM.phase = 2;
-      DIM.cur = null; updateGuide();
-      scheduleOverlay(); return;
-    }
-    if (DIM.tool === 'linePt') {
-      var ptSnap = msSnap(wx, wy);
-      DIM.linePtPt = {x:ptSnap.x, y:ptSnap.y};
-      DIM.pts.push({x:ptSnap.x, y:ptSnap.y, kind:'pt', ent:null});
-      DIM.phase = 2; DIM.cur = null;
-      updateGuide(); scheduleOverlay(); return;
-    }
-    // dxdy / diag: P2確定
-    var pt2 = msSnap(wx, wy);
-    DIM.pts.push({x:pt2.x, y:pt2.y, kind:'pt', ent:null});
-    DIM.phase = 2; DIM.cur = null; updateGuide();
-    scheduleOverlay(); return;
-  }
-
-  // ── phase 2: 位置確定 ──
-  if (DIM.phase === 2) {
-    confirmDIM({x:wx, y:wy}); return;
-  }
-};
-
-// ─ 寸法確定 ─────────────────────────────────────────────────
-function buildCircDimPhi(ent, p3) {
-  var sd = parseFloat(document.getElementById('scaleDenom').value) || 1;
-  var cx = ent.cx, cy = ent.cy, r = ent.r;
-  var ang = Math.atan2(p3.y - cy, p3.x - cx);
-  var x1 = cx + r * Math.cos(ang + Math.PI);
-  var y1 = cy + r * Math.sin(ang + Math.PI);
-  var x2 = cx + r * Math.cos(ang);
-  var y2 = cy + r * Math.sin(ang);
-  var textAng = (ang > Math.PI/2) ? ang - Math.PI : (ang < -Math.PI/2) ? ang + Math.PI : ang;
-  var dist = Math.hypot(p3.x - cx, p3.y - cy);
-  var extLen = Math.max(dist, r + 20/scale);
-  var tx2 = cx + extLen * Math.cos(ang);
-  var ty2 = cy + extLen * Math.sin(ang);
-  return {
-    lines: [{x1:x1,y1:y1,x2:x2,y2:y2}],
-    arrows: [
-      {x:x1, y:y1, angle: ang + Math.PI},
-      {x:x2, y:y2, angle: ang}
-    ],
-    text: 'φ' + formatDim(r * 2 / sd),
-    tx: tx2, ty: ty2,
-    tangle: textAng,
-    type: 'circDim', color: '#f39c12'
-  };
-}
-
-function buildRadDim(ent, p3) {
-  var sd = parseFloat(document.getElementById('scaleDenom').value) || 1;
-  var cx = ent.cx, cy = ent.cy, r = ent.r;
-  var ang = Math.atan2(p3.y - cy, p3.x - cx);
-  var ex = cx + r * Math.cos(ang);
-  var ey = cy + r * Math.sin(ang);
-  var dist = Math.hypot(p3.x - cx, p3.y - cy);
-  var extLen = Math.max(dist, r + 15/scale);
-  var tx2 = cx + extLen * Math.cos(ang);
-  var ty2 = cy + extLen * Math.sin(ang);
-  var textAng = (ang > Math.PI/2) ? ang - Math.PI : (ang < -Math.PI/2) ? ang + Math.PI : ang;
-  return {
-    lines: [{x1:cx,y1:cy,x2:ex,y2:ey}],
-    arrows: [{x:ex, y:ey, angle: ang}],
-    text: 'R' + formatDim(r / sd),
-    tx: tx2, ty: ty2,
-    tangle: textAng,
-    type: 'radDim', color: '#f39c12'
-  };
-}
-
-function confirmDIM(p3) {
-  var p1 = DIM.pts[0], p2 = DIM.pts[1];
-  var d = null;
-  try {
-    if (DIM.tool === 'circDim' && p1 && p1.ent) {
-      d = buildCircDimPhi(p1.ent, p3);
-    } else if (DIM.tool === 'radDim' && p1 && p1.ent) {
-      d = buildRadDim(p1.ent, p3);
-    } else if ((DIM.tool === 'dxdy' || DIM.tool === 'diag') && p1 && p2) {
-      var dimType = DIM.tool;
-      if (DIM.tool === 'dxdy') {
-        // p3 の位置で水平/鉛直を自動判定
-        var midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
-        var horizOfs = Math.abs(p3.x - midX), vertOfs = Math.abs(p3.y - midY);
-        dimType = (vertOfs >= horizOfs) ? 'dx' : 'dy';
-      }
-      d = buildDim(p1, p2, p3, dimType);
-    } else if (DIM.tool === 'distDim' && p1 && p2) {
-      var res = calcDistDim(p1, p2);
-      if (res) d = buildDim(res.p1, res.p2, p3, res.type);
-    } else if (DIM.tool === 'linePt' && DIM.linePtLine && DIM.linePtPt) {
-      d = buildLinePtDim(DIM.linePtLine, DIM.linePtPt, p3);
-    }
-  } catch(err) { console.warn('[DIM V0_39 confirm]', err); }
-
-  if (d) {
-    snapshot();
-    dims.push(d);
-    scheduleSave(); scheduleDraw();
-    showGuide('寸法を追加しました ↩ で取消', 2000);
-  }
-
-  // 次の計測へリセット（ツールは維持）
-  DIM.pts = []; DIM.phase = 0; DIM.cur = null; DIM._hoverPos = null;
-  DIM.linePtLine = null; DIM.linePtPt = null;
-  var nextG = GUIDES[DIM.tool];
-  if (nextG) {
-    setTimeout(function() {
-      if (DIM.active) showGuide(nextG[0]);
-    }, 2000);
-  }
-  scheduleOverlay();
-}
-
-// ─ drawOverlay フック ────────────────────────────────────────
-var _origDO = drawOverlay;
-window.drawOverlay = function() {
+// ─ drawOverlay フック ─────────────────────────────
+var _origDO=drawOverlay;
+window.drawOverlay=function(){
   _origDO();
-  if (DIM.active) drawDIMOverlay();
+  if(DIM.active) drawDIMOverlay();
 };
 
-// ─ DIMオーバーレイ描画 ──────────────────────────────────────
-var SNAP_COLORS_DIM = {
+// snapPt のラベルマップ拡張（既存に追加）
+var SNAP_COLORS={
   'end':'#00ff7f','int':'#ffd700','cen':'#00f0ff','mid':'#ffbb33',
-  'on':'#FF8C00','default':'#f39c12'
+  'cxl':'#ff88cc','cxc':'#ffcc44','default':'#f39c12'
 };
 
-function drawSnapMarker(sx, sy, type) {
-  var col = SNAP_COLORS_DIM[type] || SNAP_COLORS_DIM.default;
+function drawDIMOverlay(){
+  var dpr=window.devicePixelRatio||1;
   octx.save();
-  octx.strokeStyle = col; octx.fillStyle = col; octx.lineWidth = 2;
-  if (type === 'end') {
-    octx.strokeRect(sx-7, sy-7, 14, 14);
-    octx.beginPath();
-    octx.moveTo(sx-12,sy); octx.lineTo(sx+12,sy);
-    octx.moveTo(sx,sy-12); octx.lineTo(sx,sy+12);
-    octx.stroke();
-  } else if (type === 'cen') {
-    octx.beginPath(); octx.arc(sx,sy,9,0,Math.PI*2); octx.stroke();
-    octx.beginPath(); octx.arc(sx,sy,3,0,Math.PI*2); octx.fill();
-    octx.beginPath();
-    octx.moveTo(sx-13,sy); octx.lineTo(sx+13,sy);
-    octx.moveTo(sx,sy-13); octx.lineTo(sx,sy+13);
-    octx.stroke();
-  } else if (type === 'mid') {
-    octx.beginPath();
-    octx.moveTo(sx,sy-10); octx.lineTo(sx+10,sy);
-    octx.lineTo(sx,sy+10); octx.lineTo(sx-10,sy);
-    octx.closePath(); octx.stroke();
-  } else if (type === 'int') {
-    octx.beginPath();
-    octx.moveTo(sx-10,sy-10); octx.lineTo(sx+10,sy+10);
-    octx.moveTo(sx+10,sy-10); octx.lineTo(sx-10,sy+10);
-    octx.stroke();
-    octx.beginPath(); octx.arc(sx,sy,3,0,Math.PI*2); octx.fill();
-  } else {
-    // on / default: オレンジ丸+クロス
-    octx.strokeStyle = '#FF8C00'; octx.lineWidth = 2.5;
-    octx.beginPath(); octx.arc(sx,sy,9,0,Math.PI*2); octx.stroke();
-    octx.beginPath();
-    octx.moveTo(sx-13,sy); octx.lineTo(sx+13,sy);
-    octx.moveTo(sx,sy-13); octx.lineTo(sx,sy+13);
-    octx.stroke();
-  }
-  octx.restore();
-}
+  octx.scale(dpr,dpr);
 
-function drawDIMOverlay() {
-  var dpr = window.devicePixelRatio || 1;
-  octx.save();
-  octx.scale(dpr, dpr);
-
-  // 1. circDim/radDim phase=0: 円ハイライト
-  if ((DIM.tool==='circDim'||DIM.tool==='radDim') && DIM.phase===0 && doc && doc.enko) {
-    var hp = DIM._hoverPos;
-    if (hp) {
-      var nearEnk = findNearestCircleEdge(hp.x, hp.y);
-      if (nearEnk) {
-        var hsc = w2s(nearEnk.cx, nearEnk.cy);
-        var hr = nearEnk.r * scale;
+  // circDim phase=0 時: 近傍の円をハイライト
+  if(DIM.tool==='circDim'&&DIM.phase===0&&doc&&doc.enko){
+    // ホバー中の最近傍円をオレンジハイライト（DIM.cur の有無に関わらず _hoverPos を使用）
+    var _hp=DIM._hoverPos;
+    if(_hp){
+      var nearEnk=findNearestCircleEdge(_hp.x,_hp.y);
+      if(nearEnk){
+        var hsc=w2s(nearEnk.cx,nearEnk.cy);
+        var hr=nearEnk.r*scale;
         octx.save();
-        octx.strokeStyle = DIM.tool==='circDim' ? '#FF8C00' : '#00ffcc';
-        octx.lineWidth = 3;
-        if (DIM.tool==='radDim') { octx.setLineDash([6,3]); }
-        octx.beginPath(); octx.arc(hsc[0], hsc[1], hr, 0, Math.PI*2); octx.stroke();
+        octx.strokeStyle='#FF8C00';  // オレンジ
+        octx.lineWidth=3;
+        octx.beginPath(); octx.arc(hsc[0],hsc[1],hr,0,Math.PI*2); octx.stroke();
+        octx.restore();
+      }
+    }
+  }
+
+  // radDim phase=0 時: 近傍の円をシアンハイライト
+  if(DIM.tool==='radDim'&&DIM.phase===0&&doc&&doc.enko){
+    var _rhp=DIM._hoverPos;
+    if(_rhp){
+      var rNearEnk=findNearestCircleEdge(_rhp.x,_rhp.y);
+      if(rNearEnk){
+        var rhsc=w2s(rNearEnk.cx,rNearEnk.cy);
+        var rhr=rNearEnk.r*scale;
+        octx.save();
+        octx.strokeStyle='#00ffcc';
+        octx.lineWidth=2.5;
+        octx.setLineDash([6,3]);
+        octx.beginPath(); octx.arc(rhsc[0],rhsc[1],rhr,0,Math.PI*2); octx.stroke();
         octx.setLineDash([]);
         octx.restore();
       }
     }
   }
 
-  // 1b. linePt phase=0: 近傍線をオレンジハイライト
-  if (DIM.tool==='linePt' && DIM.phase===0 && DIM.linePtLine) {
-    var lns = DIM.linePtLine;
-    var sc1=w2s(lns.x1,lns.y1), sc2=w2s(lns.x2,lns.y2);
-    octx.save();
-    octx.strokeStyle='#FF8C00'; octx.lineWidth=3; octx.setLineDash([]);
-    octx.beginPath(); octx.moveTo(sc1[0],sc1[1]); octx.lineTo(sc2[0],sc2[1]); octx.stroke();
-    octx.restore();
-  }
-
-  // 2. スナップマーカー（dxdy/diag/distDim移動中）
-  var snap = DIM.cur;
-  if (snap && DIM.phase < 2) {
-    var sc = w2s(snap.x, snap.y);
-    drawSnapMarker(sc[0], sc[1], snap.type);
-    // ラベル
-    var STC = {int:'交点',end:'端点',cen:'中心',mid:'中点',on:'線上'};
-    var lbl = STC[snap.type]||'';
-    if (lbl) {
-      octx.font = 'bold 11px sans-serif';
-      var tw = octx.measureText(lbl).width;
-      octx.fillStyle = 'rgba(0,0,0,0.72)';
-      octx.fillRect(sc[0]+15, sc[1]-19, tw+8, 17);
-      var col2 = SNAP_COLORS_DIM[snap.type]||SNAP_COLORS_DIM.default;
-      octx.fillStyle = col2;
-      octx.textAlign = 'left'; octx.textBaseline = 'bottom';
-      octx.fillText(lbl, sc[0]+19, sc[1]-4);
+  // カーソル位置のスナップマーカー
+  var snap=DIM.cur;
+  if(snap){
+    var sc=w2s(snap.x,snap.y);
+    // distDim 時は kind='line'/'arc'/'snap' などを使用
+    var snapType=snap.type||(snap.kind==='line'?'on_line':snap.kind==='arc'?'on_arc':null)||snap.type;
+    drawExtSnapMarker(octx,sc[0],sc[1],snapType);
+    // distDim の線上スナップマーカー追加表示（橙色クロス）
+    if(DIM.active&&DIM.tool==='distDim'&&(snap.kind==='line'||snap.kind==='arc')){
+      octx.save();
+      octx.strokeStyle='#FF8C00'; octx.lineWidth=2.5;
+      octx.beginPath();
+      octx.arc(sc[0],sc[1],9,0,Math.PI*2); octx.stroke();
+      octx.beginPath();
+      octx.moveTo(sc[0]-13,sc[1]); octx.lineTo(sc[0]+13,sc[1]);
+      octx.moveTo(sc[0],sc[1]-13); octx.lineTo(sc[0],sc[1]+13);
+      octx.stroke();
+      octx.restore();
     }
   }
 
-  // 3. 確定済み点のマーカー（青）
-  DIM.pts.forEach(function(p, idx) {
-    var sc = w2s(p.x, p.y);
-    octx.fillStyle = '#00d4ff'; octx.strokeStyle = '#00d4ff';
-    octx.lineWidth = 2;
-    octx.beginPath(); octx.arc(sc[0], sc[1], 5, 0, Math.PI*2); octx.fill();
-    octx.font = 'bold 12px sans-serif';
-    octx.textAlign = 'left'; octx.textBaseline = 'bottom';
-    octx.fillText('P'+(idx+1), sc[0]+8, sc[1]-2);
+  // 確定済み点のマーカー
+  DIM.pts.forEach(function(p,idx){
+    var sc=w2s(p.x,p.y);
+    octx.fillStyle='#00d4ff'; octx.strokeStyle='#00d4ff';
+    octx.lineWidth=2;
+    octx.beginPath(); octx.arc(sc[0],sc[1],5,0,Math.PI*2); octx.fill();
+    octx.font='bold 12px sans-serif'; octx.textAlign='left'; octx.textBaseline='bottom';
+    octx.fillText('P'+(idx+1),sc[0]+8,sc[1]-2);
   });
 
-  // 4. 位置指定フェーズ: プレビュー
-  if (DIM.phase === (DIM.tool==='dxdy'||DIM.tool==='diag'?2:DIM.tool==='distDim'?2:DIM.tool==='linePt'?2:1) && DIM.cur) {
-    drawDIMPreview();
+  // フェーズ2: 位置指定プレビュー
+  if(DIM.phase===2 && DIM.cur){
+    drawDIMPreview(octx);
   }
 
   octx.restore();
 }
 
-function drawDIMPreview() {
-  var p3 = DIM.cur;
-  if (!p3) return;
-  var prevDim = null;
-  try {
-    if (DIM.tool === 'circDim' && DIM.pts[0] && DIM.pts[0].ent) {
-      prevDim = buildCircDimPhi(DIM.pts[0].ent, p3);
-    } else if (DIM.tool === 'radDim' && DIM.pts[0] && DIM.pts[0].ent) {
-      prevDim = buildRadDim(DIM.pts[0].ent, p3);
-    } else if ((DIM.tool==='dxdy'||DIM.tool==='diag') && DIM.pts.length >= 2) {
-      var p1=DIM.pts[0], p2=DIM.pts[1];
-      var dType = DIM.tool;
-      if (DIM.tool==='dxdy') {
-        var midX=(p1.x+p2.x)/2, midY=(p1.y+p2.y)/2;
-        dType = (Math.abs(p3.y-midY)>=Math.abs(p3.x-midX)) ? 'dx' : 'dy';
+function drawExtSnapMarker(ctx,sx,sy,type){
+  var col=SNAP_COLORS[type]||SNAP_COLORS.default;
+  ctx.save();
+  ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=2;
+  // cxl, cxc は既存と異なるマーカー形状
+  if(type==='cxl'){
+    ctx.beginPath();
+    ctx.moveTo(sx-8,sy-8); ctx.lineTo(sx+8,sy+8);
+    ctx.moveTo(sx+8,sy-8); ctx.lineTo(sx-8,sy+8);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(sx,sy,4,0,Math.PI*2); ctx.stroke();
+  } else if(type==='cxc'){
+    ctx.beginPath(); ctx.arc(sx,sy,8,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
+  }
+  // ラベル
+  var lbl={cxl:'円-線交点',cxc:'円-円交点'}[type]||'';
+  if(lbl){
+    ctx.font='bold 11px sans-serif';
+    var tw=ctx.measureText(lbl).width;
+    ctx.fillStyle='rgba(0,0,0,0.72)';
+    ctx.fillRect(sx+15,sy-19,tw+8,17);
+    ctx.fillStyle=col;
+    ctx.textAlign='left'; ctx.textBaseline='bottom';
+    ctx.fillText(lbl,sx+19,sy-4);
+  }
+  ctx.restore();
+}
+
+function drawDIMPreview(ctx){
+  var p3=DIM.cur;
+  if(!p3) return;
+  var prevDim=null;
+  try{
+    if(DIM.tool==='circDim'){
+      if(DIM.pts.length>=1&&DIM.pts[0].ent){
+        prevDim=buildCircDimPhi(DIM.pts[0].ent,p3);
       }
-      prevDim = buildDim(p1, p2, p3, dType);
-    } else if (DIM.tool==='distDim' && DIM.pts.length >= 2) {
-      var res2 = calcDistDim(DIM.pts[0], DIM.pts[1]);
-      if (res2) prevDim = buildDim(res2.p1, res2.p2, p3, res2.type);
-    } else if (DIM.tool==='linePt' && DIM.linePtLine && DIM.linePtPt) {
-      prevDim = buildLinePtDim(DIM.linePtLine, DIM.linePtPt, p3);
+    } else if(DIM.tool==='distDim'){
+      if(DIM.pts.length===2){
+        var res=calcDistDim(DIM.pts[0],DIM.pts[1]);
+        if(res) prevDim=buildDim(res.p1,res.p2,p3,res.type);
+      }
+    } else if(DIM.tool==='radDim'){
+      if(DIM.pts.length>=1&&DIM.pts[0].ent){
+        prevDim=buildRadDim(DIM.pts[0].ent,p3);
+      }
     }
-  } catch(e) { console.warn('[DIM preview]', e); }
-  if (!prevDim || !prevDim.lines) return;
+  }catch(e){ console.warn('[DIM preview]',e); }
+  if(!prevDim||!prevDim.lines) return;
 
-  octx.save();
-  octx.strokeStyle = 'rgba(0,212,255,0.75)';
-  octx.lineWidth = 1.5; octx.setLineDash([5,3]); octx.lineCap = 'round';
-  prevDim.lines.forEach(function(l) {
-    var s1=w2s(l.x1,l.y1), s2=w2s(l.x2,l.y2);
-    octx.beginPath(); octx.moveTo(s1[0],s1[1]); octx.lineTo(s2[0],s2[1]); octx.stroke();
+  ctx.save();
+  ctx.strokeStyle='rgba(0,212,255,0.75)';
+  ctx.lineWidth=1.5; ctx.setLineDash([5,3]); ctx.lineCap='round';
+  prevDim.lines.forEach(function(l){
+    var s1=w2s(l.x1,l.y1),s2=w2s(l.x2,l.y2);
+    ctx.beginPath(); ctx.moveTo(s1[0],s1[1]); ctx.lineTo(s2[0],s2[1]); ctx.stroke();
   });
-  octx.setLineDash([]);
-  if (prevDim.text && prevDim.tx != null) {
-    var stx = w2s(prevDim.tx, prevDim.ty);
-    octx.font = 'bold 17px sans-serif';
-    octx.textAlign = 'center'; octx.textBaseline = 'middle';
-    var tw2 = octx.measureText(prevDim.text).width;
-    octx.fillStyle = 'rgba(0,20,40,0.65)';
-    octx.fillRect(stx[0]-tw2/2-3, stx[1]-10, tw2+6, 20);
-    octx.fillStyle = 'rgba(0,212,255,0.85)';
-    if (prevDim.tangle) {
-      octx.save(); octx.translate(stx[0],stx[1]); octx.rotate(prevDim.tangle);
-      octx.fillText(prevDim.text, 0, 0); octx.restore();
-    } else {
-      octx.fillText(prevDim.text, stx[0], stx[1]);
-    }
+  ctx.setLineDash([]);
+  if(prevDim.text&&prevDim.tx!=null){
+    var stx=w2s(prevDim.tx,prevDim.ty);
+    ctx.font='bold 17px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    var tw=ctx.measureText(prevDim.text).width;
+    ctx.fillStyle='rgba(0,20,40,0.65)';
+    ctx.fillRect(stx[0]-tw/2-3,stx[1]-10,tw+6,20);
+    ctx.fillStyle='rgba(0,212,255,0.85)';
+    ctx.fillText(prevDim.text,stx[0],stx[1]);
   }
-  octx.restore();
+  ctx.restore();
 }
 
-// ─ pointerイベント（ov キャプチャ） ─────────────────────────
-// タッチイベントとの二重処理を防ぐため、isPenがtrueの場合のみ処理
-var ov2 = document.getElementById('ov');
-if (!ov2) ov2 = document.getElementById('cv');
+// ─ φ寸法構築 ────────────────────────────────────
+function buildCircDimPhi(ent,p3){
+  var cx=ent.cx,cy=ent.cy,r=ent.r;
+  // p3方向の角度
+  var ang=Math.atan2(p3.y-cy,p3.x-cx);
+  var ux=Math.cos(ang),uy=Math.sin(ang);
+  // 直径線の端点（円周上）
+  var p1x=cx-r*ux,p1y=cy-r*uy; // p3と反対側
+  var p2x=cx+r*ux,p2y=cy+r*uy; // p3に近い側
+  var sd=parseFloat(document.getElementById('scaleDenom').value)||1;
+  var ext=6/scale; // 補助線のはみ出し量
+  // p3が円外にある場合は寸法線をp3まで延長
+  var distP3=Math.hypot(p3.x-cx,p3.y-cy);
+  var ep2x=(distP3>r+ext)?p3.x:p2x+ux*ext;
+  var ep2y=(distP3>r+ext)?p3.y:p2y+uy*ext;
+  // p3が円外の反対側延長もext分はみ出す
+  var ep1x=p1x-ux*ext, ep1y=p1y-uy*ext;
+  // 文字角度: 横向きになるよう正規化
+  var rawAng=ang;
+  var tangle=(rawAng>Math.PI/2)?rawAng-Math.PI:(rawAng<-Math.PI/2)?rawAng+Math.PI:rawAng;
+  return{
+    lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
+    arrows:[{x:p1x,y:p1y,angle:ang+Math.PI},{x:p2x,y:p2y,angle:ang}],
+    text:'φ'+formatDim(r*2/sd),
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:'#00d4ff'
+  };
+}
 
-ov2.addEventListener('pointerdown', function(e) {
-  if (!DIM.active) return;
-  // Pencil (pointerType==='pen') のみ処理。タッチはtouchstartで処理。
-  if (e.pointerType !== 'pen') return;
-  e.stopPropagation(); e.preventDefault();
-  var rect = this.getBoundingClientRect();
-  var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-  DIM.handleDown(sx, sy);
-}, true);
+// ─ 距離計算 ─────────────────────────────────────
+function calcDistDim(t1,t2){
+  if(t1.kind==='line'&&t2.kind==='line'){
+    // 平行線間距離
+    var mp={x:(t1.ent.x1+t1.ent.x2)/2,y:(t1.ent.y1+t1.ent.y2)/2};
+    var ft=projOnLine(mp.x,mp.y,t2.ent);
+    return{p1:mp,p2:ft,type:'diag'};
+  }
+  if(t1.kind==='line'||t2.kind==='line'){
+    var lineT=t1.kind==='line'?t1:t2;
+    var ptT=t1.kind==='line'?t2:t1;
+    var ft2=projOnLine(ptT.x,ptT.y,lineT.ent);
+    return{p1:{x:ptT.x,y:ptT.y},p2:ft2,type:'diag'};
+  }
+  return{p1:{x:t1.x,y:t1.y},p2:{x:t2.x,y:t2.y},type:'diag'};
+}
 
-ov2.addEventListener('pointermove', function(e) {
-  if (!DIM.active) return;
-  if (e.pointerType !== 'pen') return;
-  e.stopPropagation(); e.preventDefault();
-  var rect = this.getBoundingClientRect();
-  var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-  DIM.handleMove(sx, sy);
-}, true);
+function projOnLine(px,py,e){
+  var dx=e.x2-e.x1,dy=e.y2-e.y1,len2=dx*dx+dy*dy;
+  if(len2<1e-10) return{x:e.x1,y:e.y1};
+  var t=((px-e.x1)*dx+(py-e.y1)*dy)/len2;
+  return{x:e.x1+t*dx,y:e.y1+t*dy};
+}
 
-ov2.addEventListener('pointerup', function(e) {
-  if (!DIM.active || !DIM.penDown) return;
-  if (e.pointerType !== 'pen') return;
+// ─ ポインターイベント（ov キャプチャ） ──────────────
+var ov2=document.getElementById('ov');
+if(!ov2) ov2=document.getElementById('cv');
+
+ov2.addEventListener('pointerdown',function(e){
+  if(!DIM.active) return;
+  e.stopPropagation(); e.preventDefault(); // handlePointerDownが発火しないようにする
+  var rect=this.getBoundingClientRect();
+  var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
+  var wp=s2w(sx,sy);
+  var snp=(DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0],wp[1]);
+  DIM.penDown=true;
+  DIM.downSnapPt=snp;
+  DIM.cur=snp||{x:wp[0],y:wp[1],type:'default'};
+  scheduleOverlay();
+},true);
+
+ov2.addEventListener('pointermove',function(e){
+  if(!DIM.active) return;
+  var rect=this.getBoundingClientRect();
+  var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
+  var wp=s2w(sx,sy);
+  // _hoverPos は常に更新（penDown 不要）→ circDim ハイライト用
+  DIM._hoverPos={x:wp[0],y:wp[1]};
+  if(!DIM.penDown){ scheduleOverlay(); return; }
   e.stopPropagation(); e.preventDefault();
-  var rect = this.getBoundingClientRect();
-  var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-  DIM.handleUp(sx, sy);
-}, true);
+  var snp=(DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0],wp[1]);
+  DIM.cur=snp||{x:wp[0],y:wp[1],type:'default'};
+  scheduleOverlay();
+},true);
+
+ov2.addEventListener('pointerup',function(e){
+  if(!DIM.active||!DIM.penDown) return;
+  e.stopPropagation(); e.preventDefault();
+  DIM.penDown=false;
+  // distDim の場合は pointerup でも snapDistDim で最終位置を確定
+  if(DIM.tool==='distDim'){
+    var wp2=s2w(sx,sy);
+    var snp2=snapDistDim(wp2[0],wp2[1]);
+    DIM.cur=snp2||DIM.cur;
+  }
+  var pt=DIM.cur;
+  if(!pt) return;
+
+  if(DIM.phase===0){
+    // P1確定
+    var entry={x:pt.x,y:pt.y,kind:'pt'};
+    if(DIM.tool==='circDim'){
+      // 円周タップ方式: cen スナップまたは円周近傍で円確定
+      var ent=null;
+      if(pt.type==='cen'&&doc) ent=findEnkoAt(pt.x,pt.y);
+      if(!ent) ent=findNearestCircleEdge(pt.x,pt.y);
+      if(ent){
+        entry.kind='circ'; entry.ent=ent;
+        entry.x=ent.cx; entry.y=ent.cy; // 中心座標を記録
+        DIM.pts=[entry]; DIM.phase=2;
+        showGuide(GUIDES.POS);
+        DIM.cur=null; scheduleOverlay(); return;
+      } else {
+        showGuide('円の近くにペンを当ててください', 1500);
+        DIM.cur=null; scheduleOverlay(); return;
+      }
+    }
+    if(DIM.tool==='radDim'){
+      var rent=findNearestCircleEdge(pt.x,pt.y);
+      if(rent){
+        entry.kind='circ'; entry.ent=rent;
+        entry.x=rent.cx; entry.y=rent.cy;
+        DIM.pts=[entry]; DIM.phase=2;
+        showGuide(GUIDES.POS); console.log('[DIM] radDim: circle selected', rent);
+        DIM.cur=null; scheduleOverlay(); return;
+      } else {
+        showGuide('円の近くにペンを当ててください', 1500);
+        DIM.cur=null; scheduleOverlay(); return;
+      }
+    }
+    if(DIM.tool==='distDim'){
+      var nl=pt.onLine||findNearestLine(pt.x,pt.y);
+      if(nl){entry.kind='line'; entry.ent=nl;}
+    }
+    DIM.pts=[entry]; DIM.phase=1;
+    showGuide(DIM.tool==='distDim'?GUIDES.DIST_L2:GUIDES.P2);
+    DIM.cur=null; scheduleOverlay();
+
+  } else if(DIM.phase===1){
+    // P2確定
+    var entry2={x:pt.x,y:pt.y,kind:'pt'};
+    if(DIM.tool==='distDim'){
+      var nl2=pt.onLine||findNearestLine(pt.x,pt.y);
+      if(nl2){entry2.kind='line'; entry2.ent=nl2;}
+    }
+    DIM.pts.push(entry2); DIM.phase=2;
+    showGuide(GUIDES.POS);
+    DIM.cur=null; scheduleOverlay();
+
+  } else if(DIM.phase===2){
+    // 位置確定→寸法追加
+    confirmDIM(pt);
+  }
+},true);
+
+function findEnkoAt(wx,wy){
+  if(!doc||!doc.enko) return null;
+  var best=null,bd=Infinity;
+  doc.enko.forEach(function(e){
+    var d=Math.abs(Math.hypot(wx-e.cx,wy-e.cy)-e.r);
+    if(d<bd){bd=d;best=e;}
+  });
+  return bd<10/scale?best:null;
+}
+
+function findNearestCircleEdge(wx,wy){
+  if(!doc||!doc.enko) return null;
+  var THRESH=24/scale; // 円周から24px以内
+  var best=null,bd=Infinity;
+  doc.enko.forEach(function(e){
+    if(hiddenLayers&&hiddenLayers.has(e.layer)) return;
+    var distToEdge=Math.abs(Math.hypot(wx-e.cx,wy-e.cy)-e.r);
+    if(distToEdge<THRESH&&distToEdge<bd){bd=distToEdge;best=e;}
+  });
+  return best;
+}
+
+function findNearestLine(wx,wy){
+  // distDim 用: タップ位置に最も近い線分エンティティを返す
+  if(!doc||!doc.sen) return null;
+  var THRESH=24/scale;
+  var best=null,bd=Infinity;
+  doc.sen.forEach(function(e){
+    if(hiddenLayers&&hiddenLayers.has(e.layer)) return;
+    var d=distToSeg(wx,wy,e.x1,e.y1,e.x2,e.y2);
+    if(d<THRESH&&d<bd){bd=d;best=e;}
+  });
+  return best;
+}
+
+function snapDistDim(wx,wy){
+  // distDim 用スナップ: まず既存スナップを試し、なければ線上/円周上の最近傍点を返す
+  var sp=snapAt(wx,wy);
+  if(sp) return {x:sp.x,y:sp.y,kind:'snap',ent:null,onLine:sp.onLine||null};
+  var THRESH=25/scale;
+  var best=null,bd=Infinity;
+  // 線分への最近傍点
+  if(doc&&doc.sen){
+    doc.sen.forEach(function(s){
+      if(hiddenLayers&&hiddenLayers.has(s.layer)) return;
+      var dx=s.x2-s.x1,dy=s.y2-s.y1,len2=dx*dx+dy*dy;
+      if(len2<1e-12) return;
+      var t=((wx-s.x1)*dx+(wy-s.y1)*dy)/len2;
+      t=Math.max(0,Math.min(1,t));
+      var px=s.x1+t*dx,py=s.y1+t*dy;
+      var d=Math.hypot(wx-px,wy-py);
+      if(d<THRESH&&d<bd){bd=d;best={x:px,y:py,kind:'line',ent:s,onLine:s};}
+    });
+  }
+  // 円・円弧の円周上最近傍点
+  if(doc&&doc.enko){
+    doc.enko.forEach(function(e){
+      if(hiddenLayers&&hiddenLayers.has(e.layer)) return;
+      var d=Math.abs(Math.hypot(wx-e.cx,wy-e.cy)-e.r);
+      if(d<THRESH&&d<bd){
+        var ang=Math.atan2(wy-e.cy,wx-e.cx);
+        var px=e.cx+e.r*Math.cos(ang),py=e.cy+e.r*Math.sin(ang);
+        bd=d;best={x:px,y:py,kind:'arc',ent:e,onLine:null};
+      }
+    });
+  }
+  return best||{x:wx,y:wy,kind:'pt',ent:null,onLine:null};
+}
+
+function confirmDIM(p3){
+  var p1=DIM.pts[0],p2=DIM.pts[1];
+  var d=null;
+  console.log('[DIM] confirmDIM tool='+DIM.tool+' p1=',p1,' p2=',p2,' p3=',p3);
+  try{
+    if(DIM.tool==='circDim'&&p1.ent){
+      d=buildCircDimPhi(p1.ent,p3);
+      console.log('Dimension Created', d);
+    } else if(DIM.tool==='radDim'&&p1&&p1.ent){
+      d=buildRadDim(p1.ent,p3);
+      console.log('Dimension Created', d);
+    } else if(DIM.tool==='distDim'&&p1&&p2){
+      var res=calcDistDim(p1,p2);
+      if(res) d=buildDim(res.p1,res.p2,p3,res.type);
+      if(d) console.log('Dimension Created', d);
+    }
+  }catch(err){ console.warn('[DIM confirm]',err); }
+
+  if(d){
+    snapshot();
+    dims.push(d);
+    scheduleSave(); scheduleDraw();
+    showGuide('寸法を追加しました ↩ で取消', 2000);
+  }
+  // 次の寸法へ
+  DIM.pts=[]; DIM.phase=0; DIM.cur=null;
+  var nextGuide=DIM.tool==='circDim'?GUIDES.CIRC:DIM.tool==='radDim'?GUIDES.RAD:GUIDES.DIST_L1;
+  setTimeout(function(){
+    if(DIM.active) showGuide(nextGuide);
+  },2000);
+  scheduleOverlay();
+}
+
+// ─ R寸法構築 ────────────────────────────────────
+function buildRadDim(ent,p3){
+  var cx=ent.cx,cy=ent.cy,r=ent.r;
+  var ang=Math.atan2(p3.y-cy,p3.x-cx);
+  var ux=Math.cos(ang),uy=Math.sin(ang);
+  var ex=cx+r*ux,ey=cy+r*uy; // 円周上の端点
+  var sd=parseFloat(document.getElementById('scaleDenom').value)||1;
+  var ext=6/scale; // 補助線のはみ出し量
+  // p3が円外にある場合は半径線をp3まで延長
+  var distP3=Math.hypot(p3.x-cx,p3.y-cy);
+  var ep2x=(distP3>r+ext)?p3.x:ex+ux*ext;
+  var ep2y=(distP3>r+ext)?p3.y:ey+uy*ext;
+  // 文字角度: 横向きになるよう正規化
+  var rawAng=ang;
+  var tangle=(rawAng>Math.PI/2)?rawAng-Math.PI:(rawAng<-Math.PI/2)?rawAng+Math.PI:rawAng;
+  return{
+    lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
+    arrows:[{x:ex,y:ey,angle:ang}],
+    text:'R'+formatDim(r/sd),
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:'#00d4ff'
+  };
+}
+
+// ─ window.DIM 公開（タッチ/マウス連携用） ──────────────────────
+DIM.handleDown = function(sx, sy) {
+  var wp = s2w(sx, sy);
+  var snp = (DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0], wp[1]);
+  DIM.penDown = true;
+  DIM.downSnapPt = snp;
+  DIM.cur = snp || {x: wp[0], y: wp[1], type: 'default'};
+  console.log('[DIM] handleDown phase=' + DIM.phase + ' tool=' + DIM.tool);
+  scheduleOverlay();
+};
+
+DIM.handleMove = function(sx, sy) {
+  var wp = s2w(sx, sy);
+  // _hoverPos は penDown 不要で常時更新（circDim ハイライト用）
+  DIM._hoverPos = {x: wp[0], y: wp[1]};
+  if (!DIM.penDown) { scheduleOverlay(); return; }
+  var snp = (DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0], wp[1]);
+  DIM.cur = snp || {x: wp[0], y: wp[1], type: 'default'};
+  scheduleOverlay();
+};
+
+DIM.handleUp = function(sx, sy) {
+  if (!DIM.penDown) return;
+  DIM.penDown = false;
+  var wp = s2w(sx, sy);
+  var snp = (DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0], wp[1]);
+  var pt = snp || DIM.cur || {x: wp[0], y: wp[1], type: 'default'};
+  DIM.cur = pt;
+  console.log('[DIM] handleUp phase=' + DIM.phase + ' tool=' + DIM.tool);
+
+  if (DIM.phase === 0) {
+    var entry = {x: pt.x, y: pt.y, kind: 'pt'};
+    if (DIM.tool === 'circDim') {
+      var ent = null;
+      if (pt.type === 'cen' && doc) ent = findEnkoAt(pt.x, pt.y);
+      if (!ent) ent = findNearestCircleEdge(pt.x, pt.y);
+      if (ent) {
+        entry.kind = 'circ'; entry.ent = ent;
+        entry.x = ent.cx; entry.y = ent.cy;
+        DIM.pts = [entry]; DIM.phase = 2;
+        showGuide(GUIDES.POS);
+        console.log('[DIM] circDim: circle selected', ent);
+        console.log('Target Selected', ent);
+        DIM.cur = null; scheduleOverlay(); return;
+      } else {
+        showGuide('円の近くにペンを当ててください', 1500);
+        DIM.cur = null; scheduleOverlay(); return;
+      }
+    }
+    if (DIM.tool === 'radDim') {
+      var rent_ = findNearestCircleEdge(pt.x, pt.y);
+      if (rent_) {
+        entry.kind = 'circ'; entry.ent = rent_;
+        entry.x = rent_.cx; entry.y = rent_.cy;
+        DIM.pts = [entry]; DIM.phase = 2;
+        showGuide(GUIDES.POS);
+        console.log('[DIM] radDim: circle selected', rent_);
+        console.log('Target Selected', rent_);
+        DIM.cur = null; scheduleOverlay(); return;
+      } else {
+        showGuide('円の近くにペンを当ててください', 1500);
+        DIM.cur = null; scheduleOverlay(); return;
+      }
+    }
+    if (DIM.tool === 'distDim') {
+      var nl_=pt.onLine||findNearestLine(pt.x,pt.y);
+      if(nl_){entry.kind='line'; entry.ent=nl_;}
+      console.log('[DIM] distDim: line1 selected', nl_||pt);
+      console.log('Target Selected', nl_||pt);
+    }
+    DIM.pts = [entry]; DIM.phase = 1;
+    showGuide(DIM.tool === 'distDim' ? GUIDES.DIST_L2 : GUIDES.P2);
+    DIM.cur = null; scheduleOverlay();
+
+  } else if (DIM.phase === 1) {
+    var entry2 = {x: pt.x, y: pt.y, kind: 'pt'};
+    if (DIM.tool === 'distDim') {
+      var nl2_=pt.onLine||findNearestLine(pt.x,pt.y);
+      if(nl2_){entry2.kind='line'; entry2.ent=nl2_;}
+      console.log('[DIM] distDim: line2 selected', nl2_||pt);
+    }
+    DIM.pts.push(entry2); DIM.phase = 2;
+    showGuide(GUIDES.POS);
+    DIM.cur = null; scheduleOverlay();
+
+  } else if (DIM.phase === 2) {
+    confirmDIM(pt);
+  }
+};
 
 window.DIM = DIM;
+console.log('[DIM] module initialized');
 
-})();
-// ============================================================
-// PERFORMANCE OPTIMIZATION V0_39
-// ─ スナップキャッシュ・BBOX フィルタ・全要素ループ削減
-// ============================================================
-;(function(){
-'use strict';
-
-// ── スナップキャッシュ本体 ──────────────────────────────────
-var _SC = {
-  built: false,
-  pts: [],
-  segs: [],
-  circs: [],
-  hiddenKey: ''
-};
-
-function _hiddenKey() {
-  if (typeof hiddenLayers === 'undefined') return '';
-  var a = [];
-  hiddenLayers.forEach(function(v){ a.push(v); });
-  return a.sort().join(',');
-}
-
-function _buildCache() {
-  _SC.pts = []; _SC.segs = []; _SC.circs = [];
-  _SC.built = false;
-  if (typeof doc === 'undefined' || !doc) return;
-
-  var sen  = doc.sen  || [];
-  var enko = doc.enko || [];
-  var hk   = _hiddenKey();
-  _SC.hiddenKey = hk;
-
-  // 線分: 端点・中点
-  for (var i = 0; i < sen.length; i++) {
-    var s = sen[i];
-    if (typeof hiddenLayers !== 'undefined' && hiddenLayers.has(s.layer)) continue;
-    _SC.segs.push(s);
-    _SC.pts.push({x:s.x1, y:s.y1, type:'end'});
-    _SC.pts.push({x:s.x2, y:s.y2, type:'end'});
-    _SC.pts.push({x:(s.x1+s.x2)*0.5, y:(s.y1+s.y2)*0.5, type:'mid'});
-  }
-
-  // 円弧: 端点・中点・中心
-  for (var i = 0; i < enko.length; i++) {
-    var e = enko[i];
-    if (typeof hiddenLayers !== 'undefined' && hiddenLayers.has(e.layer)) continue;
-    _SC.circs.push(e);
-    var R2D = Math.PI / 180;
-    _SC.pts.push({x: e.cx + e.r*Math.cos(e.a1*R2D), y: e.cy + e.r*Math.sin(e.a1*R2D), type:'end'});
-    _SC.pts.push({x: e.cx + e.r*Math.cos(e.a2*R2D), y: e.cy + e.r*Math.sin(e.a2*R2D), type:'end'});
-    var am = (e.a1 + e.a2) / 2;
-    _SC.pts.push({x: e.cx + e.r*Math.cos(am*R2D), y: e.cy + e.r*Math.sin(am*R2D), type:'mid'});
-    _SC.pts.push({x: e.cx, y: e.cy, type:'cen'});
-  }
-
-  // 線分-線分交点（上限付き）
-  var ss = _SC.segs;
-  var MAX_ISECT = ss.length > 800 ? 200 : ss.length > 400 ? 500 : 1200;
-  var cnt = 0;
-  outer_ll:
-  for (var i = 0; i < ss.length; i++) {
-    for (var j = i+1; j < ss.length; j++) {
-      if (cnt >= MAX_ISECT) break outer_ll;
-      var dx1=ss[i].x2-ss[i].x1, dy1=ss[i].y2-ss[i].y1;
-      var dx2=ss[j].x2-ss[j].x1, dy2=ss[j].y2-ss[j].y1;
-      var dn = dx1*dy2 - dy1*dx2;
-      if (Math.abs(dn) < 1e-10) continue;
-      var t = ((ss[j].x1-ss[i].x1)*dy2 - (ss[j].y1-ss[i].y1)*dx2) / dn;
-      var u = ((ss[j].x1-ss[i].x1)*dy1 - (ss[j].y1-ss[i].y1)*dx1) / dn;
-      if (t>=-0.001&&t<=1.001&&u>=-0.001&&u<=1.001) {
-        _SC.pts.push({x: ss[i].x1+t*dx1, y: ss[i].y1+t*dy1, type:'int'});
-        cnt++;
-      }
-    }
-  }
-
-  // 円-線交点（BBOXフィルタ+上限200）
-  var ec = _SC.circs;
-  var cxlCnt = 0;
-  outer_cl:
-  for (var ci = 0; ci < ec.length; ci++) {
-    var c = ec[ci];
-    for (var si = 0; si < ss.length; si++) {
-      if (cxlCnt >= 200) break outer_cl;
-      var s = ss[si];
-      if (Math.min(s.x1,s.x2)-THRESH > c.cx+c.r) continue;
-      if (Math.max(s.x1,s.x2)+THRESH < c.cx-c.r) continue;
-      if (Math.min(s.y1,s.y2)-THRESH > c.cy+c.r) continue;
-      if (Math.max(s.y1,s.y2)+THRESH < c.cy-c.r) continue;
-      var dx=s.x2-s.x1, dy=s.y2-s.y1;
-      var fx=s.x1-c.cx, fy=s.y1-c.cy;
-      var a2=dx*dx+dy*dy, b2=2*(fx*dx+fy*dy), disc=b2*b2-4*a2*(fx*fx+fy*fy-c.r*c.r);
-      if (disc < 0 || a2 < 1e-12) continue;
-      var sd = Math.sqrt(disc);
-      [-1,1].forEach(function(sg){
-        var t=(-b2+sg*sd)/(2*a2);
-        if(t>=-0.001&&t<=1.001){ _SC.pts.push({x:s.x1+t*dx,y:s.y1+t*dy,type:'cxl'}); cxlCnt++; }
-      });
-    }
-  }
-
-  // 円-円交点（上限100）
-  var cxcCnt = 0;
-  outer_cc:
-  for (var i = 0; i < ec.length; i++) {
-    for (var j = i+1; j < ec.length; j++) {
-      if (cxcCnt >= 100) break outer_cc;
-      var c1=ec[i], c2=ec[j];
-      var dx=c2.cx-c1.cx, dy=c2.cy-c1.cy, d=Math.sqrt(dx*dx+dy*dy);
-      if (d>c1.r+c2.r+1e-9||d<Math.abs(c1.r-c2.r)-1e-9||d<1e-9) continue;
-      var a3=(c1.r*c1.r-c2.r*c2.r+d*d)/(2*d);
-      var h2=c1.r*c1.r-a3*a3;
-      if(h2<0) continue;
-      var h=Math.sqrt(h2);
-      var mx=c1.cx+a3*dx/d, my=c1.cy+a3*dy/d;
-      if(h<1e-9){ _SC.pts.push({x:mx,y:my,type:'cxc'}); cxcCnt++; continue; }
-      _SC.pts.push({x:mx+h*dy/d, y:my-h*dx/d, type:'cxc'});
-      _SC.pts.push({x:mx-h*dy/d, y:my+h*dx/d, type:'cxc'});
-      cxcCnt += 2;
-    }
-  }
-
-  _SC.built = true;
-}
-
-// キャッシュ無効化（外部公開）
-window._invalidateSnapCache = function() {
-  _SC.built = false;
-  _SC.pts = []; _SC.segs = []; _SC.circs = [];
-};
-
-// キャッシュ取得（必要なら自動構築、hiddenLayers 変化で再構築）
-function _getCache() {
-  if (!_SC.built) {
-    if (typeof doc !== 'undefined' && doc) _buildCache();
-  } else {
-    var hk = _hiddenKey();
-    if (hk !== _SC.hiddenKey) _buildCache();
-  }
-  return _SC;
-}
-
-// ── snapAt 上書き ────────────────────────────────────────────
-// この IIFE は拡張スナップ(B)のIIFEより後に実行されるため
-// window.snapAt（円-線・円-円交点含む版）をキャッシュ版で置き換える
-window.snapAt = function(wx, wy) {
-  var sc = _getCache();
-  if (!sc.built) return null;
-
-  var SR = 24 / (typeof scale !== 'undefined' ? scale : 1);
-  var BN = {int:SR*0.55, end:SR*0.35, cen:SR*0.20, mid:SR*0.05,
-            cxl:SR*0.50, cxc:SR*0.50};
-  var best = null, bestScore = SR;
-  var pts = sc.pts;
-
-  for (var i = 0, n = pts.length; i < n; i++) {
-    var p = pts[i];
-    var dx = wx - p.x, dy = wy - p.y;
-    var d = Math.sqrt(dx*dx + dy*dy);
-    if (d > SR) continue;
-    var score = d - (BN[p.type] || 0);
-    if (score < bestScore) { bestScore = score; best = {x:p.x, y:p.y, type:p.type}; }
-  }
-  return best;
-};
-
-// ── findNearestLine 上書き（BBOXフィルタ追加） ──────────────
-window.findNearestLine = function(wx, wy) {
-  var sc = _getCache();
-  var THRESH = 24 / (typeof scale !== 'undefined' ? scale : 1);
-  var best = null, bd = Infinity;
-  var segs = sc.built ? sc.segs : (typeof doc !== 'undefined' && doc && doc.sen ? doc.sen : []);
-  for (var i = 0, n = segs.length; i < n; i++) {
-    var s = segs[i];
-    if (Math.min(s.x1,s.x2) - THRESH > wx) continue;
-    if (Math.max(s.x1,s.x2) + THRESH < wx) continue;
-    if (Math.min(s.y1,s.y2) - THRESH > wy) continue;
-    if (Math.max(s.y1,s.y2) + THRESH < wy) continue;
-    var dx=s.x2-s.x1, dy=s.y2-s.y1, l2=dx*dx+dy*dy;
-    if (l2 < 1e-12) continue;
-    var t = ((wx-s.x1)*dx+(wy-s.y1)*dy)/l2;
-    t = t<0?0:t>1?1:t;
-    var ex=s.x1+t*dx, ey=s.y1+t*dy;
-    var d = Math.sqrt((wx-ex)*(wx-ex)+(wy-ey)*(wy-ey));
-    if (d < THRESH && d < bd) { bd=d; best=s; }
-  }
-  return best;
-};
-
-// ── findNearestCircleEdge 上書き（BBOXフィルタ追加） ─────────
-window.findNearestCircleEdge = function(wx, wy) {
-  var sc = _getCache();
-  var THRESH = 24 / (typeof scale !== 'undefined' ? scale : 1);
-  var best = null, bd = Infinity;
-  var circs = sc.built ? sc.circs : (typeof doc !== 'undefined' && doc && doc.enko ? doc.enko : []);
-  for (var i = 0, n = circs.length; i < n; i++) {
-    var e = circs[i];
-    if (e.cx - e.r - THRESH > wx) continue;
-    if (e.cx + e.r + THRESH < wx) continue;
-    if (e.cy - e.r - THRESH > wy) continue;
-    if (e.cy + e.r + THRESH < wy) continue;
-    var dc = Math.sqrt((wx-e.cx)*(wx-e.cx)+(wy-e.cy)*(wy-e.cy));
-    var d = Math.abs(dc - e.r);
-    if (d < THRESH && d < bd) { bd=d; best=e; }
-  }
-  return best;
-};
-
-// ── doc 変化監視: 自動キャッシュ構築 ────────────────────────
-var _prevDoc = null;
-var _docWatchTimer = setInterval(function() {
-  if (typeof doc === 'undefined') return;
-  if (doc !== _prevDoc) {
-    _prevDoc = doc;
-    if (doc) setTimeout(function(){ _buildCache(); }, 150);
-    else window._invalidateSnapCache();
-  }
-}, 300);
-window._docWatchTimer = _docWatchTimer;
-
-})();
+})(); // end C
 </script>
 <div id="guideMsg" style="
   display:none;
@@ -3228,6 +2906,6 @@ window._docWatchTimer = _docWatchTimer;
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_39) -->
+<!-- 太さパネル削除済み (V0_35) -->
 </body>
-</html>                
+</html>
