@@ -637,7 +637,9 @@ console.log('[DIM] module initialized');
 var LP={
   active:false, phase:0,
   selLine:null, selPt:null, footPt:null,
-  penDown:false, cur:null, _hoverPos:null
+  penDown:false, cur:null,
+  _downPos:null,   // pointerdown時の座標(phase0確定に使用)
+  _hoverPos:null   // 最新カーソル座標(ハイライト描画に使用)
 };
 var LP_GUIDES={
   LINE:'線の近くにペンを当てて選択（離して確定）',
@@ -648,7 +650,7 @@ var LP_GUIDES={
 function resetLP(){
   LP.active=false; LP.phase=0;
   LP.selLine=null; LP.selPt=null; LP.footPt=null;
-  LP.penDown=false; LP.cur=null; LP._hoverPos=null;
+  LP.penDown=false; LP.cur=null; LP._downPos=null; LP._hoverPos=null;
 }
 
 // ─ 垂線の足 ─────────────────────────────────────────
@@ -743,20 +745,6 @@ function drawLPPreview(ctx2,dim){
   }
 }
 
-// ─ ツール切り替えフック ────────────────────────────────
-document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
-  btn.addEventListener('click',function(){
-    var t=this.dataset.tool;
-    if(t==='lp'){
-      if(window.DIM) window.DIM.active=false;
-      resetLP(); LP.active=true; LP.phase=0;
-      showGuide(LP_GUIDES.LINE,0);
-    } else {
-      resetLP();
-    }
-  });
-});
-
 // ─ drawOverlay フック ─────────────────────────────────
 var _lpOrigDO=window.drawOverlay;
 window.drawOverlay=function(){ _lpOrigDO(); if(LP.active) drawLPOverlay(); };
@@ -765,29 +753,40 @@ function drawLPOverlay(){
   var dpr=window.devicePixelRatio||1;
   var ctx2=octx;
   ctx2.save(); ctx2.scale(dpr,dpr);
-  // Phase0: ホバー最近傍線をオレンジハイライト
+
+  // Phase0: タッチ/ホバー位置の最近傍線をオレンジハイライト(強化)
   if(LP.phase===0&&LP._hoverPos&&doc){
     var hl=findNearestSen(LP._hoverPos.x,LP._hoverPos.y);
     if(hl){
       var hs1=w2s(hl.x1,hl.y1),hs2=w2s(hl.x2,hl.y2);
-      ctx2.strokeStyle='#ff8c00';ctx2.lineWidth=3;ctx2.setLineDash([]);
+      ctx2.save();
+      ctx2.strokeStyle='#ff8c00';ctx2.lineWidth=5;ctx2.setLineDash([]);
+      ctx2.globalAlpha=0.85;
       ctx2.beginPath();ctx2.moveTo(hs1[0],hs1[1]);ctx2.lineTo(hs2[0],hs2[1]);ctx2.stroke();
+      ctx2.restore();
     }
   }
-  // 選択済み線ハイライト(Phase1,2)
+
+  // 選択済み線ハイライト(Phase1,2) ─ より太く
   if(LP.selLine&&LP.phase>=1){
     var ls1=w2s(LP.selLine.x1,LP.selLine.y1),ls2=w2s(LP.selLine.x2,LP.selLine.y2);
-    ctx2.strokeStyle='#ff8c00';ctx2.lineWidth=2.5;ctx2.setLineDash([]);
+    ctx2.save();
+    ctx2.strokeStyle='#ff8c00';ctx2.lineWidth=5;ctx2.setLineDash([]);
+    ctx2.globalAlpha=0.9;
     ctx2.beginPath();ctx2.moveTo(ls1[0],ls1[1]);ctx2.lineTo(ls2[0],ls2[1]);ctx2.stroke();
+    ctx2.restore();
   }
+
   // Phase1: スナップマーカー
   if(LP.phase===1&&LP.cur){
     var sc=w2s(LP.cur.x,LP.cur.y);
     drawExtSnapMarker(ctx2,sc[0],sc[1],LP.cur.type||'default');
   }
+
   // Phase2: 選択済み点+垂点マーカー
   if(LP.selPt&&LP.phase===2){
     var spt=w2s(LP.selPt.x,LP.selPt.y);
+    ctx2.save();
     ctx2.strokeStyle='#00ff7f';ctx2.lineWidth=2;ctx2.setLineDash([]);
     ctx2.beginPath();ctx2.arc(spt[0],spt[1],6,0,Math.PI*2);ctx2.stroke();
     if(LP.footPt){
@@ -798,22 +797,28 @@ function drawLPOverlay(){
       ctx2.beginPath();ctx2.moveTo(sfp[0],sfp[1]);ctx2.lineTo(spt[0],spt[1]);ctx2.stroke();
       ctx2.setLineDash([]);
     }
+    ctx2.restore();
   }
+
   // Phase2: プレビュー
   if(LP.phase===2&&LP.cur&&LP.selLine&&LP.selPt){
     drawLPPreview(ctx2,buildLinePtDim(LP.selLine,LP.selPt,LP.cur));
   }
+
   ctx2.restore();
 }
 
 // ─ ポインタハンドラ ───────────────────────────────────
 LP.handleDown=function(sx,sy){
   var wp=s2w(sx,sy);
+  // _downPos: このタッチのダウン位置(phase0確定に使用; moveで上書きしない)
+  LP._downPos={x:wp[0],y:wp[1]};
   LP._hoverPos={x:wp[0],y:wp[1]};
   LP.penDown=true;
   if(LP.phase===1){
-    var snp=snapAt(wp[0],wp[1]);
+    var snp=window.snapAt(wp[0],wp[1]);
     LP.cur=snp||{x:wp[0],y:wp[1],type:'default'};
+    console.log('[LP] ph1 down snap='+LP.cur.type+' ('+LP.cur.x.toFixed(1)+','+LP.cur.y.toFixed(1)+')');
   } else if(LP.phase===2){
     LP.cur={x:wp[0],y:wp[1]};
   }
@@ -823,9 +828,10 @@ LP.handleDown=function(sx,sy){
 LP.handleMove=function(sx,sy){
   var wp=s2w(sx,sy);
   LP._hoverPos={x:wp[0],y:wp[1]};
+  // _downPos はこのタッチ内のdown位置のまま保持(上書き禁止)
   if(!LP.penDown){scheduleOverlay();return;}
   if(LP.phase===1){
-    var snp=snapAt(wp[0],wp[1]);
+    var snp=window.snapAt(wp[0],wp[1]);
     LP.cur=snp||{x:wp[0],y:wp[1],type:'default'};
   } else if(LP.phase===2){
     LP.cur={x:wp[0],y:wp[1]};
@@ -838,31 +844,53 @@ LP.handleUp=function(sx,sy){
   LP.penDown=false;
   var wp=s2w(sx,sy);
   if(LP.phase===0){
-    var hp=LP._hoverPos||{x:wp[0],y:wp[1]};
-    var line=findNearestSen(hp.x,hp.y);
+    // _downPos(ペンを置いた位置)で線を判定 ─ moveで位置がずれても影響しない
+    var dp=LP._downPos||{x:wp[0],y:wp[1]};
+    var line=findNearestSen(dp.x,dp.y);
+    console.log('[LP] ph0 up: downPos=('+dp.x.toFixed(1)+','+dp.y.toFixed(1)+') found='+!!line);
     if(line){
       LP.selLine=line; LP.phase=1; LP.cur=null;
       showGuide(LP_GUIDES.PT,0);
+      console.log('[LP] → phase1: line confirmed');
     } else {
       showGuide('線の近くにペンを当ててください',1500);
     }
   } else if(LP.phase===1){
-    var pt=LP.cur||{x:wp[0],y:wp[1],type:'default'};
+    // handleMove で最後にセットされた LP.cur を使用(tapの場合はhandleDownのcur    var pt=LP.cur||{x:wp[0],y:wp[1],type:'default'};
     LP.selPt=pt;
     LP.footPt=computeFoot(LP.selLine,pt);
     LP.phase=2; LP.cur=null;
     showGuide(LP_GUIDES.POS,0);
+    console.log('[LP] → phase2: pt=('+pt.x.toFixed(1)+','+pt.y.toFixed(1)+') type='+pt.type);
   } else if(LP.phase===2){
     var pArrow=LP.cur||{x:wp[0],y:wp[1]};
     var dim=buildLinePtDim(LP.selLine,LP.selPt,pArrow);
+    console.log('[LP] ph2 up: dim='+(dim?dim.text:'null'));
     if(dim){ snapshot(); dims.push(dim); scheduleSave(); scheduleDraw(); }
     LP.selLine=null; LP.selPt=null; LP.footPt=null; LP.phase=0; LP.cur=null;
     showGuide(LP_GUIDES.LINE,0);
+    console.log('[LP] → phase0: dim placed, reset');
   }
   scheduleOverlay();
 };
+
+// ─ ツール切り替えフック ─────────────────────────────────
+document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var t=this.dataset.tool;
+    if(t==='lp'){
+      if(window.DIM) window.DIM.active=false;
+      resetLP(); LP.active=true; LP.phase=0;
+      showGuide(LP_GUIDES.LINE,0);
+      console.log('[LP] tool activated');
+    } else {
+      resetLP();
+    }
+  });
+});
 
 window.LP=LP;
 console.log('[LP] module initialized');
 
 })(); // end D
+D

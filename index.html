@@ -162,13 +162,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
   <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色・太さ</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
@@ -286,7 +286,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <script src="viewer.js"></script>
 <script>
-const APP_VERSION = 'V0_49';
+const APP_VERSION = 'V0_50';
 
 // =========================================================
 // グローバル状態
