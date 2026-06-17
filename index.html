@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
 // ════════════════════════════════════════════════════
-// V0_28 拡張コード
+// V0_29 拡張コード
 // ════════════════════════════════════════════════════
 
 // ── A. 線幅ボタン（「太さ」ボタン）フリーズなし実装 ──────────────────
@@ -185,10 +185,12 @@ var DIM={
 };
 
 var GUIDES={
-  P1:'1点目を選択（タップして探索→離して確定）',
-  P2:'2点目を選択（タップして探索→離して確定）',
+  P1:'1点目を選択（ペンを当てて探索→離して確定）',
+  P2:'2点目を選択（ペンを当てて探索→離して確定）',
   POS:'寸法位置を指定（ペンを移動→離して確定）',
-  CIRC:'円の中心をタップ→離して確定→位置を指定',
+  CIRC:'円の円周にペンを近づける→離して確定→位置を指定',
+  DIST_L1:'1つ目の線を選択（線上をタップ→離して確定）',
+  DIST_L2:'2つ目の線を選択（線上をタップ→離して確定）',
 };
 
 function resetDIM(){
@@ -204,7 +206,7 @@ document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
     resetDIM();
     if(t==='circDim'||t==='distDim'){
       DIM.active=true; DIM.tool=t; DIM.phase=0;
-      showGuide(t==='circDim'?GUIDES.CIRC:GUIDES.P1);
+      showGuide(t==='circDim'?GUIDES.CIRC:GUIDES.DIST_L1);
     }
   });
 });
@@ -226,6 +228,20 @@ function drawDIMOverlay(){
   var dpr=window.devicePixelRatio||1;
   octx.save();
   octx.scale(dpr,dpr);
+
+  // circDim phase=0 時: 近傍の円をハイライト
+  if(DIM.tool==='circDim'&&DIM.phase===0&&DIM.cur&&doc&&doc.enko){
+    var nearEnk=findNearestCircleEdge(DIM.cur.x,DIM.cur.y);
+    if(nearEnk){
+      var hsc=w2s(nearEnk.cx,nearEnk.cy);
+      var hr=nearEnk.r*scale;
+      octx.save();
+      octx.strokeStyle='rgba(0,212,255,0.6)';
+      octx.lineWidth=3;
+      octx.beginPath(); octx.arc(hsc[0],hsc[1],hr,0,Math.PI*2); octx.stroke();
+      octx.restore();
+    }
+  }
 
   // カーソル位置のスナップマーカー
   var snap=DIM.cur;
@@ -365,6 +381,7 @@ if(!ov2) ov2=document.getElementById('cv');
 
 ov2.addEventListener('pointerdown',function(e){
   if(!DIM.active) return;
+  e.stopPropagation(); e.preventDefault(); // handlePointerDownが発火しないようにする
   var rect=this.getBoundingClientRect();
   var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
   var wp=s2w(sx,sy);
@@ -377,6 +394,7 @@ ov2.addEventListener('pointerdown',function(e){
 
 ov2.addEventListener('pointermove',function(e){
   if(!DIM.active||!DIM.penDown) return;
+  e.stopPropagation(); e.preventDefault();
   var rect=this.getBoundingClientRect();
   var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
   var wp=s2w(sx,sy);
@@ -387,6 +405,7 @@ ov2.addEventListener('pointermove',function(e){
 
 ov2.addEventListener('pointerup',function(e){
   if(!DIM.active||!DIM.penDown) return;
+  e.stopPropagation(); e.preventDefault();
   DIM.penDown=false;
   var pt=DIM.cur;
   if(!pt) return;
@@ -394,12 +413,19 @@ ov2.addEventListener('pointerup',function(e){
   if(DIM.phase===0){
     // P1確定
     var entry={x:pt.x,y:pt.y,kind:'pt'};
-    if(DIM.tool==='circDim'&&pt.type==='cen'&&doc){
-      var ent=findEnkoAt(pt.x,pt.y);
+    if(DIM.tool==='circDim'){
+      // 円周タップ方式: cen スナップまたは円周近傍で円確定
+      var ent=null;
+      if(pt.type==='cen'&&doc) ent=findEnkoAt(pt.x,pt.y);
+      if(!ent) ent=findNearestCircleEdge(pt.x,pt.y);
       if(ent){
         entry.kind='circ'; entry.ent=ent;
+        entry.x=ent.cx; entry.y=ent.cy; // 中心座標を記録
         DIM.pts=[entry]; DIM.phase=2;
         showGuide(GUIDES.POS);
+        DIM.cur=null; scheduleOverlay(); return;
+      } else {
+        showGuide('円の近くにペンを当ててください', 1500);
         DIM.cur=null; scheduleOverlay(); return;
       }
     }
@@ -407,7 +433,7 @@ ov2.addEventListener('pointerup',function(e){
       entry.kind='line'; entry.ent=pt.onLine;
     }
     DIM.pts=[entry]; DIM.phase=1;
-    showGuide(DIM.tool==='distDim'?GUIDES.P2:GUIDES.P2);
+    showGuide(DIM.tool==='distDim'?GUIDES.DIST_L2:GUIDES.P2);
     DIM.cur=null; scheduleOverlay();
 
   } else if(DIM.phase===1){
@@ -436,6 +462,18 @@ function findEnkoAt(wx,wy){
   return bd<10/scale?best:null;
 }
 
+function findNearestCircleEdge(wx,wy){
+  if(!doc||!doc.enko) return null;
+  var THRESH=24/scale; // 円周から24px以内
+  var best=null,bd=Infinity;
+  doc.enko.forEach(function(e){
+    if(hiddenLayers&&hiddenLayers.has(e.layer)) return;
+    var distToEdge=Math.abs(Math.hypot(wx-e.cx,wy-e.cy)-e.r);
+    if(distToEdge<THRESH&&distToEdge<bd){bd=distToEdge;best=e;}
+  });
+  return best;
+}
+
 function confirmDIM(p3){
   var p1=DIM.pts[0],p2=DIM.pts[1];
   var d=null;
@@ -457,7 +495,7 @@ function confirmDIM(p3){
   // 次の寸法へ
   DIM.pts=[]; DIM.phase=0; DIM.cur=null;
   setTimeout(function(){
-    if(DIM.active) showGuide(DIM.tool==='circDim'?GUIDES.CIRC:GUIDES.P1);
+    if(DIM.active) showGuide(DIM.tool==='circDim'?GUIDES.CIRC:GUIDES.DIST_L1);
   },2000);
   scheduleOverlay();
 }
@@ -624,7 +662,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">φ</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="距離寸法"><span class="tb-tool-label">距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><polyline points="9,11 12,8 15,11"/><polyline points="9,13 12,16 15,13"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="最短距離寸法"><span class="tb-tool-label">最短距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><polyline points="9,11 12,8 15,11"/><polyline points="9,13 12,16 15,13"/></svg></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
@@ -704,7 +742,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_28</div>
+  <div id="ver-label">DXF_View V0_29</div>
 </div>
 
 <div id="colorOverlay">
@@ -739,7 +777,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_28';
+const APP_VERSION = 'V0_29';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1868,7 +1906,7 @@ function handlePointerDown(sx,sy,isPenInput){
       if(dimState.pts.length===1) showGuide('2点目を選択してください');
       else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
     }
-    const need=currentTool==='diag'?2:3;
+    const need=3; // diag も dxdy も 3ステップ（P1→P2→位置）
     if(dimState.pts.length>=need){
       const[p1,p2,p3]=dimState.pts;
       snapshot();
@@ -1947,7 +1985,7 @@ function handlePointerUp(sx,sy,isPenInput){
         if(dimState.pts.length===1) showGuide('2点目を選択してください');
         else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
       }
-      const need=currentTool==='diag'?2:3;
+      const need=3; // diag も dxdy も 3ステップ（P1→P2→位置）
       if(dimState.pts.length>=need){
         const[p1,p2,p3]=dimState.pts;
         snapshot();
@@ -2203,8 +2241,8 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
       'eraser':'消去したい線をなぞってください',
       'dxdy':'1点目を選択してください',
       'diag':'1点目を選択してください',
-      'circDim':'円の中心をタップ→位置を指定',
-      'distDim':'1点目を選択してください'
+      'circDim':'円の円周にペンを近づける→離して確定→位置を指定',
+      'distDim':'1つ目の線を選択してください（線上をタップ→離して確定）'
     };
     if(currentTool==='sketch'||currentTool==='eraser'){
       showGuide(guideMap[currentTool]||'', 2000);
@@ -2616,7 +2654,7 @@ if(vd) vd.textContent = APP_VERSION;
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル (V0_28) -->
+<!-- 太さパネル (V0_29) -->
 <div id="wPanel" style="display:none;position:fixed;z-index:8500;background:#1a2332;border:1.5px solid #00d4ff;border-radius:12px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.7);min-width:180px;">
   <div style="font-size:12px;color:#aab;margin-bottom:10px;text-align:center;">線の太さ</div>
   <div id="wPanelList" style="display:flex;flex-direction:column;gap:8px;"></div>
