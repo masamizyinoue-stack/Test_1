@@ -35,7 +35,7 @@ function lineIntersect(x1,y1,x2,y2,x3,y3,x4,y4){
   if(Math.abs(d)<1e-10) return null;
   const t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/d;
   const u=-((x1-x2)*(y1-y3)-(y1-y2)*(x1-x3))/d;
-  if(t>=-0.001&&t<=1.001&&u>=-0.001&&u<=1.001)
+  if(t>=-1e-9&&t<=1+1e-9&&u>=-1e-9&&u<=1+1e-9)
     return{x:x1+t*(x2-x1),y:y1+t*(y2-y1)};
   return null;
 }
@@ -172,7 +172,7 @@ function formatDim(d){
       if(hiddenLayers.has(c.layer)) return;
       sen.forEach(function(e){
         if(hiddenLayers.has(e.layer)) return;
-        var pts=circLineIntersect(c.cx,c.cy,c.r,e.x1,e.y1,e.x2,e.y2);
+        var pts=circLineIntersect(c.cx,c.cy,c.r,e.x1,e.y1,e.x2,e.y2,c.a1,c.a2);
         pts.forEach(function(p){
           var d=Math.hypot(wx-p.x,wy-p.y);
           if(d<sr) extras.push({x:p.x,y:p.y,type:'cxl',dist:d,onLine:e});
@@ -185,7 +185,7 @@ function formatDim(d){
       for(var j=i+1;j<enko.length;j++){
         var c1=enko[i],c2=enko[j];
         if(hiddenLayers.has(c1.layer)||hiddenLayers.has(c2.layer)) continue;
-        var pts=circCircIntersect(c1.cx,c1.cy,c1.r,c2.cx,c2.cy,c2.r);
+        var pts=circCircIntersect(c1.cx,c1.cy,c1.r,c2.cx,c2.cy,c2.r,c1.a1,c1.a2,c2.a1,c2.a2);
         pts.forEach(function(p){
           var d=Math.hypot(wx-p.x,wy-p.y);
           if(d<sr) extras.push({x:p.x,y:p.y,type:'cxc',dist:d});
@@ -202,7 +202,17 @@ function formatDim(d){
     return base;
   };
 
-  function circLineIntersect(cx,cy,r,x1,y1,x2,y2){
+  function arcAngleOk(px,py,cx,cy,a1,a2){
+    // フル円(a1=0,a2=360)は常にOK
+    if(a1===0&&a2===360) return true;
+    var ang=Math.atan2(py-cy,px-cx)*180/Math.PI;
+    ang=((ang%360)+360)%360;
+    if(a1<=a2) return ang>=a1&&ang<=a2;
+    return ang>=a1||ang<=a2; // 折り返しアーク
+  }
+  function circLineIntersect(cx,cy,r,x1,y1,x2,y2,a1,a2){
+    if(a1===undefined) a1=0;
+    if(a2===undefined) a2=360;
     var dx=x2-x1,dy=y2-y1,fx=x1-cx,fy=y1-cy;
     var a=dx*dx+dy*dy,b=2*(fx*dx+fy*dy),c=fx*fx+fy*fy-r*r;
     var disc=b*b-4*a*c;
@@ -210,12 +220,17 @@ function formatDim(d){
     var res=[],sd=Math.sqrt(disc);
     [-1,1].forEach(function(s){
       var t=(-b+s*sd)/(2*a);
-      if(t>=-0.001&&t<=1.001) res.push({x:x1+t*dx,y:y1+t*dy});
+      if(t>=-0.001&&t<=1.001){
+        var px=x1+t*dx,py=y1+t*dy;
+        if(arcAngleOk(px,py,cx,cy,a1,a2)) res.push({x:px,y:py});
+      }
     });
     return res;
   }
 
-  function circCircIntersect(cx1,cy1,r1,cx2,cy2,r2){
+  function circCircIntersect(cx1,cy1,r1,cx2,cy2,r2,a1_1,a2_1,a1_2,a2_2){
+    if(a1_1===undefined) a1_1=0; if(a2_1===undefined) a2_1=360;
+    if(a1_2===undefined) a1_2=0; if(a2_2===undefined) a2_2=360;
     var dx=cx2-cx1,dy=cy2-cy1,d=Math.hypot(dx,dy);
     if(d>r1+r2+1e-9||d<Math.abs(r1-r2)-1e-9||d<1e-9) return [];
     var a=(r1*r1-r2*r2+d*d)/(2*d);
@@ -223,8 +238,10 @@ function formatDim(d){
     if(h2<0) return [];
     var h=Math.sqrt(h2);
     var mx=cx1+a*dx/d,my=cy1+a*dy/d;
-    if(h<1e-9) return [{x:mx,y:my}];
-    return [{x:mx+h*dy/d,y:my-h*dx/d},{x:mx-h*dy/d,y:my+h*dx/d}];
+    var cands=(h<1e-9)?[{x:mx,y:my}]:[{x:mx+h*dy/d,y:my-h*dx/d},{x:mx-h*dy/d,y:my+h*dx/d}];
+    return cands.filter(function(p){
+      return arcAngleOk(p.x,p.y,cx1,cy1,a1_1,a2_1)&&arcAngleOk(p.x,p.y,cx2,cy2,a1_2,a2_2);
+    });
   }
 })();
 
@@ -438,105 +455,18 @@ function buildCircDimPhi(ent,p3){
   var ep2y=(distP3>r+ext)?p3.y:p2y+uy*ext;
   // p3が円外の反対側延長もext分はみ出す
   var ep1x=p1x-ux*ext, ep1y=p1y-uy*ext;
-  // 文字角度: 横向きになるよう正規化
-  var rawAng=ang;
-  var tangle=(rawAng>Math.PI/2)?rawAng-Math.PI:(rawAng<-Math.PI/2)?rawAng+Math.PI:rawAng;
+  // スクリーン空間の角度: w2sがY軸反転するため atan2(-uy, ux) を使用
+  var screenAng=Math.atan2(-uy,ux);
+  var tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
   return{
     lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
-    arrows:[{x:p1x,y:p1y,angle:ang+Math.PI},{x:p2x,y:p2y,angle:ang}],
+    arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
     text:'φ'+formatDim(r*2/sd),
     tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:'#00d4ff'
   };
 }
 
 
-
-// ─ ポインターイベント（ov キャプチャ） ──────────────
-var ov2=document.getElementById('ov');
-if(!ov2) ov2=document.getElementById('cv');
-
-ov2.addEventListener('pointerdown',function(e){
-  if(!DIM.active) return;
-  e.stopPropagation(); e.preventDefault(); // handlePointerDownが発火しないようにする
-  var rect=this.getBoundingClientRect();
-  var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
-  var wp=s2w(sx,sy);
-  var snp=snapAt(wp[0],wp[1]);
-  DIM.penDown=true;
-  DIM.downSnapPt=snp;
-  DIM.cur=snp||{x:wp[0],y:wp[1],type:'default'};
-  scheduleOverlay();
-},true);
-
-ov2.addEventListener('pointermove',function(e){
-  if(!DIM.active) return;
-  var rect=this.getBoundingClientRect();
-  var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
-  var wp=s2w(sx,sy);
-  // _hoverPos は常に更新（penDown 不要）→ circDim ハイライト用
-  DIM._hoverPos={x:wp[0],y:wp[1]};
-  if(!DIM.penDown){ scheduleOverlay(); return; }
-  e.stopPropagation(); e.preventDefault();
-  var snp=snapAt(wp[0],wp[1]);
-  DIM.cur=snp||{x:wp[0],y:wp[1],type:'default'};
-  scheduleOverlay();
-},true);
-
-ov2.addEventListener('pointerup',function(e){
-  if(!DIM.active||!DIM.penDown) return;
-  e.stopPropagation(); e.preventDefault();
-  DIM.penDown=false;
-  var pt=DIM.cur;
-  if(!pt) return;
-
-  if(DIM.phase===0){
-    // P1確定
-    var entry={x:pt.x,y:pt.y,kind:'pt'};
-    if(DIM.tool==='circDim'){
-      // 円周タップ方式: cen スナップまたは円周近傍で円確定
-      var ent=null;
-      if(pt.type==='cen'&&doc) ent=findEnkoAt(pt.x,pt.y);
-      if(!ent) ent=findNearestCircleEdge(pt.x,pt.y);
-      if(ent){
-        entry.kind='circ'; entry.ent=ent;
-        entry.x=ent.cx; entry.y=ent.cy; // 中心座標を記録
-        DIM.pts=[entry]; DIM.phase=2;
-        showGuide(GUIDES.POS);
-        DIM.cur=null; scheduleOverlay(); return;
-      } else {
-        showGuide('円の近くにペンを当ててください', 1500);
-        DIM.cur=null; scheduleOverlay(); return;
-      }
-    }
-    if(DIM.tool==='radDim'){
-      var rent=findNearestCircleEdge(pt.x,pt.y);
-      if(rent){
-        entry.kind='circ'; entry.ent=rent;
-        entry.x=rent.cx; entry.y=rent.cy;
-        DIM.pts=[entry]; DIM.phase=2;
-        showGuide(GUIDES.POS); console.log('[DIM] radDim: circle selected', rent);
-        DIM.cur=null; scheduleOverlay(); return;
-      } else {
-        showGuide('円の近くにペンを当ててください', 1500);
-        DIM.cur=null; scheduleOverlay(); return;
-      }
-    }
-    DIM.pts=[entry]; DIM.phase=1;
-    showGuide(GUIDES.P2);
-    DIM.cur=null; scheduleOverlay();
-
-  } else if(DIM.phase===1){
-    // P2確定
-    var entry2={x:pt.x,y:pt.y,kind:'pt'};
-    DIM.pts.push(entry2); DIM.phase=2;
-    showGuide(GUIDES.POS);
-    DIM.cur=null; scheduleOverlay();
-
-  } else if(DIM.phase===2){
-    // 位置確定→寸法追加
-    confirmDIM(pt);
-  }
-},true);
 
 function findEnkoAt(wx,wy){
   if(!doc||!doc.enko) return null;
@@ -603,12 +533,12 @@ function buildRadDim(ent,p3){
   var distP3=Math.hypot(p3.x-cx,p3.y-cy);
   var ep2x=(distP3>r+ext)?p3.x:ex+ux*ext;
   var ep2y=(distP3>r+ext)?p3.y:ey+uy*ext;
-  // 文字角度: 横向きになるよう正規化
-  var rawAng=ang;
-  var tangle=(rawAng>Math.PI/2)?rawAng-Math.PI:(rawAng<-Math.PI/2)?rawAng+Math.PI:rawAng;
+  // スクリーン空間の角度: w2sがY軸反転するため atan2(-uy, ux) を使用
+  var screenAng=Math.atan2(-uy,ux);
+  var tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
   return{
     lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
-    arrows:[{x:ex,y:ey,angle:ang}],
+    arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
     text:'R'+formatDim(r/sd),
     tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:'#00d4ff'
   };
@@ -638,11 +568,13 @@ DIM.handleMove = function(sx, sy) {
 DIM.handleUp = function(sx, sy) {
   if (!DIM.penDown) return;
   DIM.penDown = false;
-  var wp = s2w(sx, sy);
-  var snp = snapAt(wp[0], wp[1]);
-  var pt = snp || DIM.cur || {x: wp[0], y: wp[1], type: 'default'};
-  DIM.cur = pt;
-  console.log('[DIM] handleUp phase=' + DIM.phase + ' tool=' + DIM.tool);
+  // プレビューと確定位置を一致させる: 最後のmoveで確定したDIM.curをそのまま使う
+  // handleUpで再計算すると表示位置と異なるスナップが選ばれる可能性がある
+  var pt = DIM.cur;
+  if (!pt) {
+    var wp = s2w(sx, sy);
+    pt = {x: wp[0], y: wp[1], type: 'default'};
+  }
 
   if (DIM.phase === 0) {
     var entry = {x: pt.x, y: pt.y, kind: 'pt'};

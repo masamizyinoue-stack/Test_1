@@ -249,7 +249,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_45</div>
+  <div id="ver-label">DXF_View V0_47</div>
 </div>
 
 <div id="colorOverlay">
@@ -284,7 +284,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_45';
+const APP_VERSION = 'V0_47';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1330,6 +1330,7 @@ function handlePointerDown(sx,sy,isPenInput){
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
     if(isPenInput){
+      snapPt=snapAt(wx,wy); // ペンダウン位置でスナップ初期化（touchmove不発火対策）
       dimPendingDown=true;return;
     }
     const snap=snapAt(wx,wy);const pt=snap||{x:wx,y:wy};
@@ -1486,8 +1487,8 @@ ov.addEventListener('mousedown',e=>{
 });
 window.addEventListener('mousemove',e=>{
   const p=getPos(e);
-  if(window.DIM&&window.DIM.active&&mouseDown){
-    window.DIM.handleMove(p.x,p.y);
+  if(window.DIM&&window.DIM.active){
+    window.DIM.handleMove(p.x,p.y); // mouseDown不要: ホバー中も_hoverPos更新
   } else { handlePointerMove(p.x,p.y,false); }
   lastMX=p.x;lastMY=p.y;
 });
@@ -2156,6 +2157,6 @@ if(vd) vd.textContent = APP_VERSION;
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_45) -->
+<!-- 太さパネル削除済み (V0_47) -->
 </body>
 </html>
