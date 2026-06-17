@@ -250,7 +250,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_37</div>
+  <div id="ver-label">DXF_View V0_39</div>
 </div>
 
 <div id="colorOverlay">
@@ -285,7 +285,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_37';
+const APP_VERSION = 'V0_39';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1583,7 +1583,6 @@ ov.addEventListener('mousedown',e=>{
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
   if(window.DIM&&window.DIM.active){
     window.DIM.handleDown(p.x,p.y);
-    console.log('[DIM] mousedown → handleDown');
   } else { handlePointerDown(p.x,p.y,false); }
 });
 window.addEventListener('mousemove',e=>{
@@ -1598,7 +1597,6 @@ window.addEventListener('mouseup',e=>{
   const p=getPos(e);
   if(window.DIM&&window.DIM.active){
     window.DIM.handleUp(p.x,p.y);
-    console.log('[DIM] mouseup → handleUp');
   } else { handlePointerUp(p.x,p.y,false); }
 });
 ov.addEventListener('wheel',e=>{
@@ -1622,7 +1620,6 @@ ov.addEventListener('touchstart',e=>{
       panning=false;
       if(window.DIM&&window.DIM.active){
         window.DIM.handleDown(sx,sy);
-        console.log('[DIM] touchstart(pencil) → handleDown');
       } else { handlePointerDown(sx,sy,true); }
     }
   } else if(fingers.length>=2){
@@ -1693,7 +1690,6 @@ ov.addEventListener('touchend',e=>{
   if(liftedStylus.length>0&&isPen&&mouseDown){
     if(window.DIM&&window.DIM.active){
       window.DIM.handleUp(lastMX,lastMY);
-      console.log('[DIM] touchend(pencil) → handleUp');
     } else { handlePointerUp(lastMX,lastMY,true); }
     mouseDown=false;isPen=false;
     if(remFing.length>=2){
@@ -1791,7 +1787,6 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
-    console.log('[Tool] switched to:', currentTool, 'DIM.active=', window.DIM&&window.DIM.active);
     // ガイドメッセージ
     const guideMap={
       'sketch':'Apple Pencilまたは指でスケッチ',
@@ -1800,7 +1795,8 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
       'diag':'1点目を選択してください',
       'circDim':'円の円周にペンを近づける→離して確定→位置を指定',
       'distDim':'1つ目の線を選択してください（線上をタップ→離して確定）',
-      'radDim':'円または円弧を選択→離して確定→半径線の位置を指定'
+      'radDim':'円または円弧を選択→離して確定→半径線の位置を指定',
+      'linePt':'線をApple Pencilで選択してください（線に近づける→離す）'
     };
     if(currentTool==='sketch'||currentTool==='eraser'){
       showGuide(guideMap[currentTool]||'', 2000);
@@ -2051,7 +2047,6 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
   }
 });
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
-document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();});
 
 
@@ -2220,14 +2215,14 @@ const vd = document.getElementById('versionDisplay');
 if(vd) vd.textContent = APP_VERSION;
 
 // ════════════════════════════════════════════════════
-// V0_37 拡張コード（メインスクリプト末尾に統合）
+// V0_39 拡張コード（メインスクリプト末尾に統合）
 // ── 旧 script[src=pdf.min.js] インラインコードを移動 ──
 // ════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════
 // V0_31 拡張コード
 // ════════════════════════════════════════════════════
 
-// ── A. 線幅ボタン削除済み（V0_37: UIシンプル化） ──────────────────
+// ── A. 線幅ボタン削除済み（V0_39: UIシンプル化） ──────────────────
 
 // ── B. 拡張スナップ（円-直線交点・円-円交点） ──────────────────────────
 ;(function(){
@@ -2300,7 +2295,7 @@ if(vd) vd.textContent = APP_VERSION;
   }
 })();
 
-// ── C. 統一計測システム V0_37 ──────────────────────────────────
+// ── C. 統一計測システム V0_39 ──────────────────────────────────
 ;(function(){
 'use strict';
 
@@ -2361,7 +2356,6 @@ document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn) {
       if (typeof dimState !== 'undefined') dimState = {pts:[]};
       if (typeof dimPendingDown !== 'undefined') dimPendingDown = false;
       updateGuide();
-      console.log('[DIM V0_37] activated:', t);
     }
   });
 });
@@ -2599,7 +2593,6 @@ DIM.handleUp = function(sx, sy) {
   var wp = s2w(sx, sy);
   var wx = wp[0], wy = wp[1];
 
-  console.log('[DIM V0_37] handleUp phase=' + DIM.phase + ' tool=' + DIM.tool);
 
   // ── phase 0: 最初の点/対象を確定 ──
   if (DIM.phase === 0) {
@@ -2611,8 +2604,6 @@ DIM.handleUp = function(sx, sy) {
         DIM.phase = 1;
         DIM.cur = null;
         updateGuide();
-        console.log('[DIM V0_37] circle/arc selected', ent.r);
-        console.log('Target Selected', ent);
         scheduleOverlay(); return;
       } else {
         showGuide('円の近くにペンを当ててください', 1500);
@@ -2628,7 +2619,6 @@ DIM.handleUp = function(sx, sy) {
       }
       DIM.pts = [entry1]; DIM.phase = 1;
       DIM.cur = null; updateGuide();
-      console.log('[DIM V0_37] distDim target1:', entry1.kind);
       scheduleOverlay(); return;
     }
     if (DIM.tool === 'linePt') {
@@ -2665,7 +2655,6 @@ DIM.handleUp = function(sx, sy) {
       }
       DIM.pts.push(entry2); DIM.phase = 2;
       DIM.cur = null; updateGuide();
-      console.log('[DIM V0_37] distDim target2:', entry2.kind);
       scheduleOverlay(); return;
     }
     if (DIM.tool === 'linePt') {
@@ -2739,7 +2728,6 @@ function buildRadDim(ent, p3) {
 function confirmDIM(p3) {
   var p1 = DIM.pts[0], p2 = DIM.pts[1];
   var d = null;
-  console.log('[DIM V0_37] confirmDIM tool=' + DIM.tool, p1, p2, p3);
   try {
     if (DIM.tool === 'circDim' && p1 && p1.ent) {
       d = buildCircDimPhi(p1.ent, p3);
@@ -2760,14 +2748,13 @@ function confirmDIM(p3) {
     } else if (DIM.tool === 'linePt' && DIM.linePtLine && DIM.linePtPt) {
       d = buildLinePtDim(DIM.linePtLine, DIM.linePtPt, p3);
     }
-  } catch(err) { console.warn('[DIM V0_37 confirm]', err); }
+  } catch(err) { console.warn('[DIM V0_39 confirm]', err); }
 
   if (d) {
     snapshot();
     dims.push(d);
     scheduleSave(); scheduleDraw();
     showGuide('寸法を追加しました ↩ で取消', 2000);
-    console.log('Dimension Created', d);
   }
 
   // 次の計測へリセット（ツールは維持）
@@ -2994,9 +2981,230 @@ ov2.addEventListener('pointerup', function(e) {
 }, true);
 
 window.DIM = DIM;
-console.log('[DIM V0_37] Unified Measurement System initialized');
 
-})(); // end C V0_37
+})();
+// ============================================================
+// PERFORMANCE OPTIMIZATION V0_39
+// ─ スナップキャッシュ・BBOX フィルタ・全要素ループ削減
+// ============================================================
+;(function(){
+'use strict';
+
+// ── スナップキャッシュ本体 ──────────────────────────────────
+var _SC = {
+  built: false,
+  pts: [],
+  segs: [],
+  circs: [],
+  hiddenKey: ''
+};
+
+function _hiddenKey() {
+  if (typeof hiddenLayers === 'undefined') return '';
+  var a = [];
+  hiddenLayers.forEach(function(v){ a.push(v); });
+  return a.sort().join(',');
+}
+
+function _buildCache() {
+  _SC.pts = []; _SC.segs = []; _SC.circs = [];
+  _SC.built = false;
+  if (typeof doc === 'undefined' || !doc) return;
+
+  var sen  = doc.sen  || [];
+  var enko = doc.enko || [];
+  var hk   = _hiddenKey();
+  _SC.hiddenKey = hk;
+
+  // 線分: 端点・中点
+  for (var i = 0; i < sen.length; i++) {
+    var s = sen[i];
+    if (typeof hiddenLayers !== 'undefined' && hiddenLayers.has(s.layer)) continue;
+    _SC.segs.push(s);
+    _SC.pts.push({x:s.x1, y:s.y1, type:'end'});
+    _SC.pts.push({x:s.x2, y:s.y2, type:'end'});
+    _SC.pts.push({x:(s.x1+s.x2)*0.5, y:(s.y1+s.y2)*0.5, type:'mid'});
+  }
+
+  // 円弧: 端点・中点・中心
+  for (var i = 0; i < enko.length; i++) {
+    var e = enko[i];
+    if (typeof hiddenLayers !== 'undefined' && hiddenLayers.has(e.layer)) continue;
+    _SC.circs.push(e);
+    var R2D = Math.PI / 180;
+    _SC.pts.push({x: e.cx + e.r*Math.cos(e.a1*R2D), y: e.cy + e.r*Math.sin(e.a1*R2D), type:'end'});
+    _SC.pts.push({x: e.cx + e.r*Math.cos(e.a2*R2D), y: e.cy + e.r*Math.sin(e.a2*R2D), type:'end'});
+    var am = (e.a1 + e.a2) / 2;
+    _SC.pts.push({x: e.cx + e.r*Math.cos(am*R2D), y: e.cy + e.r*Math.sin(am*R2D), type:'mid'});
+    _SC.pts.push({x: e.cx, y: e.cy, type:'cen'});
+  }
+
+  // 線分-線分交点（上限付き）
+  var ss = _SC.segs;
+  var MAX_ISECT = ss.length > 800 ? 200 : ss.length > 400 ? 500 : 1200;
+  var cnt = 0;
+  outer_ll:
+  for (var i = 0; i < ss.length; i++) {
+    for (var j = i+1; j < ss.length; j++) {
+      if (cnt >= MAX_ISECT) break outer_ll;
+      var dx1=ss[i].x2-ss[i].x1, dy1=ss[i].y2-ss[i].y1;
+      var dx2=ss[j].x2-ss[j].x1, dy2=ss[j].y2-ss[j].y1;
+      var dn = dx1*dy2 - dy1*dx2;
+      if (Math.abs(dn) < 1e-10) continue;
+      var t = ((ss[j].x1-ss[i].x1)*dy2 - (ss[j].y1-ss[i].y1)*dx2) / dn;
+      var u = ((ss[j].x1-ss[i].x1)*dy1 - (ss[j].y1-ss[i].y1)*dx1) / dn;
+      if (t>=-0.001&&t<=1.001&&u>=-0.001&&u<=1.001) {
+        _SC.pts.push({x: ss[i].x1+t*dx1, y: ss[i].y1+t*dy1, type:'int'});
+        cnt++;
+      }
+    }
+  }
+
+  // 円-線交点（BBOXフィルタ+上限200）
+  var ec = _SC.circs;
+  var cxlCnt = 0;
+  outer_cl:
+  for (var ci = 0; ci < ec.length; ci++) {
+    var c = ec[ci];
+    for (var si = 0; si < ss.length; si++) {
+      if (cxlCnt >= 200) break outer_cl;
+      var s = ss[si];
+      if (Math.min(s.x1,s.x2)-THRESH > c.cx+c.r) continue;
+      if (Math.max(s.x1,s.x2)+THRESH < c.cx-c.r) continue;
+      if (Math.min(s.y1,s.y2)-THRESH > c.cy+c.r) continue;
+      if (Math.max(s.y1,s.y2)+THRESH < c.cy-c.r) continue;
+      var dx=s.x2-s.x1, dy=s.y2-s.y1;
+      var fx=s.x1-c.cx, fy=s.y1-c.cy;
+      var a2=dx*dx+dy*dy, b2=2*(fx*dx+fy*dy), disc=b2*b2-4*a2*(fx*fx+fy*fy-c.r*c.r);
+      if (disc < 0 || a2 < 1e-12) continue;
+      var sd = Math.sqrt(disc);
+      [-1,1].forEach(function(sg){
+        var t=(-b2+sg*sd)/(2*a2);
+        if(t>=-0.001&&t<=1.001){ _SC.pts.push({x:s.x1+t*dx,y:s.y1+t*dy,type:'cxl'}); cxlCnt++; }
+      });
+    }
+  }
+
+  // 円-円交点（上限100）
+  var cxcCnt = 0;
+  outer_cc:
+  for (var i = 0; i < ec.length; i++) {
+    for (var j = i+1; j < ec.length; j++) {
+      if (cxcCnt >= 100) break outer_cc;
+      var c1=ec[i], c2=ec[j];
+      var dx=c2.cx-c1.cx, dy=c2.cy-c1.cy, d=Math.sqrt(dx*dx+dy*dy);
+      if (d>c1.r+c2.r+1e-9||d<Math.abs(c1.r-c2.r)-1e-9||d<1e-9) continue;
+      var a3=(c1.r*c1.r-c2.r*c2.r+d*d)/(2*d);
+      var h2=c1.r*c1.r-a3*a3;
+      if(h2<0) continue;
+      var h=Math.sqrt(h2);
+      var mx=c1.cx+a3*dx/d, my=c1.cy+a3*dy/d;
+      if(h<1e-9){ _SC.pts.push({x:mx,y:my,type:'cxc'}); cxcCnt++; continue; }
+      _SC.pts.push({x:mx+h*dy/d, y:my-h*dx/d, type:'cxc'});
+      _SC.pts.push({x:mx-h*dy/d, y:my+h*dx/d, type:'cxc'});
+      cxcCnt += 2;
+    }
+  }
+
+  _SC.built = true;
+}
+
+// キャッシュ無効化（外部公開）
+window._invalidateSnapCache = function() {
+  _SC.built = false;
+  _SC.pts = []; _SC.segs = []; _SC.circs = [];
+};
+
+// キャッシュ取得（必要なら自動構築、hiddenLayers 変化で再構築）
+function _getCache() {
+  if (!_SC.built) {
+    if (typeof doc !== 'undefined' && doc) _buildCache();
+  } else {
+    var hk = _hiddenKey();
+    if (hk !== _SC.hiddenKey) _buildCache();
+  }
+  return _SC;
+}
+
+// ── snapAt 上書き ────────────────────────────────────────────
+// この IIFE は拡張スナップ(B)のIIFEより後に実行されるため
+// window.snapAt（円-線・円-円交点含む版）をキャッシュ版で置き換える
+window.snapAt = function(wx, wy) {
+  var sc = _getCache();
+  if (!sc.built) return null;
+
+  var SR = 24 / (typeof scale !== 'undefined' ? scale : 1);
+  var BN = {int:SR*0.55, end:SR*0.35, cen:SR*0.20, mid:SR*0.05,
+            cxl:SR*0.50, cxc:SR*0.50};
+  var best = null, bestScore = SR;
+  var pts = sc.pts;
+
+  for (var i = 0, n = pts.length; i < n; i++) {
+    var p = pts[i];
+    var dx = wx - p.x, dy = wy - p.y;
+    var d = Math.sqrt(dx*dx + dy*dy);
+    if (d > SR) continue;
+    var score = d - (BN[p.type] || 0);
+    if (score < bestScore) { bestScore = score; best = {x:p.x, y:p.y, type:p.type}; }
+  }
+  return best;
+};
+
+// ── findNearestLine 上書き（BBOXフィルタ追加） ──────────────
+window.findNearestLine = function(wx, wy) {
+  var sc = _getCache();
+  var THRESH = 24 / (typeof scale !== 'undefined' ? scale : 1);
+  var best = null, bd = Infinity;
+  var segs = sc.built ? sc.segs : (typeof doc !== 'undefined' && doc && doc.sen ? doc.sen : []);
+  for (var i = 0, n = segs.length; i < n; i++) {
+    var s = segs[i];
+    if (Math.min(s.x1,s.x2) - THRESH > wx) continue;
+    if (Math.max(s.x1,s.x2) + THRESH < wx) continue;
+    if (Math.min(s.y1,s.y2) - THRESH > wy) continue;
+    if (Math.max(s.y1,s.y2) + THRESH < wy) continue;
+    var dx=s.x2-s.x1, dy=s.y2-s.y1, l2=dx*dx+dy*dy;
+    if (l2 < 1e-12) continue;
+    var t = ((wx-s.x1)*dx+(wy-s.y1)*dy)/l2;
+    t = t<0?0:t>1?1:t;
+    var ex=s.x1+t*dx, ey=s.y1+t*dy;
+    var d = Math.sqrt((wx-ex)*(wx-ex)+(wy-ey)*(wy-ey));
+    if (d < THRESH && d < bd) { bd=d; best=s; }
+  }
+  return best;
+};
+
+// ── findNearestCircleEdge 上書き（BBOXフィルタ追加） ─────────
+window.findNearestCircleEdge = function(wx, wy) {
+  var sc = _getCache();
+  var THRESH = 24 / (typeof scale !== 'undefined' ? scale : 1);
+  var best = null, bd = Infinity;
+  var circs = sc.built ? sc.circs : (typeof doc !== 'undefined' && doc && doc.enko ? doc.enko : []);
+  for (var i = 0, n = circs.length; i < n; i++) {
+    var e = circs[i];
+    if (e.cx - e.r - THRESH > wx) continue;
+    if (e.cx + e.r + THRESH < wx) continue;
+    if (e.cy - e.r - THRESH > wy) continue;
+    if (e.cy + e.r + THRESH < wy) continue;
+    var dc = Math.sqrt((wx-e.cx)*(wx-e.cx)+(wy-e.cy)*(wy-e.cy));
+    var d = Math.abs(dc - e.r);
+    if (d < THRESH && d < bd) { bd=d; best=e; }
+  }
+  return best;
+};
+
+// ── doc 変化監視: 自動キャッシュ構築 ────────────────────────
+var _prevDoc = null;
+var _docWatchTimer = setInterval(function() {
+  if (typeof doc === 'undefined') return;
+  if (doc !== _prevDoc) {
+    _prevDoc = doc;
+    if (doc) setTimeout(function(){ _buildCache(); }, 150);
+    else window._invalidateSnapCache();
+  }
+}, 300);
+window._docWatchTimer = _docWatchTimer;
+
+})();
 </script>
 <div id="guideMsg" style="
   display:none;
@@ -3020,6 +3228,6 @@ console.log('[DIM V0_37] Unified Measurement System initialized');
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_37) -->
+<!-- 太さパネル削除済み (V0_39) -->
 </body>
-</html>
+</html>                
