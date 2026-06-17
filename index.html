@@ -170,7 +170,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="最短距離寸法"><span class="tb-tool-label">最短距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><polyline points="9,11 12,8 15,11"/><polyline points="9,13 12,16 15,13"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="linePt" title="線から点への距離寸法"><span class="tb-tool-label">線から点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="6" x2="21" y2="6"/><line x1="12" y1="6" x2="12" y2="18"/><circle cx="12" cy="18" r="2" fill="currentColor" stroke="none"/><line x1="9" y1="9" x2="12" y2="6"/><line x1="15" y1="9" x2="12" y2="6"/></svg></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
@@ -250,7 +250,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_36</div>
+  <div id="ver-label">DXF_View V0_37</div>
 </div>
 
 <div id="colorOverlay">
@@ -285,7 +285,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_36';
+const APP_VERSION = 'V0_37';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -2093,17 +2093,11 @@ function _showMemMenu(idx,anchorBtn){
   menu.style.top=(r.bottom+6)+'px';
   menu.style.left=Math.max(4,r.left-60)+'px';
   menu.innerHTML='<div style="color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;margin-bottom:4px;">記憶'+(idx+1)+'</div>'
-    +'<button id="_memGoto" style="background:#2a6aad;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">表示VIEWへ移動</button>'
     +'<button id="_memOvr" style="background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">上書き保存</button>'
     +'<button id="_memRst" style="background:#8B0000;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">記憶リセット</button>'
     +'<button id="_memCnl" style="background:#333;color:#aaa;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;">キャンセル</button>';
   document.body.appendChild(menu);
   function closeMenu(){if(document.getElementById('_memMenu'))menu.remove();}
-  document.getElementById('_memGoto').onclick=function(){
-    var sv=savedViews[idx];if(!sv)return;
-    tx=sv.tx;ty=sv.ty;scale=sv.scale;scheduleDraw();
-    closeMenu();showGuide('記憶'+(idx+1)+'の位置へ移動しました',1500);
-  };
   document.getElementById('_memOvr').onclick=function(){
     savedViews[idx]={tx:tx,ty:ty,scale:scale};updateViewmemoState(idx);scheduleSave();
     closeMenu();showGuide('記憶'+(idx+1)+'を上書き保存しました',1500);
@@ -2226,14 +2220,14 @@ const vd = document.getElementById('versionDisplay');
 if(vd) vd.textContent = APP_VERSION;
 
 // ════════════════════════════════════════════════════
-// V0_36 拡張コード（メインスクリプト末尾に統合）
+// V0_37 拡張コード（メインスクリプト末尾に統合）
 // ── 旧 script[src=pdf.min.js] インラインコードを移動 ──
 // ════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════
 // V0_31 拡張コード
 // ════════════════════════════════════════════════════
 
-// ── A. 線幅ボタン削除済み（V0_36: UIシンプル化） ──────────────────
+// ── A. 線幅ボタン削除済み（V0_37: UIシンプル化） ──────────────────
 
 // ── B. 拡張スナップ（円-直線交点・円-円交点） ──────────────────────────
 ;(function(){
@@ -2306,7 +2300,7 @@ if(vd) vd.textContent = APP_VERSION;
   }
 })();
 
-// ── C. 統一計測システム V0_36 ──────────────────────────────────
+// ── C. 統一計測システム V0_37 ──────────────────────────────────
 ;(function(){
 'use strict';
 
@@ -2336,6 +2330,9 @@ var GUIDES = {
                '半径線の位置を指定（移動→離して確定）'],
   'distDim': ['1つ目の対象を選択（線または点）→離して確定',
                '2つ目の対象を選択（線または点）→離して確定',
+               '寸法位置を指定（移動→離して確定）'],
+  'linePt':  ['線をApple Pencilで選択してください（線に近づける→離す）',
+               '点を選択してください（スナップ確認→離す）',
                '寸法位置を指定（移動→離して確定）']
 };
 
@@ -2348,6 +2345,7 @@ function updateGuide() {
 function resetDIM() {
   DIM.active = false; DIM.tool = ''; DIM.phase = 0;
   DIM.pts = []; DIM.cur = null; DIM.penDown = false; DIM._hoverPos = null;
+  DIM.linePtLine = null; DIM.linePtPt = null;
 }
 
 // ─ ツール切り替えフック ──────────────────────────────────────
@@ -2356,14 +2354,14 @@ document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn) {
   btn.addEventListener('click', function() {
     var t = this.dataset.tool;
     resetDIM();
-    var MEASURE_TOOLS = ['dxdy','diag','circDim','radDim','distDim'];
+    var MEASURE_TOOLS = ['dxdy','diag','circDim','radDim','distDim','linePt'];
     if (MEASURE_TOOLS.indexOf(t) >= 0) {
       DIM.active = true; DIM.tool = t; DIM.phase = 0;
       // 既存ツールのdimState/dimPendingDownもリセット（二重処理防止）
       if (typeof dimState !== 'undefined') dimState = {pts:[]};
       if (typeof dimPendingDown !== 'undefined') dimPendingDown = false;
       updateGuide();
-      console.log('[DIM V0_36] activated:', t);
+      console.log('[DIM V0_37] activated:', t);
     }
   });
 });
@@ -2501,6 +2499,45 @@ function findNearestLine(wx, wy) {
   return best;
 }
 
+function buildLinePtDim(sen, pt, p3) {
+  var sd = parseFloat(document.getElementById('scaleDenom').value) || 1;
+  var dx = sen.x2 - sen.x1, dy = sen.y2 - sen.y1;
+  var len2 = dx*dx + dy*dy;
+  if (len2 < 1e-12) return null;
+  var t = ((pt.x - sen.x1)*dx + (pt.y - sen.y1)*dy) / len2;
+  var footX = sen.x1 + t*dx, footY = sen.y1 + t*dy;
+  var dist = Math.hypot(pt.x - footX, pt.y - footY);
+  if (dist < 1e-6) return null;
+  var len = Math.sqrt(len2);
+  var ux = dx/len, uy = dy/len;
+  var nx = pt.x - footX, ny = pt.y - footY;
+  var nlen = Math.hypot(nx, ny);
+  nx /= nlen; ny /= nlen;
+  var midX = (pt.x + footX)/2, midY = (pt.y + footY)/2;
+  var offset = (p3.x - midX)*(-uy) + (p3.y - midY)*ux;
+  var ep1x = footX - uy*offset, ep1y = footY + ux*offset;
+  var ep2x = pt.x  - uy*offset, ep2y = pt.y  + ux*offset;
+  var ext = 8/scale;
+  var sig = offset >= 0 ? 1 : -1;
+  var ang = Math.atan2(ny, nx);
+  var textAng = (ang > Math.PI/2) ? ang - Math.PI : (ang < -Math.PI/2) ? ang + Math.PI : ang;
+  return {
+    lines: [
+      {x1:ep1x, y1:ep1y, x2:ep2x, y2:ep2y},
+      {x1:footX, y1:footY, x2:ep1x + (-uy)*sig*ext, y2:ep1y + ux*sig*ext},
+      {x1:pt.x,  y1:pt.y,  x2:ep2x + (-uy)*sig*ext, y2:ep2y + ux*sig*ext}
+    ],
+    arrows: [
+      {x:ep1x, y:ep1y, angle: ang + Math.PI},
+      {x:ep2x, y:ep2y, angle: ang}
+    ],
+    text: formatDim(dist / sd),
+    tx: p3.x, ty: p3.y,
+    tangle: textAng,
+    type: 'linePt', color: '#f39c12'
+  };
+}
+
 // ─ handleDown/Move/Up（タッチハンドラから呼ぶ） ───────────────
 DIM.handleDown = function(sx, sy) {
   if (!DIM.active) return;
@@ -2512,6 +2549,15 @@ DIM.handleDown = function(sx, sy) {
   if ((DIM.tool==='circDim'||DIM.tool==='radDim') && DIM.phase===0) {
     // 円選択フェーズ: ホバーのみ更新、確定はUPで
     DIM.cur = null;
+  } else if (DIM.tool==='linePt') {
+    if (DIM.phase===0) {
+      DIM.linePtLine = findNearestLine(wx, wy);
+      DIM.cur = null;
+    } else if (DIM.phase===1) {
+      DIM.cur = msSnap(wx, wy);
+    } else if (DIM.phase===2) {
+      DIM.cur = {x:wx, y:wy, kind:'pt', type:'default', ent:null};
+    }
   } else if (DIM.tool==='distDim') {
     DIM.cur = msSnapDistDim(wx, wy);
   } else {
@@ -2528,6 +2574,17 @@ DIM.handleMove = function(sx, sy) {
 
   if ((DIM.tool==='circDim'||DIM.tool==='radDim') && DIM.phase===0) {
     DIM.cur = null; // ホバーはdrawDIMOverlayで_hoverPosから描画
+  } else if ((DIM.tool==='circDim'||DIM.tool==='radDim') && DIM.phase===1) {
+    DIM.cur = {x:wx, y:wy, kind:'pt', type:'default', ent:null};
+  } else if (DIM.tool==='linePt') {
+    if (DIM.phase===0) {
+      DIM.linePtLine = findNearestLine(wx, wy);
+      DIM.cur = null;
+    } else if (DIM.phase===1) {
+      DIM.cur = msSnap(wx, wy);
+    } else if (DIM.phase===2) {
+      DIM.cur = {x:wx, y:wy, kind:'pt', type:'default', ent:null};
+    }
   } else if (DIM.tool==='distDim') {
     DIM.cur = msSnapDistDim(wx, wy);
   } else {
@@ -2542,7 +2599,7 @@ DIM.handleUp = function(sx, sy) {
   var wp = s2w(sx, sy);
   var wx = wp[0], wy = wp[1];
 
-  console.log('[DIM V0_36] handleUp phase=' + DIM.phase + ' tool=' + DIM.tool);
+  console.log('[DIM V0_37] handleUp phase=' + DIM.phase + ' tool=' + DIM.tool);
 
   // ── phase 0: 最初の点/対象を確定 ──
   if (DIM.phase === 0) {
@@ -2554,7 +2611,7 @@ DIM.handleUp = function(sx, sy) {
         DIM.phase = 1;
         DIM.cur = null;
         updateGuide();
-        console.log('[DIM V0_36] circle/arc selected', ent.r);
+        console.log('[DIM V0_37] circle/arc selected', ent.r);
         console.log('Target Selected', ent);
         scheduleOverlay(); return;
       } else {
@@ -2571,8 +2628,20 @@ DIM.handleUp = function(sx, sy) {
       }
       DIM.pts = [entry1]; DIM.phase = 1;
       DIM.cur = null; updateGuide();
-      console.log('[DIM V0_36] distDim target1:', entry1.kind);
+      console.log('[DIM V0_37] distDim target1:', entry1.kind);
       scheduleOverlay(); return;
+    }
+    if (DIM.tool === 'linePt') {
+      var ln0 = DIM.linePtLine || findNearestLine(wx, wy);
+      if (ln0) {
+        DIM.linePtLine = ln0;
+        DIM.pts = [{x:(ln0.x1+ln0.x2)/2, y:(ln0.y1+ln0.y2)/2, kind:'line', ent:ln0}];
+        DIM.phase = 1; DIM.cur = null; DIM.linePtPt = null;
+        updateGuide(); scheduleOverlay(); return;
+      } else {
+        showGuide('線の近くにペンを当ててください', 1500);
+        DIM.cur = null; scheduleOverlay(); return;
+      }
     }
     // dxdy / diag
     var pt1 = msSnap(wx, wy);
@@ -2596,8 +2665,15 @@ DIM.handleUp = function(sx, sy) {
       }
       DIM.pts.push(entry2); DIM.phase = 2;
       DIM.cur = null; updateGuide();
-      console.log('[DIM V0_36] distDim target2:', entry2.kind);
+      console.log('[DIM V0_37] distDim target2:', entry2.kind);
       scheduleOverlay(); return;
+    }
+    if (DIM.tool === 'linePt') {
+      var ptSnap = msSnap(wx, wy);
+      DIM.linePtPt = {x:ptSnap.x, y:ptSnap.y};
+      DIM.pts.push({x:ptSnap.x, y:ptSnap.y, kind:'pt', ent:null});
+      DIM.phase = 2; DIM.cur = null;
+      updateGuide(); scheduleOverlay(); return;
     }
     // dxdy / diag: P2確定
     var pt2 = msSnap(wx, wy);
@@ -2613,10 +2689,57 @@ DIM.handleUp = function(sx, sy) {
 };
 
 // ─ 寸法確定 ─────────────────────────────────────────────────
+function buildCircDimPhi(ent, p3) {
+  var sd = parseFloat(document.getElementById('scaleDenom').value) || 1;
+  var cx = ent.cx, cy = ent.cy, r = ent.r;
+  var ang = Math.atan2(p3.y - cy, p3.x - cx);
+  var x1 = cx + r * Math.cos(ang + Math.PI);
+  var y1 = cy + r * Math.sin(ang + Math.PI);
+  var x2 = cx + r * Math.cos(ang);
+  var y2 = cy + r * Math.sin(ang);
+  var textAng = (ang > Math.PI/2) ? ang - Math.PI : (ang < -Math.PI/2) ? ang + Math.PI : ang;
+  var dist = Math.hypot(p3.x - cx, p3.y - cy);
+  var extLen = Math.max(dist, r + 20/scale);
+  var tx2 = cx + extLen * Math.cos(ang);
+  var ty2 = cy + extLen * Math.sin(ang);
+  return {
+    lines: [{x1:x1,y1:y1,x2:x2,y2:y2}],
+    arrows: [
+      {x:x1, y:y1, angle: ang + Math.PI},
+      {x:x2, y:y2, angle: ang}
+    ],
+    text: 'φ' + formatDim(r * 2 / sd),
+    tx: tx2, ty: ty2,
+    tangle: textAng,
+    type: 'circDim', color: '#f39c12'
+  };
+}
+
+function buildRadDim(ent, p3) {
+  var sd = parseFloat(document.getElementById('scaleDenom').value) || 1;
+  var cx = ent.cx, cy = ent.cy, r = ent.r;
+  var ang = Math.atan2(p3.y - cy, p3.x - cx);
+  var ex = cx + r * Math.cos(ang);
+  var ey = cy + r * Math.sin(ang);
+  var dist = Math.hypot(p3.x - cx, p3.y - cy);
+  var extLen = Math.max(dist, r + 15/scale);
+  var tx2 = cx + extLen * Math.cos(ang);
+  var ty2 = cy + extLen * Math.sin(ang);
+  var textAng = (ang > Math.PI/2) ? ang - Math.PI : (ang < -Math.PI/2) ? ang + Math.PI : ang;
+  return {
+    lines: [{x1:cx,y1:cy,x2:ex,y2:ey}],
+    arrows: [{x:ex, y:ey, angle: ang}],
+    text: 'R' + formatDim(r / sd),
+    tx: tx2, ty: ty2,
+    tangle: textAng,
+    type: 'radDim', color: '#f39c12'
+  };
+}
+
 function confirmDIM(p3) {
   var p1 = DIM.pts[0], p2 = DIM.pts[1];
   var d = null;
-  console.log('[DIM V0_36] confirmDIM tool=' + DIM.tool, p1, p2, p3);
+  console.log('[DIM V0_37] confirmDIM tool=' + DIM.tool, p1, p2, p3);
   try {
     if (DIM.tool === 'circDim' && p1 && p1.ent) {
       d = buildCircDimPhi(p1.ent, p3);
@@ -2634,8 +2757,10 @@ function confirmDIM(p3) {
     } else if (DIM.tool === 'distDim' && p1 && p2) {
       var res = calcDistDim(p1, p2);
       if (res) d = buildDim(res.p1, res.p2, p3, res.type);
+    } else if (DIM.tool === 'linePt' && DIM.linePtLine && DIM.linePtPt) {
+      d = buildLinePtDim(DIM.linePtLine, DIM.linePtPt, p3);
     }
-  } catch(err) { console.warn('[DIM V0_36 confirm]', err); }
+  } catch(err) { console.warn('[DIM V0_37 confirm]', err); }
 
   if (d) {
     snapshot();
@@ -2647,6 +2772,7 @@ function confirmDIM(p3) {
 
   // 次の計測へリセット（ツールは維持）
   DIM.pts = []; DIM.phase = 0; DIM.cur = null; DIM._hoverPos = null;
+  DIM.linePtLine = null; DIM.linePtPt = null;
   var nextG = GUIDES[DIM.tool];
   if (nextG) {
     setTimeout(function() {
@@ -2733,6 +2859,16 @@ function drawDIMOverlay() {
     }
   }
 
+  // 1b. linePt phase=0: 近傍線をオレンジハイライト
+  if (DIM.tool==='linePt' && DIM.phase===0 && DIM.linePtLine) {
+    var lns = DIM.linePtLine;
+    var sc1=w2s(lns.x1,lns.y1), sc2=w2s(lns.x2,lns.y2);
+    octx.save();
+    octx.strokeStyle='#FF8C00'; octx.lineWidth=3; octx.setLineDash([]);
+    octx.beginPath(); octx.moveTo(sc1[0],sc1[1]); octx.lineTo(sc2[0],sc2[1]); octx.stroke();
+    octx.restore();
+  }
+
   // 2. スナップマーカー（dxdy/diag/distDim移動中）
   var snap = DIM.cur;
   if (snap && DIM.phase < 2) {
@@ -2765,7 +2901,7 @@ function drawDIMOverlay() {
   });
 
   // 4. 位置指定フェーズ: プレビュー
-  if (DIM.phase === (DIM.tool==='dxdy'||DIM.tool==='diag'?2:DIM.tool==='distDim'?2:1) && DIM.cur) {
+  if (DIM.phase === (DIM.tool==='dxdy'||DIM.tool==='diag'?2:DIM.tool==='distDim'?2:DIM.tool==='linePt'?2:1) && DIM.cur) {
     drawDIMPreview();
   }
 
@@ -2792,6 +2928,8 @@ function drawDIMPreview() {
     } else if (DIM.tool==='distDim' && DIM.pts.length >= 2) {
       var res2 = calcDistDim(DIM.pts[0], DIM.pts[1]);
       if (res2) prevDim = buildDim(res2.p1, res2.p2, p3, res2.type);
+    } else if (DIM.tool==='linePt' && DIM.linePtLine && DIM.linePtPt) {
+      prevDim = buildLinePtDim(DIM.linePtLine, DIM.linePtPt, p3);
     }
   } catch(e) { console.warn('[DIM preview]', e); }
   if (!prevDim || !prevDim.lines) return;
@@ -2856,9 +2994,9 @@ ov2.addEventListener('pointerup', function(e) {
 }, true);
 
 window.DIM = DIM;
-console.log('[DIM V0_36] Unified Measurement System initialized');
+console.log('[DIM V0_37] Unified Measurement System initialized');
 
-})(); // end C V0_36
+})(); // end C V0_37
 </script>
 <div id="guideMsg" style="
   display:none;
@@ -2882,6 +3020,6 @@ console.log('[DIM V0_36] Unified Measurement System initialized');
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_36) -->
+<!-- 太さパネル削除済み (V0_37) -->
 </body>
 </html>
