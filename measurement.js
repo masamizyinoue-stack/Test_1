@@ -629,3 +629,240 @@ window.DIM = DIM;
 console.log('[DIM] module initialized');
 
 })(); // end C
+
+// ── D. 線と点 距離寸法 ──────────────────────────────────────────────────────
+;(function(){
+
+// ─ 状態 ────────────────────────────────────────────
+var LP={
+  active:false, phase:0,
+  selLine:null, selPt:null, footPt:null,
+  penDown:false, cur:null, _hoverPos:null
+};
+var LP_GUIDES={
+  LINE:'線の近くにペンを当てて選択（離して確定）',
+  PT:  '点を選択（スナップ→離して確定）',
+  POS: '寸法位置を指定（移動→離して確定）',
+};
+
+function resetLP(){
+  LP.active=false; LP.phase=0;
+  LP.selLine=null; LP.selPt=null; LP.footPt=null;
+  LP.penDown=false; LP.cur=null; LP._hoverPos=null;
+}
+
+// ─ 垂線の足 ─────────────────────────────────────────
+function computeFoot(line,pt){
+  var dx=line.x2-line.x1,dy=line.y2-line.y1,len2=dx*dx+dy*dy;
+  if(len2<1e-12) return {x:line.x1,y:line.y1};
+  var t=((pt.x-line.x1)*dx+(pt.y-line.y1)*dy)/len2;
+  return {x:line.x1+t*dx,y:line.y1+t*dy};
+}
+
+// ─ 最近傍線 ─────────────────────────────────────────
+function findNearestSen(wx,wy){
+  if(!doc||!doc.sen) return null;
+  var sr=30/scale,best=null,bestDist=sr;
+  for(var i=0;i<doc.sen.length;i++){
+    var e=doc.sen[i];
+    if(hiddenLayers.has(e.layer)) continue;
+    var d=distToSeg(wx,wy,e.x1,e.y1,e.x2,e.y2);
+    if(d<bestDist){bestDist=d;best=e;}
+  }
+  return best;
+}
+
+// ─ 寸法構築 ─────────────────────────────────────────
+function buildLinePtDim(line,pt,pArrow){
+  var sd=parseFloat(document.getElementById('scaleDenom').value)||1;
+  var dx=line.x2-line.x1,dy=line.y2-line.y1;
+  var lineLen=Math.hypot(dx,dy);
+  if(lineLen<1e-9) return null;
+  var lux=dx/lineLen,luy=dy/lineLen;           // 線方向単位ベクトル
+  var foot=computeFoot(line,pt);
+  var perpX=pt.x-foot.x,perpY=pt.y-foot.y;
+  var dist=Math.hypot(perpX,perpY);
+  if(dist<1e-9) return null;
+  var ux=perpX/dist,uy=perpY/dist;             // 垂線方向(foot→pt)
+  // pArrow を線方向へ射影してオフセット量を決定
+  var offset=(pArrow.x-foot.x)*lux+(pArrow.y-foot.y)*luy;
+  // 寸法線端点(線と平行にoffset移動)
+  var d1={x:foot.x+lux*offset,y:foot.y+luy*offset};
+  var d2={x:pt.x  +lux*offset,y:pt.y  +luy*offset};
+  // 補助線: 測定点→寸法線端(少し延長)
+  var ext=8/scale,sig=offset>=0?1:-1;
+  var lines=[
+    {x1:foot.x,y1:foot.y,x2:d1.x+lux*sig*ext,y2:d1.y+luy*sig*ext},
+    {x1:pt.x,  y1:pt.y,  x2:d2.x+lux*sig*ext,y2:d2.y+luy*sig*ext},
+    {x1:d1.x,  y1:d1.y,  x2:d2.x,             y2:d2.y}
+  ];
+  // 矢印(Y軸反転考慮)
+  var screenAng=Math.atan2(-uy,ux);
+  var arrows=[
+    {x:d1.x,y:d1.y,angle:screenAng+Math.PI},
+    {x:d2.x,y:d2.y,angle:screenAng}
+  ];
+  // テキスト位置(寸法線中点); 短すぎれば引出線を追加
+  var tx2=(d1.x+d2.x)/2,ty2=(d1.y+d2.y)/2;
+  var tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
+  var sd1=w2s(d1.x,d1.y),sd2=w2s(d2.x,d2.y);
+  var pxLen=Math.hypot(sd2[0]-sd1[0],sd2[1]-sd1[1]);
+  if(pxLen<60){
+    // 引出線: 寸法線端から線方向に延伸してテキストを外側へ
+    var ref=(offset>=0?32:-32)/scale;
+    tx2=d2.x+lux*ref; ty2=d2.y+luy*ref;
+    lines.push({x1:d2.x,y1:d2.y,x2:tx2,y2:ty2});
+  }
+  return {lines,arrows,
+    text:(Math.round(dist/sd*10)/10).toFixed(1),
+    tx:tx2,ty:ty2,tangle,color:'#f39c12'};
+}
+
+// ─ プレビュー描画(点線) ───────────────────────────────
+function drawLPPreview(ctx2,dim){
+  if(!dim) return;
+  ctx2.strokeStyle=ctx2.fillStyle=dim.color||'#f39c12';
+  ctx2.lineWidth=1.5; ctx2.setLineDash([5,4]);
+  for(var i=0;i<dim.lines.length;i++){
+    var l=dim.lines[i],s1=w2s(l.x1,l.y1),s2=w2s(l.x2,l.y2);
+    ctx2.beginPath();ctx2.moveTo(s1[0],s1[1]);ctx2.lineTo(s2[0],s2[1]);ctx2.stroke();
+  }
+  ctx2.setLineDash([]);
+  for(var j=0;j<dim.arrows.length;j++){
+    var a=dim.arrows[j],sa=w2s(a.x,a.y);
+    ctx2.save();ctx2.translate(sa[0],sa[1]);ctx2.rotate(a.angle);
+    ctx2.beginPath();ctx2.moveTo(0,0);ctx2.lineTo(-10,4);ctx2.lineTo(-10,-4);
+    ctx2.closePath();ctx2.fill();ctx2.restore();
+  }
+  if(dim.text){
+    var st=w2s(dim.tx,dim.ty);
+    ctx2.save();ctx2.translate(st[0],st[1]);ctx2.rotate(dim.tangle||0);
+    ctx2.font='bold 17px sans-serif';ctx2.fillStyle=dim.color||'#f39c12';
+    ctx2.textAlign='center';ctx2.textBaseline='bottom';
+    ctx2.fillText(dim.text,0,0);ctx2.restore();
+  }
+}
+
+// ─ ツール切り替えフック ────────────────────────────────
+document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var t=this.dataset.tool;
+    if(t==='lp'){
+      if(window.DIM) window.DIM.active=false;
+      resetLP(); LP.active=true; LP.phase=0;
+      showGuide(LP_GUIDES.LINE,0);
+    } else {
+      resetLP();
+    }
+  });
+});
+
+// ─ drawOverlay フック ─────────────────────────────────
+var _lpOrigDO=window.drawOverlay;
+window.drawOverlay=function(){ _lpOrigDO(); if(LP.active) drawLPOverlay(); };
+
+function drawLPOverlay(){
+  var dpr=window.devicePixelRatio||1;
+  var ctx2=octx;
+  ctx2.save(); ctx2.scale(dpr,dpr);
+  // Phase0: ホバー最近傍線をオレンジハイライト
+  if(LP.phase===0&&LP._hoverPos&&doc){
+    var hl=findNearestSen(LP._hoverPos.x,LP._hoverPos.y);
+    if(hl){
+      var hs1=w2s(hl.x1,hl.y1),hs2=w2s(hl.x2,hl.y2);
+      ctx2.strokeStyle='#ff8c00';ctx2.lineWidth=3;ctx2.setLineDash([]);
+      ctx2.beginPath();ctx2.moveTo(hs1[0],hs1[1]);ctx2.lineTo(hs2[0],hs2[1]);ctx2.stroke();
+    }
+  }
+  // 選択済み線ハイライト(Phase1,2)
+  if(LP.selLine&&LP.phase>=1){
+    var ls1=w2s(LP.selLine.x1,LP.selLine.y1),ls2=w2s(LP.selLine.x2,LP.selLine.y2);
+    ctx2.strokeStyle='#ff8c00';ctx2.lineWidth=2.5;ctx2.setLineDash([]);
+    ctx2.beginPath();ctx2.moveTo(ls1[0],ls1[1]);ctx2.lineTo(ls2[0],ls2[1]);ctx2.stroke();
+  }
+  // Phase1: スナップマーカー
+  if(LP.phase===1&&LP.cur){
+    var sc=w2s(LP.cur.x,LP.cur.y);
+    drawExtSnapMarker(ctx2,sc[0],sc[1],LP.cur.type||'default');
+  }
+  // Phase2: 選択済み点+垂点マーカー
+  if(LP.selPt&&LP.phase===2){
+    var spt=w2s(LP.selPt.x,LP.selPt.y);
+    ctx2.strokeStyle='#00ff7f';ctx2.lineWidth=2;ctx2.setLineDash([]);
+    ctx2.beginPath();ctx2.arc(spt[0],spt[1],6,0,Math.PI*2);ctx2.stroke();
+    if(LP.footPt){
+      var sfp=w2s(LP.footPt.x,LP.footPt.y);
+      ctx2.strokeStyle='#88ccff';ctx2.lineWidth=1.5;
+      ctx2.beginPath();ctx2.arc(sfp[0],sfp[1],4,0,Math.PI*2);ctx2.stroke();
+      ctx2.strokeStyle='rgba(255,140,0,0.35)';ctx2.setLineDash([4,4]);
+      ctx2.beginPath();ctx2.moveTo(sfp[0],sfp[1]);ctx2.lineTo(spt[0],spt[1]);ctx2.stroke();
+      ctx2.setLineDash([]);
+    }
+  }
+  // Phase2: プレビュー
+  if(LP.phase===2&&LP.cur&&LP.selLine&&LP.selPt){
+    drawLPPreview(ctx2,buildLinePtDim(LP.selLine,LP.selPt,LP.cur));
+  }
+  ctx2.restore();
+}
+
+// ─ ポインタハンドラ ───────────────────────────────────
+LP.handleDown=function(sx,sy){
+  var wp=s2w(sx,sy);
+  LP._hoverPos={x:wp[0],y:wp[1]};
+  LP.penDown=true;
+  if(LP.phase===1){
+    var snp=snapAt(wp[0],wp[1]);
+    LP.cur=snp||{x:wp[0],y:wp[1],type:'default'};
+  } else if(LP.phase===2){
+    LP.cur={x:wp[0],y:wp[1]};
+  }
+  scheduleOverlay();
+};
+
+LP.handleMove=function(sx,sy){
+  var wp=s2w(sx,sy);
+  LP._hoverPos={x:wp[0],y:wp[1]};
+  if(!LP.penDown){scheduleOverlay();return;}
+  if(LP.phase===1){
+    var snp=snapAt(wp[0],wp[1]);
+    LP.cur=snp||{x:wp[0],y:wp[1],type:'default'};
+  } else if(LP.phase===2){
+    LP.cur={x:wp[0],y:wp[1]};
+  }
+  scheduleOverlay();
+};
+
+LP.handleUp=function(sx,sy){
+  if(!LP.penDown) return;
+  LP.penDown=false;
+  var wp=s2w(sx,sy);
+  if(LP.phase===0){
+    var hp=LP._hoverPos||{x:wp[0],y:wp[1]};
+    var line=findNearestSen(hp.x,hp.y);
+    if(line){
+      LP.selLine=line; LP.phase=1; LP.cur=null;
+      showGuide(LP_GUIDES.PT,0);
+    } else {
+      showGuide('線の近くにペンを当ててください',1500);
+    }
+  } else if(LP.phase===1){
+    var pt=LP.cur||{x:wp[0],y:wp[1],type:'default'};
+    LP.selPt=pt;
+    LP.footPt=computeFoot(LP.selLine,pt);
+    LP.phase=2; LP.cur=null;
+    showGuide(LP_GUIDES.POS,0);
+  } else if(LP.phase===2){
+    var pArrow=LP.cur||{x:wp[0],y:wp[1]};
+    var dim=buildLinePtDim(LP.selLine,LP.selPt,pArrow);
+    if(dim){ snapshot(); dims.push(dim); scheduleSave(); scheduleDraw(); }
+    LP.selLine=null; LP.selPt=null; LP.footPt=null; LP.phase=0; LP.cur=null;
+    showGuide(LP_GUIDES.LINE,0);
+  }
+  scheduleOverlay();
+};
+
+window.LP=LP;
+console.log('[LP] module initialized');
+
+})(); // end D

@@ -162,6 +162,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
   <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色・太さ</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
@@ -285,7 +286,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <script src="viewer.js"></script>
 <script>
-const APP_VERSION = 'V0_48';
+const APP_VERSION = 'V0_49';
 
 // =========================================================
 // グローバル状態
@@ -594,6 +595,7 @@ function getPos(e){const r=ov.getBoundingClientRect();return {x:e.clientX-r.left
 function handlePointerDown(sx,sy,isPenInput){
   // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
+  if(window.LP&&window.LP.active)return;
   const[wx,wy]=s2w(sx,sy);
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
@@ -653,6 +655,7 @@ function handlePointerDown(sx,sy,isPenInput){
 function handlePointerMove(sx,sy,isPenInput){
   // DIMシステムがアクティブな場合は DIM の pointermove ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
+  if(window.LP&&window.LP.active)return;
   const[wx,wy]=s2w(sx,sy);
   currentCursorWorld={x:wx,y:wy}; // 寸法プレビュー用カーソル世界座標を更新
   // 寸法ツール: ペン・指どちらでもスナップ更新
@@ -680,6 +683,7 @@ function handlePointerMove(sx,sy,isPenInput){
 function handlePointerUp(sx,sy,isPenInput){
   // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
+  if(window.LP&&window.LP.active)return;
   if(dimPendingDown&&isPenInput){
     dimPendingDown=false;
     if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
@@ -738,12 +742,16 @@ ov.addEventListener('mousedown',e=>{
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
   if(window.DIM&&window.DIM.active){
     window.DIM.handleDown(p.x,p.y);
+  } else if(window.LP&&window.LP.active){
+    window.LP.handleDown(p.x,p.y);
   } else { handlePointerDown(p.x,p.y,false); }
 });
 window.addEventListener('mousemove',e=>{
   const p=getPos(e);
   if(window.DIM&&window.DIM.active){
     window.DIM.handleMove(p.x,p.y); // mouseDown不要: ホバー中も_hoverPos更新
+  } else if(window.LP&&window.LP.active){
+    window.LP.handleMove(p.x,p.y);
   } else { handlePointerMove(p.x,p.y,false); }
   lastMX=p.x;lastMY=p.y;
 });
@@ -752,6 +760,8 @@ window.addEventListener('mouseup',e=>{
   const p=getPos(e);
   if(window.DIM&&window.DIM.active){
     window.DIM.handleUp(p.x,p.y);
+  } else if(window.LP&&window.LP.active){
+    window.LP.handleUp(p.x,p.y);
   } else { handlePointerUp(p.x,p.y,false); }
 });
 ov.addEventListener('wheel',e=>{
@@ -776,6 +786,8 @@ ov.addEventListener('touchstart',e=>{
       if(window.DIM&&window.DIM.active){
         window.DIM.handleDown(sx,sy);
         console.log('[DIM] touchstart(pencil) → handleDown');
+      } else if(window.LP&&window.LP.active){
+        window.LP.handleDown(sx,sy);
       } else { handlePointerDown(sx,sy,true); }
     }
   } else if(fingers.length>=2){
@@ -809,6 +821,8 @@ ov.addEventListener('touchmove',e=>{
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     if(window.DIM&&window.DIM.active){
       window.DIM.handleMove(sx,sy);
+    } else if(window.LP&&window.LP.active){
+      window.LP.handleMove(sx,sy);
     } else { handlePointerMove(sx,sy,true); }
     lastMX=sx;lastMY=sy;
   } else if(fingers.length>=2&&pinchDist!==null){
@@ -847,6 +861,8 @@ ov.addEventListener('touchend',e=>{
     if(window.DIM&&window.DIM.active){
       window.DIM.handleUp(lastMX,lastMY);
       console.log('[DIM] touchend(pencil) → handleUp');
+    } else if(window.LP&&window.LP.active){
+      window.LP.handleUp(lastMX,lastMY);
     } else { handlePointerUp(lastMX,lastMY,true); }
     mouseDown=false;isPen=false;
     if(remFing.length>=2){
