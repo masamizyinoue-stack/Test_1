@@ -249,7 +249,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_42</div>
+  <div id="ver-label">DXF_View V0_43</div>
 </div>
 
 <div id="colorOverlay">
@@ -284,7 +284,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_42';
+const APP_VERSION = 'V0_43';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -336,6 +336,10 @@ let isPen=false;
 let mouseDown=false,lastMX=0,lastMY=0,panning=false;
 let pinchDist=null,pinchMid=null;
 const ERASER_RADIUS_PX=20;
+// ─ パフォーマンス最適化 ─
+let _scEndPts=[],_scMidPts=[],_scCenPts=[]; // スナップキャッシュ（Xソート済）
+let perfMode=false; // 軽量モード（大容量DXF自動切替）
+const PERF_THRESHOLD=800; // この要素数を超えたら軽量モード
 
 // =========================================================
 // 操作ガイドメッセージ
@@ -825,6 +829,36 @@ function computeBBox(){
   return {minx,miny,maxx,maxy};
 }
 
+// =========================================================
+// スナップキャッシュ（DXF読込時に事前計算）
+// =========================================================
+function buildSnapCache(){
+  _scEndPts=[];_scMidPts=[];_scCenPts=[];
+  if(!doc) return;
+  for(const e of doc.sen){
+    _scEndPts.push({x:e.x1,y:e.y1,layer:e.layer});
+    _scEndPts.push({x:e.x2,y:e.y2,layer:e.layer});
+    _scMidPts.push({x:(e.x1+e.x2)/2,y:(e.y1+e.y2)/2,layer:e.layer});
+  }
+  for(const e of doc.enko){
+    _scCenPts.push({x:e.cx,y:e.cy,layer:e.layer});
+    _scEndPts.push({x:e.cx+e.r*Math.cos(e.a1*Math.PI/180),y:e.cy+e.r*Math.sin(e.a1*Math.PI/180),layer:e.layer});
+    _scEndPts.push({x:e.cx+e.r*Math.cos(e.a2*Math.PI/180),y:e.cy+e.r*Math.sin(e.a2*Math.PI/180),layer:e.layer});
+    const am=(e.a1+e.a2)/2;
+    _scMidPts.push({x:e.cx+e.r*Math.cos(am*Math.PI/180),y:e.cy+e.r*Math.sin(am*Math.PI/180),layer:e.layer});
+  }
+  // X座標でソート → 二分探索で高速範囲絞り込み
+  _scEndPts.sort((a,b)=>a.x-b.x);
+  _scMidPts.sort((a,b)=>a.x-b.x);
+  _scCenPts.sort((a,b)=>a.x-b.x);
+}
+function checkPerfMode(){
+  if(!doc){perfMode=false;return;}
+  const n=doc.sen.length+doc.enko.length;
+  perfMode=(n>PERF_THRESHOLD);
+  if(perfMode) console.log('[PerfMode] 軽量モード ON: '+n+' 要素');
+}
+
 function fit(){
   const bb=computeBBox();
   const W=cv.width,H=cv.height;
@@ -849,21 +883,20 @@ function rafLoop(){
 
 function draw(){
   const dpr=window.devicePixelRatio||1;
-  // 物理ピクセルサイズで全クリア
   ctx.clearRect(0,0,cv.width,cv.height);
-  // dprスケールを設定（以降の描画はCSSピクセル座標で行う）
   ctx.save();
   ctx.scale(dpr,dpr);
   const W=cv.width/dpr, H=cv.height/dpr;
   const darkBg=!bwMode;
   ctx.fillStyle=bwMode?'#ffffff':'#1e2430';
   ctx.fillRect(0,0,W,H);
-  if(!doc&&!pdfImage) return;
+  if(!doc&&!pdfImage){ctx.restore();return;}
   if(pdfImage){
     const[sx,sy]=w2s(pdfImage.wx,pdfImage.wy);
     ctx.drawImage(pdfImage.img,sx,sy,pdfImage.ww*scale,pdfImage.wh*scale);
   }
-  if(!doc) return;
+  if(!doc){ctx.restore();return;}
+  const mg=60; // ビューポート余白px
   // Solids
   for(const e of doc.solid){
     if(hiddenLayers.has(e.layer)) continue;
@@ -875,19 +908,23 @@ function draw(){
     ctx.closePath();
     ctx.fillStyle=bwMode?'#cccccc':rgbCss(e.color,darkBg);ctx.fill();
   }
-  // Lines
+  // Lines（ビューポートカリング: 画面外スキップ）
   for(const e of doc.sen){
     if(hiddenLayers.has(e.layer)) continue;
-    const[sx1,sy1]=w2s(e.x1,e.y1);const[sx2,sy2]=w2s(e.x2,e.y2);
+    const sx1=e.x1*scale+tx,sy1=-e.y1*scale+ty;
+    const sx2=e.x2*scale+tx,sy2=-e.y2*scale+ty;
+    if(Math.max(sx1,sx2)<-mg||Math.min(sx1,sx2)>W+mg||Math.max(sy1,sy2)<-mg||Math.min(sy1,sy2)>H+mg) continue;
     ctx.beginPath();
     ctx.strokeStyle=bwMode?'#000000':rgbCss(e.color,darkBg);
     ctx.lineWidth=Math.max(0.8,e.lw*scale*1.4);
     ctx.setLineDash(e.dash&&e.dash.length>0?e.dash.map(d=>d*scale):[]);
     ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
   }
-  // Arcs
+  // Arcs（ビューポートカリング: 外接矩形で判定）
   for(const e of doc.enko){
     if(hiddenLayers.has(e.layer)) continue;
+    const scx=e.cx*scale+tx,scy=-e.cy*scale+ty,sr2=e.r*scale;
+    if(scx+sr2<-mg||scx-sr2>W+mg||scy+sr2<-mg||scy-sr2>H+mg) continue;
     ctx.beginPath();
     ctx.strokeStyle=bwMode?'#000000':rgbCss(e.color,darkBg);
     ctx.lineWidth=Math.max(0.8,e.lw*scale*1.4);
@@ -895,16 +932,19 @@ function draw(){
     drawArc(ctx,e);ctx.stroke();
   }
   ctx.setLineDash([]);
-  // Points
+  // Points（ビューポートカリング）
   for(const e of doc.ten){
     if(hiddenLayers.has(e.layer)) continue;
-    const[sx,sy]=w2s(e.x,e.y);
-    ctx.beginPath();ctx.arc(sx,sy,3,0,Math.PI*2);
+    const sxt=e.x*scale+tx,syt=-e.y*scale+ty;
+    if(sxt<-mg||sxt>W+mg||syt<-mg||syt>H+mg) continue;
+    ctx.beginPath();ctx.arc(sxt,syt,3,0,Math.PI*2);
     ctx.fillStyle=bwMode?'#000000':rgbCss(e.color,darkBg);ctx.fill();
   }
-  // Text
+  // Text（ビューポートカリング）
   for(const e of doc.moji){
     if(hiddenLayers.has(e.layer)) continue;
+    const sxm=e.x*scale+tx,sym=-e.y*scale+ty,fsm=Math.max(6,e.h*scale);
+    if(sxm<-200||sxm>W+200||sym<-fsm*2-20||sym>H+200) continue;
     drawText(ctx,e,darkBg);
   }
   ctx.restore();
@@ -1209,9 +1249,7 @@ function distToSeg(px,py,x1,y1,x2,y2){
 }
 function snapAt(wx,wy){
   if(!doc) return null;
-  const sr=24/scale;   // 判定半径（画面24px相当）
-  // 優先度ボーナス: スコア=距離-ボーナス → 低いほど優先
-  // 交点は同距離なら必ず端点より優先、端点は中心より優先
+  const sr=24/scale;
   const BN={int:sr*0.55,end:sr*0.35,cen:sr*0.20,mid:sr*0.05};
   let best=null,bestScore=sr;
   function check(x,y,type){
@@ -1221,40 +1259,31 @@ function snapAt(wx,wy){
     const score=d-(BN[type]||0);
     if(score<bestScore){bestScore=score;best={x,y,type};}
   }
-  // ─ 端点（端部・コーナー）
-  for(const e of doc.sen){
-    if(hiddenLayers.has(e.layer)) continue;
-    check(e.x1,e.y1,'end');check(e.x2,e.y2,'end');
+  // キャッシュ+二分探索: X範囲を絞り込んでO(log n+m)で検索
+  function checkArr(arr,type){
+    const xlo=wx-sr;
+    let lo=0,hi=arr.length;
+    while(lo<hi){const m=(lo+hi)>>1;if(arr[m].x<xlo)lo=m+1;else hi=m;}
+    for(let i=lo;i<arr.length&&arr[i].x<=wx+sr;i++){
+      if(hiddenLayers.has(arr[i].layer)) continue;
+      check(arr[i].x,arr[i].y,type);
+    }
   }
-  for(const e of doc.enko){
-    if(hiddenLayers.has(e.layer)) continue;
-    check(e.cx+e.r*Math.cos(e.a1*Math.PI/180),e.cy+e.r*Math.sin(e.a1*Math.PI/180),'end');
-    check(e.cx+e.r*Math.cos(e.a2*Math.PI/180),e.cy+e.r*Math.sin(e.a2*Math.PI/180),'end');
-  }
-  // ─ 中心
-  for(const e of doc.enko){
-    if(hiddenLayers.has(e.layer)) continue;
-    check(e.cx,e.cy,'cen');
-  }
-  // ─ 中点
-  for(const e of doc.sen){
-    if(hiddenLayers.has(e.layer)) continue;
-    check((e.x1+e.x2)/2,(e.y1+e.y2)/2,'mid');
-  }
-  for(const e of doc.enko){
-    if(hiddenLayers.has(e.layer)) continue;
-    const am=(e.a1+e.a2)/2;
-    check(e.cx+e.r*Math.cos(am*Math.PI/180),e.cy+e.r*Math.sin(am*Math.PI/180),'mid');
-  }
-  // ─ 交点: カーソル付近の線分のみに限定して高速化
+  // キャッシュが空（レイヤ変更後など）なら再構築
+  if(_scEndPts.length===0&&doc.sen.length>0) buildSnapCache();
+  checkArr(_scEndPts,'end');
+  checkArr(_scMidPts,'mid');
+  checkArr(_scCenPts,'cen');
+  // 交点: 付近の線分のみ（軽量モードで上限を抑える）
+  const maxInt=perfMode?25:80;
   const near=doc.sen.filter(e=>!hiddenLayers.has(e.layer)&&distToSeg(wx,wy,e.x1,e.y1,e.x2,e.y2)<sr*1.5);
-  const lim=Math.min(near.length,120);
+  const lim=Math.min(near.length,maxInt);
   outer:for(let i=0;i<lim;i++){
     for(let j=i+1;j<lim;j++){
       const a=near[i],b=near[j];
       const ix=lineIntersect(a.x1,a.y1,a.x2,a.y2,b.x1,b.y1,b.x2,b.y2);
       if(ix) check(ix.x,ix.y,'int');
-      if(bestScore<-sr*0.2) break outer; // 非常に良い交点が見つかれば打ち切り
+      if(bestScore<-sr*0.2) break outer;
     }
   }
   return best;
@@ -1349,7 +1378,7 @@ function buildLayerModal(){
     const c=aci(info.color||7);
     const row=document.createElement('div');row.className='layer-row';
     const cb=document.createElement('input');cb.type='checkbox';cb.checked=!hiddenLayers.has(lname);
-    cb.addEventListener('change',()=>{if(cb.checked)hiddenLayers.delete(lname);else hiddenLayers.add(lname);scheduleDraw();scheduleSave();});
+    cb.addEventListener('change',()=>{if(cb.checked)hiddenLayers.delete(lname);else hiddenLayers.add(lname);buildSnapCache();scheduleDraw();scheduleSave();});
     const box=document.createElement('div');box.className='layer-color-box';box.style.background=`rgb(${c.r},${c.g},${c.b})`;
     const label=document.createElement('span');label.textContent=lname;
     row.append(cb,box,label);ll.appendChild(row);
@@ -1601,7 +1630,6 @@ ov.addEventListener('mousedown',e=>{
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
   if(window.DIM&&window.DIM.active){
     window.DIM.handleDown(p.x,p.y);
-    console.log('[DIM] mousedown → handleDown');
   } else { handlePointerDown(p.x,p.y,false); }
 });
 window.addEventListener('mousemove',e=>{
@@ -1616,7 +1644,6 @@ window.addEventListener('mouseup',e=>{
   const p=getPos(e);
   if(window.DIM&&window.DIM.active){
     window.DIM.handleUp(p.x,p.y);
-    console.log('[DIM] mouseup → handleUp');
   } else { handlePointerUp(p.x,p.y,false); }
 });
 ov.addEventListener('wheel',e=>{
@@ -1762,7 +1789,7 @@ fileInput.addEventListener('change',async e=>{
     try{
       doc=parseDXF(buf);
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null];[0,1,2].forEach(i=>updateViewmemoState(i));
-      buildLayerModal();detectScale();fit();scheduleDraw();showInfo();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
+      buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
       saveFile(buf,f.name);scheduleSave();updateFileNameDisplay();
       document.body.classList.remove('settings-open');
     }catch(err){alert('ファイルを開けません: '+err.message);}
@@ -2243,14 +2270,14 @@ const vd = document.getElementById('versionDisplay');
 if(vd) vd.textContent = APP_VERSION;
 
 // ════════════════════════════════════════════════════
-// V0_42 拡張コード（メインスクリプト末尾に統合）
+// V0_43 拡張コード（メインスクリプト末尾に統合）
 // ── 旧 script[src=pdf.min.js] インラインコードを移動 ──
 // ════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════
 // V0_31 拡張コード
 // ════════════════════════════════════════════════════
 
-// ── A. 線幅ボタン削除済み（V0_42: UIシンプル化） ──────────────────
+// ── A. 線幅ボタン削除済み（V0_43: UIシンプル化） ──────────────────
 
 // ── B. 拡張スナップ（円-直線交点・円-円交点） ──────────────────────────
 ;(function(){
@@ -2815,6 +2842,6 @@ console.log('[DIM] module initialized');
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_42) -->
+<!-- 太さパネル削除済み (V0_43) -->
 </body>
 </html>
