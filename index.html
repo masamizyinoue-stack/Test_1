@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
 // ════════════════════════════════════════════════════
-// V0_30 拡張コード
+// V0_31 拡張コード
 // ════════════════════════════════════════════════════
 
 // ── A. 線幅ボタン（「太さ」ボタン）フリーズなし実装 ──────────────────
@@ -207,6 +207,8 @@ document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
     if(t==='circDim'||t==='distDim'){
       DIM.active=true; DIM.tool=t; DIM.phase=0;
       showGuide(t==='circDim'?GUIDES.CIRC:GUIDES.DIST_L1);
+      if(t==='circDim') console.log('Diameter Mode');
+      if(t==='distDim') console.log('Shortest Distance Mode');
     }
   });
 });
@@ -477,12 +479,15 @@ function findNearestCircleEdge(wx,wy){
 function confirmDIM(p3){
   var p1=DIM.pts[0],p2=DIM.pts[1];
   var d=null;
+  console.log('[DIM] confirmDIM tool='+DIM.tool+' p1=',p1,' p2=',p2,' p3=',p3);
   try{
     if(DIM.tool==='circDim'&&p1.ent){
       d=buildCircDimPhi(p1.ent,p3);
+      console.log('Dimension Created', d);
     } else if(DIM.tool==='distDim'&&p1&&p2){
       var res=calcDistDim(p1,p2);
       if(res) d=buildDim(res.p1,res.p2,p3,res.type);
+      if(d) console.log('Dimension Created', d);
     }
   }catch(err){ console.warn('[DIM confirm]',err); }
 
@@ -499,6 +504,80 @@ function confirmDIM(p3){
   },2000);
   scheduleOverlay();
 }
+
+// ─ window.DIM 公開（タッチ/マウス連携用） ──────────────────────
+DIM.handleDown = function(sx, sy) {
+  var wp = s2w(sx, sy);
+  var snp = snapAt(wp[0], wp[1]);
+  DIM.penDown = true;
+  DIM.downSnapPt = snp;
+  DIM.cur = snp || {x: wp[0], y: wp[1], type: 'default'};
+  console.log('[DIM] handleDown phase=' + DIM.phase + ' tool=' + DIM.tool);
+  scheduleOverlay();
+};
+
+DIM.handleMove = function(sx, sy) {
+  if (!DIM.penDown) return;
+  var wp = s2w(sx, sy);
+  var snp = snapAt(wp[0], wp[1]);
+  DIM.cur = snp || {x: wp[0], y: wp[1], type: 'default'};
+  scheduleOverlay();
+};
+
+DIM.handleUp = function(sx, sy) {
+  if (!DIM.penDown) return;
+  DIM.penDown = false;
+  var wp = s2w(sx, sy);
+  var snp = snapAt(wp[0], wp[1]);
+  var pt = snp || DIM.cur || {x: wp[0], y: wp[1], type: 'default'};
+  DIM.cur = pt;
+  console.log('[DIM] handleUp phase=' + DIM.phase + ' tool=' + DIM.tool);
+
+  if (DIM.phase === 0) {
+    var entry = {x: pt.x, y: pt.y, kind: 'pt'};
+    if (DIM.tool === 'circDim') {
+      var ent = null;
+      if (pt.type === 'cen' && doc) ent = findEnkoAt(pt.x, pt.y);
+      if (!ent) ent = findNearestCircleEdge(pt.x, pt.y);
+      if (ent) {
+        entry.kind = 'circ'; entry.ent = ent;
+        entry.x = ent.cx; entry.y = ent.cy;
+        DIM.pts = [entry]; DIM.phase = 2;
+        showGuide(GUIDES.POS);
+        console.log('[DIM] circDim: circle selected', ent);
+        console.log('Target Selected', ent);
+        DIM.cur = null; scheduleOverlay(); return;
+      } else {
+        showGuide('円の近くにペンを当ててください', 1500);
+        DIM.cur = null; scheduleOverlay(); return;
+      }
+    }
+    if (DIM.tool === 'distDim' && pt.onLine) {
+      entry.kind = 'line'; entry.ent = pt.onLine;
+      console.log('[DIM] distDim: line1 selected', pt.onLine);
+      console.log('Target Selected', pt.onLine);
+    }
+    DIM.pts = [entry]; DIM.phase = 1;
+    showGuide(DIM.tool === 'distDim' ? GUIDES.DIST_L2 : GUIDES.P2);
+    DIM.cur = null; scheduleOverlay();
+
+  } else if (DIM.phase === 1) {
+    var entry2 = {x: pt.x, y: pt.y, kind: 'pt'};
+    if (DIM.tool === 'distDim' && pt.onLine) {
+      entry2.kind = 'line'; entry2.ent = pt.onLine;
+      console.log('[DIM] distDim: line2 selected', pt.onLine);
+    }
+    DIM.pts.push(entry2); DIM.phase = 2;
+    showGuide(GUIDES.POS);
+    DIM.cur = null; scheduleOverlay();
+
+  } else if (DIM.phase === 2) {
+    confirmDIM(pt);
+  }
+};
+
+window.DIM = DIM;
+console.log('[DIM] module initialized');
 
 })(); // end C
 
@@ -742,7 +821,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_30</div>
+  <div id="ver-label">DXF_View V0_31</div>
 </div>
 
 <div id="colorOverlay">
@@ -777,7 +856,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_30';
+const APP_VERSION = 'V0_31';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -2054,16 +2133,25 @@ function resizeCanvas(){
 ov.addEventListener('mousedown',e=>{
   if(e.button!==0)return;
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
-  if(!window.DIM||!window.DIM.active){ handlePointerDown(p.x,p.y,false); }
+  if(window.DIM&&window.DIM.active){
+    window.DIM.handleDown(p.x,p.y);
+    console.log('[DIM] mousedown → handleDown');
+  } else { handlePointerDown(p.x,p.y,false); }
 });
 window.addEventListener('mousemove',e=>{
   const p=getPos(e);
-  handlePointerMove(p.x,p.y,false);
+  if(window.DIM&&window.DIM.active&&mouseDown){
+    window.DIM.handleMove(p.x,p.y);
+  } else { handlePointerMove(p.x,p.y,false); }
   lastMX=p.x;lastMY=p.y;
 });
 window.addEventListener('mouseup',e=>{
   if(!mouseDown)return;mouseDown=false;
-  const p=getPos(e);handlePointerUp(p.x,p.y,false);
+  const p=getPos(e);
+  if(window.DIM&&window.DIM.active){
+    window.DIM.handleUp(p.x,p.y);
+    console.log('[DIM] mouseup → handleUp');
+  } else { handlePointerUp(p.x,p.y,false); }
 });
 ov.addEventListener('wheel',e=>{
   e.preventDefault();
@@ -2084,7 +2172,10 @@ ov.addEventListener('touchstart',e=>{
       const sx=t.clientX-r.left,sy=t.clientY-r.top;
       isPen=true;mouseDown=true;lastMX=sx;lastMY=sy;
       panning=false;
-      if(!window.DIM||!window.DIM.active){ handlePointerDown(sx,sy,true); }
+      if(window.DIM&&window.DIM.active){
+        window.DIM.handleDown(sx,sy);
+        console.log('[DIM] touchstart(pencil) → handleDown');
+      } else { handlePointerDown(sx,sy,true); }
     }
   } else if(fingers.length>=2){
     // 2本指: ピンチズーム+パン
@@ -2115,7 +2206,9 @@ ov.addEventListener('touchmove',e=>{
     // Apple Pencil移動: ツール操作
     const t=styli[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    if(!window.DIM||!window.DIM.active){ handlePointerMove(sx,sy,true); }
+    if(window.DIM&&window.DIM.active){
+      window.DIM.handleMove(sx,sy);
+    } else { handlePointerMove(sx,sy,true); }
     lastMX=sx;lastMY=sy;
   } else if(fingers.length>=2&&pinchDist!==null){
     // 2本指: 正確なパン+ピンチ（世界座標ピボット）
@@ -2150,7 +2243,10 @@ ov.addEventListener('touchend',e=>{
   const liftedStylus=changed.filter(t=>t.touchType==='stylus');
   // Apple Pencilが離れた
   if(liftedStylus.length>0&&isPen&&mouseDown){
-    if(!window.DIM||!window.DIM.active){ handlePointerUp(lastMX,lastMY,true); }
+    if(window.DIM&&window.DIM.active){
+      window.DIM.handleUp(lastMX,lastMY);
+      console.log('[DIM] touchend(pencil) → handleUp');
+    } else { handlePointerUp(lastMX,lastMY,true); }
     mouseDown=false;isPen=false;
     if(remFing.length>=2){
       const t0=remFing[0],t1=remFing[1];
@@ -2247,6 +2343,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
+    console.log('[Tool] switched to:', currentTool, 'DIM.active=', window.DIM&&window.DIM.active);
     // ガイドメッセージ
     const guideMap={
       'sketch':'Apple Pencilまたは指でスケッチ',
@@ -2666,7 +2763,7 @@ if(vd) vd.textContent = APP_VERSION;
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル (V0_30) -->
+<!-- 太さパネル (V0_31) -->
 <div id="wPanel" style="display:none;position:fixed;z-index:8500;background:#1a2332;border:1.5px solid #00d4ff;border-radius:12px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.7);min-width:180px;">
   <div style="font-size:12px;color:#aab;margin-bottom:10px;text-align:center;">線の太さ</div>
   <div id="wPanelList" style="display:flex;flex-direction:column;gap:8px;"></div>
