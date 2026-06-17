@@ -249,7 +249,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_41</div>
+  <div id="ver-label">DXF_View V0_42</div>
 </div>
 
 <div id="colorOverlay">
@@ -284,7 +284,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_41';
+const APP_VERSION = 'V0_42';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1099,17 +1099,21 @@ function drawOverlay(){
     if(curPt){
       let prevDim = null;
       try{
-        if((currentTool==='dxdy') && dimState.pts.length===2 && dimPendingDown===true){
-          // P3 選択中: 完全な寸法プレビュー
+        if(currentTool==='dxdy' && dimState.pts.length===2){
+          // P3 選択中: 完全な寸法プレビュー（ペン有無問わず）
           const[p1,p2,p3]=[dimState.pts[0],dimState.pts[1],curPt];
           const midX=(p1.x+p2.x)/2,midY=(p1.y+p2.y)/2;
           const pType=Math.abs(p3.y-midY)>=Math.abs(p3.x-midX)?'dx':'dy';
           prevDim=buildDim(p1,p2,p3,pType);
+        } else if(currentTool==='diag' && dimState.pts.length===2){
+          // P3 選択中: 斜め寸法P3プレビュー
+          const[p1,p2,p3]=[dimState.pts[0],dimState.pts[1],curPt];
+          prevDim=buildDim(p1,p2,p3,'diag');
         } else if(currentTool==='diag' && dimState.pts.length===1){
           // P2 選択中: 斜め寸法プレビュー
           const[p1,p2]=[dimState.pts[0],curPt];
           prevDim=buildDim(p1,p2,p2,'diag');
-        } else if((currentTool==='dxdy'||currentTool==='diag') && dimState.pts.length===1 && dimPendingDown===true){
+        } else if(currentTool==='dxdy' && dimState.pts.length===1){
           // P2 選択中: P1→カーソルの細線プレビュー
           const[sx0_,sy0_]=w2s(dimState.pts[0].x,dimState.pts[0].y);
           const[sx1_,sy1_]=w2s(curPt.x,curPt.y);
@@ -1134,18 +1138,29 @@ function drawOverlay(){
           octx.beginPath();octx.moveTo(sx1_,sy1_);octx.lineTo(sx2_,sy2_);octx.stroke();
         }
         octx.setLineDash([]);
+        // 矢印プレビュー（常時）
+        for(const a of(prevDim.arrows||[])){
+          const[sxa,sya]=w2s(a.x,a.y);
+          octx.save();octx.translate(sxa,sya);octx.rotate(a.angle);
+          octx.beginPath();octx.moveTo(0,0);octx.lineTo(-10,4);octx.lineTo(-10,-4);octx.closePath();octx.fill();octx.restore();
+        }
+        // 寸法値（常時表示・角度対応）
         const txt = prevDim.text||'';
         const ptx_ = prevDim.tx, pty_ = prevDim.ty;
-        if(!dimPendingDown && txt && ptx_!=null && pty_!=null){
+        if(txt && ptx_!=null && pty_!=null){
           const[stx_,sty_]=w2s(ptx_,pty_);
+          octx.save();
+          octx.translate(stx_,sty_);
+          if(prevDim.tangle) octx.rotate(prevDim.tangle);
           octx.font='bold 17px sans-serif';
           octx.textAlign='center';
           octx.textBaseline='middle';
           const tw=octx.measureText(txt).width;
           octx.fillStyle='rgba(0,20,40,0.65)';
-          octx.fillRect(stx_-tw/2-3,sty_-10,tw+6,20);
+          octx.fillRect(-tw/2-3,-10,tw+6,20);
           octx.fillStyle='rgba(0,212,255,0.85)';
-          octx.fillText(txt,stx_,sty_);
+          octx.fillText(txt,0,0);
+          octx.restore();
         }
         octx.restore();
       }
@@ -1300,6 +1315,10 @@ function buildDim(p1,p2,pArrow,type){
     lines.push({x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y});
     lines.push({x1:p1.x,y1:p1.y,x2:ep1x+nx2*sig2*ext2,y2:ep1y+ny2*sig2*ext2});
     lines.push({x1:p2.x,y1:p2.y,x2:ep2x+nx2*sig2*ext2,y2:ep2y+ny2*sig2*ext2});
+    // 引出線: 寸法値が寸法線範囲外の場合、端点からpRefへ引出
+    const tRef2=(pRef.x-p1.x)*ux+(pRef.y-p1.y)*uy;
+    if(tRef2<-1/scale) lines.push({x1:ep1x,y1:ep1y,x2:pRef.x,y2:pRef.y});
+    else if(tRef2>len+1/scale) lines.push({x1:ep2x,y1:ep2y,x2:pRef.x,y2:pRef.y});
     arrows.push({x:ep1x,y:ep1y,angle:a1});arrows.push({x:ep2x,y:ep2y,angle:a2});
   }
   return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:'#f39c12'};
@@ -2224,14 +2243,14 @@ const vd = document.getElementById('versionDisplay');
 if(vd) vd.textContent = APP_VERSION;
 
 // ════════════════════════════════════════════════════
-// V0_41 拡張コード（メインスクリプト末尾に統合）
+// V0_42 拡張コード（メインスクリプト末尾に統合）
 // ── 旧 script[src=pdf.min.js] インラインコードを移動 ──
 // ════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════
 // V0_31 拡張コード
 // ════════════════════════════════════════════════════
 
-// ── A. 線幅ボタン削除済み（V0_41: UIシンプル化） ──────────────────
+// ── A. 線幅ボタン削除済み（V0_42: UIシンプル化） ──────────────────
 
 // ── B. 拡張スナップ（円-直線交点・円-円交点） ──────────────────────────
 ;(function(){
@@ -2475,6 +2494,15 @@ function drawDIMPreview(ctx){
     ctx.beginPath(); ctx.moveTo(s1[0],s1[1]); ctx.lineTo(s2[0],s2[1]); ctx.stroke();
   });
   ctx.setLineDash([]);
+  // 矢印プレビュー（circDim/radDim）
+  if(prevDim.arrows){
+    ctx.fillStyle='rgba(0,212,255,0.85)';
+    prevDim.arrows.forEach(function(a){
+      var sa=w2s(a.x,a.y);
+      ctx.save();ctx.translate(sa[0],sa[1]);ctx.rotate(a.angle);
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-10,4);ctx.lineTo(-10,-4);ctx.closePath();ctx.fill();ctx.restore();
+    });
+  }
   if(prevDim.text&&prevDim.tx!=null){
     var stx=w2s(prevDim.tx,prevDim.ty);
     ctx.font='bold 17px sans-serif';
@@ -2787,6 +2815,6 @@ console.log('[DIM] module initialized');
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_41) -->
+<!-- 太さパネル削除済み (V0_42) -->
 </body>
 </html>
