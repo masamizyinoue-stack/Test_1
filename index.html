@@ -169,8 +169,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="最短距離寸法"><span class="tb-tool-label">最短距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><polyline points="9,11 12,8 15,11"/><polyline points="9,13 12,16 15,13"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="distDim" title="最短距離寸法"><span class="tb-tool-label">最短距離</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><line x1="12" y1="8" x2="12" y2="16"/><polyline points="9,11 12,8 15,11"/><polyline points="9,13 12,16 15,13"/></svg></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
@@ -250,7 +250,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_31</div>
+  <div id="ver-label">DXF_View V0_35</div>
 </div>
 
 <div id="colorOverlay">
@@ -285,7 +285,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <input type="file" id="file" hidden>
 
 <script>
-const APP_VERSION = 'V0_34';
+const APP_VERSION = 'V0_35';
 // =========================================================
 // PDF.js worker
 // =========================================================
@@ -1293,7 +1293,11 @@ function buildDim(p1,p2,pArrow,type){
     const sig2=offset2>=0?1:-1;
     const a1=Math.atan2(uy,ux),a2=Math.atan2(-uy,-ux);
     text=formatDim(len/sd);
-    tx2=pRef.x;ty2=pRef.y;tangle=0;
+    tx2=pRef.x;ty2=pRef.y;
+    // 寸法線方向角度（drawDimEntityのctx.rotateで使用）
+    var rawAng=Math.atan2(uy,ux);
+    // 文字が逆さにならないよう-90°〜90°の範囲に正規化
+    tangle=(rawAng>Math.PI/2)?rawAng-Math.PI:(rawAng<-Math.PI/2)?rawAng+Math.PI:rawAng;
     lines.push({x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y});
     lines.push({x1:p1.x,y1:p1.y,x2:ep1x+nx2*sig2*ext2,y2:ep1y+ny2*sig2*ext2});
     lines.push({x1:p2.x,y1:p2.y,x2:ep2x+nx2*sig2*ext2,y2:ep2y+ny2*sig2*ext2});
@@ -2068,17 +2072,8 @@ document.querySelectorAll('.mem-btn').forEach(btn=>{
       btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
       showGuide('記憶'+(i+1)+'に保存しました',1500);
     } else {
-      const sv=savedViews[i];
-      const atMem=(Math.abs(scale-sv.scale)<0.01&&Math.abs(tx-sv.tx)<2&&Math.abs(ty-sv.ty)<2);
-      if(!atMem){
-        // 記憶済み・別の位置 → 記憶位置へ移動
-        tx=sv.tx;ty=sv.ty;scale=sv.scale;
-        scheduleDraw();
-        showGuide('記憶'+(i+1)+'の位置へ移動しました',1500);
-      } else {
-        // 記憶済み・記憶位置 → メニュー
-        _showMemMenu(i,btn);
-      }
+      // 記憶済み → 即メニュー（移動・上書き・リセット）
+      _showMemMenu(i,btn);
     }
   });
   // 長押し廃止（メニューに統合）
@@ -2098,11 +2093,17 @@ function _showMemMenu(idx,anchorBtn){
   menu.style.top=(r.bottom+6)+'px';
   menu.style.left=Math.max(4,r.left-60)+'px';
   menu.innerHTML='<div style="color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;margin-bottom:4px;">記憶'+(idx+1)+'</div>'
-    +'<button id="_memOvr" style="background:#2a6aad;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">上書き保存</button>'
+    +'<button id="_memGoto" style="background:#2a6aad;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">表示VIEWへ移動</button>'
+    +'<button id="_memOvr" style="background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">上書き保存</button>'
     +'<button id="_memRst" style="background:#8B0000;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">記憶リセット</button>'
     +'<button id="_memCnl" style="background:#333;color:#aaa;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;">キャンセル</button>';
   document.body.appendChild(menu);
   function closeMenu(){if(document.getElementById('_memMenu'))menu.remove();}
+  document.getElementById('_memGoto').onclick=function(){
+    var sv=savedViews[idx];if(!sv)return;
+    tx=sv.tx;ty=sv.ty;scale=sv.scale;scheduleDraw();
+    closeMenu();showGuide('記憶'+(idx+1)+'の位置へ移動しました',1500);
+  };
   document.getElementById('_memOvr').onclick=function(){
     savedViews[idx]={tx:tx,ty:ty,scale:scale};updateViewmemoState(idx);scheduleSave();
     closeMenu();showGuide('記憶'+(idx+1)+'を上書き保存しました',1500);
@@ -2225,14 +2226,14 @@ const vd = document.getElementById('versionDisplay');
 if(vd) vd.textContent = APP_VERSION;
 
 // ════════════════════════════════════════════════════
-// V0_34 拡張コード（メインスクリプト末尾に統合）
+// V0_35 拡張コード（メインスクリプト末尾に統合）
 // ── 旧 script[src=pdf.min.js] インラインコードを移動 ──
 // ════════════════════════════════════════════════════
 // ════════════════════════════════════════════════════
 // V0_31 拡張コード
 // ════════════════════════════════════════════════════
 
-// ── A. 線幅ボタン削除済み（V0_34: UIシンプル化） ──────────────────
+// ── A. 線幅ボタン削除済み（V0_35: UIシンプル化） ──────────────────
 
 // ── B. 拡張スナップ（円-直線交点・円-円交点） ──────────────────────────
 ;(function(){
@@ -2403,7 +2404,21 @@ function drawDIMOverlay(){
   var snap=DIM.cur;
   if(snap){
     var sc=w2s(snap.x,snap.y);
-    drawExtSnapMarker(octx,sc[0],sc[1],snap.type);
+    // distDim 時は kind='line'/'arc'/'snap' などを使用
+    var snapType=snap.type||(snap.kind==='line'?'on_line':snap.kind==='arc'?'on_arc':null)||snap.type;
+    drawExtSnapMarker(octx,sc[0],sc[1],snapType);
+    // distDim の線上スナップマーカー追加表示（橙色クロス）
+    if(DIM.active&&DIM.tool==='distDim'&&(snap.kind==='line'||snap.kind==='arc')){
+      octx.save();
+      octx.strokeStyle='#FF8C00'; octx.lineWidth=2.5;
+      octx.beginPath();
+      octx.arc(sc[0],sc[1],9,0,Math.PI*2); octx.stroke();
+      octx.beginPath();
+      octx.moveTo(sc[0]-13,sc[1]); octx.lineTo(sc[0]+13,sc[1]);
+      octx.moveTo(sc[0],sc[1]-13); octx.lineTo(sc[0],sc[1]+13);
+      octx.stroke();
+      octx.restore();
+    }
   }
 
   // 確定済み点のマーカー
@@ -2499,17 +2514,28 @@ function drawDIMPreview(ctx){
 // ─ φ寸法構築 ────────────────────────────────────
 function buildCircDimPhi(ent,p3){
   var cx=ent.cx,cy=ent.cy,r=ent.r;
-  // p3方向の角度: p3→中心方向を基準
+  // p3方向の角度
   var ang=Math.atan2(p3.y-cy,p3.x-cx);
-  // 直径線: ang方向の点(p2)と逆方向の点(p1)
-  var p1x=cx+r*Math.cos(ang+Math.PI),p1y=cy+r*Math.sin(ang+Math.PI); // p3と反対側
-  var p2x=cx+r*Math.cos(ang),p2y=cy+r*Math.sin(ang);                  // p3に近い側
+  var ux=Math.cos(ang),uy=Math.sin(ang);
+  // 直径線の端点（円周上）
+  var p1x=cx-r*ux,p1y=cy-r*uy; // p3と反対側
+  var p2x=cx+r*ux,p2y=cy+r*uy; // p3に近い側
   var sd=parseFloat(document.getElementById('scaleDenom').value)||1;
+  var ext=6/scale; // 補助線のはみ出し量
+  // p3が円外にある場合は寸法線をp3まで延長
+  var distP3=Math.hypot(p3.x-cx,p3.y-cy);
+  var ep2x=(distP3>r+ext)?p3.x:p2x+ux*ext;
+  var ep2y=(distP3>r+ext)?p3.y:p2y+uy*ext;
+  // p3が円外の反対側延長もext分はみ出す
+  var ep1x=p1x-ux*ext, ep1y=p1y-uy*ext;
+  // 文字角度: 横向きになるよう正規化
+  var rawAng=ang;
+  var tangle=(rawAng>Math.PI/2)?rawAng-Math.PI:(rawAng<-Math.PI/2)?rawAng+Math.PI:rawAng;
   return{
-    lines:[{x1:p1x,y1:p1y,x2:p2x,y2:p2y}],
+    lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
     arrows:[{x:p1x,y:p1y,angle:ang+Math.PI},{x:p2x,y:p2y,angle:ang}],
     text:'φ'+formatDim(r*2/sd),
-    tx:p3.x,ty:p3.y,tangle:0,type:'phi',color:'#00d4ff'
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:'#00d4ff'
   };
 }
 
@@ -2547,7 +2573,7 @@ ov2.addEventListener('pointerdown',function(e){
   var rect=this.getBoundingClientRect();
   var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
   var wp=s2w(sx,sy);
-  var snp=snapAt(wp[0],wp[1]);
+  var snp=(DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0],wp[1]);
   DIM.penDown=true;
   DIM.downSnapPt=snp;
   DIM.cur=snp||{x:wp[0],y:wp[1],type:'default'};
@@ -2563,7 +2589,7 @@ ov2.addEventListener('pointermove',function(e){
   DIM._hoverPos={x:wp[0],y:wp[1]};
   if(!DIM.penDown){ scheduleOverlay(); return; }
   e.stopPropagation(); e.preventDefault();
-  var snp=snapAt(wp[0],wp[1]);
+  var snp=(DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0],wp[1]);
   DIM.cur=snp||{x:wp[0],y:wp[1],type:'default'};
   scheduleOverlay();
 },true);
@@ -2572,6 +2598,12 @@ ov2.addEventListener('pointerup',function(e){
   if(!DIM.active||!DIM.penDown) return;
   e.stopPropagation(); e.preventDefault();
   DIM.penDown=false;
+  // distDim の場合は pointerup でも snapDistDim で最終位置を確定
+  if(DIM.tool==='distDim'){
+    var wp2=s2w(sx,sy);
+    var snp2=snapDistDim(wp2[0],wp2[1]);
+    DIM.cur=snp2||DIM.cur;
+  }
   var pt=DIM.cur;
   if(!pt) return;
 
@@ -2738,20 +2770,29 @@ function confirmDIM(p3){
 function buildRadDim(ent,p3){
   var cx=ent.cx,cy=ent.cy,r=ent.r;
   var ang=Math.atan2(p3.y-cy,p3.x-cx);
-  var ex=cx+r*Math.cos(ang),ey=cy+r*Math.sin(ang); // 円周上の端点
+  var ux=Math.cos(ang),uy=Math.sin(ang);
+  var ex=cx+r*ux,ey=cy+r*uy; // 円周上の端点
   var sd=parseFloat(document.getElementById('scaleDenom').value)||1;
+  var ext=6/scale; // 補助線のはみ出し量
+  // p3が円外にある場合は半径線をp3まで延長
+  var distP3=Math.hypot(p3.x-cx,p3.y-cy);
+  var ep2x=(distP3>r+ext)?p3.x:ex+ux*ext;
+  var ep2y=(distP3>r+ext)?p3.y:ey+uy*ext;
+  // 文字角度: 横向きになるよう正規化
+  var rawAng=ang;
+  var tangle=(rawAng>Math.PI/2)?rawAng-Math.PI:(rawAng<-Math.PI/2)?rawAng+Math.PI:rawAng;
   return{
-    lines:[{x1:cx,y1:cy,x2:ex,y2:ey}],
+    lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
     arrows:[{x:ex,y:ey,angle:ang}],
     text:'R'+formatDim(r/sd),
-    tx:p3.x,ty:p3.y,tangle:0,type:'rad',color:'#00d4ff'
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:'#00d4ff'
   };
 }
 
 // ─ window.DIM 公開（タッチ/マウス連携用） ──────────────────────
 DIM.handleDown = function(sx, sy) {
   var wp = s2w(sx, sy);
-  var snp = snapAt(wp[0], wp[1]);
+  var snp = (DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0], wp[1]);
   DIM.penDown = true;
   DIM.downSnapPt = snp;
   DIM.cur = snp || {x: wp[0], y: wp[1], type: 'default'};
@@ -2764,7 +2805,7 @@ DIM.handleMove = function(sx, sy) {
   // _hoverPos は penDown 不要で常時更新（circDim ハイライト用）
   DIM._hoverPos = {x: wp[0], y: wp[1]};
   if (!DIM.penDown) { scheduleOverlay(); return; }
-  var snp = snapAt(wp[0], wp[1]);
+  var snp = (DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0], wp[1]);
   DIM.cur = snp || {x: wp[0], y: wp[1], type: 'default'};
   scheduleOverlay();
 };
@@ -2773,7 +2814,7 @@ DIM.handleUp = function(sx, sy) {
   if (!DIM.penDown) return;
   DIM.penDown = false;
   var wp = s2w(sx, sy);
-  var snp = snapAt(wp[0], wp[1]);
+  var snp = (DIM.tool==='distDim')?snapDistDim(wp[0],wp[1]):snapAt(wp[0], wp[1]);
   var pt = snp || DIM.cur || {x: wp[0], y: wp[1], type: 'default'};
   DIM.cur = pt;
   console.log('[DIM] handleUp phase=' + DIM.phase + ' tool=' + DIM.tool);
@@ -2846,9 +2887,9 @@ console.log('[DIM] module initialized');
 <div id="guideMsg" style="
   display:none;
   position:fixed;
-  top:70px;
-  left:10px;
-  transform:none;
+  top:68px;
+  left:50%;
+  transform:translateX(-50%);
   background:rgba(10,20,35,0.85);
   color:#7dd8ff;
   padding:7px 14px;
@@ -2860,11 +2901,11 @@ console.log('[DIM] module initialized');
   backdrop-filter:blur(6px);
   border:1px solid rgba(100,200,255,0.25);
   white-space:pre-wrap;
-  max-width:280px;
-  text-align:left;
+  max-width:400px;
+  text-align:center;
   letter-spacing:0.04em;
 "></div>
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_34) -->
+<!-- 太さパネル削除済み (V0_35) -->
 </body>
 </html>
