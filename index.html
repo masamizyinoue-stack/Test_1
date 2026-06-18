@@ -250,7 +250,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_54</div>
+  <div id="ver-label">DXF_View V0_55</div>
 </div>
 
 <div id="colorOverlay">
@@ -286,7 +286,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <script src="viewer.js"></script>
 <script>
-const APP_VERSION = 'V0_54';
+const APP_VERSION = 'V0_55';
 
 // =========================================================
 // グローバル状態
@@ -1261,17 +1261,11 @@ function _showMemMenu(idx,anchorBtn){
   menu.style.top=(r.bottom+6)+'px';
   menu.style.left=Math.max(4,r.left-60)+'px';
   menu.innerHTML='<div style="color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;margin-bottom:4px;">記憶'+(idx+1)+'</div>'
-    +'<button id="_memGoto" style="background:#2a6aad;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">表示VIEWへ移動</button>'
     +'<button id="_memOvr" style="background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">上書き保存</button>'
     +'<button id="_memRst" style="background:#8B0000;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">記憶リセット</button>'
     +'<button id="_memCnl" style="background:#333;color:#aaa;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;">キャンセル</button>';
   document.body.appendChild(menu);
   function closeMenu(){if(document.getElementById('_memMenu'))menu.remove();}
-  document.getElementById('_memGoto').onclick=function(){
-    var sv=savedViews[idx];if(!sv)return;
-    tx=sv.tx;ty=sv.ty;scale=sv.scale;scheduleDraw();
-    closeMenu();showGuide('記憶'+(idx+1)+'の位置へ移動しました',1500);
-  };
   document.getElementById('_memOvr').onclick=function(){
     savedViews[idx]={tx:tx,ty:ty,scale:scale};updateViewmemoState(idx);scheduleSave();
     closeMenu();showGuide('記憶'+(idx+1)+'を上書き保存しました',1500);
@@ -1430,4 +1424,4 @@ if(vd) vd.textContent = APP_VERSION;
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
 <!-- 太さパネル削除済み (V0_47) -->
 </body>
-</html>
+</html>                                                                                                                                                                                                                                                                                                                                                                                                                           
