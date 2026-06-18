@@ -255,7 +255,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_57</div>
+  <div id="ver-label">DXF_View V0_58</div>
 </div>
 
 <div id="colorOverlay">
@@ -291,7 +291,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <script src="viewer.js"></script>
 <script>
-const APP_VERSION = 'V0_57';
+const APP_VERSION = 'V0_58';
 
 // =========================================================
 // グローバル状態
@@ -1229,10 +1229,9 @@ document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDr
 document.getElementById('fitBtnTb').addEventListener('click',()=>{fit();scheduleDraw();});
 
 // =========================================================
-// DXF書き出し（書き込みストローク → LWPOLYLINE）
+// DXF書き出し（元データ + 書き込みストローク）
 // =========================================================
 function rgbToAci(r,g,b){
-  // 主要ACI色に近似マッピング
   const aci=[
     {i:1,r:255,g:0,b:0},{i:2,r:255,g:255,b:0},{i:3,r:0,g:255,b:0},
     {i:4,r:0,g:255,b:255},{i:5,r:0,g:0,b:255},{i:6,r:255,g:0,b:255},
@@ -1247,33 +1246,82 @@ function rgbToAci(r,g,b){
 }
 
 function exportSketchDxf(){
-  if(!strokes||strokes.length===0){showGuide('書き込みがありません',1500);return;}
+  if(!doc&&(!strokes||strokes.length===0)){showGuide('データがありません',1500);return;}
   const lines=[];
   lines.push('0','SECTION','2','HEADER',
     '9','$ACADVER','1','AC1015',
     '9','$INSUNITS','70','4',
     '0','ENDSEC',
     '0','SECTION','2','ENTITIES');
-  for(const s of strokes){
+
+  // ── 元のDXFデータ ──
+  if(doc){
+    // 線分 → LINE
+    for(const e of (doc.sen||[])){
+      const ci=rgbToAci(e.color.r,e.color.g,e.color.b);
+      lines.push('0','LINE',
+        '8',e.layer||'0',
+        '62',String(ci),
+        '10',String(e.x1),'20',String(e.y1),'30','0',
+        '11',String(e.x2),'21',String(e.y2),'31','0');
+    }
+    // 円弧・円 → ARC or CIRCLE
+    for(const e of (doc.enko||[])){
+      const ci=rgbToAci(e.color.r,e.color.g,e.color.b);
+      const isCircle=(e.a1===0&&e.a2===360)||(Math.abs(e.rx-e.ry)<1e-6&&e.a1===0&&e.a2===360);
+      if(isCircle){
+        lines.push('0','CIRCLE',
+          '8',e.layer||'0','62',String(ci),
+          '10',String(e.cx),'20',String(e.cy),'30','0',
+          '40',String(e.r||e.rx));
+      } else {
+        lines.push('0','ARC',
+          '8',e.layer||'0','62',String(ci),
+          '10',String(e.cx),'20',String(e.cy),'30','0',
+          '40',String(e.r||e.rx),
+          '50',String(e.a1),'51',String(e.a2));
+      }
+    }
+    // 点 → POINT
+    for(const e of (doc.ten||[])){
+      const ci=rgbToAci(e.color.r,e.color.g,e.color.b);
+      lines.push('0','POINT',
+        '8',e.layer||'0','62',String(ci),
+        '10',String(e.x),'20',String(e.y),'30','0');
+    }
+    // 文字 → TEXT
+    for(const e of (doc.moji||[])){
+      const ci=rgbToAci(e.color.r,e.color.g,e.color.b);
+      lines.push('0','TEXT',
+        '8',e.layer||'0','62',String(ci),
+        '10',String(e.x),'20',String(e.y),'30','0',
+        '40',String(e.h||1),
+        '50',String(e.angle||0),
+        '1',String(e.text||''));
+    }
+  }
+
+  // ── 書き込みストローク → LWPOLYLINE（SKETCHレイヤー）──
+  for(const s of (strokes||[])){
     if(!s.pts||s.pts.length<2) continue;
     const aci=rgbToAci(s.color.r,s.color.g,s.color.b);
-    const lw=Math.max(0,Math.round((s.lw||0)*100)); // mm→1/100mm
     lines.push('0','LWPOLYLINE',
-      '8','SKETCH',       // レイヤー名
-      '62',String(aci),   // 色
-      '43',String(s.lw||0), // 一定幅
+      '8','SKETCH',
+      '62',String(aci),
+      '43',String(s.lw||0),
       '90',String(s.pts.length),
-      '70','0');          // 開いたポリライン
+      '70','0');
     for(const p of s.pts){
       lines.push('10',String(p.x),'20',String(p.y));
     }
   }
+
   lines.push('0','ENDSEC','0','EOF');
   const content=lines.join('\n');
   const blob=new Blob([content],{type:'application/dxf'});
-  const baseName=(currentFileName||'sketch').replace(/\.[^.]+$/,'');
+  const baseName=(currentFileName||'export').replace(/\.[^.]+$/,'');
   const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,16);
-  const fileName=`${baseName}_sketch_${ts}.dxf`;
+  const fileName=`${baseName}_export_${ts}.dxf`;
   const file=new File([blob],fileName,{type:'application/dxf'});
   // iOS: Web Share → fallback download
   if(navigator.share&&typeof navigator.canShare==='function'&&navigator.canShare({files:[file]})){
@@ -1284,7 +1332,7 @@ function exportSketchDxf(){
   } else {
     _dxfFallbackDownload(blob,fileName);
   }
-  showGuide('DXF書き出し完了',2000);
+  showGuide('DXF書き出し完了（元データ+書き込み）',2000);
 }
 function _dxfFallbackDownload(blob,fileName){
   const url=URL.createObjectURL(blob);
