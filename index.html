@@ -255,7 +255,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_59</div>
+  <div id="ver-label">DXF_View V0_60</div>
 </div>
 
 <div id="colorOverlay">
@@ -291,7 +291,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <script src="viewer.js"></script>
 <script>
-const APP_VERSION = 'V0_59';
+const APP_VERSION = 'V0_60';
 
 // =========================================================
 // グローバル状態
@@ -1229,8 +1229,13 @@ document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDr
 document.getElementById('fitBtnTb').addEventListener('click',()=>{fit();scheduleDraw();});
 
 // =========================================================
-// DXF書き出し（元データ + 書き込みストローク）R12形式
+// DXF書き出し（元データ + 書き込みストローク）
 // =========================================================
+// 非ASCII文字をDXF Unicodeエスケープ \U+XXXX に変換
+function dxfEncText(s){
+  return (s||'').replace(/[^\x00-\x7F]/g,
+    c=>'\\U+'+c.charCodeAt(0).toString(16).toUpperCase().padStart(4,'0'));
+}
 function rgbToAci(r,g,b){
   const aci=[
     {i:1,r:255,g:0,b:0},{i:2,r:255,g:255,b:0},{i:3,r:0,g:255,b:0},
@@ -1260,7 +1265,7 @@ function exportSketchDxf(){
 
   // ── HEADER ──
   L.push('0','SECTION','2','HEADER',
-    '9','$ACADVER','1','AC1009',
+    '9','$ACADVER','1','AC1015',
     '9','$INSUNITS','70','4',
     '0','ENDSEC');
 
@@ -1317,7 +1322,7 @@ function exportSketchDxf(){
         '10',String(e.x),'20',String(e.y),'30','0',
         '40',String(e.h||1),
         '50',String(e.angle||0),
-        '1',String(e.text||''));
+        '1',dxfEncText(e.text||''));
     }
   }
 
