@@ -184,6 +184,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">スクショ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
 </button>
+  <button class="tb-btn" id="exportDxfBtn" title="書き込みをDXF書き出し">
+  <span class="tb-tool-label">DXF書出</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+</button>
 </div>
 
 <div class="stage" id="stage">
@@ -251,7 +255,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_56</div>
+  <div id="ver-label">DXF_View V0_57</div>
 </div>
 
 <div id="colorOverlay">
@@ -287,7 +291,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <script src="viewer.js"></script>
 <script>
-const APP_VERSION = 'V0_56';
+const APP_VERSION = 'V0_57';
 
 // =========================================================
 // グローバル状態
@@ -1224,6 +1228,74 @@ document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();});
 document.getElementById('fitBtnTb').addEventListener('click',()=>{fit();scheduleDraw();});
 
+// =========================================================
+// DXF書き出し（書き込みストローク → LWPOLYLINE）
+// =========================================================
+function rgbToAci(r,g,b){
+  // 主要ACI色に近似マッピング
+  const aci=[
+    {i:1,r:255,g:0,b:0},{i:2,r:255,g:255,b:0},{i:3,r:0,g:255,b:0},
+    {i:4,r:0,g:255,b:255},{i:5,r:0,g:0,b:255},{i:6,r:255,g:0,b:255},
+    {i:7,r:255,g:255,b:255},{i:30,r:255,g:165,b:0},{i:40,r:255,g:200,b:100}
+  ];
+  let best=7,bestD=Infinity;
+  for(const c of aci){
+    const d=Math.hypot(r-c.r,g-c.g,b-c.b);
+    if(d<bestD){bestD=d;best=c.i;}
+  }
+  return best;
+}
+
+function exportSketchDxf(){
+  if(!strokes||strokes.length===0){showGuide('書き込みがありません',1500);return;}
+  const lines=[];
+  lines.push('0','SECTION','2','HEADER',
+    '9','$ACADVER','1','AC1015',
+    '9','$INSUNITS','70','4',
+    '0','ENDSEC',
+    '0','SECTION','2','ENTITIES');
+  for(const s of strokes){
+    if(!s.pts||s.pts.length<2) continue;
+    const aci=rgbToAci(s.color.r,s.color.g,s.color.b);
+    const lw=Math.max(0,Math.round((s.lw||0)*100)); // mm→1/100mm
+    lines.push('0','LWPOLYLINE',
+      '8','SKETCH',       // レイヤー名
+      '62',String(aci),   // 色
+      '43',String(s.lw||0), // 一定幅
+      '90',String(s.pts.length),
+      '70','0');          // 開いたポリライン
+    for(const p of s.pts){
+      lines.push('10',String(p.x),'20',String(p.y));
+    }
+  }
+  lines.push('0','ENDSEC','0','EOF');
+  const content=lines.join('\n');
+  const blob=new Blob([content],{type:'application/dxf'});
+  const baseName=(currentFileName||'sketch').replace(/\.[^.]+$/,'');
+  const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,16);
+  const fileName=`${baseName}_sketch_${ts}.dxf`;
+  const file=new File([blob],fileName,{type:'application/dxf'});
+  // iOS: Web Share → fallback download
+  if(navigator.share&&typeof navigator.canShare==='function'&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:fileName}).catch(err=>{
+      if(err.name==='AbortError') return;
+      _dxfFallbackDownload(blob,fileName);
+    });
+  } else {
+    _dxfFallbackDownload(blob,fileName);
+  }
+  showGuide('DXF書き出し完了',2000);
+}
+function _dxfFallbackDownload(blob,fileName){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=fileName;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+document.getElementById('exportDxfBtn').addEventListener('click',exportSketchDxf);
+
 
 // 表示記憶
 function updateViewmemoState(i){
@@ -1358,69 +1430,4 @@ async function tryRestore(){
     strokes=d.strokes||[];dims=d.dims||[];
     savedViews=d.savedViews||[null,null,null];
     tx=d.tx||0;ty=d.ty||0;scale=d.scale||1;
-    bwMode=!!d.bwMode;
-    if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
-    currentTool=d.currentTool||'sketch';
-    if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
-    if(d.currentColor)currentColor=d.currentColor;
-    if(d.currentLW)currentLW=d.currentLW;
-    if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
-    if(bwMode){
-      document.getElementById('bwWhite').classList.add('active');
-      document.getElementById('bwBlack').classList.remove('active');
-    } else {
-      document.getElementById('bwBlack').classList.add('active');
-      document.getElementById('bwWhite').classList.remove('active');
-    }
-    document.querySelectorAll('.tool-btn').forEach(b=>{
-      b.classList.toggle('active',b.dataset.tool===currentTool);
-    });
-    const dot=document.getElementById('colorDot');
-    if(dot&&currentColor)dot.style.background=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
-    [0,1,2].forEach(i=>updateViewmemoState(i));
-    scheduleDraw();scheduleOverlay();updateUndoRedo();
-  }catch(e){console.warn('restore:',e);}
-}
-
-// リサイズ
-const ro=new ResizeObserver(resizeCanvas);ro.observe(stage);
-tryRestore();
-resizeCanvas();scheduleDraw();
-const vd = document.getElementById('versionDisplay');
-if(vd) vd.textContent = APP_VERSION;
-
-// ════════════════════════════════════════════════════
-// V0_43 拡張コード（メインスクリプト末尾に統合）
-// ── 旧 script[src=pdf.min.js] インラインコードを移動 ──
-// ════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════
-// V0_31 拡張コード
-// ════════════════════════════════════════════════════
-
-// ── A. 線幅ボタン削除済み（V0_43: UIシンプル化） ──────────────────
-
-// [measurement.js] 拡張スナップ(B) + 統一計測UX(C)
-</script>
-<script src="measurement.js"></script>
-<div id="guideMsg" style="
-  display:none;
-  position:fixed;
-  top:68px;
-  left:50%;
-  transform:translateX(-50%);
-  background:rgba(10,20,35,0.85);
-  color:#7dd8ff;
-  padding:7px 14px;
-  border-radius:10px;
-  font-size:13px;
-  font-weight:500;
-  pointer-events:none;
-  z-index:9100;
-  backdrop-filter:blur(6px);
-  border:1px solid rgba(100,200,255,0.25);
-  white-space:pre-wrap;
-  max-width:400px;
-  text-align:center;
-  letter-spacing:0.04em;
-"></div>
-<div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"><
+    bwMode=!!d.bwMod
