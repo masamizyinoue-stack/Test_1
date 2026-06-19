@@ -162,7 +162,7 @@ function handlePointerUp(sx,sy,isPenInput){
   if(isPenInput||currentTool==='sketch'){
     if(sketching&&sketchPts.length>1){
       snapshot();
-      strokes.push({pts:[...sketchPts],color:{...currentColor},lw:currentLW/scale});
+      strokes.push({pts:[...sketchPts],color:{...currentColor},lw:currentLW}); // ③ 絶対px値で保存
       sketching=false;sketchPts=[];scheduleOverlay();scheduleSave();
     }return;
   }
@@ -387,6 +387,11 @@ document.querySelectorAll('.color-btn').forEach(btn=>{
 document.querySelectorAll('.lw-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.lw-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');currentLW=parseFloat(btn.dataset.lw);
+    btn.classList.add('active');
+    currentLW=parseFloat(btn.dataset.lw);
+    // ① 色選択と同じくポップアップを閉じる
+    document.getElementById('colorOverlay').classList.remove('open');
+    // ④ ボタン内の現在値表示を更新
+    const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
   });
 });

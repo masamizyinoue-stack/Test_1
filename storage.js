@@ -71,6 +71,11 @@ async function tryRestore(){
     if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
     if(d.currentColor)currentColor=d.currentColor;
     if(d.currentLW)currentLW=d.currentLW;
+    // ④ lw-btn active 状態を currentLW に合わせて更新
+    document.querySelectorAll('.lw-btn').forEach(b=>{
+      b.classList.toggle('active',parseFloat(b.dataset.lw)===currentLW);
+    });
+    const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
     if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
     if(bwMode){
       document.getElementById('bwWhite').classList.add('active');

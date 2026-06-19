@@ -8,30 +8,45 @@
 // 寸法描画・スナップ・寸法構築
 // =========================================================
 function drawDimEntity(ctx,d){
+  const _ps=window._pdfScale||1;  // ② PDF高解像度スケール
   ctx.strokeStyle=d.color||'#f39c12';ctx.fillStyle=d.color||'#f39c12';
-  ctx.lineWidth=1.5;ctx.setLineDash([]);
+  ctx.lineWidth=1.5*_ps;ctx.setLineDash([]);
   for(const l of d.lines){
     const[sx1,sy1]=w2s(l.x1,l.y1);const[sx2,sy2]=w2s(l.x2,l.y2);
     ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
   }
   for(const a of d.arrows){
     const[sx,sy]=w2s(a.x,a.y);
+    const as=10*_ps;  // 矢印サイズ
     ctx.save();ctx.translate(sx,sy);ctx.rotate(a.angle);
-    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-10,4);ctx.lineTo(-10,-4);ctx.closePath();ctx.fill();ctx.restore();
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,as*0.4);ctx.lineTo(-as,-as*0.4);ctx.closePath();ctx.fill();ctx.restore();
   }
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
-    ctx.font='bold 17px sans-serif';
+    const fs=17*_ps;
+    ctx.font='bold '+fs+'px sans-serif';
     ctx.textAlign='center';ctx.textBaseline='bottom';
     const tw=ctx.measureText(d.text).width;
-    const gap=14;  // 寸法線からのオフセット(px) - V0_68
-    // 背景クリアランス（視認性向上）
+    const gap=14*_ps;
     ctx.fillStyle='rgba(18,26,42,0.82)';
-    ctx.fillRect(-tw/2-6,-gap-19,tw+12,21);
-    // テキスト
+    ctx.fillRect(-tw/2-6*_ps,-gap-19*_ps,tw+12*_ps,21*_ps);
     ctx.fillStyle=d.color||'#f39c12';
     ctx.fillText(d.text,0,-gap);
+    ctx.restore();
+  }
+  // ⑤ 芯マーク（直径・半径寸法の中心点）
+  if(d.centerMark){
+    const[scx,scy]=w2s(d.centerMark.cx,d.centerMark.cy);
+    const cs=10*_ps;  // 十字の腕の長さ
+    const cr=3.5*_ps; // 中心小円の半径
+    ctx.save();
+    ctx.strokeStyle=d.color||'#00d4ff';
+    ctx.lineWidth=1.5*_ps;
+    ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(scx-cs,scy);ctx.lineTo(scx+cs,scy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(scx,scy-cs);ctx.lineTo(scx,scy+cs);ctx.stroke();
+    ctx.beginPath();ctx.arc(scx,scy,cr,0,Math.PI*2);ctx.stroke();
     ctx.restore();
   }
 }
@@ -457,6 +472,14 @@ function drawDIMPreview(ctx){
     ctx.fillStyle='rgba(0,212,255,0.85)';
     ctx.fillText(prevDim.text,stx[0],stx[1]);
   }
+  // ⑤ 芯マーク プレビュー
+  if(prevDim.centerMark){
+    var scm=w2s(prevDim.centerMark.cx,prevDim.centerMark.cy);
+    ctx.strokeStyle='rgba(0,212,255,0.8)';ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(scm[0]-10,scm[1]);ctx.lineTo(scm[0]+10,scm[1]);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(scm[0],scm[1]-10);ctx.lineTo(scm[0],scm[1]+10);ctx.stroke();
+    ctx.beginPath();ctx.arc(scm[0],scm[1],3.5,0,Math.PI*2);ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -484,7 +507,8 @@ function buildCircDimPhi(ent,p3){
     lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
     arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
     text:'φ'+formatDim(r*2/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:'#00d4ff'
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:'#00d4ff',
+    centerMark:{cx:cx,cy:cy}  // ⑤ 芯マーク
   };
 }
 
@@ -562,7 +586,8 @@ function buildRadDim(ent,p3){
     lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
     arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
     text:'R'+formatDim(r/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:'#00d4ff'
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:'#00d4ff',
+    centerMark:{cx:cx,cy:cy}  // ⑤ 芯マーク
   };
 }
 

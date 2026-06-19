@@ -12,11 +12,48 @@
 // 範囲指定PDF保存（A4固定、buildPDF使用）
 // =========================================================
 async function savePDF(){
+  // ② 高解像度レンダリング（PSCALE倍で再描画）
+  const PSCALE = 3;
+  const dpr = window.devicePixelRatio || 1;
+
+  // 高解像度キャンバス作成（DXF描画用・オーバーレイ用）
+  const hCv = document.createElement('canvas');
+  hCv.width = cv.width * PSCALE;
+  hCv.height = cv.height * PSCALE;
+  const hCtx = hCv.getContext('2d');
+
+  const hOv = document.createElement('canvas');
+  hOv.width = ov.width * PSCALE;
+  hOv.height = ov.height * PSCALE;
+  const hOctx = hOv.getContext('2d');
+
+  // グローバル変数を一時退避・置換
+  const [sCv,sCtx,sOv,sOctx] = [cv,ctx,ov,octx];
+  const [sTx,sTy,sScale] = [tx,ty,scale];
+
+  window.cv=hCv; window.ctx=hCtx;
+  window.ov=hOv; window.octx=hOctx;
+  tx=sTx*PSCALE; ty=sTy*PSCALE; scale=sScale*PSCALE;
+  window._pdfScale=PSCALE;  // lineWidth/arrow/text スケール用
+
+  try{
+    draw();         // DXF/PDF描画（viewer.js）
+    drawOverlay();  // strokes・寸法・スナップ描画
+  }finally{
+    // 必ず復元
+    window.cv=sCv; window.ctx=sCtx;
+    window.ov=sOv; window.octx=sOctx;
+    tx=sTx; ty=sTy; scale=sScale;
+    window._pdfScale=undefined;
+  }
+
+  // 合成して高品質JPEG化
   const tmp=document.createElement('canvas');
-  tmp.width=cv.width;tmp.height=cv.height;
+  tmp.width=hCv.width; tmp.height=hCv.height;
   const tctx=tmp.getContext('2d');
-  tctx.drawImage(cv,0,0);tctx.drawImage(ov,0,0);
-  const jpeg=tmp.toDataURL('image/jpeg',0.92).split(',')[1];
+  tctx.drawImage(hCv,0,0);
+  tctx.drawImage(hOv,0,0);
+  const jpeg=tmp.toDataURL('image/jpeg',0.97).split(',')[1];
   const pdf=buildPDF(jpeg,tmp.width,tmp.height);
   const fname=(currentFileName||'dxf_view').replace(/\.[^.]+$/,'')
     +'_'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'.pdf';
