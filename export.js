@@ -243,6 +243,10 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     cvEl.width=CW; cvEl.height=CH;
     ovEl.width=CW; ovEl.height=CH;
 
+    // V0_73: PDF書出し時のストローク線幅スケール設定（画面表示と比例一致）
+    // sv_ow(物理px) / dprSave = 画面CSSキャンバス幅。CW/その値=PDF拡大率
+    window._pdfScale = CW * dprSave / sv_ow;
+
     // ── 4. 描画実行 ────────────────────────────────────
     if(typeof draw==='function') draw();
     if(typeof drawOverlay==='function') drawOverlay();
@@ -258,6 +262,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
 
     // ── 6. グローバル状態を復元 ────────────────────────
     Object.defineProperty(window,'devicePixelRatio',{get:()=>dprSave,configurable:true});
+    window._pdfScale = undefined;  // V0_73: PDF線幅スケールをリセット
     tx=sv.tx; ty=sv.ty; scale=sv.scale;
     cvEl.width=sv_cw; cvEl.height=sv_ch;
     ovEl.width=sv_ow; ovEl.height=sv_oh;
@@ -375,9 +380,9 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
 // 範囲指定PDFボタン（savePDF参照 × 2 — 既存仕様）
 // =========================================================
 document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
-document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
+document.getElementById('savePDFBtn').addEventListener('click',savePDF);
 
 // =========================================================
-// DXF書き出しボタン
+// DXF\u66f8\u304d\u51fa\u3057\u30dc\u30bf\u30f3
 // =========================================================
 document.getElementById('exportDxfBtn').addEventListener('click',exportSketchDxf);
