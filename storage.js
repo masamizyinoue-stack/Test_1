@@ -98,19 +98,12 @@ async function tryRestore(){
       b.classList.toggle('active',b.dataset.color===currentDimColor);
     });
     if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
-    // V0_77: 白黒ポップアップボタンの状態復元
-    {
-      const bwW=document.getElementById('bwWhite');
-      const bwB=document.getElementById('bwBlack');
-      if(bwMode){
-        bwW.classList.add('active'); bwB.classList.remove('active');
-        const wc=bwW.querySelector('.bw-check'); const bc=bwB.querySelector('.bw-check');
-        if(wc)wc.textContent='✓'; if(bc)bc.textContent=' ';
-      } else {
-        bwB.classList.add('active'); bwW.classList.remove('active');
-        const wc=bwW.querySelector('.bw-check'); const bc=bwB.querySelector('.bw-check');
-        if(wc)wc.textContent=' '; if(bc)bc.textContent='✓';
-      }
+    if(bwMode){
+      document.getElementById('bwWhite').classList.add('active');
+      document.getElementById('bwBlack').classList.remove('active');
+    } else {
+      document.getElementById('bwBlack').classList.add('active');
+      document.getElementById('bwWhite').classList.remove('active');
     }
     document.querySelectorAll('.tool-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.tool===currentTool);
