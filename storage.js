@@ -64,13 +64,19 @@ async function tryRestore(){
     const raw=localStorage.getItem(SAVE_KEY);if(!raw){buildLayerModal();return;}
     const d=JSON.parse(raw);
     strokes=d.strokes||[];dims=d.dims||[];
-    savedViews=d.savedViews||[null,null,null];
+    // V0_76: 旧バージョン(3スロット)との後方互換を保ちつつ5スロットに拡張
+    {const sv=d.savedViews||[];savedViews=[sv[0]||null,sv[1]||null,sv[2]||null,sv[3]||null,sv[4]||null];}
     tx=d.tx||0;ty=d.ty||0;scale=d.scale||1;
     bwMode=!!d.bwMode;
     if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
     currentTool=d.currentTool||'sketch';
     if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
     if(d.currentColor)currentColor=d.currentColor;
+    // V0_76: スケッチ色ボタンのactive状態を復元
+    document.querySelectorAll('.color-btn').forEach(b=>{
+      const[r,g,b_]=b.dataset.color.split(',').map(Number);
+      b.classList.toggle('active',r===currentColor.r&&g===currentColor.g&&b_===currentColor.b);
+    });
     if(d.currentLW)currentLW=d.currentLW;
     // ④ lw-btn active 状態を currentLW に合わせて更新
     document.querySelectorAll('.lw-btn').forEach(b=>{
@@ -102,7 +108,7 @@ async function tryRestore(){
     document.querySelectorAll('.tool-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.tool===currentTool);
     });
-    [0,1,2].forEach(i=>updateViewmemoState(i));
+    [0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット対応
     buildLayerModal();  // hiddenLayers復元後に呼ぶ（チェックボックス状態を正しく反映）
     scheduleDraw();scheduleOverlay();updateUndoRedo();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
