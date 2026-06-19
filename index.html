@@ -174,21 +174,6 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .dim-group{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
 .dim-group-label{font-size:9px;color:rgba(232,168,74,0.8);letter-spacing:0.5px;line-height:1;pointer-events:none;user-select:none}
 .dim-group-btns{display:flex;align-items:center;gap:1px}
-/* V0_77: 画面切替ポップアップ */
-#bwPopup{display:none;position:fixed;z-index:500;background:var(--sb-bg);
-  border:1px solid var(--border);border-radius:12px;padding:10px;
-  min-width:130px;box-shadow:0 8px 24px rgba(0,0,0,.65);flex-direction:column;gap:6px}
-#bwPopup.open{display:flex}
-#bwPopup .bw-choice{width:100%;padding:11px 12px;border-radius:9px;font-size:14px;
-  border:1.5px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
-  text-align:left;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:8px}
-#bwPopup .bw-choice.active{border-color:var(--accent);color:var(--accent);background:rgba(46,204,113,.1)}
-#bwPopup .bw-check{font-size:14px;width:16px;flex-shrink:0}
-/* V0_77: 記憶全消しボタン */
-.viewmemo .clear-all-btn{background:transparent;border:1.5px solid rgba(140,160,180,0.2);
-  color:rgba(170,190,210,0.35);opacity:1;font-weight:normal;
-  margin-top:8px;transition:all .15s ease}
-.viewmemo .clear-all-btn.has-memory{border-color:rgba(200,215,235,0.5);color:rgba(210,225,245,0.75)}
 </style>
 </head>
 <body>
@@ -229,9 +214,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">スクショ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
 </button>
-  <button class="tb-btn" id="bwBtn" title="白黒画面切替">
-  <span class="tb-tool-label">画面</span>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>
+  <button class="tb-btn" id="exportDxfBtn" title="書き込みをDXF書き出し">
+  <span class="tb-tool-label">DXF書出</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
   <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
   <span class="tb-tool-label">PDF書出</span>
@@ -262,15 +247,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button class="mem-btn" data-vi="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
     <button class="mem-btn" data-vi="3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
     <button class="mem-btn" data-vi="4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
-    <button class="clear-all-btn full-row" id="clearAllMemBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:middle;margin-right:3px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>記憶全消し</button>
   </div>
   <div id="snap-hint"></div>
 </div>
 
-<div id="bwPopup">
-  <button class="bw-choice active" id="bwWhite"><span class="bw-check">✓</span>□ 白画面</button>
-  <button class="bw-choice" id="bwBlack"><span class="bw-check"> </span>■ 黒画面</button>
-</div>
 <div id="settingsOverlay"></div>
 <div id="settingsPanel">
   <div class="sp-header">
@@ -281,6 +261,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
     <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF / PDF 対応</small></span>
   </button>
+  <div class="sp-section">
+    <div class="sp-label">白・黒画面</div>
+    <div class="sp-row">
+      <button class="sp-toggle-btn active" id="bwBlack">■ 黒</button>
+      <button class="sp-toggle-btn" id="bwWhite">□ 白</button>
+    </div>
+  </div>
   <div class="sp-section">
     <div class="sp-label">縮尺分母</div>
     <input type="number" id="scaleDenom" value="1" min="1" class="sp-input">
@@ -300,13 +287,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div class="sp-section">
-    <button id="exportDxfBtn" class="sp-action-btn">DXF書出し</button>
-  </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_77</div>
+  <div id="ver-label">DXF_View V0_76</div>
 </div>
 
 <div id="colorOverlay">
@@ -387,7 +371,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_77';
+const APP_VERSION = 'V0_76';
 
 // =========================================================
 // グローバル状態
@@ -727,47 +711,18 @@ document.getElementById('settingsBtn').addEventListener('click',()=>document.bod
 document.getElementById('settingsClose').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
-// V0_77: 画面ボタン（ポップアップ）
-(function(){
-  var popup=document.getElementById('bwPopup');
-  var bwBtnEl=document.getElementById('bwBtn');
-  function closeBwPopup(){popup.classList.remove('open');}
-  bwBtnEl.addEventListener('click',function(e){
-    e.stopPropagation();
-    if(popup.classList.contains('open')){closeBwPopup();return;}
-    var r=bwBtnEl.getBoundingClientRect();
-    popup.style.top=(r.bottom+6)+'px';
-    popup.style.right=(document.documentElement.clientWidth-r.right)+'px';
-    popup.classList.add('open');
-  });
-  document.addEventListener('click',function(e){
-    if(!popup.contains(e.target)&&e.target!==bwBtnEl)closeBwPopup();
-  });
-  document.getElementById('bwBlack').addEventListener('click',function(){
-    bwMode=false;
-    document.getElementById('bwBlack').classList.add('active');
-    document.getElementById('bwWhite').classList.remove('active');
-    document.getElementById('bwBlack').querySelector('.bw-check').textContent='✓';
-    document.getElementById('bwWhite').querySelector('.bw-check').textContent=' ';
-    closeBwPopup();scheduleDraw();scheduleSave();
-  });
-  document.getElementById('bwWhite').addEventListener('click',function(){
-    bwMode=true;
-    document.getElementById('bwWhite').classList.add('active');
-    document.getElementById('bwBlack').classList.remove('active');
-    document.getElementById('bwWhite').querySelector('.bw-check').textContent='✓';
-    document.getElementById('bwBlack').querySelector('.bw-check').textContent=' ';
-    closeBwPopup();scheduleDraw();scheduleSave();
-  });
-})();
-// V0_77: 記憶全消し
-function clearAllMemory(){
-  savedViews=[null,null,null,null,null];
-  [0,1,2,3,4].forEach(i=>updateViewmemoState(i));
-  scheduleSave();
-  showGuide('全ての記憶VIEWを削除しました',1800);
-}
-document.getElementById('clearAllMemBtn').addEventListener('click',clearAllMemory);
+document.getElementById('bwBlack').addEventListener('click',()=>{
+  bwMode=false;
+  document.getElementById('bwBlack').classList.add('active');
+  document.getElementById('bwWhite').classList.remove('active');
+  scheduleDraw();scheduleSave();
+});
+document.getElementById('bwWhite').addEventListener('click',()=>{
+  bwMode=true;
+  document.getElementById('bwWhite').classList.add('active');
+  document.getElementById('bwBlack').classList.remove('active');
+  scheduleDraw();scheduleSave();
+});
 document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 
 // PDFページ
@@ -1828,8 +1783,6 @@ function drawLPOverlay(){
     drawLPSnapMarker(ctx2,sc[0],sc[1],LP.cur.type||'default');
   }
 
-  // Phase  }
-
   // Phase2: 選択済み点+垂点マーカー
   if(LP.selPt&&LP.phase===2){
     var spt=w2s(LP.selPt.x,LP.selPt.y);
@@ -1917,3 +1870,60 @@ LP.handleUp=function(sx,sy){
     if(!LP.cur){
       showGuide('スナップ点を選択してください',1500);
       console.log('[LP] point selection failed: no snap candidate');
+    } else {
+      var pt=LP.cur;
+      LP.selPt=pt;
+      LP.footPt=computeFoot(LP.selLine,pt);
+      LP.phase=2; LP.cur=null;
+      showGuide(LP_GUIDES.POS,0);
+      console.log('[LP] point selected: ('
+        +pt.x.toFixed(1)+','+pt.y.toFixed(1)+') type='+pt.type);
+    }
+  } else if(LP.phase===2){
+    var wp=s2w(sx,sy);
+    var pArrow=LP.cur||{x:wp[0],y:wp[1]};
+    var dim=buildLinePtDim(LP.selLine,LP.selPt,pArrow);
+    console.log('[LP] dim placed: '+(dim?dim.text:'null'));
+    if(dim){ snapshot(); dims.push(dim); scheduleSave(); scheduleDraw(); }
+    LP.selLine=null; LP.selPt=null; LP.footPt=null; LP.phase=0; LP.cur=null;
+    showGuide(LP_GUIDES.LINE,0);
+    console.log('[LP] → phase0: reset');
+  }
+  scheduleOverlay();
+};
+
+// ─ ツール切り替えフック ─────────────────────────────────
+document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var t=this.dataset.tool;
+    if(t==='lp'){
+      if(window.DIM) window.DIM.active=false;
+      resetLP(); LP.active=true; LP.phase=0;
+      showGuide(LP_GUIDES.LINE,0);
+      console.log('[LP] tool activated');
+    } else {
+      resetLP();
+    }
+  });
+});
+
+window.LP=LP;
+console.log('[LP] module initialized');
+
+})(); // end D
+
+</script>
+<div id="guideMsg" style="
+  display:none;
+  position:fixed;
+  top:68px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(10,20,35,0.85);
+  color:#7dd8ff;
+  padding:7px 14px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:500;
+  pointer-events:none;
+  z-index:9
