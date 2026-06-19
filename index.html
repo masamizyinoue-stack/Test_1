@@ -240,7 +240,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <span class="nd-text">NO DRAWING LOADED</span>
   </div>
   <div class="viewmemo" id="viewmemo">
-    <button class="full-row" id="fitBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg> 全体</button>
+    <button class="mem-btn full-row" id="fitBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><polyline points="8 3 3 3 3 8"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="3 16 3 21 8 21"/></svg>全体</button>
     <button class="mem-btn" data-vi="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
     <button class="mem-btn" data-vi="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
     <button class="mem-btn" data-vi="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
@@ -285,10 +285,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
-    <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_74</div>
+  <div id="ver-label">DXF_View V0_75</div>
 </div>
 
 <div id="colorOverlay">
@@ -369,7 +368,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_74';
+const APP_VERSION = 'V0_75';
 
 // =========================================================
 // グローバル状態
@@ -655,12 +654,12 @@ function drawOverlay(){
           if(prevDim.tangle) octx.rotate(prevDim.tangle);
           octx.font='bold 17px sans-serif';
           octx.textAlign='center';
-          octx.textBaseline='middle';
+          octx.textBaseline='bottom'; // V0_75: drawDimEntityと同一(bottom, -5px)
           const tw=octx.measureText(txt).width;
           octx.fillStyle='rgba(0,20,40,0.65)';
-          octx.fillRect(-tw/2-3,-10,tw+6,20);
+          octx.fillRect(-tw/2-3,-22,tw+6,17);
           octx.fillStyle='rgba(0,212,255,0.85)';
-          octx.fillText(txt,0,0);
+          octx.fillText(txt,0,-5);
           octx.restore();
         }
         octx.restore();
@@ -1362,12 +1361,12 @@ function drawDIMPreview(ctx){
   if(prevDim.text&&prevDim.tx!=null){
     var stx=w2s(prevDim.tx,prevDim.ty);
     ctx.font='bold 17px sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.textAlign='center'; ctx.textBaseline='bottom'; // V0_75: drawDimEntityと同一
     var tw=ctx.measureText(prevDim.text).width;
     ctx.fillStyle='rgba(0,20,40,0.65)';
-    ctx.fillRect(stx[0]-tw/2-3,stx[1]-10,tw+6,20);
+    ctx.fillRect(stx[0]-tw/2-3,stx[1]-22,tw+6,17);
     ctx.fillStyle='rgba(0,212,255,0.85)';
-    ctx.fillText(prevDim.text,stx[0],stx[1]);
+    ctx.fillText(prevDim.text,stx[0],stx[1]-5);
   }
   ctx.restore();
 }
@@ -1740,7 +1739,8 @@ function drawLPPreview(ctx2,dim){
     ctx2.save();ctx2.translate(st[0],st[1]);ctx2.rotate(dim.tangle||0);
     ctx2.font='bold 17px sans-serif';ctx2.fillStyle=dim.color||'#f39c12';
     ctx2.textAlign='center';ctx2.textBaseline='bottom';
-    ctx2.fillText(dim.text,0,0);ctx2.restore();
+    ctx2.fillText(dim.text,0,-5); // V0_75: drawDimEntityと同一(-5px offset)
+    ctx2.restore();
   }
 }
 
@@ -1923,15 +1923,4 @@ console.log('[LP] module initialized');
   font-size:13px;
   font-weight:500;
   pointer-events:none;
-  z-index:9100;
-  backdrop-filter:blur(6px);
-  border:1px solid rgba(100,200,255,0.25);
-  white-space:pre-wrap;
-  max-width:400px;
-  text-align:center;
-  letter-spacing:0.04em;
-"></div>
-<div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-<!-- 太さパネル削除済み (V0_47) -->
-</body>
-</html>
+  z-index:9

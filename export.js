@@ -377,9 +377,8 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
 });
 
 // =========================================================
-// 範囲指定PDFボタン（savePDF参照 × 2 — 既存仕様）
+// PDFボタン（V0_75: 範囲PDF保存を削除、PDF書出のみ維持）
 // =========================================================
-document.getElementById('rangeAreaPDFBtn').addEventListener('click',savePDF);
 document.getElementById('savePDFBtn').addEventListener('click',savePDF);
 
 // =========================================================
