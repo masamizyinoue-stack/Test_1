@@ -118,7 +118,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   -webkit-tap-highlight-color:transparent}
 .sp-danger-btn:active{background:rgba(192,57,43,.22)}
 #ver-label{font-size:11px;color:var(--text-dim);text-align:center;padding:16px;margin-top:auto}
-#colorOverlay{display:none;position:fixed;z-index:400;top:62px;right:10px;
+#colorOverlay{display:none;position:fixed;z-index:400;top:0;left:0;
   background:var(--sb-bg);border:1px solid var(--border);border-radius:16px;
   padding:16px;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,.65);flex-direction:column;gap:14px}
 #colorOverlay.open{display:flex}
@@ -176,10 +176,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
   <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.95"/></svg></button>
-  <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
-  <span class="tb-tool-label">PDF</span>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
-</button>
+
   <button class="tb-btn" id="screenshotBtn" title="スクリーンショット">
   <span class="tb-tool-label">スクショ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -187,6 +184,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-btn" id="exportDxfBtn" title="書き込みをDXF書き出し">
   <span class="tb-tool-label">DXF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+</button>
+  <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
+  <span class="tb-tool-label">PDF書出</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
 </button>
 </div>
 
@@ -255,7 +256,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_67</div>
+  <div id="ver-label">DXF_View V0_68</div>
 </div>
 
 <div id="colorOverlay">
@@ -298,7 +299,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_67';
+const APP_VERSION = 'V0_68';
 
 // =========================================================
 // グローバル状態
@@ -361,7 +362,7 @@ function drawOverlay(){
   }
   // Dims
   for(const d of dims) drawDimEntity(octx,d);
-  // Strokes（moveTo/lineTo直描画 - V0_13でsmoothPath廃止）
+  // Strokes（Catmull-Rom風 midpoint quadratic bezier - V0_68）
   for(const s of strokes){
     if(!s.pts || s.pts.length < 2) continue;
     octx.save();
@@ -370,16 +371,25 @@ function drawOverlay(){
     octx.lineCap = 'round';
     octx.lineJoin = 'round';
     octx.beginPath();
-    const [sx0,sy0] = w2s(s.pts[0].x, s.pts[0].y);
-    octx.moveTo(sx0, sy0);
-    for(let i = 1; i < s.pts.length; i++){
-      const [sx,sy] = w2s(s.pts[i].x, s.pts[i].y);
-      octx.lineTo(sx, sy);
+    const spts=s.pts;const n=spts.length;
+    const [sx0,sy0]=w2s(spts[0].x,spts[0].y);
+    if(n===2){octx.moveTo(sx0,sy0);const[sx1,sy1]=w2s(spts[1].x,spts[1].y);octx.lineTo(sx1,sy1);}
+    else{
+      // midpoint curve: control points at actual points, pass-through at midpoints
+      const[sx1,sy1]=w2s(spts[1].x,spts[1].y);
+      octx.moveTo((sx0+sx1)/2,(sy0+sy1)/2);
+      for(let i=1;i<n-1;i++){
+        const[cx,cy]=w2s(spts[i].x,spts[i].y);
+        const[nx,ny]=w2s(spts[i+1].x,spts[i+1].y);
+        octx.quadraticCurveTo(cx,cy,(cx+nx)/2,(cy+ny)/2);
+      }
+      const[slx,sly]=w2s(spts[n-1].x,spts[n-1].y);
+      octx.lineTo(slx,sly);
     }
     octx.stroke();
     octx.restore();
   }
-  // Current sketch（moveTo/lineTo直描画）
+  // Current sketch（midpoint quadratic bezier - V0_68）
   if(sketching && sketchPts.length >= 2){
     octx.save();
     octx.strokeStyle = `rgba(${currentColor.r},${currentColor.g},${currentColor.b},0.9)`;
@@ -387,11 +397,19 @@ function drawOverlay(){
     octx.lineCap = 'round';
     octx.lineJoin = 'round';
     octx.beginPath();
-    const [sx0_,sy0_] = w2s(sketchPts[0].x, sketchPts[0].y);
-    octx.moveTo(sx0_, sy0_);
-    for(let i = 1; i < sketchPts.length; i++){
-      const [sx_,sy_] = w2s(sketchPts[i].x, sketchPts[i].y);
-      octx.lineTo(sx_, sy_);
+    const sp=sketchPts;const sn=sp.length;
+    const [sx0_,sy0_]=w2s(sp[0].x,sp[0].y);
+    if(sn===2){octx.moveTo(sx0_,sy0_);const[sx1_,sy1_]=w2s(sp[1].x,sp[1].y);octx.lineTo(sx1_,sy1_);}
+    else{
+      const[sx1_,sy1_]=w2s(sp[1].x,sp[1].y);
+      octx.moveTo((sx0_+sx1_)/2,(sy0_+sy1_)/2);
+      for(let i=1;i<sn-1;i++){
+        const[cx_,cy_]=w2s(sp[i].x,sp[i].y);
+        const[nx_,ny_]=w2s(sp[i+1].x,sp[i+1].y);
+        octx.quadraticCurveTo(cx_,cy_,(cx_+nx_)/2,(cy_+ny_)/2);
+      }
+      const[slx_,sly_]=w2s(sp[sn-1].x,sp[sn-1].y);
+      octx.lineTo(slx_,sly_);
     }
     octx.stroke();
     octx.restore();
@@ -709,10 +727,20 @@ document.querySelectorAll('.show-btn').forEach(btn=>{
 });
 
 
-// カラーピッカー開閉
+// カラーピッカー開閉（ボタン直下に動的配置）
 document.getElementById('colorIndicatorBtn').addEventListener('click',function(e){
   e.stopPropagation();
-  document.getElementById('colorOverlay').classList.toggle('open');
+  const co=document.getElementById('colorOverlay');
+  if(co.classList.contains('open')){co.classList.remove('open');return;}
+  const rect=this.getBoundingClientRect();
+  const popW=236,popH=170;
+  let left=rect.left;
+  let top=rect.bottom+6;
+  if(left+popW>window.innerWidth) left=window.innerWidth-popW-8;
+  if(left<4) left=4;
+  if(top+popH>window.innerHeight) top=rect.top-popH-4;
+  co.style.top=top+'px';co.style.left=left+'px';
+  co.classList.add('open');
 });
 document.addEventListener('click',function(e){
   const co=document.getElementById('colorOverlay');

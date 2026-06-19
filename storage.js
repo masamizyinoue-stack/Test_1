@@ -55,12 +55,12 @@ async function tryRestore(){
       if(name.toLowerCase().endsWith('.pdf')){
         await loadPDF(buf);
       } else {
-        doc=parseDXF(buf);buildLayerModal();detectScale();
+        doc=parseDXF(buf);detectScale();
       }
       const nd=document.getElementById('noDrawingMsg');if(nd)nd.style.display='none';
       updateFileNameDisplay();
     }
-    const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
+    const raw=localStorage.getItem(SAVE_KEY);if(!raw){buildLayerModal();return;}
     const d=JSON.parse(raw);
     strokes=d.strokes||[];dims=d.dims||[];
     savedViews=d.savedViews||[null,null,null];
@@ -85,6 +85,7 @@ async function tryRestore(){
     const dot=document.getElementById('colorDot');
     if(dot&&currentColor)dot.style.background=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
     [0,1,2].forEach(i=>updateViewmemoState(i));
+    buildLayerModal();  // hiddenLayers復元後に呼ぶ（チェックボックス状態を正しく反映）
     scheduleDraw();scheduleOverlay();updateUndoRedo();
   }catch(e){console.warn('restore:',e);}
 }

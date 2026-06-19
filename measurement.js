@@ -22,8 +22,17 @@ function drawDimEntity(ctx,d){
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
-    ctx.font='bold 17px sans-serif';ctx.fillStyle=d.color||'#f39c12';
-    ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(d.text,0,0);ctx.restore();
+    ctx.font='bold 17px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='bottom';
+    const tw=ctx.measureText(d.text).width;
+    const gap=14;  // 寸法線からのオフセット(px) - V0_68
+    // 背景クリアランス（視認性向上）
+    ctx.fillStyle='rgba(18,26,42,0.82)';
+    ctx.fillRect(-tw/2-6,-gap-19,tw+12,21);
+    // テキスト
+    ctx.fillStyle=d.color||'#f39c12';
+    ctx.fillText(d.text,0,-gap);
+    ctx.restore();
   }
 }
 
