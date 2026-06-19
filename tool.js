@@ -355,6 +355,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
+    if(typeof updateToolColorDots==='function')updateToolColorDots();
     console.log('[Tool] switched to:', currentTool, 'DIM.active=', window.DIM&&window.DIM.active);
     // ガイドメッセージ
     const guideMap={
@@ -383,7 +384,7 @@ document.querySelectorAll('.color-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
-    const[r,g,b]=btn.dataset.color.split(',').map(Number);currentColor={r,g,b};const dot=document.getElementById('colorDot');if(dot)dot.style.background=btn.style.background;document.getElementById('colorOverlay').classList.remove('open');
+    const[r,g,b]=btn.dataset.color.split(',').map(Number);currentColor={r,g,b};document.getElementById('colorOverlay').classList.remove('open');if(typeof updateToolColorDots==='function')updateToolColorDots();
   });
 });
 
@@ -412,6 +413,7 @@ document.querySelectorAll('.hl-color-btn').forEach(btn=>{
     const[r,g,b]=btn.dataset.color.split(',').map(Number);
     currentHL_Color={r,g,b};
     document.getElementById('colorOverlay').classList.remove('open');
+    if(typeof updateToolColorDots==='function')updateToolColorDots();
   });
 });
 
@@ -436,5 +438,6 @@ document.querySelectorAll('.dim-color-btn').forEach(btn=>{
     btn.classList.add('active');
     currentDimColor=btn.dataset.color;
     document.getElementById('colorOverlay').classList.remove('open');
+    if(typeof updateToolColorDots==='function')updateToolColorDots();
   });
 });

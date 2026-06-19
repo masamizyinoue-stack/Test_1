@@ -161,6 +161,14 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 @supports (padding-bottom:env(safe-area-inset-bottom)){
   .btbar{bottom:calc(22px + env(safe-area-inset-bottom))}}
 .tb-btn svg, .tb-tool-btn svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
+/* V0_71: コンテキスト感知色丸ボタン */
+.tool-color-dot{width:24px;height:24px;border-radius:50%;border:2.5px solid rgba(255,255,255,0.5);cursor:pointer;padding:0;flex-shrink:0;-webkit-tap-highlight-color:transparent;margin-left:4px}
+.tool-color-dot:active{border-color:#fff}
+/* colorOverlay モード別セクション表示制御 */
+#colorOverlay .co-sketch-section,#colorOverlay .co-hl-section,#colorOverlay .co-dim-section{display:none}
+#colorOverlay[data-mode="sketch"] .co-sketch-section{display:block}
+#colorOverlay[data-mode="hl"] .co-hl-section{display:block}
+#colorOverlay[data-mode="dim"] .co-dim-section{display:block}
 </style>
 </head>
 <body>
@@ -174,8 +182,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+  <button class="tool-color-dot" id="sketchColorDot" title="スケッチ色" style="display:none;background:rgb(255,0,0)"></button>
   <button class="tb-tool-btn tool-btn" data-tool="hl" title="蛍光ペン"><span class="tb-tool-label">蛍光</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3l6 6-11 11H4v-6L15 3z" fill="rgba(255,255,0,0.25)"/><line x1="11" y1="7" x2="17" y2="13"/></svg></button>
-  <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色・太さ</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span><span id="lwLabel" style="font-size:11px;font-weight:700;color:var(--accent);margin-left:3px;vertical-align:middle">1</span></button>
+  <button class="tool-color-dot" id="hlColorDot" title="蛍光色" style="display:none;background:rgb(255,255,0)"></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
@@ -184,6 +193,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
+  <button class="tool-color-dot" id="dimColorDot" title="寸法色" style="display:none;background:#f39c12"></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <button class="tb-btn" id="fitBtnTb" title="全体表示"><span class="tb-tool-label">全体</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
   <div class="tb-sep"></div>
@@ -269,11 +279,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_70</div>
+  <div id="ver-label">DXF_View V0_71</div>
 </div>
 
 <div id="colorOverlay">
-  <div>
+  <div class="co-sketch-section">
     <div class="co-label">スケッチ色</div>
     <div class="co-colors">
       <button class="color-btn active" data-color="255,0,0" style="background:#f00" title="赤"></button>
@@ -283,7 +293,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="color-btn" data-color="255,0,180" style="background:#f0b" title="ピンク"></button>
     </div>
   </div>
-  <div>
+  <div class="co-sketch-section">
     <div class="co-label">ペン線幅</div>
     <div class="co-lw">
       <button class="lw-btn active" data-lw="1">1</button>
@@ -296,7 +306,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="lw-btn" data-lw="10">10</button>
     </div>
   </div>
-  <div>
+  <div class="co-hl-section">
     <div class="co-label">蛍光色</div>
     <div class="co-hl-colors">
       <button class="hl-color-btn active" data-color="255,255,0" style="background:#ff0" title="黄"></button>
@@ -305,7 +315,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="hl-color-btn" data-color="80,210,255" style="background:#50d2ff" title="水色"></button>
     </div>
   </div>
-  <div>
+  <div class="co-hl-section">
     <div class="co-label">蛍光線幅</div>
     <div class="co-hl-lw">
       <button class="hl-lw-btn" data-lw="3">3</button>
@@ -316,7 +326,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="hl-lw-btn" data-lw="20">20</button>
     </div>
   </div>
-  <div>
+  <div class="co-dim-section">
     <div class="co-label">寸法色</div>
     <div class="co-dim-colors">
       <button class="dim-color-btn active" data-color="#f39c12" style="background:#f39c12" title="橙（既定）"></button>
@@ -348,7 +358,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_70';
+const APP_VERSION = 'V0_71';
 
 // =========================================================
 // グローバル状態
@@ -796,13 +806,29 @@ document.querySelectorAll('.show-btn').forEach(btn=>{
 });
 
 
-// カラーピッカー開閉（ボタン直下に動的配置）
-document.getElementById('colorIndicatorBtn').addEventListener('click',function(e){
-  e.stopPropagation();
+// V0_71: コンテキスト感知色丸ボタン制御
+const DIM_TOOLS=['dxdy','diag','lp','circDim','radDim'];
+function updateToolColorDots(){
+  const isSk=currentTool==='sketch';
+  const isHl=currentTool==='hl';
+  const isDim=DIM_TOOLS.includes(currentTool);
+  const sd=document.getElementById('sketchColorDot');
+  const hd=document.getElementById('hlColorDot');
+  const dd=document.getElementById('dimColorDot');
+  if(sd){sd.style.display=isSk?'block':'none';}
+  if(hd){hd.style.display=isHl?'block':'none';}
+  if(dd){dd.style.display=isDim?'block':'none';}
+  // 色丸の色を現在値に合わせて更新
+  if(sd&&currentColor)sd.style.background=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
+  if(hd&&currentHL_Color)hd.style.background=`rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
+  if(dd&&currentDimColor)dd.style.background=currentDimColor;
+}
+function openContextPopup(mode,anchorEl){
   const co=document.getElementById('colorOverlay');
-  if(co.classList.contains('open')){co.classList.remove('open');return;}
-  const rect=this.getBoundingClientRect();
-  const popW=236,popH=170;
+  if(co.classList.contains('open')&&co.dataset.mode===mode){co.classList.remove('open');return;}
+  co.dataset.mode=mode;
+  const rect=anchorEl.getBoundingClientRect();
+  const popW=252,popH=180;
   let left=rect.left;
   let top=rect.bottom+6;
   if(left+popW>window.innerWidth) left=window.innerWidth-popW-8;
@@ -810,13 +836,25 @@ document.getElementById('colorIndicatorBtn').addEventListener('click',function(e
   if(top+popH>window.innerHeight) top=rect.top-popH-4;
   co.style.top=top+'px';co.style.left=left+'px';
   co.classList.add('open');
-});
+}
+// 色丸ボタンのクリックハンドラ
+(function(){
+  const sd=document.getElementById('sketchColorDot');
+  const hd=document.getElementById('hlColorDot');
+  const dd=document.getElementById('dimColorDot');
+  if(sd)sd.addEventListener('click',function(e){e.stopPropagation();openContextPopup('sketch',this);});
+  if(hd)hd.addEventListener('click',function(e){e.stopPropagation();openContextPopup('hl',this);});
+  if(dd)dd.addEventListener('click',function(e){e.stopPropagation();openContextPopup('dim',this);});
+})();
 document.addEventListener('click',function(e){
   const co=document.getElementById('colorOverlay');
-  if(co.classList.contains('open')&&!co.contains(e.target)&&e.target.id!=='colorIndicatorBtn'){
+  const ids=['sketchColorDot','hlColorDot','dimColorDot'];
+  if(co.classList.contains('open')&&!co.contains(e.target)&&!ids.includes(e.target.id)){
     co.classList.remove('open');
   }
 });
+// 初期表示（ページ読み込み時: スケッチが選択済み）
+updateToolColorDots();
 // ダブルタップ → 全体表示
 let _dtCount=0,_dtTimer=0;
 ov.addEventListener('touchend',function(e){
@@ -862,22 +900,40 @@ if(vd) vd.textContent = APP_VERSION;
 // 寸法描画・スナップ・寸法構築
 // =========================================================
 function drawDimEntity(ctx,d){
-  ctx.strokeStyle=d.color||'#f39c12';ctx.fillStyle=d.color||'#f39c12';
-  ctx.lineWidth=1.5;ctx.setLineDash([]);
+  var PS=window._pdfScale||1;
+  var col=d.color||'#f39c12';
+  ctx.strokeStyle=col;ctx.fillStyle=col;
+  ctx.lineWidth=1.5*PS;ctx.setLineDash([]);
   for(const l of d.lines){
     const[sx1,sy1]=w2s(l.x1,l.y1);const[sx2,sy2]=w2s(l.x2,l.y2);
     ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
   }
+  var arrowLen=10*PS,arrowW=4*PS;
   for(const a of d.arrows){
     const[sx,sy]=w2s(a.x,a.y);
     ctx.save();ctx.translate(sx,sy);ctx.rotate(a.angle);
-    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-10,4);ctx.lineTo(-10,-4);ctx.closePath();ctx.fill();ctx.restore();
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-arrowLen,arrowW);ctx.lineTo(-arrowLen,-arrowW);ctx.closePath();ctx.fill();ctx.restore();
   }
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
+    var fSize=17*PS;
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
-    ctx.font='bold 17px sans-serif';ctx.fillStyle=d.color||'#f39c12';
-    ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(d.text,0,0);ctx.restore();
+    ctx.font='bold '+fSize+'px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    var tw=ctx.measureText(d.text).width;
+    var pad=4*PS,th=fSize;
+    ctx.fillStyle='rgba(0,0,0,0.55)';
+    ctx.fillRect(-tw/2-pad,-th/2-pad,tw+pad*2,th+pad*2);
+    ctx.fillStyle=col;
+    ctx.fillText(d.text,0,0);ctx.restore();
+  }
+  // センターマーク（直径・半径寸法）
+  if(d.centerMark){
+    var[cmx,cmy]=w2s(d.centerMark.cx,d.centerMark.cy);
+    var cml=8*PS;
+    ctx.strokeStyle=col;ctx.lineWidth=1*PS;
+    ctx.beginPath();ctx.moveTo(cmx-cml,cmy);ctx.lineTo(cmx+cml,cmy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cmx,cmy-cml);ctx.lineTo(cmx,cmy+cml);ctx.stroke();
   }
 }
 
@@ -1010,7 +1066,7 @@ function buildDim(p1,p2,pArrow,type){
     else if(tRef2>len+1/scale) lines.push({x1:ep2x,y1:ep2y,x2:pRef.x,y2:pRef.y});
     arrows.push({x:ep1x,y:ep1y,angle:a1});arrows.push({x:ep2x,y:ep2y,angle:a2});
   }
-  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:'#f39c12'};
+  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12'};
 }
 
 function formatDim(d){
@@ -1329,7 +1385,8 @@ function buildCircDimPhi(ent,p3){
     lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
     arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
     text:'φ'+formatDim(r*2/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:'#00d4ff'
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:currentDimColor||'#f39c12',
+    centerMark:{cx:cx,cy:cy}
   };
 }
 
@@ -1407,7 +1464,8 @@ function buildRadDim(ent,p3){
     lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
     arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
     text:'R'+formatDim(r/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:'#00d4ff'
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:currentDimColor||'#f39c12',
+    centerMark:{cx:cx,cy:cy}
   };
 }
 
@@ -1647,7 +1705,7 @@ function buildLinePtDim(line,pt,pArrow){
   }
   return {lines,arrows,
     text:formatDim(dist/sd),
-    tx:tx2,ty:ty2,tangle,color:'#f39c12'};
+    tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12'};
 }
 
 // ─ プレビュー描画(点線) ───────────────────────────────
@@ -1865,4 +1923,4 @@ console.log('[LP] module initialized');
 <div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
 <!-- 太さパネル削除済み (V0_47) -->
 </body>
-</html>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+</html>

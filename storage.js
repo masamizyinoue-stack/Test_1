@@ -102,10 +102,9 @@ async function tryRestore(){
     document.querySelectorAll('.tool-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.tool===currentTool);
     });
-    const dot=document.getElementById('colorDot');
-    if(dot&&currentColor)dot.style.background=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
     [0,1,2].forEach(i=>updateViewmemoState(i));
     buildLayerModal();  // hiddenLayers復元後に呼ぶ（チェックボックス状態を正しく反映）
     scheduleDraw();scheduleOverlay();updateUndoRedo();
+    if(typeof updateToolColorDots==='function')updateToolColorDots();
   }catch(e){console.warn('restore:',e);}
 }

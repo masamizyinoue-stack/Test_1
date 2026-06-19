@@ -1010,12 +1010,4 @@ document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
       showGuide(LP_GUIDES.LINE,0);
       console.log('[LP] tool activated');
     } else {
-      resetLP();
-    }
-  });
-});
-
-window.LP=LP;
-console.log('[LP] module initialized');
-
-})(); // end D
+      re
