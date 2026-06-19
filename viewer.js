@@ -18,7 +18,7 @@ var doc=null;
 var currentFileName='';
 var tx=0,ty=0,scale=1;
 var bwMode=false;
-var hiddenLayers=new Set();
+// hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
 var pdfImage=null;
 var rafId=null;
@@ -663,20 +663,7 @@ function showInfo(){
     `線:${doc.sen.length} 円弧:${doc.enko.length}<br>文字:${doc.moji.length} 点:${doc.ten.length}<br>ソリッド:${doc.solid.length}<br>レイヤ:${Object.keys(doc.layerMap).length}<br>Ver:${doc.ver||'不明'}`;
 }
 
-function buildLayerModal(){
-  const ll=document.getElementById('layerList');ll.innerHTML='';
-  if(!doc) return;
-  for(const lname of Object.keys(doc.usedLayers).sort()){
-    const info=doc.layerMap[lname]||{color:7};
-    const c=aci(info.color||7);
-    const row=document.createElement('div');row.className='layer-row';
-    const cb=document.createElement('input');cb.type='checkbox';cb.checked=!hiddenLayers.has(lname);
-    cb.addEventListener('change',()=>{if(cb.checked)hiddenLayers.delete(lname);else hiddenLayers.add(lname);buildSnapCache();scheduleDraw();scheduleSave();});
-    const box=document.createElement('div');box.className='layer-color-box';box.style.background=`rgb(${c.r},${c.g},${c.b})`;
-    const label=document.createElement('span');label.textContent=lname;
-    row.append(cb,box,label);ll.appendChild(row);
-  }
-}
+// buildLayerModal → layer.js
 
 // =========================================================
 // PDF表示

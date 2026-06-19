@@ -255,7 +255,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_63</div>
+  <div id="ver-label">DXF_View V0_65</div>
 </div>
 
 <div id="colorOverlay">
@@ -289,32 +289,34 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <input type="file" id="file" hidden>
 
+<script src="layer.js"></script>
 <script src="viewer.js"></script>
 <script src="utils.js"></script>
 <script src="ui.js"></script>
 <script src="dialog.js"></script>
+<script src="storage.js"></script>
 <script>
-const APP_VERSION = 'V0_63';
+const APP_VERSION = 'V0_65';
 
 // =========================================================
 // グローバル状態
 // =========================================================
 
 let scaleDenom=1;
-let currentTool='sketch';
-let currentColor={r:255,g:0,b:0};
-let currentLW=1;
-let dims=[];
-let strokes=[];
+var currentTool='sketch';
+var currentColor={r:255,g:0,b:0};
+var currentLW=1;
+var dims=[];
+var strokes=[];
 let images=[];
 var savedViews=[null,null,null];
 let history=[];    // [{strokes,dims}]
 let redoStack=[];  // [{strokes,dims}]
 const MAX_HISTORY=30;
 let dimPendingDown=false;
-let saveTimer=null;
-const SAVE_KEY='dxfview_v1';
-const FILE_KEY='dxfview_v1_file';
+// saveTimer → storage.js
+// SAVE_KEY  → storage.js
+// FILE_KEY  → storage.js
 let snapPt=null;
 let currentCursorWorld=null; // 現在のカーソル世界座標（寸法プレビュー用）
 let dimState={pts:[]};
@@ -917,9 +919,7 @@ fileInput.addEventListener('change',async e=>{
 document.getElementById('settingsBtn').addEventListener('click',()=>document.body.classList.add('settings-open'));
 document.getElementById('settingsClose').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
-document.getElementById('layerBtn').addEventListener('click',()=>document.getElementById('layerModal').classList.add('open'));
-document.getElementById('layerClose').addEventListener('click',()=>document.getElementById('layerModal').classList.remove('open'));
-document.getElementById('layerModal').addEventListener('click',e=>{if(e.target===document.getElementById('layerModal'))document.getElementById('layerModal').classList.remove('open');});
+// layerBtn/layerClose/layerModal イベントリスナー → layer.js
 document.getElementById('bwBlack').addEventListener('click',()=>{
   bwMode=false;
   document.getElementById('bwBlack').classList.add('active');
@@ -1388,68 +1388,7 @@ ov.addEventListener('touchend',function(e){
 // 2本指パンと競合するため2本指タップUndoは廃止 → ↩ボタンで操作
 // viewmemo初期状態
 [0,1,2].forEach(i=>updateViewmemoState(i));
-// localStorage 保存・復元
-function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(doSave,800);}
-// arrayBufferToB64 → utils.js
-function doSave(){
-  try{
-    const sd=parseFloat(document.getElementById('scaleDenom').value)||1;
-    localStorage.setItem(SAVE_KEY,JSON.stringify({
-      strokes,dims,savedViews,tx,ty,scale,
-      bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
-      currentTool,currentColor,currentLW,currentFileName
-    }));
-  }catch(e){}
-}
-function saveFile(buf,name){
-  if(!buf||buf.byteLength>1.5*1024*1024){localStorage.removeItem(FILE_KEY);return;}
-  try{localStorage.setItem(FILE_KEY,JSON.stringify({name,b64:arrayBufferToB64(buf)}));}
-  catch(e){localStorage.removeItem(FILE_KEY);}
-}
-async function tryRestore(){
-  try{
-    const fr=localStorage.getItem(FILE_KEY);
-    if(fr){
-      const{name,b64}=JSON.parse(fr);
-      const bin=atob(b64);const buf=new ArrayBuffer(bin.length);const arr=new Uint8Array(buf);
-      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
-      currentFileName=name;
-      if(name.toLowerCase().endsWith('.pdf')){
-        await loadPDF(buf);
-      } else {
-        doc=parseDXF(buf);buildLayerModal();detectScale();
-      }
-      const nd=document.getElementById('noDrawingMsg');if(nd)nd.style.display='none';
-      updateFileNameDisplay();
-    }
-    const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;
-    const d=JSON.parse(raw);
-    strokes=d.strokes||[];dims=d.dims||[];
-    savedViews=d.savedViews||[null,null,null];
-    tx=d.tx||0;ty=d.ty||0;scale=d.scale||1;
-    bwMode=!!d.bwMode;
-    if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
-    currentTool=d.currentTool||'sketch';
-    if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
-    if(d.currentColor)currentColor=d.currentColor;
-    if(d.currentLW)currentLW=d.currentLW;
-    if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
-    if(bwMode){
-      document.getElementById('bwWhite').classList.add('active');
-      document.getElementById('bwBlack').classList.remove('active');
-    } else {
-      document.getElementById('bwBlack').classList.add('active');
-      document.getElementById('bwWhite').classList.remove('active');
-    }
-    document.querySelectorAll('.tool-btn').forEach(b=>{
-      b.classList.toggle('active',b.dataset.tool===currentTool);
-    });
-    const dot=document.getElementById('colorDot');
-    if(dot&&currentColor)dot.style.background=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
-    [0,1,2].forEach(i=>updateViewmemoState(i));
-    scheduleDraw();scheduleOverlay();updateUndoRedo();
-  }catch(e){console.warn('restore:',e);}
-}
+// scheduleSave, doSave, saveFile, tryRestore → storage.js
 
 // リサイズ
 const ro=new ResizeObserver(resizeCanvas);ro.observe(stage);
