@@ -126,7 +126,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .co-hl-colors{display:flex;gap:8px}
 .hl-color-btn{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .hl-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
-.co-hl-lw{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.co-hl-lw{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
 .hl-lw-btn{height:38px;border-radius:8px;font-size:14px;font-weight:600;
   border:1.5px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
   -webkit-tap-highlight-color:transparent;min-width:0}
@@ -188,12 +188,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
+  <button class="tool-color-dot" id="dimColorDot" title="寸法色" style="display:none;background:#f39c12"></button>
   <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
-  <button class="tool-color-dot" id="dimColorDot" title="寸法色" style="display:none;background:#f39c12"></button>
   <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
   <button class="tb-btn" id="fitBtnTb" title="全体表示"><span class="tb-tool-label">全体</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
   <div class="tb-sep"></div>
@@ -279,7 +279,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_71</div>
+  <div id="ver-label">DXF_View V0_72</div>
 </div>
 
 <div id="colorOverlay">
@@ -318,12 +318,14 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="co-hl-section">
     <div class="co-label">蛍光線幅</div>
     <div class="co-hl-lw">
-      <button class="hl-lw-btn" data-lw="3">3</button>
       <button class="hl-lw-btn" data-lw="5">5</button>
       <button class="hl-lw-btn" data-lw="8">8</button>
       <button class="hl-lw-btn active" data-lw="10">10</button>
       <button class="hl-lw-btn" data-lw="15">15</button>
       <button class="hl-lw-btn" data-lw="20">20</button>
+      <button class="hl-lw-btn" data-lw="30">30</button>
+      <button class="hl-lw-btn" data-lw="40">40</button>
+      <button class="hl-lw-btn" data-lw="50">50</button>
     </div>
   </div>
   <div class="co-dim-section">
@@ -358,7 +360,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_71';
+const APP_VERSION = 'V0_72';
 
 // =========================================================
 // グローバル状態
@@ -917,15 +919,12 @@ function drawDimEntity(ctx,d){
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
     var fSize=17*PS;
+    var gap=10*PS; // 寸法線からの余白
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
     ctx.font='bold '+fSize+'px sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    var tw=ctx.measureText(d.text).width;
-    var pad=4*PS,th=fSize;
-    ctx.fillStyle='rgba(0,0,0,0.55)';
-    ctx.fillRect(-tw/2-pad,-th/2-pad,tw+pad*2,th+pad*2);
+    ctx.textAlign='center';ctx.textBaseline='bottom';
     ctx.fillStyle=col;
-    ctx.fillText(d.text,0,0);ctx.restore();
+    ctx.fillText(d.text,0,-gap);ctx.restore();
   }
   // センターマーク（直径・半径寸法）
   if(d.centerMark){
