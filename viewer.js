@@ -17,7 +17,7 @@ var octx=ov.getContext('2d',{desynchronized:true});
 var doc=null;
 var currentFileName='';
 var tx=0,ty=0,scale=1;
-var bwMode=false;
+var bwMode=true;
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
 var pdfImage=null;

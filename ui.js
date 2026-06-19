@@ -31,4 +31,13 @@ function updateViewmemoState(i){
   const sb=document.querySelector('.show-btn[data-vs="'+i+'"]');
   if(mb) mb.classList.toggle('vm-saved',!!savedViews[i]);
   if(sb) sb.classList.toggle('vm-saved',!!savedViews[i]);
+  updateClearAllBtn();
+}
+
+// V0_77: 記憶全消しボタン状態更新（記憶あり/なしでスタイル切替）
+function updateClearAllBtn(){
+  const btn=document.getElementById('clearAllMemBtn');
+  if(!btn) return;
+  const hasAny=savedViews.some(v=>v!==null);
+  btn.classList.toggle('has-memory',hasAny);
 }
