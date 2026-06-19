@@ -70,8 +70,8 @@ function handlePointerDown(sx,sy,isPenInput){
   if(currentTool==='eraser'){
     snapshot();eraserPos={x:wx,y:wy};eraseAt(wx,wy);scheduleOverlay();return;
   }
-  // スケッチ: ペンは常に描画（マウス時はsketchツール時のみ）
-  if(isPenInput||currentTool==='sketch'){
+  // スケッチ/蛍光ペン: ペンは常に描画（マウス時はsketch/hlツール時のみ）
+  if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     sketchPts=[{x:wx,y:wy}];sketching=true;scheduleOverlay();return;
   }
   // 画像選択
@@ -106,8 +106,8 @@ function handlePointerMove(sx,sy,isPenInput){
   if(currentTool==='eraser'){
     eraserPos={x:wx,y:wy};if(mouseDown)eraseAt(wx,wy);scheduleOverlay();return;
   }
-  // スケッチ描画
-  if(isPenInput||currentTool==='sketch'){
+  // スケッチ/蛍光ペン描画
+  if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     if(sketching){sketchPts.push({x:wx,y:wy});scheduleOverlay();}return;
   }
   // パン
@@ -159,10 +159,15 @@ function handlePointerUp(sx,sy,isPenInput){
     }
   }
   if(currentTool==='eraser'){eraserPos=null;scheduleOverlay();return;}
-  if(isPenInput||currentTool==='sketch'){
+  if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     if(sketching&&sketchPts.length>1){
       snapshot();
-      strokes.push({pts:[...sketchPts],color:{...currentColor},lw:currentLW}); // ③ 絶対px値で保存
+      if(currentTool==='hl'){
+        // 蛍光ペン: hl:true フラグ付きで保存（V0_70）
+        strokes.push({pts:[...sketchPts],color:{...currentHL_Color},lw:currentHL_LW,hl:true});
+      } else {
+        strokes.push({pts:[...sketchPts],color:{...currentColor},lw:currentLW}); // ③ 絶対px値で保存
+      }
       sketching=false;sketchPts=[];scheduleOverlay();scheduleSave();
     }return;
   }
@@ -353,14 +358,15 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     console.log('[Tool] switched to:', currentTool, 'DIM.active=', window.DIM&&window.DIM.active);
     // ガイドメッセージ
     const guideMap={
-      'sketch':'Apple Pencilまたは指でスケッチ',
+      'sketch':'Apple Pencilまたはマウスでスケッチ',
+      'hl':'蛍光ペン：Apple Pencilまたはマウスでハイライト',
       'eraser':'消去したい線をなぞってください',
       'dxdy':'1点目を選択してください',
       'diag':'1点目を選択してください',
       'circDim':'円の円周にペンを近づける→離して確定→位置を指定',
       'radDim':'円または円弧を選択→離して確定→半径線の位置を指定'
     };
-    if(currentTool==='sketch'||currentTool==='eraser'){
+    if(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'){
       showGuide(guideMap[currentTool]||'', 2000);
     } else if(guideMap[currentTool]){
       showGuide(guideMap[currentTool]);
@@ -393,5 +399,42 @@ document.querySelectorAll('.lw-btn').forEach(btn=>{
     document.getElementById('colorOverlay').classList.remove('open');
     // ④ ボタン内の現在値表示を更新
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
+  });
+});
+
+// =========================================================
+// 蛍光ペン色選択ボタン（V0_70）
+// =========================================================
+document.querySelectorAll('.hl-color-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.hl-color-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const[r,g,b]=btn.dataset.color.split(',').map(Number);
+    currentHL_Color={r,g,b};
+    document.getElementById('colorOverlay').classList.remove('open');
+  });
+});
+
+// =========================================================
+// 蛍光ペン線幅選択ボタン（V0_70）
+// =========================================================
+document.querySelectorAll('.hl-lw-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.hl-lw-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentHL_LW=parseFloat(btn.dataset.lw);
+    document.getElementById('colorOverlay').classList.remove('open');
+  });
+});
+
+// =========================================================
+// 寸法色選択ボタン（V0_70）
+// =========================================================
+document.querySelectorAll('.dim-color-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.dim-color-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentDimColor=btn.dataset.color;
+    document.getElementById('colorOverlay').classList.remove('open');
   });
 });

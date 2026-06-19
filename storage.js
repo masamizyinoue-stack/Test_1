@@ -27,7 +27,8 @@ function doSave(){
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       strokes,dims,savedViews,tx,ty,scale,
       bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
-      currentTool,currentColor,currentLW,currentFileName
+      currentTool,currentColor,currentLW,currentFileName,
+      currentHL_Color,currentHL_LW,currentDimColor
     }));
   }catch(e){}
 }
@@ -76,6 +77,20 @@ async function tryRestore(){
       b.classList.toggle('active',parseFloat(b.dataset.lw)===currentLW);
     });
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
+    // ⑨ 蛍光ペン色・線幅、寸法色 復元（V0_70）
+    if(d.currentHL_Color)currentHL_Color=d.currentHL_Color;
+    if(d.currentHL_LW)currentHL_LW=d.currentHL_LW;
+    if(d.currentDimColor)currentDimColor=d.currentDimColor;
+    document.querySelectorAll('.hl-color-btn').forEach(b=>{
+      const[r,g,b_]=b.dataset.color.split(',').map(Number);
+      b.classList.toggle('active',r===currentHL_Color.r&&g===currentHL_Color.g&&b_===currentHL_Color.b);
+    });
+    document.querySelectorAll('.hl-lw-btn').forEach(b=>{
+      b.classList.toggle('active',parseFloat(b.dataset.lw)===currentHL_LW);
+    });
+    document.querySelectorAll('.dim-color-btn').forEach(b=>{
+      b.classList.toggle('active',b.dataset.color===currentDimColor);
+    });
     if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
     if(bwMode){
       document.getElementById('bwWhite').classList.add('active');

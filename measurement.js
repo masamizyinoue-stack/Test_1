@@ -180,7 +180,7 @@ function buildDim(p1,p2,pArrow,type){
     else if(tRef2>len+1/scale) lines.push({x1:ep2x,y1:ep2y,x2:pRef.x,y2:pRef.y});
     arrows.push({x:ep1x,y:ep1y,angle:a1});arrows.push({x:ep2x,y:ep2y,angle:a2});
   }
-  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:'#f39c12'};
+  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:window.currentDimColor||'#f39c12'};
 }
 
 function formatDim(d){
@@ -507,7 +507,7 @@ function buildCircDimPhi(ent,p3){
     lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
     arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
     text:'φ'+formatDim(r*2/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:'#00d4ff',
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:window.currentDimColor||'#f39c12',
     centerMark:{cx:cx,cy:cy}  // ⑤ 芯マーク
   };
 }
@@ -586,7 +586,7 @@ function buildRadDim(ent,p3){
     lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
     arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
     text:'R'+formatDim(r/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:'#00d4ff',
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:window.currentDimColor||'#f39c12',
     centerMark:{cx:cx,cy:cy}  // ⑤ 芯マーク
   };
 }
@@ -827,7 +827,7 @@ function buildLinePtDim(line,pt,pArrow){
   }
   return {lines,arrows,
     text:formatDim(dist/sd),
-    tx:tx2,ty:ty2,tangle,color:'#f39c12'};
+    tx:tx2,ty:ty2,tangle,color:window.currentDimColor||'#f39c12'};
 }
 
 // ─ プレビュー描画(点線) ───────────────────────────────

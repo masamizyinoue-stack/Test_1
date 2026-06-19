@@ -120,8 +120,20 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #ver-label{font-size:11px;color:var(--text-dim);text-align:center;padding:16px;margin-top:auto}
 #colorOverlay{display:none;position:fixed;z-index:400;top:0;left:0;
   background:var(--sb-bg);border:1px solid var(--border);border-radius:16px;
-  padding:14px 16px;min-width:232px;box-shadow:0 8px 32px rgba(0,0,0,.65);flex-direction:column;gap:14px}
+  padding:14px 16px;min-width:252px;max-height:80vh;overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,.65);flex-direction:column;gap:14px}
 #colorOverlay.open{display:flex}
+.co-hl-colors{display:flex;gap:8px}
+.hl-color-btn{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hl-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+.co-hl-lw{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.hl-lw-btn{height:38px;border-radius:8px;font-size:14px;font-weight:600;
+  border:1.5px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
+  -webkit-tap-highlight-color:transparent;min-width:0}
+.hl-lw-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(46,204,113,.1)}
+.co-dim-colors{display:flex;gap:7px;flex-wrap:wrap}
+.dim-color-btn{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dim-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
 .co-label{font-size:11px;color:var(--text-dim);margin-bottom:8px;
   text-transform:uppercase;letter-spacing:.5px;font-weight:500}
 .co-colors{display:flex;gap:8px}
@@ -162,6 +174,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="hl" title="蛍光ペン"><span class="tb-tool-label">蛍光</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3l6 6-11 11H4v-6L15 3z" fill="rgba(255,255,0,0.25)"/><line x1="11" y1="7" x2="17" y2="13"/></svg></button>
   <button class="tb-btn" id="colorIndicatorBtn" title="色選択"><span class="tb-tool-label">色・太さ</span><span id="colorDot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:rgb(255,0,0);border:1.5px solid #aaa;vertical-align:middle"></span><span id="lwLabel" style="font-size:11px;font-weight:700;color:var(--accent);margin-left:3px;vertical-align:middle">1</span></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
@@ -256,12 +269,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="rangeAreaPDFBtn" class="sp-action-btn">範囲PDF保存</button>
     <button id="clearBtn" class="sp-danger-btn">全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_69</div>
+  <div id="ver-label">DXF_View V0_70</div>
 </div>
 
 <div id="colorOverlay">
   <div>
-    <div class="co-label">カラー</div>
+    <div class="co-label">スケッチ色</div>
     <div class="co-colors">
       <button class="color-btn active" data-color="255,0,0" style="background:#f00" title="赤"></button>
       <button class="color-btn" data-color="255,140,0" style="background:#f80" title="橙"></button>
@@ -271,7 +284,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     </div>
   </div>
   <div>
-    <div class="co-label">線幅</div>
+    <div class="co-label">ペン線幅</div>
     <div class="co-lw">
       <button class="lw-btn active" data-lw="1">1</button>
       <button class="lw-btn" data-lw="2">2</button>
@@ -281,6 +294,37 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="lw-btn" data-lw="6">6</button>
       <button class="lw-btn" data-lw="8">8</button>
       <button class="lw-btn" data-lw="10">10</button>
+    </div>
+  </div>
+  <div>
+    <div class="co-label">蛍光色</div>
+    <div class="co-hl-colors">
+      <button class="hl-color-btn active" data-color="255,255,0" style="background:#ff0" title="黄"></button>
+      <button class="hl-color-btn" data-color="255,80,160" style="background:#f050a0" title="ピンク"></button>
+      <button class="hl-color-btn" data-color="80,255,80" style="background:#50ff50" title="緑"></button>
+      <button class="hl-color-btn" data-color="80,210,255" style="background:#50d2ff" title="水色"></button>
+    </div>
+  </div>
+  <div>
+    <div class="co-label">蛍光線幅</div>
+    <div class="co-hl-lw">
+      <button class="hl-lw-btn" data-lw="3">3</button>
+      <button class="hl-lw-btn" data-lw="5">5</button>
+      <button class="hl-lw-btn" data-lw="8">8</button>
+      <button class="hl-lw-btn active" data-lw="10">10</button>
+      <button class="hl-lw-btn" data-lw="15">15</button>
+      <button class="hl-lw-btn" data-lw="20">20</button>
+    </div>
+  </div>
+  <div>
+    <div class="co-label">寸法色</div>
+    <div class="co-dim-colors">
+      <button class="dim-color-btn active" data-color="#f39c12" style="background:#f39c12" title="橙（既定）"></button>
+      <button class="dim-color-btn" data-color="#00d4ff" style="background:#00d4ff" title="水色"></button>
+      <button class="dim-color-btn" data-color="#ff4444" style="background:#f44" title="赤"></button>
+      <button class="dim-color-btn" data-color="#ffffff" style="background:#fff" title="白"></button>
+      <button class="dim-color-btn" data-color="#2ecc71" style="background:#2ecc71" title="緑"></button>
+      <button class="dim-color-btn" data-color="#ff88ff" style="background:#f8f" title="紫"></button>
     </div>
   </div>
 </div>
@@ -304,7 +348,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_69';
+const APP_VERSION = 'V0_70';
 
 // =========================================================
 // グローバル状態
@@ -314,6 +358,9 @@ let scaleDenom=1;
 var currentTool='sketch';
 var currentColor={r:255,g:0,b:0};
 var currentLW=1;
+var currentHL_Color={r:255,g:255,b:0}; // 蛍光ペン色（黄）
+var currentHL_LW=10;                    // 蛍光ペン線幅
+var currentDimColor='#f39c12';          // 寸法色
 var dims=[];
 var strokes=[];
 let images=[];
@@ -371,9 +418,18 @@ function drawOverlay(){
   for(const s of strokes){
     if(!s.pts || s.pts.length < 2) continue;
     octx.save();
-    octx.strokeStyle = `rgba(${s.color.r},${s.color.g},${s.color.b},0.9)`;
-    octx.lineWidth = Math.max(1, s.lw) * (window._pdfScale||1); // ③ ズーム非依存
-    octx.lineCap = 'round';
+    if(s.hl){
+      // 蛍光ペン: 半透明（V0_70）
+      octx.globalAlpha = 0.45;
+      octx.strokeStyle = `rgb(${s.color.r},${s.color.g},${s.color.b})`;
+      octx.lineWidth = s.lw * (window._pdfScale||1);
+      octx.lineCap = 'round';
+    } else {
+      octx.globalAlpha = 1;
+      octx.strokeStyle = `rgba(${s.color.r},${s.color.g},${s.color.b},0.9)`;
+      octx.lineWidth = Math.max(1, s.lw) * (window._pdfScale||1); // ③ ズーム非依存
+      octx.lineCap = 'round';
+    }
     octx.lineJoin = 'round';
     octx.beginPath();
     const spts=s.pts;const n=spts.length;
@@ -397,8 +453,16 @@ function drawOverlay(){
   // Current sketch（midpoint quadratic bezier - V0_68）
   if(sketching && sketchPts.length >= 2){
     octx.save();
-    octx.strokeStyle = `rgba(${currentColor.r},${currentColor.g},${currentColor.b},0.9)`;
-    octx.lineWidth = Math.max(1, currentLW) * (window._pdfScale||1); // ③ _pdfScale対応
+    if(currentTool==='hl'){
+      // 蛍光ペン描画中プレビュー（V0_70）
+      octx.globalAlpha = 0.45;
+      octx.strokeStyle = `rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
+      octx.lineWidth = currentHL_LW * (window._pdfScale||1);
+    } else {
+      octx.globalAlpha = 1;
+      octx.strokeStyle = `rgba(${currentColor.r},${currentColor.g},${currentColor.b},0.9)`;
+      octx.lineWidth = Math.max(1, currentLW) * (window._pdfScale||1); // ③ _pdfScale対応
+    }
     octx.lineCap = 'round';
     octx.lineJoin = 'round';
     octx.beginPath();
