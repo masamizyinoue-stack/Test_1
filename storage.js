@@ -28,7 +28,8 @@ function doSave(){
       strokes,dims,savedViews,tx,ty,scale,
       bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
       currentTool,currentColor,currentLW,currentFileName,
-      currentHL_Color,currentHL_LW,currentDimColor
+      currentHL_Color,currentHL_LW,currentDimColor,
+      dimensionTextMode
     }));
   }catch(e){}
 }
@@ -105,6 +106,9 @@ async function tryRestore(){
     [0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット対応
     buildLayerModal();  // hiddenLayers復元後に呼ぶ（チェックボックス状態を正しく反映）
     scheduleDraw();scheduleOverlay();updateUndoRedo();
+    // dimensionTextMode復元
+    if(d.dimensionTextMode)dimensionTextMode=d.dimensionTextMode;
+    if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
   }catch(e){console.warn('restore:',e);}
 }

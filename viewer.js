@@ -17,7 +17,10 @@ var octx=ov.getContext('2d',{desynchronized:true});
 var doc=null;
 var currentFileName='';
 var tx=0,ty=0,scale=1;
-var bwMode=true;
+var bwMode=true;  // false=黒背景
+var dimensionTextMode='auto'; // 'auto' | 'fixed'  寸法文字サイズモード
+var DIM_TEXT_MIN_PX=11;  // autoモード: 最小スクリーンpx
+var DIM_TEXT_MAX_PX=30;  // autoモード: 最大スクリーンpx
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
 var pdfImage=null;

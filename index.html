@@ -285,10 +285,23 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section">
     <button id="exportDxfBtn" class="sp-action-btn" title="書き込みをDXF書き出し">DXF書き込み書出し</button>
   </div>
+  <div class="sp-section">
+    <div class="sp-label">寸法文字サイズ</div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="dimTextMode" id="dimTextAuto" value="auto" checked style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>自動（推奨）</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="dimTextMode" id="dimTextFixed" value="fixed" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>作成時サイズ固定</span>
+      </label>
+    </div>
+  </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_77</div>
+  <div id="ver-label">DXF_View V0_78</div>
 </div>
 
 <div id="colorOverlay">
@@ -369,7 +382,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_77';
+const APP_VERSION = 'V0_78';
 
 // =========================================================
 // グローバル状態
@@ -653,12 +666,13 @@ function drawOverlay(){
           octx.save();
           octx.translate(stx_,sty_);
           if(prevDim.tangle) octx.rotate(prevDim.tangle);
-          octx.font='bold 17px sans-serif';
+          var _pvfs=getDimFontSize(prevDim,1); // V0_78
+          octx.font='bold '+_pvfs+'px sans-serif';
           octx.textAlign='center';
           octx.textBaseline='bottom'; // V0_75: drawDimEntityと同一(bottom, -5px)
           const tw=octx.measureText(txt).width;
           octx.fillStyle='rgba(0,20,40,0.65)';
-          octx.fillRect(-tw/2-3,-22,tw+6,17);
+          octx.fillRect(-tw/2-3,-(_pvfs+5),tw+6,_pvfs);
           octx.fillStyle='rgba(0,212,255,0.85)';
           octx.fillText(txt,0,-5);
           octx.restore();
@@ -724,6 +738,19 @@ document.getElementById('bwToggleBtn').addEventListener('click',()=>{
   scheduleDraw();scheduleSave();
 });
 updateBwToggleBtn();
+// V0_78: 寸法文字サイズモード切替
+document.querySelectorAll('input[name="dimTextMode"]').forEach(function(r){
+  r.addEventListener('change',function(){
+    if(this.checked){dimensionTextMode=this.value;scheduleOverlay();scheduleSave();}
+  });
+});
+function updateDimTextModeUI(){
+  var autoR=document.getElementById('dimTextAuto');
+  var fixedR=document.getElementById('dimTextFixed');
+  if(autoR)autoR.checked=(dimensionTextMode==='auto');
+  if(fixedR)fixedR.checked=(dimensionTextMode==='fixed');
+}
+updateDimTextModeUI();
 document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 
 // PDFページ
@@ -942,6 +969,17 @@ if(vd) vd.textContent = APP_VERSION;
 // =========================================================
 // 寸法描画・スナップ・寸法構築
 // =========================================================
+// V0_78: 寸法文字サイズモード対応ヘルパー
+function getDimFontSize(d, PS) {
+  PS = PS || 1;
+  if (dimensionTextMode === 'fixed') {
+    return ((d && d.fixedTextPx) ? d.fixedTextPx : 17) * PS;
+  }
+  // auto: worldFontH * scale をDIM_TEXT_MIN/MAX_PXでクランプ
+  var worldH = (d && d.worldFontH) ? d.worldFontH : (17 / (scale || 1));
+  var px = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH * scale));
+  return px * PS;
+}
 function drawDimEntity(ctx,d){
   var PS=window._pdfScale||1;
   var col=d.color||'#f39c12';
@@ -959,7 +997,7 @@ function drawDimEntity(ctx,d){
   }
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
-    var fSize=17*PS;
+    var fSize=getDimFontSize(d,PS); // V0_78: dimensionTextModeに応じたサイズ
     var gap=5*PS; // 寸法線からの余白（V0_74: 10→5に縮小）
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
     ctx.font='bold '+fSize+'px sans-serif';
@@ -1106,7 +1144,7 @@ function buildDim(p1,p2,pArrow,type){
     else if(tRef2>len+1/scale) lines.push({x1:ep2x,y1:ep2y,x2:pRef.x,y2:pRef.y});
     arrows.push({x:ep1x,y:ep1y,angle:a1});arrows.push({x:ep2x,y:ep2y,angle:a2});
   }
-  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12'};
+  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12',worldFontH:17/(scale||1),fixedTextPx:17}; // V0_78: テキストサイズモード用
 }
 
 function formatDim(d){
@@ -1390,11 +1428,12 @@ function drawDIMPreview(ctx){
   }
   if(prevDim.text&&prevDim.tx!=null){
     var stx=w2s(prevDim.tx,prevDim.ty);
-    ctx.font='bold 17px sans-serif';
+    var _pfs=getDimFontSize(prevDim,1); // V0_78
+    ctx.font='bold '+_pfs+'px sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='bottom'; // V0_75: drawDimEntityと同一
     var tw=ctx.measureText(prevDim.text).width;
     ctx.fillStyle='rgba(0,20,40,0.65)';
-    ctx.fillRect(stx[0]-tw/2-3,stx[1]-22,tw+6,17);
+    ctx.fillRect(stx[0]-tw/2-3,stx[1]-(_pfs+5),tw+6,_pfs);
     ctx.fillStyle='rgba(0,212,255,0.85)';
     ctx.fillText(prevDim.text,stx[0],stx[1]-5);
   }
@@ -1767,7 +1806,8 @@ function drawLPPreview(ctx2,dim){
   if(dim.text){
     var st=w2s(dim.tx,dim.ty);
     ctx2.save();ctx2.translate(st[0],st[1]);ctx2.rotate(dim.tangle||0);
-    ctx2.font='bold 17px sans-serif';ctx2.fillStyle=dim.color||'#f39c12';
+    var _lpfs=getDimFontSize(dim,1); // V0_78
+    ctx2.font='bold '+_lpfs+'px sans-serif';ctx2.fillStyle=dim.color||'#f39c12';
     ctx2.textAlign='center';ctx2.textBaseline='bottom';
     ctx2.fillText(dim.text,0,-5); // V0_75: drawDimEntityと同一(-5px offset)
     ctx2.restore();
