@@ -98,13 +98,7 @@ async function tryRestore(){
       b.classList.toggle('active',b.dataset.color===currentDimColor);
     });
     if(d.scaleDenom)document.getElementById('scaleDenom').value=d.scaleDenom;
-    if(bwMode){
-      document.getElementById('bwWhite').classList.add('active');
-      document.getElementById('bwBlack').classList.remove('active');
-    } else {
-      document.getElementById('bwBlack').classList.add('active');
-      document.getElementById('bwWhite').classList.remove('active');
-    }
+    if(typeof updateBwToggleBtn==='function') updateBwToggleBtn();
     document.querySelectorAll('.tool-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.tool===currentTool);
     });

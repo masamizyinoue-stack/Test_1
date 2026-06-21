@@ -174,52 +174,6 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .dim-group{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
 .dim-group-label{font-size:9px;color:rgba(232,168,74,0.8);letter-spacing:0.5px;line-height:1;pointer-events:none;user-select:none}
 .dim-group-btns{display:flex;align-items:center;gap:1px}
-
-/* SPACE THEME */
-:root{
- --bg:#050816;--sb-bg:#0b1026;--topbar-bg:rgba(10,15,35,.88);
- --accent:#6cf0ff;--accent-2:#b388ff;
- --text:#eaf6ff;--text-dim:#9fb3d9;--border:#2d4d8f;
-}
-body{
- background:
- radial-gradient(circle at 20% 20%,rgba(108,240,255,.12),transparent 25%),
- radial-gradient(circle at 80% 10%,rgba(179,136,255,.12),transparent 25%),
- linear-gradient(180deg,#030712,#081126 55%,#040816);
-}
-body::before{
- content:"";position:fixed;inset:0;pointer-events:none;
- background-image:
- radial-gradient(2px 2px at 10% 20%,#fff,transparent),
- radial-gradient(1px 1px at 30% 70%,#fff,transparent),
- radial-gradient(2px 2px at 60% 30%,#fff,transparent),
- radial-gradient(1px 1px at 80% 80%,#fff,transparent),
- radial-gradient(2px 2px at 90% 15%,#fff,transparent);
- opacity:.7;
-}
-.topbar,.btbar{
- background:rgba(8,14,32,.78)!important;
- backdrop-filter:blur(18px);
- border-color:#3558a8!important;
- box-shadow:0 0 25px rgba(108,240,255,.15);
-}
-.logo-text{
- color:#6cf0ff!important;
- text-shadow:0 0 10px rgba(108,240,255,.8);
-}
-.tb-btn,.tb-tool-btn,.viewmemo button{
- border-color:#3558a8!important;
- background:rgba(12,18,40,.55)!important;
-}
-.tb-tool-btn.active,.bt-btn.active{
- box-shadow:0 0 18px rgba(108,240,255,.55);
-}
-.stage{
- background:
- radial-gradient(circle at center,rgba(30,50,120,.35),transparent 40%),
- #02040b!important;
-}
-
 </style>
 </head>
 <body>
@@ -232,10 +186,10 @@ body::before{
   </div>
   <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
-  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
   <button class="tool-color-dot" id="sketchColorDot" title="スケッチ色" style="display:none;background:rgb(255,0,0)"></button>
+  <button class="tool-color-dot" id="hlColorDot" title="蛍光色" style="display:none;background:rgb(255,255,0);margin-right:8px"></button>
+  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
   <button class="tb-tool-btn tool-btn" data-tool="hl" title="蛍光ペン"><span class="tb-tool-label">蛍光</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3l6 6-11 11H4v-6L15 3z" fill="rgba(255,255,0,0.25)"/><line x1="11" y1="7" x2="17" y2="13"/></svg></button>
-  <button class="tool-color-dot" id="hlColorDot" title="蛍光色" style="display:none;background:rgb(255,255,0)"></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
@@ -243,7 +197,7 @@ body::before{
   <div class="dim-group">
     <span class="dim-group-label">計測</span>
     <div class="dim-group-btns">
-      <button class="tool-color-dot" id="dimColorDot" title="寸法色" style="display:none;background:#f39c12"></button>
+      <button class="tool-color-dot" id="dimColorDot" title="寸法色" style="display:none;background:#f39c12;margin-right:8px"></button>
       <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
       <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
       <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
@@ -256,14 +210,15 @@ body::before{
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
   <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.95"/></svg></button>
 
+  <button class="tb-btn" id="bwToggleBtn" title="白/黒背景切替" style="font-size:12px;min-width:36px;padding:0 6px;">
+  <span class="tb-tool-label">画面</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor"/></svg>
+</button>
   <button class="tb-btn" id="screenshotBtn" title="スクリーンショット">
   <span class="tb-tool-label">スクショ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
 </button>
-  <button class="tb-btn" id="exportDxfBtn" title="書き込みをDXF書き出し">
-  <span class="tb-tool-label">DXF書出</span>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-</button>
+
   <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
   <span class="tb-tool-label">PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
@@ -307,13 +262,7 @@ body::before{
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
     <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF / PDF 対応</small></span>
   </button>
-  <div class="sp-section">
-    <div class="sp-label">白・黒画面</div>
-    <div class="sp-row">
-      <button class="sp-toggle-btn active" id="bwBlack">■ 黒</button>
-      <button class="sp-toggle-btn" id="bwWhite">□ 白</button>
-    </div>
-  </div>
+
   <div class="sp-section">
     <div class="sp-label">縮尺分母</div>
     <input type="number" id="scaleDenom" value="1" min="1" class="sp-input">
@@ -333,10 +282,13 @@ body::before{
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
-    <button id="clearBtn" class="sp-danger-btn">全消去</button>
+  <div class="sp-section">
+    <button id="exportDxfBtn" class="sp-action-btn" title="書き込みをDXF書き出し">DXF書き込み書出し</button>
   </div>
-  <div id="ver-label">DXF_View V0_76</div>
+  <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
+    <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
+  </div>
+  <div id="ver-label">DXF_View V0_77</div>
 </div>
 
 <div id="colorOverlay">
@@ -417,7 +369,7 @@ body::before{
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_76';
+const APP_VERSION = 'V0_77';
 
 // =========================================================
 // グローバル状態
@@ -757,18 +709,21 @@ document.getElementById('settingsBtn').addEventListener('click',()=>document.bod
 document.getElementById('settingsClose').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
-document.getElementById('bwBlack').addEventListener('click',()=>{
-  bwMode=false;
-  document.getElementById('bwBlack').classList.add('active');
-  document.getElementById('bwWhite').classList.remove('active');
+function updateBwToggleBtn(){
+  var btn=document.getElementById('bwToggleBtn');
+  if(!btn)return;
+  if(bwMode){
+    btn.style.background='#e8e8e8';btn.style.color='#222';btn.title='白背景（タップで黒へ）';
+  } else {
+    btn.style.background='#222';btn.style.color='#fff';btn.title='黒背景（タップで白へ）';
+  }
+}
+document.getElementById('bwToggleBtn').addEventListener('click',()=>{
+  bwMode=!bwMode;
+  updateBwToggleBtn();
   scheduleDraw();scheduleSave();
 });
-document.getElementById('bwWhite').addEventListener('click',()=>{
-  bwMode=true;
-  document.getElementById('bwWhite').classList.add('active');
-  document.getElementById('bwBlack').classList.remove('active');
-  scheduleDraw();scheduleSave();
-});
+updateBwToggleBtn();
 document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 
 // PDFページ
@@ -861,7 +816,33 @@ document.querySelectorAll('.mem-btn').forEach(btn=>{
 });
 // _showMemMenu → dialog.js
 document.querySelectorAll('.show-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
+  var _lpTimer=null;
+  var _lpFired=false;
+  btn.addEventListener('touchstart',function(e){
+    _lpFired=false;
+    _lpTimer=setTimeout(function(){
+      _lpFired=true;
+      // 長押し: 全記憶VIEW削除確認
+      if(confirm('全ての記憶Viewを削除してもいいですか？')){
+        savedViews=[null,null,null,null,null];
+        [0,1,2,3,4].forEach(i=>updateViewmemoState(i));
+        scheduleSave();
+        showGuide('全ての記憶Viewを削除しました',1500);
+      }
+    },500);
+  },{passive:true});
+  btn.addEventListener('touchend',function(){
+    if(_lpTimer){clearTimeout(_lpTimer);_lpTimer=null;}
+  });
+  btn.addEventListener('touchcancel',function(){
+    if(_lpTimer){clearTimeout(_lpTimer);_lpTimer=null;}
+    _lpFired=false;
+  });
+  btn.addEventListener('touchmove',function(){
+    if(_lpTimer){clearTimeout(_lpTimer);_lpTimer=null;}
+  });
+  btn.addEventListener('click',function(){
+    if(_lpFired){_lpFired=false;return;}
     const i=parseInt(btn.dataset.vs);
     if(savedViews[i]){({tx,ty,scale}=savedViews[i]);scheduleDraw();}
   });

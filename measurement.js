@@ -10,7 +10,7 @@
 function drawDimEntity(ctx,d){
   const _ps=window._pdfScale||1;  // ② PDF高解像度スケール
   ctx.strokeStyle=d.color||'#f39c12';ctx.fillStyle=d.color||'#f39c12';
-  ctx.lineWidth=(1.5/Math.max(0.0001,(window.scale||1)))*_ps;ctx.setLineDash([]);
+  ctx.lineWidth=1.5*_ps;ctx.setLineDash([]);
   for(const l of d.lines){
     const[sx1,sy1]=w2s(l.x1,l.y1);const[sx2,sy2]=w2s(l.x2,l.y2);
     ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
@@ -42,7 +42,7 @@ function drawDimEntity(ctx,d){
     const cr=3.5*_ps; // 中心小円の半径
     ctx.save();
     ctx.strokeStyle=d.color||'#00d4ff';
-    ctx.lineWidth=(1.5/Math.max(0.0001,(window.scale||1)))*_ps;
+    ctx.lineWidth=1.5*_ps;
     ctx.setLineDash([]);
     ctx.beginPath();ctx.moveTo(scx-cs,scy);ctx.lineTo(scx+cs,scy);ctx.stroke();
     ctx.beginPath();ctx.moveTo(scx,scy-cs);ctx.lineTo(scx,scy+cs);ctx.stroke();
