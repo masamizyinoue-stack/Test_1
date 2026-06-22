@@ -1,5 +1,5 @@
 // export.js — ファイル出力・エクスポート機能
-// DXF Viewer V0_91
+// DXF Viewer V0_92
 // 依存グローバル: cv, ov, doc, hiddenLayers, tx, ty, scale, bwMode, pdfImage, currentFileName (viewer.js)
 //               draw, drawAnnotation, scheduleDraw, scheduleOverlay (viewer.js)
 //               strokes, dims (var, HTML inline script)
@@ -7,11 +7,10 @@
 //               rgbToAci, dxfEncText (utils.js)
 //               showGuide, hideGuide (ui.js)
 //               drawOverlay (HTML inline script)
-// V0_91: PDF最高解像度対応
-//   - LONG_PX: 5000→8000（684DPI相当 for A4）
-//   - 出力形式: JPEG→PNG（ロスレス、細線の滲みなし）
-//   - Canvas方式: Object.defineProperty(dpr=1)+CW×CH（安全サイズ ~45MP）
-//   - try-finally: 描画エラー時も必ず状態復元
+// V0_92: PDF黒画面バグ修正
+//   - LONG_PX: 8000→6000（iPad安全canvas範囲: ~25.5MP、513DPI for A4）
+//   - 出力形式: PNG→JPEG 0.98（大容量PNG→jsPDF失敗の回避、高品質維持）
+// V0_91: PDF最高解像度対応（LONG_PX=8000、PNG、try-finally）
 // V0_90: スクショ修正（html2canvas+実canvas合成ハイブリッド、bwMode対応）
 
 // =========================================================
@@ -118,7 +117,7 @@ function exportSketchDxf(){
 }
 
 // =========================================================
-// PDF出力ボタン（最高解像度・PNG出力）
+// PDF出力ボタン（最高解像度・JPEG高品質出力）
 // =========================================================
 document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('savePDFBtn');
@@ -152,7 +151,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
 
-    const LONG_PX=8000;  // V0_91: 5000→8000（684DPI for A4）
+    const LONG_PX=6000;  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）
     const aspect=extW/extH;
     const CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);
     const CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;
@@ -212,7 +211,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     }
     if(!comp){showGuide('描画に失敗しました',2000);return;}
 
-    // ── 5. jsPDF で PDF 生成（PNG: ロスレス高品質）──────────
+    // ── 5. jsPDF で PDF 生成（JPEG 0.98: 高品質・大容量PNG回避）──────────
     if(typeof window.jspdf==='undefined'){
       const url=URL.createObjectURL(await new Promise(r=>comp.toBlob(r,'image/png')));
       const a=document.createElement('a');
@@ -224,9 +223,9 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const {jsPDF}=window.jspdf;
     const orient=pageMM_W>=pageMM_H?'l':'p';
     const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
-    // V0_91: PNG（ロスレス）に変更。細線・寸法の滲みをなくす
-    const imgData=comp.toDataURL('image/png');
-    pdf.addImage(imgData,'PNG',0,0,pageMM_W,pageMM_H);
+    // V0_92: JPEG 0.98（PNG at 45MP → jsPDF/iOS failure の回避、高品質維持）
+    const imgData=comp.toDataURL('image/jpeg',0.98);
+    pdf.addImage(imgData,'JPEG',0,0,pageMM_W,pageMM_H);
     const ts=new Date().toISOString().slice(0,10);
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_${ts}.pdf`;
     pdf.save(fname);
