@@ -314,7 +314,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_80</div>
+  <div id="ver-label">DXF_View V0_81</div>
 </div>
 
 <div id="colorOverlay">
@@ -395,7 +395,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_80';
+const APP_VERSION = 'V0_81';
 
 // =========================================================
 // グローバル状態
@@ -465,18 +465,18 @@ function drawOverlay(){
   for(const s of strokes){
     if(!s.pts || s.pts.length < 2) continue;
     octx.save();
+    // V0_81: CTMを明示リセット — drawDimEntity等の副作用を排除しlineWidthをズーム非依存に固定
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if(s.hl){
       // 蛍光ペン: 半透明（V0_70）
-      // V0_74: lineWidthはCSS pixel固定 — scale/zoom不使用。画面=s.lw px、PDF=s.lw*_pdfScale
       octx.globalAlpha = 0.45;
       octx.strokeStyle = `rgb(${s.color.r},${s.color.g},${s.color.b})`;
-      octx.lineWidth = s.lw * (window._pdfScale||1);
+      octx.lineWidth = s.lw * (window._pdfScale||1); // CSS px固定（zoom非依存）
       octx.lineCap = 'round';
     } else {
       octx.globalAlpha = 1;
       octx.strokeStyle = `rgba(${s.color.r},${s.color.g},${s.color.b},0.9)`;
-      // V0_74: lineWidthはCSS pixel固定 — scale/zoom不使用。画面=s.lw px、PDF=s.lw*_pdfScale
-      octx.lineWidth = Math.max(1, s.lw) * (window._pdfScale||1);
+      octx.lineWidth = Math.max(1, s.lw) * (window._pdfScale||1); // CSS px固定（zoom非依存）
       octx.lineCap = 'round';
     }
     octx.lineJoin = 'round';
@@ -502,17 +502,17 @@ function drawOverlay(){
   // Current sketch（midpoint quadratic bezier - V0_68）
   if(sketching && sketchPts.length >= 2){
     octx.save();
+    // V0_81: CTMを明示リセット — lineWidthをズーム非依存に固定
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if(currentTool==='hl'){
       // 蛍光ペン描画中プレビュー（V0_70）
-      // V0_74: lineWidthはCSS pixel固定（scale/zoom不使用）
       octx.globalAlpha = 0.45;
       octx.strokeStyle = `rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
-      octx.lineWidth = currentHL_LW * (window._pdfScale||1);
+      octx.lineWidth = currentHL_LW * (window._pdfScale||1); // CSS px固定（zoom非依存）
     } else {
       octx.globalAlpha = 1;
       octx.strokeStyle = `rgba(${currentColor.r},${currentColor.g},${currentColor.b},0.9)`;
-      // V0_74: lineWidthはCSS pixel固定（scale/zoom不使用）
-      octx.lineWidth = Math.max(1, currentLW) * (window._pdfScale||1);
+      octx.lineWidth = Math.max(1, currentLW) * (window._pdfScale||1); // CSS px固定（zoom非依存）
     }
     octx.lineCap = 'round';
     octx.lineJoin = 'round';
