@@ -316,7 +316,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_88</div>
+  <div id="ver-label">DXF_View V0_89</div>
 </div>
 
 <div id="colorOverlay">
@@ -397,7 +397,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_88';
+const APP_VERSION = 'V0_89';
 
 // =========================================================
 // グローバル状態
@@ -446,7 +446,7 @@ function drawAnnotation(targetCtx) {
   var dpr = window.devicePixelRatio || 1;
   // V0_85: 通常表示はPS=1固定。エクスポート時(targetCtx指定)のみ_pdfScaleを使用。
   // lineWidthからscale/zoom/pdfScaleを完全排除し画面上の線幅を常に固定する。
-  var PS = targetCtx ? (window._pdfScale || 1) : 1;
+  var PS = 1;  // V0_89: annotationはscale/lwRef比率で自然スケールするためPS不要（PDF時も過剰増幅しない）
   // V0_87: ズーム比例lineWidth。fitScale基準でscaleに追従→DXF内容と同じ比率で拡縮。
   // lwRef=0防止。fitScaleが未設定(=1)の場合も安全に動作。
   var lwRef = (typeof fitScale !== 'undefined' && fitScale > 0) ? fitScale : scale;
@@ -760,11 +760,15 @@ document.getElementById('settingsOverlay').addEventListener('click',()=>document
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
 function updateBwToggleBtn(){
   var btn=document.getElementById('bwToggleBtn');
+  var fitBtn=document.getElementById('fitBtn');
   if(!btn)return;
   if(bwMode){
     btn.style.background='#e8e8e8';btn.style.color='#222';btn.title='白背景（タップで黒へ）';
+    // V0_89: 白背景時は「全体」ボタンの枠・文字を黒に
+    if(fitBtn){fitBtn.style.borderColor='rgba(0,0,0,0.65)';fitBtn.style.color='rgba(0,0,0,0.85)';}
   } else {
     btn.style.background='#222';btn.style.color='#fff';btn.title='黒背景（タップで白へ）';
+    if(fitBtn){fitBtn.style.borderColor='';fitBtn.style.color='';}
   }
 }
 document.getElementById('bwToggleBtn').addEventListener('click',()=>{
@@ -1026,12 +1030,15 @@ function drawDimEntity(ctx,d){
   var PS=window._pdfScale||1;
   var col=d.color||'#f39c12';
   ctx.strokeStyle=col;ctx.fillStyle=col;
-  ctx.lineWidth=1.5*PS;ctx.setLineDash([]);
+  // V0_89: 作成時サイズ固定モード時は線幅・矢印・オフセットもズームに比例させる
+  var fixedRatio=1;
+  if(dimensionTextMode==='fixed'&&d&&d.worldFontH){fixedRatio=(d.worldFontH*scale)/17;}
+  ctx.lineWidth=1.5*PS*fixedRatio;ctx.setLineDash([]);
   for(const l of d.lines){
     const[sx1,sy1]=w2s(l.x1,l.y1);const[sx2,sy2]=w2s(l.x2,l.y2);
     ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
   }
-  var arrowLen=10*PS,arrowW=4*PS;
+  var arrowLen=10*PS*fixedRatio,arrowW=4*PS*fixedRatio;
   for(const a of d.arrows){
     const[sx,sy]=w2s(a.x,a.y);
     ctx.save();ctx.translate(sx,sy);ctx.rotate(a.angle);
@@ -1040,7 +1047,7 @@ function drawDimEntity(ctx,d){
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
     var fSize=getDimFontSize(d,PS); // V0_78: dimensionTextModeに応じたサイズ
-    var gap=5*PS; // 寸法線からの余白（V0_74: 10→5に縮小）
+    var gap=5*PS*fixedRatio; // 寸法線からの余白（V0_89: fixedRatio対応）
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
     ctx.font='bold '+fSize+'px sans-serif';
     ctx.textAlign='center';ctx.textBaseline='bottom';
@@ -1050,8 +1057,8 @@ function drawDimEntity(ctx,d){
   // センターマーク（直径・半径寸法）
   if(d.centerMark){
     var[cmx,cmy]=w2s(d.centerMark.cx,d.centerMark.cy);
-    var cml=8*PS;
-    ctx.strokeStyle=col;ctx.lineWidth=1*PS;
+    var cml=8*PS*fixedRatio;
+    ctx.strokeStyle=col;ctx.lineWidth=1*PS*fixedRatio;
     ctx.beginPath();ctx.moveTo(cmx-cml,cmy);ctx.lineTo(cmx+cml,cmy);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cmx,cmy-cml);ctx.lineTo(cmx,cmy+cml);ctx.stroke();
   }
@@ -2022,27 +2029,4 @@ console.log('[LP] module initialized');
 })(); // end D
 
 </script>
-<div id="guideMsg" style="
-  display:none;
-  position:fixed;
-  top:68px;
-  left:50%;
-  transform:translateX(-50%);
-  background:rgba(10,20,35,0.85);
-  color:#7dd8ff;
-  padding:7px 14px;
-  border-radius:10px;
-  font-size:13px;
-  font-weight:500;
-  pointer-events:none;
-  z-index:9100;
-  backdrop-filter:blur(6px);
-  border:1px solid rgba(100,200,255,0.25);
-  white-space:pre-wrap;
-  max-width:400px;
-  text-align:center;
-  letter-spacing:0.04em;
-"></div>
-<div id="versionDisplay" style="position:fixed;right:6px;top:4px;font-size:10px;color:rgba(150,180,210,0.6);pointer-events:none;z-index:9999;font-family:monospace;letter-spacing:0.05em;user-select:none;"></div>
-</body>
-</html>
+<div id="guideMsg" st

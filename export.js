@@ -1,5 +1,5 @@
 // export.js — ファイル出力・エクスポート機能
-// DXF Viewer V0_66
+// DXF Viewer V0_89
 // 依存グローバル: cv, ov, doc, hiddenLayers, tx, ty, scale, bwMode, pdfImage, currentFileName (viewer.js)
 //               buildPDF, draw, scheduleDraw, scheduleOverlay (viewer.js)
 //               strokes, dims (var, HTML inline script)
@@ -7,73 +7,7 @@
 //               rgbToAci, dxfEncText (utils.js)
 //               showGuide, hideGuide (ui.js)
 //               drawOverlay (HTML inline script)
-
-// =========================================================
-// 範囲指定PDF保存（A4固定、buildPDF使用）
-// =========================================================
-async function savePDF(){
-  // ② 高解像度レンダリング（PSCALE倍で再描画）
-  const PSCALE = 3;
-  const dpr = window.devicePixelRatio || 1;
-
-  // 高解像度キャンバス作成（DXF描画用・オーバーレイ用）
-  const hCv = document.createElement('canvas');
-  hCv.width = cv.width * PSCALE;
-  hCv.height = cv.height * PSCALE;
-  const hCtx = hCv.getContext('2d');
-
-  const hOv = document.createElement('canvas');
-  hOv.width = ov.width * PSCALE;
-  hOv.height = ov.height * PSCALE;
-  const hOctx = hOv.getContext('2d');
-
-  // グローバル変数を一時退避・置換
-  const [sCv,sCtx,sOv,sOctx] = [cv,ctx,ov,octx];
-  const [sTx,sTy,sScale] = [tx,ty,scale];
-
-  // V0_82: アノテーション用高解像度キャンバス（グローバル置換前に元サイズを使う）
-  const hAc = document.createElement('canvas');
-  hAc.width = sCv.width * PSCALE;
-  hAc.height = sCv.height * PSCALE;
-  const hActx = hAc.getContext('2d');
-
-  window.cv=hCv; window.ctx=hCtx;
-  window.ov=hOv; window.octx=hOctx;
-  tx=sTx*PSCALE; ty=sTy*PSCALE; scale=sScale*PSCALE;
-  window._pdfScale=PSCALE;  // lineWidth/arrow/text スケール用
-
-  try{
-    draw();         // DXF/PDF描画（viewer.js）
-    if(typeof drawAnnotation==='function') drawAnnotation(hActx); // V0_82: アノテーション
-    drawOverlay();  // 寸法・スナップ描画
-  }finally{
-    // 必ず復元
-    window.cv=sCv; window.ctx=sCtx;
-    window.ov=sOv; window.octx=sOctx;
-    tx=sTx; ty=sTy; scale=sScale;
-    window._pdfScale=undefined;
-  }
-
-  // 合成して高品質JPEG化
-  const tmp=document.createElement('canvas');
-  tmp.width=hCv.width; tmp.height=hCv.height;
-  const tctx=tmp.getContext('2d');
-  tctx.drawImage(hCv,0,0);
-  tctx.drawImage(hAc,0,0);   // V0_82: アノテーション合成
-  tctx.drawImage(hOv,0,0);
-  const jpeg=tmp.toDataURL('image/jpeg',0.97).split(',')[1];
-  const pdf=buildPDF(jpeg,tmp.width,tmp.height);
-  const fname=(currentFileName||'dxf_view').replace(/\.[^.]+$/,'')
-    +'_'+new Date().toISOString().slice(2,10).replace(/-/g,'')+'.pdf';
-  if(window.showSaveFilePicker){
-    try{
-      const fh=await showSaveFilePicker({suggestedName:fname,types:[{description:'PDF',accept:{'application/pdf':['.pdf']}}]});
-      const w=await fh.createWritable();await w.write(pdf);await w.close();return;
-    }catch(e){}
-  }
-  const blob=new Blob([pdf],{type:'application/pdf'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();
-}
+// V0_89: 旧savePDF削除（重複リスナーによるバグ修正）、PAD余白削減
 
 // =========================================================
 // DXF書き出し（元データ + 書き込みストローク）
@@ -216,7 +150,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     if(!isFinite(mnX)){showGuide('描画データがありません',2000);return;}
 
     // ── 2. キャンバスサイズ決定（約450DPI相当）───────────────
-    const PAD=0.03;
+    const PAD=0.01;  // V0_89: 余白1%に削減（従来3%）
     const eW=mxX-mnX, eH=mxY-mnY;
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
@@ -394,11 +328,7 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
 });
 
 // =========================================================
-// PDFボタン（V0_75: 範囲PDF保存を削除、PDF書出のみ維持）
-// =========================================================
-document.getElementById('savePDFBtn').addEventListener('click',savePDF);
-
-// =========================================================
 // DXF\u66f8\u304d\u51fa\u3057\u30dc\u30bf\u30f3
 // =========================================================
 document.getElementById('exportDxfBtn').addEventListener('click',exportSketchDxf);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
