@@ -314,7 +314,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_79</div>
+  <div id="ver-label">DXF_View V0_80</div>
 </div>
 
 <div id="colorOverlay">
@@ -395,7 +395,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_79';
+const APP_VERSION = 'V0_80';
 
 // =========================================================
 // グローバル状態
@@ -951,16 +951,8 @@ document.addEventListener('click',function(e){
 });
 // 初期表示（ページ読み込み時: スケッチが選択済み）
 updateToolColorDots();
-// ダブルタップ → 全体表示
-let _dtCount=0,_dtTimer=0;
-ov.addEventListener('touchend',function(e){
-  if(e.changedTouches.length===1&&e.touches.length===0){
-    if(e.changedTouches[0].touchType==='stylus')return;
-    _dtCount++;
-    if(_dtCount===1){_dtTimer=setTimeout(function(){_dtCount=0;},350);}
-    else if(_dtCount>=2){clearTimeout(_dtTimer);_dtCount=0;fit();scheduleDraw();}
-  }
-},{passive:false});
+// ダブルタップ全体表示は削除（V0_80: 誤操作防止）
+// 全体表示は「全体」ボタン(fitBtn)のみで実行
 // 2本指パンと競合するため2本指タップUndoは廃止 → ↩ボタンで操作
 // viewmemo初期状態
 [0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット対応
