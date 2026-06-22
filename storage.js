@@ -25,7 +25,7 @@ function doSave(){
   try{
     const sd=parseFloat(document.getElementById('scaleDenom').value)||1;
     localStorage.setItem(SAVE_KEY,JSON.stringify({
-      strokes,dims,savedViews,tx,ty,scale,
+      strokes,dims,savedViews,tx,ty,scale,fitScale,
       bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
       currentTool,currentColor,currentLW,currentFileName,
       currentHL_Color,currentHL_LW,currentDimColor,
@@ -68,6 +68,7 @@ async function tryRestore(){
     // V0_76: 旧バージョン(3スロット)との後方互換を保ちつつ5スロットに拡張
     {const sv=d.savedViews||[];savedViews=[sv[0]||null,sv[1]||null,sv[2]||null,sv[3]||null,sv[4]||null];}
     tx=d.tx||0;ty=d.ty||0;scale=d.scale||1;
+  if(d.fitScale) fitScale=d.fitScale; // V0_93: fitScale復元
     bwMode=!!d.bwMode;
     if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
     currentTool=d.currentTool||'sketch';

@@ -24,16 +24,20 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;font-size:14px}
 .topbar{height:62px;min-height:62px;background:var(--topbar-bg);border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:6px;padding:0 10px;position:relative;z-index:10;flex-shrink:0}
-.logo-block{display:flex;align-items:baseline;gap:4px;flex-shrink:0;padding:0 4px}
+.logo-block{display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex-shrink:0;padding:0 4px;max-width:150px;min-width:0}
 .logo-text{font-size:17px;font-weight:700;color:var(--accent);line-height:1.2;white-space:nowrap}
 .logo-sub{font-size:10px;color:var(--text-dim);white-space:nowrap}
+.logo-top{display:flex;align-items:baseline;gap:4px}
+.logo-file-area{display:flex;align-items:center;gap:2px;min-width:0;width:100%}
+.logo-file-name{font-size:10px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;cursor:default;line-height:1.2;user-select:none}
+.logo-file-nav{display:none;background:transparent;border:none;color:#8ab4d0;font-size:9px;padding:0 2px;cursor:pointer;line-height:1;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .tb-btn{width:44px;height:52px;border-radius:10px;flex-shrink:0;border:1px solid var(--border);
   background:transparent;color:var(--text);font-size:20px;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:1px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tb-btn:active{background:rgba(255,255,255,.1)}
 #settingsBtn{border-color:var(--accent);color:var(--accent);font-size:22px}
 .tb-sep{width:1px;height:26px;background:var(--border);margin:0 3px;flex-shrink:0}
-.tb-tool-btn{width:44px;height:52px;border-radius:9px;flex-shrink:0;border:1.5px solid transparent;background:transparent;color:var(--text);font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tb-tool-btn{width:44px;height:52px;border-radius:9px;flex-shrink:0;border:1.5px solid rgba(70,90,120,0.5);background:transparent;color:var(--text);font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tb-tool-label{font-size:9px;line-height:1;opacity:0.75;letter-spacing:0.02em;pointer-events:none}
 .tb-tool-btn:active{background:rgba(255,255,255,.1)}
 .tb-tool-btn.active{background:rgba(0,212,255,0.22);border-color:#00d4ff;color:#00d4ff}
@@ -128,7 +132,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .co-hl-colors{display:flex;gap:8px}
 .hl-color-btn{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .hl-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
-.co-hl-lw{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.co-hl-lw{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
 .hl-lw-btn{height:38px;border-radius:8px;font-size:14px;font-weight:600;
   border:1.5px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
   -webkit-tap-highlight-color:transparent;min-width:0}
@@ -142,7 +146,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .color-btn{width:38px;height:38px;border-radius:50%;border:3px solid transparent;cursor:pointer;
   -webkit-tap-highlight-color:transparent}
 .color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
-.co-lw{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.co-lw{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
 .lw-btn{height:40px;border-radius:8px;font-size:14px;font-weight:600;
   border:1.5px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
   -webkit-tap-highlight-color:transparent;min-width:0}
@@ -182,10 +186,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div class="topbar">
   <button class="tb-btn" id="settingsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
   <div class="logo-block">
-    <span class="logo-text">DXF</span>
-    <span class="logo-sub">Viewer</span>
+    <div class="logo-top">
+      <span class="logo-text">DXF</span>
+      <span class="logo-sub">Viewer</span>
+    </div>
+    <div class="logo-file-area">
+      <button id="prevFileBtn" class="logo-file-nav">◀</button>
+      <div id="fileNameDisplay" class="logo-file-name" title="">---</div>
+      <button id="nextFileBtn" class="logo-file-nav">▶</button>
+    </div>
   </div>
-  <div id="fileNameDisplay" title="" style="flex:1;min-width:0;max-width:180px;font-size:12px;color:#8ab4d0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 6px;cursor:default;line-height:1.2;user-select:none;">---</div>
   <div class="tb-sep"></div>
   <button class="tool-color-dot" id="sketchColorDot" title="スケッチ色" style="display:none;background:rgb(255,0,0)"></button>
   <button class="tool-color-dot" id="hlColorDot" title="蛍光色" style="display:none;background:rgb(255,255,0);margin-right:8px"></button>
@@ -204,7 +214,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
       <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
       <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
-      <button class="tb-btn" id="clearDimsBtn" title="寸法を全消去" style="font-size:13px;color:#e8a84a;"><span class="tb-tool-label" style="color:#e8a84a">全消去</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="20" height="7" rx="1"/><line x1="6" y1="14" x2="6" y2="18"/><line x1="10" y1="14" x2="10" y2="17"/><line x1="14" y1="14" x2="14" y2="17"/><line x1="18" y1="14" x2="18" y2="18"/><polyline points="9 3 9 8"/><polyline points="15 3 15 8"/><line x1="7" y1="3" x2="17" y2="3"/><line x1="9" y1="8" x2="15" y2="8"/></svg></button>
+
     </div>
   </div>
   <div class="tb-sep"></div>
@@ -258,6 +268,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_93</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -307,16 +318,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="layerBtn" class="sp-action-btn">レイヤ設定</button>
   </div>
   <div class="sp-section">
-    <div class="sp-label">DXF情報</div>
-    <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
-  </div>
-  <div class="sp-section">
     <button id="exportDxfBtn" class="sp-action-btn" title="書き込みをDXF書き出し">DXF書き込み書出し</button>
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_92</div>
+  <div class="sp-section">
+    <div class="sp-label">DXF情報</div>
+    <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
+  </div>
+  <div id="ver-label">DXF_View V0_93</div>
 </div>
 
 <div id="colorOverlay">
@@ -333,13 +344,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="co-sketch-section">
     <div class="co-label">ペン線幅</div>
     <div class="co-lw">
+      <button class="lw-btn" data-lw="0.4">0.4</button>
+      <button class="lw-btn" data-lw="0.6">0.6</button>
+      <button class="lw-btn" data-lw="0.8">0.8</button>
       <button class="lw-btn active" data-lw="1">1</button>
       <button class="lw-btn" data-lw="2">2</button>
       <button class="lw-btn" data-lw="3">3</button>
       <button class="lw-btn" data-lw="4">4</button>
       <button class="lw-btn" data-lw="5">5</button>
-      <button class="lw-btn" data-lw="6">6</button>
-      <button class="lw-btn" data-lw="8">8</button>
+      <button class="lw-btn" data-lw="7">7</button>
       <button class="lw-btn" data-lw="10">10</button>
     </div>
   </div>
@@ -355,14 +368,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="co-hl-section">
     <div class="co-label">蛍光線幅</div>
     <div class="co-hl-lw">
+      <button class="hl-lw-btn" data-lw="1">1</button>
+      <button class="hl-lw-btn" data-lw="2">2</button>
+      <button class="hl-lw-btn" data-lw="3">3</button>
+      <button class="hl-lw-btn" data-lw="4">4</button>
       <button class="hl-lw-btn" data-lw="5">5</button>
+      <button class="hl-lw-btn" data-lw="6">6</button>
+      <button class="hl-lw-btn" data-lw="7">7</button>
       <button class="hl-lw-btn" data-lw="8">8</button>
+      <button class="hl-lw-btn" data-lw="9">9</button>
       <button class="hl-lw-btn active" data-lw="10">10</button>
-      <button class="hl-lw-btn" data-lw="15">15</button>
-      <button class="hl-lw-btn" data-lw="20">20</button>
-      <button class="hl-lw-btn" data-lw="30">30</button>
-      <button class="hl-lw-btn" data-lw="40">40</button>
-      <button class="hl-lw-btn" data-lw="50">50</button>
     </div>
   </div>
   <div class="co-dim-section">
@@ -397,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_92';
+const APP_VERSION = 'V0_93';
 
 // =========================================================
 // グローバル状態
@@ -750,8 +765,68 @@ fileInput.addEventListener('change',async e=>{
       document.body.classList.remove('settings-open');
     }catch(err){alert('ファイルを開けません: '+err.message);}
   }
+  // V0_93: openFilesに登録
+  if(currentFileIdx<0){openFiles.push({name:f.name});currentFileIdx=0;}else{var _xi=openFiles.findIndex(function(x){return x.name===f.name;});if(_xi>=0){currentFileIdx=_xi;}else{openFiles.push({name:f.name});currentFileIdx=openFiles.length-1;}}saveCurrentFileState();updateFileNavUI();
   e.target.value='';
 });
+
+// V0_93: マルチファイル管理 ─────────────────────────────────────
+var openFiles=[];   // [{name,doc,pdfDoc,pdfImage,pdfPageNum,strokes,dims,images,savedViews,hiddenLayersArr,currentFileName}]
+var currentFileIdx=-1;
+
+function saveCurrentFileState(){
+  if(currentFileIdx<0||currentFileIdx>=openFiles.length) return;
+  var pn=1; try{ if(typeof pdfPageNum!=='undefined') pn=pdfPageNum; }catch(e){}
+  openFiles[currentFileIdx]=Object.assign(openFiles[currentFileIdx],{
+    doc:doc, pdfDoc:pdfDoc, pdfImage:pdfImage, pdfPageNum:pn,
+    strokes: strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});}),
+    dims: dims.slice(),
+    images: (typeof images!=='undefined'?images.slice():[]),
+    savedViews: savedViews.slice(),
+    hiddenLayersArr: Array.from(hiddenLayers),
+    currentFileName: currentFileName
+  });
+}
+
+function switchToFile(idx){
+  if(idx<0||idx>=openFiles.length) return;
+  saveCurrentFileState();
+  currentFileIdx=idx;
+  var f=openFiles[idx];
+  doc=f.doc; pdfDoc=f.pdfDoc; pdfImage=f.pdfImage;
+  try{ if(typeof pdfPageNum!=='undefined') pdfPageNum=f.pdfPageNum||1; }catch(e){}
+  strokes=f.strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});});
+  dims=f.dims.slice();
+  if(typeof images!=='undefined') images=f.images.slice();
+  savedViews=f.savedViews.slice();
+  hiddenLayers=new Set(f.hiddenLayersArr);
+  currentFileName=f.currentFileName;
+  if(typeof history!=='undefined'){history=[];redoStack=[];}
+  updateUndoRedo();
+  if(typeof buildLayerModal==='function') buildLayerModal();
+  if(typeof buildSnapCache==='function') buildSnapCache();
+  if(typeof checkPerfMode==='function') checkPerfMode();
+  fit(); scheduleDraw(); scheduleOverlay();
+  updateFileNameDisplay(); scheduleSave();
+  var ppc=document.getElementById('pdfPageCtrl');
+  if(ppc) ppc.style.display=pdfDoc?'':'none';
+  if(pdfDoc){var pi=document.getElementById('pageInfo');if(pi)pi.textContent=(f.pdfPageNum||1)+'/'+pdfDoc.numPages;}
+  var nd=document.getElementById('noDrawingMsg');
+  if(nd) nd.style.display=(doc||pdfImage)?'none':'';
+  [0,1,2,3,4].forEach(function(i){if(typeof updateViewmemoState==='function')updateViewmemoState(i);});
+}
+
+function updateFileNavUI(){
+  var prev=document.getElementById('prevFileBtn');
+  var next=document.getElementById('nextFileBtn');
+  var n=openFiles.length;
+  if(prev) prev.style.display=n>1?'inline':'none';
+  if(next) next.style.display=n>1?'inline':'none';
+}
+
+document.getElementById('prevFileBtn').addEventListener('click',function(){if(currentFileIdx>0) switchToFile(currentFileIdx-1);});
+document.getElementById('nextFileBtn').addEventListener('click',function(){if(currentFileIdx<openFiles.length-1) switchToFile(currentFileIdx+1);});
+
 
 // サイドバー
 document.getElementById('settingsBtn').addEventListener('click',()=>document.body.classList.add('settings-open'));
@@ -849,13 +924,7 @@ function updateUndoRedo(){
 }
 document.getElementById('undoBtn').addEventListener('click',undo);
 document.getElementById('redoBtn').addEventListener('click',redo);
-document.getElementById('clearDimsBtn').addEventListener('click',()=>{
-  if(!dims.length)return;
-  if(confirm('すべての寸法を削除しますか？')){
-    snapshot();dims=[];scheduleOverlay();scheduleSave();
-    showGuide('寸法をすべて消去しました ↩ で取消', 2000);
-  }
-});
+
 document.getElementById('clearBtn').addEventListener('click',()=>{
   if(confirm('全てのスケッチと寸法を消去しますか？')){snapshot();dims=[];strokes=[];scheduleOverlay();scheduleSave();}
 });
@@ -1513,7 +1582,7 @@ function buildCircDimPhi(ent,p3){
     lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
     arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
     text:'φ'+formatDim(r*2/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:currentDimColor||'#f39c12',
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',worldFontH:17/(scale||1),color:currentDimColor||'#f39c12',
     centerMark:{cx:cx,cy:cy}
   };
 }
@@ -1592,7 +1661,7 @@ function buildRadDim(ent,p3){
     lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
     arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
     text:'R'+formatDim(r/sd),
-    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:currentDimColor||'#f39c12',
+    tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',worldFontH:17/(scale||1),color:currentDimColor||'#f39c12',
     centerMark:{cx:cx,cy:cy}
   };
 }
@@ -1833,7 +1902,7 @@ function buildLinePtDim(line,pt,pArrow){
   }
   return {lines,arrows,
     text:formatDim(dist/sd),
-    tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12'};
+    tx:tx2,ty:ty2,tangle,worldFontH:17/(scale||1),color:currentDimColor||'#f39c12'};
 }
 
 // ─ プレビュー描画(点線) ───────────────────────────────

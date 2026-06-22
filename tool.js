@@ -256,7 +256,7 @@ ov.addEventListener('touchstart',e=>{
     isPen=false;mouseDown=true;lastMX=sx;lastMY=sy;
     // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
     if(inputMode==='freehand'
-        &&(currentTool==='sketch'||currentTool==='hl')
+        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')
         &&!(window.DIM&&window.DIM.active)
         &&!(window.LP&&window.LP.active)){
       panning=false;
@@ -300,7 +300,7 @@ ov.addEventListener('touchmove',e=>{
     }
     tx=mid.x-wx*scale;ty=mid.y+wy*scale;
     pinchDist=dist;pinchMid=mid;scheduleDraw();
-  } else if(fingers.length===1&&mouseDown&&!panning&&sketching){
+  } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
     // V0_79: 手書きモード 指1本描画中
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
@@ -351,7 +351,7 @@ ov.addEventListener('touchend',e=>{
   // 全タッチ終了
   if(remaining.length===0){
     // V0_79: 手書きモードで指描画中だった場合はストロークを確定
-    if(!isPen&&sketching){
+    if(!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
       handlePointerUp(lastMX,lastMY,false);
     }
     if(!isPen){panning=false;mouseDown=false;}
@@ -469,6 +469,6 @@ document.querySelectorAll('.dim-color-btn').forEach(btn=>{
     btn.classList.add('active');
     currentDimColor=btn.dataset.color;
     document.getElementById('colorOverlay').classList.remove('open');
-    if(typeof updateToolColorDots==='function')updateToolColorDots();
+        if(typeof updateToolColorDots==='function')updateToolColorDots();
   });
 });
