@@ -19,6 +19,8 @@ var actx=ac.getContext('2d'); // V0_82: Annotation Canvas context (CTM=identity)
 var doc=null;
 var currentFileName='';
 var tx=0,ty=0,scale=1;
+var fitScale=1;       // V0_83: 全体表示時のscaleを記録（DXF線幅固定モード用）
+var dxfLWMode='zoom'; // V0_83: 'zoom'=ズーム連動（現状） | 'fixed'=固定表示
 var bwMode=true;  // false=黒背景
 var dimensionTextMode='auto'; // 'auto' | 'fixed'  寸法文字サイズモード
 var DIM_TEXT_MIN_PX=11;  // autoモード: 最小スクリーンpx
@@ -544,6 +546,7 @@ function fit(){
   const margin=0.05; // 5%余白
   const s=Math.min(W*(1-2*margin)/dw,H*(1-2*margin)/dh);
   scale=s;
+  fitScale=s; // V0_83: 全体表示時のscaleを保存
   tx=W/2-((bb.minx+bb.maxx)/2)*s;
   ty=H/2+((bb.miny+bb.maxy)/2)*s;
 }
@@ -596,7 +599,7 @@ function draw(){
     if(Math.max(sx1,sx2)<-mg||Math.min(sx1,sx2)>W+mg||Math.max(sy1,sy2)<-mg||Math.min(sy1,sy2)>H+mg) continue;
     ctx.beginPath();
     ctx.strokeStyle=bwMode?'#000000':rgbCss(e.color,darkBg);
-    ctx.lineWidth=Math.max(0.8,e.lw*scale*1.4);
+    ctx.lineWidth=Math.max(0.8,e.lw*(dxfLWMode==='fixed'?fitScale:scale)*1.4); // V0_83: モード切替
     ctx.setLineDash(e.dash&&e.dash.length>0?e.dash.map(d=>d*scale):[]);
     ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
   }
@@ -607,7 +610,7 @@ function draw(){
     if(scx+sr2<-mg||scx-sr2>W+mg||scy+sr2<-mg||scy-sr2>H+mg) continue;
     ctx.beginPath();
     ctx.strokeStyle=bwMode?'#000000':rgbCss(e.color,darkBg);
-    ctx.lineWidth=Math.max(0.8,e.lw*scale*1.4);
+    ctx.lineWidth=Math.max(0.8,e.lw*(dxfLWMode==='fixed'?fitScale:scale)*1.4); // V0_83: モード切替
     ctx.setLineDash(e.dash&&e.dash.length>0?e.dash.map(d=>d*scale):[]);
     drawArc(ctx,e);ctx.stroke();
   }
