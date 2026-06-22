@@ -216,7 +216,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     if(!isFinite(mnX)){showGuide('描画データがありません',2000);return;}
 
     // ── 2. キャンバスサイズ決定（約450DPI相当）───────────────
-    const PAD=0.03;
+    const PAD=0.015;  // V0_89: ⑤ 余白2.5%（従来3%）
     const eW=mxX-mnX, eH=mxY-mnY;
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
@@ -395,8 +395,8 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
 
 // =========================================================
 // PDFボタン（V0_75: 範囲PDF保存を削除、PDF書出のみ維持）
+// V0_89: ③ 重複addEventListenerを削除（上部のasync listenerを使用）
 // =========================================================
-document.getElementById('savePDFBtn').addEventListener('click',savePDF);
 
 // =========================================================
 // DXF\u66f8\u304d\u51fa\u3057\u30dc\u30bf\u30f3
