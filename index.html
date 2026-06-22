@@ -41,6 +41,7 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 .color-dot{width:22px;height:22px;border-radius:50%;display:block;border:2.5px solid rgba(255,255,255,.45)}
 .stage{flex:1;position:relative;overflow:hidden;background:#000;min-height:0}
 #cv,#ov{position:absolute;top:0;left:0;width:100%;height:100%}
+#ac{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none} /* V0_82: Annotation専用Canvas */
 #ov{pointer-events:all;cursor:crosshair;touch-action:none}
 #noDrawingMsg{position:absolute;inset:0;display:flex;flex-direction:column;
   align-items:center;justify-content:center;pointer-events:none;gap:14px}
@@ -227,6 +228,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <div class="stage" id="stage">
   <canvas id="cv"></canvas>
+  <canvas id="ac"></canvas>
   <canvas id="ov"></canvas>
   <div id="noDrawingMsg">
     <svg width="72" height="68" viewBox="0 0 72 68" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -314,7 +316,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_81</div>
+  <div id="ver-label">DXF_View V0_82</div>
 </div>
 
 <div id="colorOverlay">
@@ -395,7 +397,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_81';
+const APP_VERSION = 'V0_82';
 
 // =========================================================
 // グローバル状態
@@ -435,6 +437,93 @@ var pinchDist=null,pinchMid=null;
 
 
 // =========================================================
+// アノテーション描画 V0_82: #ac専用Canvas（CTM=identity）
+// ワールド座標 → 物理ピクセル直接変換でzoom非依存
+// =========================================================
+function drawAnnotation(targetCtx) {
+  var atc = targetCtx || actx;
+  if (!atc) return;
+  var dpr = window.devicePixelRatio || 1;
+  var PS = window._pdfScale || 1;
+  atc.clearRect(0, 0, atc.canvas.width, atc.canvas.height);
+  // ワールド座標 → 物理ピクセル変換（CTM不使用）
+  // scale/txはexport時に既に調整済み。PSはlineWidthのみに使用
+  function physX(wx){ return (wx * scale + tx) * dpr; }
+  function physY(wy){ return (-wy * scale + ty) * dpr; }
+
+  // 保存済みストローク（Catmull-Rom風 midpoint quadratic bezier）
+  for(var si=0; si<strokes.length; si++){
+    var s = strokes[si];
+    if(!s.pts || s.pts.length < 2) continue;
+    atc.save();
+    if(s.hl){
+      atc.globalAlpha = 0.45;
+      atc.strokeStyle = 'rgb('+s.color.r+','+s.color.g+','+s.color.b+')';
+      atc.lineWidth = s.lw * dpr * PS;
+      atc.lineCap = 'round';
+    } else {
+      atc.globalAlpha = 1;
+      atc.strokeStyle = 'rgba('+s.color.r+','+s.color.g+','+s.color.b+',0.9)';
+      atc.lineWidth = Math.max(1, s.lw) * dpr * PS;
+      atc.lineCap = 'round';
+    }
+    atc.lineJoin = 'round';
+    atc.beginPath();
+    var spts = s.pts, n = spts.length;
+    var px0 = physX(spts[0].x), py0 = physY(spts[0].y);
+    if(n === 2){
+      atc.moveTo(px0, py0);
+      atc.lineTo(physX(spts[1].x), physY(spts[1].y));
+    } else {
+      var px1 = physX(spts[1].x), py1 = physY(spts[1].y);
+      atc.moveTo((px0+px1)/2, (py0+py1)/2);
+      for(var i=1; i<n-1; i++){
+        var cx = physX(spts[i].x),   cy = physY(spts[i].y);
+        var nx = physX(spts[i+1].x), ny = physY(spts[i+1].y);
+        atc.quadraticCurveTo(cx, cy, (cx+nx)/2, (cy+ny)/2);
+      }
+      atc.lineTo(physX(spts[n-1].x), physY(spts[n-1].y));
+    }
+    atc.stroke();
+    atc.restore();
+  }
+
+  // 描画中スケッチプレビュー
+  if(sketching && sketchPts.length >= 2){
+    atc.save();
+    if(currentTool === 'hl'){
+      atc.globalAlpha = 0.45;
+      atc.strokeStyle = 'rgb('+currentHL_Color.r+','+currentHL_Color.g+','+currentHL_Color.b+')';
+      atc.lineWidth = currentHL_LW * dpr * PS;
+    } else {
+      atc.globalAlpha = 1;
+      atc.strokeStyle = 'rgba('+currentColor.r+','+currentColor.g+','+currentColor.b+',0.9)';
+      atc.lineWidth = Math.max(1, currentLW) * dpr * PS;
+    }
+    atc.lineCap = 'round';
+    atc.lineJoin = 'round';
+    atc.beginPath();
+    var sp = sketchPts, sn = sp.length;
+    var spx0 = physX(sp[0].x), spy0 = physY(sp[0].y);
+    if(sn === 2){
+      atc.moveTo(spx0, spy0);
+      atc.lineTo(physX(sp[1].x), physY(sp[1].y));
+    } else {
+      var spx1 = physX(sp[1].x), spy1 = physY(sp[1].y);
+      atc.moveTo((spx0+spx1)/2, (spy0+spy1)/2);
+      for(var j=1; j<sn-1; j++){
+        var scx = physX(sp[j].x),   scy = physY(sp[j].y);
+        var snx = physX(sp[j+1].x), sny = physY(sp[j+1].y);
+        atc.quadraticCurveTo(scx, scy, (scx+snx)/2, (scy+sny)/2);
+      }
+      atc.lineTo(physX(sp[sn-1].x), physY(sp[sn-1].y));
+    }
+    atc.stroke();
+    atc.restore();
+  }
+}
+
+// =========================================================
 // オーバーレイ描画
 // =========================================================
 function drawOverlay(){
@@ -461,79 +550,7 @@ function drawOverlay(){
   }
   // Dims
   for(const d of dims) drawDimEntity(octx,d);
-  // Strokes（Catmull-Rom風 midpoint quadratic bezier - V0_68）
-  for(const s of strokes){
-    if(!s.pts || s.pts.length < 2) continue;
-    octx.save();
-    // V0_81: CTMを明示リセット — drawDimEntity等の副作用を排除しlineWidthをズーム非依存に固定
-    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if(s.hl){
-      // 蛍光ペン: 半透明（V0_70）
-      octx.globalAlpha = 0.45;
-      octx.strokeStyle = `rgb(${s.color.r},${s.color.g},${s.color.b})`;
-      octx.lineWidth = s.lw * (window._pdfScale||1); // CSS px固定（zoom非依存）
-      octx.lineCap = 'round';
-    } else {
-      octx.globalAlpha = 1;
-      octx.strokeStyle = `rgba(${s.color.r},${s.color.g},${s.color.b},0.9)`;
-      octx.lineWidth = Math.max(1, s.lw) * (window._pdfScale||1); // CSS px固定（zoom非依存）
-      octx.lineCap = 'round';
-    }
-    octx.lineJoin = 'round';
-    octx.beginPath();
-    const spts=s.pts;const n=spts.length;
-    const [sx0,sy0]=w2s(spts[0].x,spts[0].y);
-    if(n===2){octx.moveTo(sx0,sy0);const[sx1,sy1]=w2s(spts[1].x,spts[1].y);octx.lineTo(sx1,sy1);}
-    else{
-      // midpoint curve: control points at actual points, pass-through at midpoints
-      const[sx1,sy1]=w2s(spts[1].x,spts[1].y);
-      octx.moveTo((sx0+sx1)/2,(sy0+sy1)/2);
-      for(let i=1;i<n-1;i++){
-        const[cx,cy]=w2s(spts[i].x,spts[i].y);
-        const[nx,ny]=w2s(spts[i+1].x,spts[i+1].y);
-        octx.quadraticCurveTo(cx,cy,(cx+nx)/2,(cy+ny)/2);
-      }
-      const[slx,sly]=w2s(spts[n-1].x,spts[n-1].y);
-      octx.lineTo(slx,sly);
-    }
-    octx.stroke();
-    octx.restore();
-  }
-  // Current sketch（midpoint quadratic bezier - V0_68）
-  if(sketching && sketchPts.length >= 2){
-    octx.save();
-    // V0_81: CTMを明示リセット — lineWidthをズーム非依存に固定
-    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if(currentTool==='hl'){
-      // 蛍光ペン描画中プレビュー（V0_70）
-      octx.globalAlpha = 0.45;
-      octx.strokeStyle = `rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
-      octx.lineWidth = currentHL_LW * (window._pdfScale||1); // CSS px固定（zoom非依存）
-    } else {
-      octx.globalAlpha = 1;
-      octx.strokeStyle = `rgba(${currentColor.r},${currentColor.g},${currentColor.b},0.9)`;
-      octx.lineWidth = Math.max(1, currentLW) * (window._pdfScale||1); // CSS px固定（zoom非依存）
-    }
-    octx.lineCap = 'round';
-    octx.lineJoin = 'round';
-    octx.beginPath();
-    const sp=sketchPts;const sn=sp.length;
-    const [sx0_,sy0_]=w2s(sp[0].x,sp[0].y);
-    if(sn===2){octx.moveTo(sx0_,sy0_);const[sx1_,sy1_]=w2s(sp[1].x,sp[1].y);octx.lineTo(sx1_,sy1_);}
-    else{
-      const[sx1_,sy1_]=w2s(sp[1].x,sp[1].y);
-      octx.moveTo((sx0_+sx1_)/2,(sy0_+sy1_)/2);
-      for(let i=1;i<sn-1;i++){
-        const[cx_,cy_]=w2s(sp[i].x,sp[i].y);
-        const[nx_,ny_]=w2s(sp[i+1].x,sp[i+1].y);
-        octx.quadraticCurveTo(cx_,cy_,(cx_+nx_)/2,(cy_+ny_)/2);
-      }
-      const[slx_,sly_]=w2s(sp[sn-1].x,sp[sn-1].y);
-      octx.lineTo(slx_,sly_);
-    }
-    octx.stroke();
-    octx.restore();
-  }
+  // V0_82: Strokes/Sketch → drawAnnotation() (#ac専用Canvas) に移動
   // Dim guide
   if((currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag')&&dimState.pts.length>0){
     octx.strokeStyle='#2ecc71';octx.lineWidth=1;octx.setLineDash([4,4]);

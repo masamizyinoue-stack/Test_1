@@ -31,6 +31,12 @@ async function savePDF(){
   const [sCv,sCtx,sOv,sOctx] = [cv,ctx,ov,octx];
   const [sTx,sTy,sScale] = [tx,ty,scale];
 
+  // V0_82: アノテーション用高解像度キャンバス（グローバル置換前に元サイズを使う）
+  const hAc = document.createElement('canvas');
+  hAc.width = sCv.width * PSCALE;
+  hAc.height = sCv.height * PSCALE;
+  const hActx = hAc.getContext('2d');
+
   window.cv=hCv; window.ctx=hCtx;
   window.ov=hOv; window.octx=hOctx;
   tx=sTx*PSCALE; ty=sTy*PSCALE; scale=sScale*PSCALE;
@@ -38,7 +44,8 @@ async function savePDF(){
 
   try{
     draw();         // DXF/PDF描画（viewer.js）
-    drawOverlay();  // strokes・寸法・スナップ描画
+    if(typeof drawAnnotation==='function') drawAnnotation(hActx); // V0_82: アノテーション
+    drawOverlay();  // 寸法・スナップ描画
   }finally{
     // 必ず復元
     window.cv=sCv; window.ctx=sCtx;
@@ -52,6 +59,7 @@ async function savePDF(){
   tmp.width=hCv.width; tmp.height=hCv.height;
   const tctx=tmp.getContext('2d');
   tctx.drawImage(hCv,0,0);
+  tctx.drawImage(hAc,0,0);   // V0_82: アノテーション合成
   tctx.drawImage(hOv,0,0);
   const jpeg=tmp.toDataURL('image/jpeg',0.97).split(',')[1];
   const pdf=buildPDF(jpeg,tmp.width,tmp.height);
@@ -247,8 +255,14 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     // sv_ow(物理px) / dprSave = 画面CSSキャンバス幅。CW/その値=PDF拡大率
     window._pdfScale = CW * dprSave / sv_ow;
 
-    // ── 4. 描画実行 ────────────────────────────────────
+    // ── 4. アノテーション用キャンバス（#ac相当）
+    const acEl = document.createElement('canvas');
+    acEl.width = CW; acEl.height = CH;
+    const acCtx = acEl.getContext('2d');
+
+    // ── 4b. 描画実行 ───────────────────────────────────
     if(typeof draw==='function') draw();
+    if(typeof drawAnnotation==='function') drawAnnotation(acCtx); // V0_82: アノテーション
     if(typeof drawOverlay==='function') drawOverlay();
 
     // ── 5. 合成 ────────────────────────────────────────
@@ -258,6 +272,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     cctx.fillStyle=bwMode?'#fff':'#1e2430';
     cctx.fillRect(0,0,CW,CH);
     cctx.drawImage(cvEl,0,0);
+    cctx.drawImage(acEl,0,0);  // V0_82: アノテーション合成
     cctx.drawImage(ovEl,0,0);
 
     // ── 6. グローバル状態を復元 ────────────────────────
@@ -322,8 +337,9 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
       });
       imageBlob = await new Promise(res => captureCanvas.toBlob(res, 'image/png'));
     } else {
-      // フォールバック: cv + ov の合成（ヘッダーなし）
+      // フォールバック: cv + ac + ov の合成（ヘッダーなし）V0_82
       const cv = document.getElementById('cv');
+      const acSs = document.getElementById('ac'); // V0_82
       const ov = document.getElementById('ov');
       const W = cv.width, H = cv.height;
       const comp = document.createElement('canvas');
@@ -333,6 +349,7 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
       ctx2.fillStyle = '#0b0f16';
       ctx2.fillRect(0, 0, W, H);
       ctx2.drawImage(cv, 0, 0);
+      if(acSs) ctx2.drawImage(acSs, 0, 0); // V0_82: アノテーション
       ctx2.drawImage(ov, 0, 0);
       imageBlob = await new Promise(res => comp.toBlob(res, 'image/png'));
     }
