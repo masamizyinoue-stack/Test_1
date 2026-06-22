@@ -1,4 +1,4 @@
-// export.js — ファイル出力・エクスポート機能
+f// export.js — ファイル出力・エクスポート機能
 // DXF Viewer V0_66
 // 依存グローバル: cv, ov, doc, hiddenLayers, tx, ty, scale, bwMode, pdfImage, currentFileName (viewer.js)
 //               buildPDF, draw, scheduleDraw, scheduleOverlay (viewer.js)
@@ -13,7 +13,7 @@
 // =========================================================
 async function savePDF(){
   // ② 高解像度レンダリング（PSCALE倍で再描画）
-  const PSCALE = 3;
+  const PSCALE = 5;
   const dpr = window.devicePixelRatio || 1;
 
   // 高解像度キャンバス作成（DXF描画用・オーバーレイ用）
