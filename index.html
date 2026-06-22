@@ -972,11 +972,14 @@ if(vd) vd.textContent = APP_VERSION;
 // V0_78: 寸法文字サイズモード対応ヘルパー
 function getDimFontSize(d, PS) {
   PS = PS || 1;
-  if (dimensionTextMode === 'fixed') {
-    return ((d && d.fixedTextPx) ? d.fixedTextPx : 17) * PS;
-  }
-  // auto: worldFontH * scale をDIM_TEXT_MIN/MAX_PXでクランプ
+  // 作成時のワールドフォント高（保存済みorフォールバック）
   var worldH = (d && d.worldFontH) ? d.worldFontH : (17 / (scale || 1));
+  if (dimensionTextMode === 'fixed') {
+    // 作成時サイズ固定: ワールド座標基準でズームに比例して拡縮
+    // → 図面上に描かれた文字のように、ズームアウトで小さく・ズームインで大きく
+    return Math.max(4, worldH * scale) * PS;
+  }
+  // auto（推奨）: DIM_TEXT_MIN/MAX_PXでクランプ → 常に読みやすいサイズを維持
   var px = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH * scale));
   return px * PS;
 }
