@@ -331,7 +331,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_86</div>
+  <div id="ver-label">DXF_View V0_87</div>
 </div>
 
 <div id="colorOverlay">
@@ -412,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_86';
+const APP_VERSION = 'V0_87';
 
 // =========================================================
 // グローバル状態
@@ -462,8 +462,11 @@ function drawAnnotation(targetCtx) {
   // V0_85: 通常表示はPS=1固定。エクスポート時(targetCtx指定)のみ_pdfScaleを使用。
   // lineWidthからscale/zoom/pdfScaleを完全排除し画面上の線幅を常に固定する。
   var PS = targetCtx ? (window._pdfScale || 1) : 1;
+  // V0_87: ズーム比例lineWidth。fitScale基準でscaleに追従→DXF内容と同じ比率で拡縮。
+  // lwRef=0防止。fitScaleが未設定(=1)の場合も安全に動作。
+  var lwRef = (typeof fitScale !== 'undefined' && fitScale > 0) ? fitScale : scale;
   atc.clearRect(0, 0, atc.canvas.width, atc.canvas.height);
-  // 座標のみズーム追従（physX/physYはscaleを使用）。lineWidthはdpr×PSのみ。
+  // 座標・lineWidth 両方ともscaleに追従（DXF内容と同じ比率で拡縮）
   function physX(wx){ return (wx * scale + tx) * dpr; }
   function physY(wy){ return (-wy * scale + ty) * dpr; }
 
@@ -475,12 +478,12 @@ function drawAnnotation(targetCtx) {
     if(s.hl){
       atc.globalAlpha = 0.45;
       atc.strokeStyle = 'rgb('+s.color.r+','+s.color.g+','+s.color.b+')';
-      atc.lineWidth = s.lw * dpr * PS;
+      atc.lineWidth = s.lw * (scale / lwRef) * dpr * PS;  // V0_87: zoom比例
       atc.lineCap = 'round';
     } else {
       atc.globalAlpha = 1;
       atc.strokeStyle = 'rgba('+s.color.r+','+s.color.g+','+s.color.b+',0.9)';
-      atc.lineWidth = Math.max(1, s.lw) * dpr * PS;
+      atc.lineWidth = Math.max(dpr, s.lw * (scale / lwRef) * dpr * PS);  // V0_87: zoom比例・最小1px
       atc.lineCap = 'round';
     }
     atc.lineJoin = 'round';
@@ -510,11 +513,11 @@ function drawAnnotation(targetCtx) {
     if(currentTool === 'hl'){
       atc.globalAlpha = 0.45;
       atc.strokeStyle = 'rgb('+currentHL_Color.r+','+currentHL_Color.g+','+currentHL_Color.b+')';
-      atc.lineWidth = currentHL_LW * dpr * PS;
+      atc.lineWidth = currentHL_LW * (scale / lwRef) * dpr * PS;  // V0_87: zoom比例
     } else {
       atc.globalAlpha = 1;
       atc.strokeStyle = 'rgba('+currentColor.r+','+currentColor.g+','+currentColor.b+',0.9)';
-      atc.lineWidth = Math.max(1, currentLW) * dpr * PS;
+      atc.lineWidth = Math.max(dpr, currentLW * (scale / lwRef) * dpr * PS);  // V0_87: zoom比例・最小1px
     }
     atc.lineCap = 'round';
     atc.lineJoin = 'round';
@@ -545,15 +548,16 @@ function drawAnnotation(targetCtx) {
       var firstStroke = strokes.length > 0 ? strokes[0] : null;
       var slw  = firstStroke ? firstStroke.lw : '(なし)';
       // lineWidth再計算（最初のストロークで確認）
+      // V0_87: zoom比例formula
       var computedLW = firstStroke
-        ? (firstStroke.hl ? firstStroke.lw * dpr * PS
-                          : Math.max(1, firstStroke.lw) * dpr * PS)
+        ? (firstStroke.hl ? firstStroke.lw * (scale/lwRef) * dpr * PS
+                          : Math.max(dpr, firstStroke.lw * (scale/lwRef) * dpr * PS))
         : '(なし)';
       dbg.textContent =
         'scale      = ' + scale.toFixed(4) + '\n' +
-        'pdfScale   = ' + (window._pdfScale || 1).toFixed(1) + '\n' +
+        'fitScale   = ' + (typeof fitScale!=='undefined'?fitScale.toFixed(4):'?') + '\n' +
+        'scale/fit  = ' + (scale/lwRef).toFixed(3) + 'x\n' +
         'dpr        = ' + dpr.toFixed(1) + '\n' +
-        'PS(used)   = ' + PS.toFixed(1) + '\n' +
         's.lw       = ' + slw + '\n' +
         'ctx.lw(phys)= ' + (typeof computedLW==='number' ? computedLW.toFixed(2) : computedLW) + '\n' +
         'ctx.lw(css) = ' + (typeof computedLW==='number' ? (computedLW/dpr).toFixed(2)+'px' : computedLW) + '\n' +
@@ -2007,19 +2011,3 @@ LP.handleUp=function(sx,sy){
     // handleDown/Moveで更新した _hoverLine をそのまま確定
     // handleUpで再検索しない → 表示=確定を保証
     if(LP._hoverLine){
-      LP.selLine=LP._hoverLine;
-      LP._hoverLine=null;
-      LP.phase=1; LP.cur=null;
-      showGuide(LP_GUIDES.PT,0);
-      console.log('[LP] line selected');
-    } else {
-      showGuide('線の近くにペンを当ててください',1500);
-    }
-  } else if(LP.phase===1){
-    // LP.cur==null → スナップ候補なし → 確定禁止
-    if(!LP.cur){
-      showGuide('スナップ点を選択してください',1500);
-      console.log('[LP] point selection failed: no snap candidate');
-    } else {
-      var pt=LP.cur;
-      LP.selPt=p
