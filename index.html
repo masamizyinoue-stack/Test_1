@@ -329,7 +329,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_84</div>
+  <div id="ver-label">DXF_View V0_85</div>
 </div>
 
 <div id="colorOverlay">
@@ -410,7 +410,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_84';
+const APP_VERSION = 'V0_85';
 
 // =========================================================
 // グローバル状態
@@ -457,10 +457,11 @@ function drawAnnotation(targetCtx) {
   var atc = targetCtx || actx;
   if (!atc) return;
   var dpr = window.devicePixelRatio || 1;
-  var PS = window._pdfScale || 1;
+  // V0_85: 通常表示はPS=1固定。エクスポート時(targetCtx指定)のみ_pdfScaleを使用。
+  // lineWidthからscale/zoom/pdfScaleを完全排除し画面上の線幅を常に固定する。
+  var PS = targetCtx ? (window._pdfScale || 1) : 1;
   atc.clearRect(0, 0, atc.canvas.width, atc.canvas.height);
-  // ワールド座標 → 物理ピクセル変換（CTM不使用）
-  // scale/txはexport時に既に調整済み。PSはlineWidthのみに使用
+  // 座標のみズーム追従（physX/physYはscaleを使用）。lineWidthはdpr×PSのみ。
   function physX(wx){ return (wx * scale + tx) * dpr; }
   function physY(wy){ return (-wy * scale + ty) * dpr; }
 
