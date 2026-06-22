@@ -1,4 +1,4 @@
-f// export.js — ファイル出力・エクスポート機能
+// export.js — ファイル出力・エクスポート機能
 // DXF Viewer V0_66
 // 依存グローバル: cv, ov, doc, hiddenLayers, tx, ty, scale, bwMode, pdfImage, currentFileName (viewer.js)
 //               buildPDF, draw, scheduleDraw, scheduleOverlay (viewer.js)
