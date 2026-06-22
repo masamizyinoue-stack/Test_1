@@ -230,6 +230,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <canvas id="cv"></canvas>
   <canvas id="ac"></canvas>
   <canvas id="ov"></canvas>
+  <!-- V0_86 デバッグ表示 -->
+  <div id="dbg-ann" style="position:absolute;top:8px;left:8px;z-index:500;background:rgba(0,0,0,0.75);color:#0f0;font-family:monospace;font-size:13px;line-height:1.7;padding:8px 12px;border-radius:6px;pointer-events:none;white-space:pre;"></div>
   <div id="noDrawingMsg">
     <svg width="72" height="68" viewBox="0 0 72 68" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="2" y="4" width="68" height="46" rx="3" stroke="#4a6080" stroke-width="2.5"/>
@@ -329,7 +331,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_85</div>
+  <div id="ver-label">DXF_View V0_86</div>
 </div>
 
 <div id="colorOverlay">
@@ -410,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_85';
+const APP_VERSION = 'V0_86';
 
 // =========================================================
 // グローバル状態
@@ -534,6 +536,29 @@ function drawAnnotation(targetCtx) {
     }
     atc.stroke();
     atc.restore();
+  }
+
+  // V0_86: デバッグ表示（通常表示時のみ）
+  if(!targetCtx){
+    var dbg = document.getElementById('dbg-ann');
+    if(dbg){
+      var firstStroke = strokes.length > 0 ? strokes[0] : null;
+      var slw  = firstStroke ? firstStroke.lw : '(なし)';
+      // lineWidth再計算（最初のストロークで確認）
+      var computedLW = firstStroke
+        ? (firstStroke.hl ? firstStroke.lw * dpr * PS
+                          : Math.max(1, firstStroke.lw) * dpr * PS)
+        : '(なし)';
+      dbg.textContent =
+        'scale      = ' + scale.toFixed(4) + '\n' +
+        'pdfScale   = ' + (window._pdfScale || 1).toFixed(1) + '\n' +
+        'dpr        = ' + dpr.toFixed(1) + '\n' +
+        'PS(used)   = ' + PS.toFixed(1) + '\n' +
+        's.lw       = ' + slw + '\n' +
+        'ctx.lw(phys)= ' + (typeof computedLW==='number' ? computedLW.toFixed(2) : computedLW) + '\n' +
+        'ctx.lw(css) = ' + (typeof computedLW==='number' ? (computedLW/dpr).toFixed(2)+'px' : computedLW) + '\n' +
+        'strokes    = ' + strokes.length;
+    }
   }
 }
 
@@ -1997,47 +2022,4 @@ LP.handleUp=function(sx,sy){
       console.log('[LP] point selection failed: no snap candidate');
     } else {
       var pt=LP.cur;
-      LP.selPt=pt;
-      LP.footPt=computeFoot(LP.selLine,pt);
-      LP.phase=2; LP.cur=null;
-      showGuide(LP_GUIDES.POS,0);
-      console.log('[LP] point selected: ('
-        +pt.x.toFixed(1)+','+pt.y.toFixed(1)+') type='+pt.type);
-    }
-  } else if(LP.phase===2){
-    var wp=s2w(sx,sy);
-    var pArrow=LP.cur||{x:wp[0],y:wp[1]};
-    var dim=buildLinePtDim(LP.selLine,LP.selPt,pArrow);
-    console.log('[LP] dim placed: '+(dim?dim.text:'null'));
-    if(dim){ snapshot(); dims.push(dim); scheduleSave(); scheduleDraw(); }
-    LP.selLine=null; LP.selPt=null; LP.footPt=null; LP.phase=0; LP.cur=null;
-    showGuide(LP_GUIDES.LINE,0);
-    console.log('[LP] → phase0: reset');
-  }
-  scheduleOverlay();
-};
-
-// ─ ツール切り替えフック ─────────────────────────────────
-document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
-  btn.addEventListener('click',function(){
-    var t=this.dataset.tool;
-    if(t==='lp'){
-      if(window.DIM) window.DIM.active=false;
-      resetLP(); LP.active=true; LP.phase=0;
-      showGuide(LP_GUIDES.LINE,0);
-      console.log('[LP] tool activated');
-    } else {
-      resetLP();
-    }
-  });
-});
-
-window.LP=LP;
-console.log('[LP] module initialized');
-
-})(); // end D
-
-</script>
-<div id="guideMsg" style="
-  display:none;
-  position:fixed
+      LP.selPt=p
