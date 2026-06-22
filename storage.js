@@ -29,7 +29,7 @@ function doSave(){
       bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
       currentTool,currentColor,currentLW,currentFileName,
       currentHL_Color,currentHL_LW,currentDimColor,
-      dimensionTextMode
+      dimensionTextMode,inputMode
     }));
   }catch(e){}
 }
@@ -109,6 +109,8 @@ async function tryRestore(){
     // dimensionTextMode復元
     if(d.dimensionTextMode)dimensionTextMode=d.dimensionTextMode;
     if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
+    if(d.inputMode)inputMode=d.inputMode;
+    if(typeof updateInputModeUI==='function')updateInputModeUI();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
   }catch(e){console.warn('restore:',e);}
 }

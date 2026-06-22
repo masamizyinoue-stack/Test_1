@@ -262,6 +262,19 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
     <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF / PDF 対応</small></span>
   </button>
+  <div class="sp-section">
+    <div class="sp-label">モード選択</div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="inputMode" id="inputModePen" value="pen" checked style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>ペンモード<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">Apple Pencil/マウスで描画・指でパン</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="inputMode" id="inputModeFreehand" value="freehand" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>手書きモード<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">ペン/蛍光選択中：指1本で描画・指2本でパン/ズーム</small></span>
+      </label>
+    </div>
+  </div>
 
   <div class="sp-section">
     <div class="sp-label">縮尺分母</div>
@@ -301,7 +314,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_78</div>
+  <div id="ver-label">DXF_View V0_79</div>
 </div>
 
 <div id="colorOverlay">
@@ -382,7 +395,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_78';
+const APP_VERSION = 'V0_79';
 
 // =========================================================
 // グローバル状態
@@ -751,6 +764,19 @@ function updateDimTextModeUI(){
   if(fixedR)fixedR.checked=(dimensionTextMode==='fixed');
 }
 updateDimTextModeUI();
+// V0_79: モード選択
+document.querySelectorAll('input[name="inputMode"]').forEach(function(r){
+  r.addEventListener('change',function(){
+    if(this.checked){inputMode=this.value;scheduleSave();showGuide(inputMode==='freehand'?'手書きモード：ペン/蛍光選択中は指1本で描画':'ペンモード：Apple Pencilで描画',2000);}
+  });
+});
+function updateInputModeUI(){
+  var pr=document.getElementById('inputModePen');
+  var fr=document.getElementById('inputModeFreehand');
+  if(pr)pr.checked=(inputMode==='pen');
+  if(fr)fr.checked=(inputMode==='freehand');
+}
+updateInputModeUI();
 document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 
 // PDFページ

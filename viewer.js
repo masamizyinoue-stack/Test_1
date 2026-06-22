@@ -21,6 +21,7 @@ var bwMode=true;  // false=黒背景
 var dimensionTextMode='auto'; // 'auto' | 'fixed'  寸法文字サイズモード
 var DIM_TEXT_MIN_PX=11;  // autoモード: 最小スクリーンpx
 var DIM_TEXT_MAX_PX=30;  // autoモード: 最大スクリーンpx
+var inputMode='pen'; // 'pen' | 'freehand'  入力モード
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
 var pdfImage=null;

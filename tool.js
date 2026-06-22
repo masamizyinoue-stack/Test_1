@@ -251,12 +251,21 @@ ov.addEventListener('touchstart',e=>{
     pinchDist=Math.hypot(x1-x0,y1-y0);
     pinchMid={x:(x0+x1)/2,y:(y0+y1)/2};
   } else if(fingers.length===1){
-    // 指1本: パンのみ（描画しない）
-    if(sketching){sketching=false;sketchPts=[];}
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     isPen=false;mouseDown=true;lastMX=sx;lastMY=sy;
-    panning=true;
+    // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
+    if(inputMode==='freehand'
+        &&(currentTool==='sketch'||currentTool==='hl')
+        &&!(window.DIM&&window.DIM.active)
+        &&!(window.LP&&window.LP.active)){
+      panning=false;
+      handlePointerDown(sx,sy,false); // currentTool===sketch/hlなので描画開始
+    } else {
+      // ペンモード or 手書きモード+非描画ツール: パンのみ（既存動作）
+      if(sketching){sketching=false;sketchPts=[];}
+      panning=true;
+    }
   }
 },{passive:false});
 
@@ -291,8 +300,18 @@ ov.addEventListener('touchmove',e=>{
     }
     tx=mid.x-wx*scale;ty=mid.y+wy*scale;
     pinchDist=dist;pinchMid=mid;scheduleDraw();
+  } else if(fingers.length===1&&mouseDown&&!panning&&sketching){
+    // V0_79: 手書きモード 指1本描画中
+    const t=fingers[0];
+    const sx=t.clientX-r.left,sy=t.clientY-r.top;
+    if(window.DIM&&window.DIM.active){
+      window.DIM.handleMove(sx,sy);
+    } else if(window.LP&&window.LP.active){
+      window.LP.handleMove(sx,sy);
+    } else { handlePointerMove(sx,sy,false); }
+    lastMX=sx;lastMY=sy;
   } else if(fingers.length===1&&mouseDown&&panning){
-    // 1本指パン
+    // 1本指パン（既存動作）
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     tx+=sx-lastMX;ty+=sy-lastMY;scheduleDraw();
@@ -331,6 +350,10 @@ ov.addEventListener('touchend',e=>{
   }
   // 全タッチ終了
   if(remaining.length===0){
+    // V0_79: 手書きモードで指描画中だった場合はストロークを確定
+    if(!isPen&&sketching){
+      handlePointerUp(lastMX,lastMY,false);
+    }
     if(!isPen){panning=false;mouseDown=false;}
     pinchDist=null;pinchMid=null;return;
   }
@@ -339,7 +362,15 @@ ov.addEventListener('touchend',e=>{
     pinchDist=null;pinchMid=null;
     const t=remFing[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    mouseDown=true;lastMX=sx;lastMY=sy;panning=true;
+    mouseDown=true;lastMX=sx;lastMY=sy;
+    // V0_79: 手書きモード+描画ツールなら描画再開、そうでなければパン
+    if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl')
+        &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)){
+      panning=false;
+      handlePointerDown(sx,sy,false); // 新しい指で描画再開
+    } else {
+      panning=true;
+    }
   }
 },{passive:false});
 
