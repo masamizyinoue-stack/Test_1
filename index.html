@@ -316,7 +316,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
-  <div id="ver-label">DXF_View V0_89</div>
+  <div id="ver-label">DXF_View V0_88</div>
 </div>
 
 <div id="colorOverlay">
@@ -397,7 +397,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_89';
+const APP_VERSION = 'V0_88';
 
 // =========================================================
 // グローバル状態
@@ -444,9 +444,14 @@ function drawAnnotation(targetCtx) {
   var atc = targetCtx || actx;
   if (!atc) return;
   var dpr = window.devicePixelRatio || 1;
-  // V0_89: ① lineWidthはズーム非依存。s.lw = CSS px（画面・PDFで一致）
+  // V0_85: 通常表示はPS=1固定。エクスポート時(targetCtx指定)のみ_pdfScaleを使用。
+  // lineWidthからscale/zoom/pdfScaleを完全排除し画面上の線幅を常に固定する。
   var PS = targetCtx ? (window._pdfScale || 1) : 1;
+  // V0_87: ズーム比例lineWidth。fitScale基準でscaleに追従→DXF内容と同じ比率で拡縮。
+  // lwRef=0防止。fitScaleが未設定(=1)の場合も安全に動作。
+  var lwRef = (typeof fitScale !== 'undefined' && fitScale > 0) ? fitScale : scale;
   atc.clearRect(0, 0, atc.canvas.width, atc.canvas.height);
+  // 座標・lineWidth 両方ともscaleに追従（DXF内容と同じ比率で拡縮）
   function physX(wx){ return (wx * scale + tx) * dpr; }
   function physY(wy){ return (-wy * scale + ty) * dpr; }
 
@@ -458,12 +463,12 @@ function drawAnnotation(targetCtx) {
     if(s.hl){
       atc.globalAlpha = 0.45;
       atc.strokeStyle = 'rgb('+s.color.r+','+s.color.g+','+s.color.b+')';
-      atc.lineWidth = s.lw * dpr * PS;  // V0_89: CSS px固定
+      atc.lineWidth = s.lw * (scale / lwRef) * dpr * PS;  // V0_87: zoom比例
       atc.lineCap = 'round';
     } else {
       atc.globalAlpha = 1;
       atc.strokeStyle = 'rgba('+s.color.r+','+s.color.g+','+s.color.b+',0.9)';
-      atc.lineWidth = Math.max(dpr * PS, s.lw * dpr * PS);  // V0_89: CSS px固定・最小1px
+      atc.lineWidth = Math.max(dpr, s.lw * (scale / lwRef) * dpr * PS);  // V0_87: zoom比例・最小1px
       atc.lineCap = 'round';
     }
     atc.lineJoin = 'round';
@@ -493,11 +498,11 @@ function drawAnnotation(targetCtx) {
     if(currentTool === 'hl'){
       atc.globalAlpha = 0.45;
       atc.strokeStyle = 'rgb('+currentHL_Color.r+','+currentHL_Color.g+','+currentHL_Color.b+')';
-      atc.lineWidth = currentHL_LW * dpr * PS;  // V0_89: CSS px固定
+      atc.lineWidth = currentHL_LW * (scale / lwRef) * dpr * PS;  // V0_87: zoom比例
     } else {
       atc.globalAlpha = 1;
       atc.strokeStyle = 'rgba('+currentColor.r+','+currentColor.g+','+currentColor.b+',0.9)';
-      atc.lineWidth = Math.max(dpr * PS, currentLW * dpr * PS);  // V0_89: CSS px固定・最小1px
+      atc.lineWidth = Math.max(dpr, currentLW * (scale / lwRef) * dpr * PS);  // V0_87: zoom比例・最小1px
     }
     atc.lineCap = 'round';
     atc.lineJoin = 'round';
@@ -761,17 +766,6 @@ function updateBwToggleBtn(){
   } else {
     btn.style.background='#222';btn.style.color='#fff';btn.title='黒背景（タップで白へ）';
   }
-  // V0_89: ⑥ 白画面時の全体ボタン（fit-btn）を黒文字・黒枠に
-  var fitBtn=document.getElementById('fitBtn');
-  if(fitBtn){
-    if(bwMode){
-      fitBtn.style.color='rgba(10,20,50,0.9)';
-      fitBtn.style.borderColor='rgba(0,0,80,0.55)';
-    } else {
-      fitBtn.style.color='';
-      fitBtn.style.borderColor='';
-    }
-  }
 }
 document.getElementById('bwToggleBtn').addEventListener('click',()=>{
   bwMode=!bwMode;
@@ -1030,16 +1024,14 @@ function getDimFontSize(d, PS) {
 }
 function drawDimEntity(ctx,d){
   var PS=window._pdfScale||1;
-  // V0_89: ② fixed modeでは全要素をズーム比例スケール（作成時サイズ完全固定）
-  var dimScale=(d.worldFontH&&dimensionTextMode==='fixed')?(d.worldFontH*scale/17):1;
   var col=d.color||'#f39c12';
   ctx.strokeStyle=col;ctx.fillStyle=col;
-  ctx.lineWidth=1.5*dimScale*PS;ctx.setLineDash([]);
+  ctx.lineWidth=1.5*PS;ctx.setLineDash([]);
   for(const l of d.lines){
     const[sx1,sy1]=w2s(l.x1,l.y1);const[sx2,sy2]=w2s(l.x2,l.y2);
     ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
   }
-  var arrowLen=10*dimScale*PS,arrowW=4*dimScale*PS;
+  var arrowLen=10*PS,arrowW=4*PS;
   for(const a of d.arrows){
     const[sx,sy]=w2s(a.x,a.y);
     ctx.save();ctx.translate(sx,sy);ctx.rotate(a.angle);
@@ -1048,7 +1040,7 @@ function drawDimEntity(ctx,d){
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
     var fSize=getDimFontSize(d,PS); // V0_78: dimensionTextModeに応じたサイズ
-    var gap=5*dimScale*PS; // 寸法線からの余白（V0_74: 10→5に縮小）
+    var gap=5*PS; // 寸法線からの余白（V0_74: 10→5に縮小）
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
     ctx.font='bold '+fSize+'px sans-serif';
     ctx.textAlign='center';ctx.textBaseline='bottom';
@@ -1058,8 +1050,8 @@ function drawDimEntity(ctx,d){
   // センターマーク（直径・半径寸法）
   if(d.centerMark){
     var[cmx,cmy]=w2s(d.centerMark.cx,d.centerMark.cy);
-    var cml=8*dimScale*PS;
-    ctx.strokeStyle=col;ctx.lineWidth=1*dimScale*PS;
+    var cml=8*PS;
+    ctx.strokeStyle=col;ctx.lineWidth=1*PS;
     ctx.beginPath();ctx.moveTo(cmx-cml,cmy);ctx.lineTo(cmx+cml,cmy);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cmx,cmy-cml);ctx.lineTo(cmx,cmy+cml);ctx.stroke();
   }
@@ -1515,7 +1507,7 @@ function buildCircDimPhi(ent,p3){
     arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
     text:'φ'+formatDim(r*2/sd),
     tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',color:currentDimColor||'#f39c12',
-    centerMark:{cx:cx,cy:cy},worldFontH:17/(scale||1)
+    centerMark:{cx:cx,cy:cy}
   };
 }
 
@@ -1594,7 +1586,7 @@ function buildRadDim(ent,p3){
     arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
     text:'R'+formatDim(r/sd),
     tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',color:currentDimColor||'#f39c12',
-    centerMark:{cx:cx,cy:cy},worldFontH:17/(scale||1)
+    centerMark:{cx:cx,cy:cy}
   };
 }
 
@@ -1834,7 +1826,7 @@ function buildLinePtDim(line,pt,pArrow){
   }
   return {lines,arrows,
     text:formatDim(dist/sd),
-    tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12',worldFontH:17/(scale||1)};
+    tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12'};
 }
 
 // ─ プレビュー描画(点線) ───────────────────────────────
