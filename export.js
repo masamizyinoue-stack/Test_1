@@ -196,10 +196,6 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
   btn.disabled = true;
   showGuide('PDFを生成中...');
   try{
-    // ④ V0_89: PDF生成前にfitToView実行→全体表示・BBox確実化
-    if(typeof fit==='function')fit();
-    await new Promise(r=>requestAnimationFrame(r));
-    await new Promise(r=>requestAnimationFrame(r));
     // ── 1. バウンディングボックス計算 ────────────────────
     let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
     function upd(x,y){if(!isFinite(x)||!isFinite(y))return;mnX=Math.min(mnX,x);mxX=Math.max(mxX,x);mnY=Math.min(mnY,y);mxY=Math.max(mxY,y);}
@@ -220,7 +216,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     if(!isFinite(mnX)){showGuide('描画データがありません',2000);return;}
 
     // ── 2. キャンバスサイズ決定（約450DPI相当）───────────────
-    const PAD=0.02;  // V0_89: ⑤ 余白2%
+    const PAD=0.03;
     const eW=mxX-mnX, eH=mxY-mnY;
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
@@ -398,10 +394,11 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
 });
 
 // =========================================================
-// PDFボタン（V0_75: 範囲PDF保存を削除 / V0_89: ③ 重複listener削除）
+// PDFボタン（V0_75: 範囲PDF保存を削除、PDF書出のみ維持）
 // =========================================================
+document.getElementById('savePDFBtn').addEventListener('click',savePDF);
 
 // =========================================================
-// DXF書き出しボタン
+// DXF\u66f8\u304d\u51fa\u3057\u30dc\u30bf\u30f3
 // =========================================================
 document.getElementById('exportDxfBtn').addEventListener('click',exportSketchDxf);
