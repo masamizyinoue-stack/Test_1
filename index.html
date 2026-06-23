@@ -1112,8 +1112,8 @@ function drawDimEntity(ctx,d){
   var col=d.color||'#f39c12';
   ctx.strokeStyle=col;ctx.fillStyle=col;
   // V0_89: 作成時サイズ固定モード時は線幅・矢印・オフセットもズームに比例させる
-  // V0_94: PDF時はfixedRatio=1（画面表示と同じサイズ）
   var fixedRatio=1;
+  // V0_94: PDF時はfixedRatio=1（画面表示と同じサイズ）
   if(!window._pdfScale&&dimensionTextMode==='fixed'&&d&&d.worldFontH){fixedRatio=(d.worldFontH*scale)/17;}
   ctx.lineWidth=1.5*PS*fixedRatio;ctx.setLineDash([]);
   for(const l of d.lines){
@@ -2087,4 +2087,35 @@ LP.handleUp=function(sx,sy){
   } else if(LP.phase===2){
     var wp=s2w(sx,sy);
     var pArrow=LP.cur||{x:wp[0],y:wp[1]};
-    var dim=buildLin
+    var dim=buildLinePtDim(LP.selLine,LP.selPt,pArrow);
+    console.log('[LP] dim placed: '+(dim?dim.text:'null'));
+    if(dim){ snapshot(); dims.push(dim); scheduleSave(); scheduleDraw(); }
+    LP.selLine=null; LP.selPt=null; LP.footPt=null; LP.phase=0; LP.cur=null;
+    showGuide(LP_GUIDES.LINE,0);
+    console.log('[LP] → phase0: reset');
+  }
+  scheduleOverlay();
+};
+
+// ─ ツール切り替えフック ─────────────────────────────────────────────
+document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var t=this.dataset.tool;
+    if(t==='lp'){
+      if(window.DIM) window.DIM.active=false;
+      resetLP(); LP.active=true; LP.phase=0;
+      showGuide(LP_GUIDES.LINE,0);
+      console.log('[LP] tool activated');
+    } else {
+      resetLP();
+    }
+  });
+});
+
+window.LP=LP;
+console.log('[LP] module initialized');
+
+})(); // end D
+
+</script>
+<div id="guideMsg" st
