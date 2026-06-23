@@ -209,7 +209,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #folderIndexBtn{width:100%;padding:10px 0;border-radius:9px;border:none;background:var(--accent,#00d4ff);color:#000;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
 #folderIndexBtn:active{opacity:.8}
 #folderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center}
-/* V0_105: タブバー */
+/* V0_107: タブバー */
 #tabBar{display:flex;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;background:#0d1117;border-bottom:1px solid #2a3040;min-height:0;max-height:40px;flex-shrink:0}
 #tabBar:empty{max-height:0;border-bottom:none}
 .tab-item{display:flex;align-items:center;padding:0 6px 0 12px;min-width:80px;max-width:180px;height:40px;background:#0d1117;border-right:1px solid #2a3040;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;gap:4px;box-sizing:border-box}
@@ -314,7 +314,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_105</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_107</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -373,7 +373,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_105</div>
+  <div id="ver-label">DXF_View V0_107</div>
 </div>
 
 <div id="colorOverlay">
@@ -499,7 +499,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_105';
+const APP_VERSION = 'V0_107';
 
 // =========================================================
 // グローバル状態
@@ -925,6 +925,7 @@ function switchToFile(idx){
   var nd=document.getElementById('noDrawingMsg');
   if(nd) nd.style.display=(doc||pdfImage)?'none':'';
   [0,1,2,3,4].forEach(function(i){if(typeof updateViewmemoState==='function')updateViewmemoState(i);});
+  if(typeof updateFileNavUI==='function') updateFileNavUI(); // V0_107: タブ強調表示を同期
 }
 
 function updateFileNavUI(){
@@ -969,6 +970,7 @@ function closeTab(idx){
     box.appendChild(b);
   }
   makeBtn('PDF書出しして閉じる','#00d4ff','#000',function(){
+    if(idx!==currentFileIdx) switchToFile(idx); // V0_107: 対象タブのdoc/strokes/dimsを確実にロード
     window._afterPDFExport=function(){doCloseTab(idx);};
     var pdfBtn=document.getElementById('savePDFBtn');
     if(pdfBtn) pdfBtn.click();
@@ -1005,7 +1007,7 @@ function doCloseTab(idx){
   updateFileNavUI();
 }
 
-// V0_105: prevFileBtn/nextFileBtn removed (replaced by tab bar)
+// V0_107: prevFileBtn/nextFileBtn removed (replaced by tab bar)
 
 
 // サイドバー
@@ -2459,8 +2461,7 @@ function openDxfFromDb(name,buf,keyword){
     hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];
     [0,1,2,3,4].forEach(function(i){updateViewmemoState(i);});
     buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();
-    // V0_104: 最初のマーク位置へジャンプ
-    if(_searchMarks.length>0){var _m=_searchMarks[0];var _dpr=window.devicePixelRatio||1;var _W=cv.width/_dpr,_H=cv.height/_dpr;var _ts=Math.min(fitScale*15,Math.max(fitScale*2,40/(_m.h||1)));scale=_ts;tx=_W/2-_m.x*scale;ty=_H/2+_m.y*scale;}
+    // V0_107: 自動ズーム廃止。fit()後の全体表示のままマークを表示する（検索文字の全体位置を把握しやすくする）
     scheduleDraw();scheduleOverlay();showInfo();buildSearchIndex();
     currentFileName=name;updateFileNameDisplay();
     var xi=openFiles.findIndex(function(x){return x.name===name;});
@@ -2605,4 +2606,3 @@ function _dimTextDragUp(){
 }
 
 </script>
-<div id="guideMsg" st
