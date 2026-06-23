@@ -156,6 +156,7 @@ function handlePointerUp(sx,sy,isPenInput){
         }
         dims.push(buildDim(p1,p2,p3||p2,dimType));
         dimState={pts:[]};
+        doSave(); // V0_103: 即時保存
         hideGuide();
         showGuide('寸法を追加しました ↩ で取消', 2000);
       }
@@ -172,7 +173,7 @@ function handlePointerUp(sx,sy,isPenInput){
       } else {
         strokes.push({pts:[...sketchPts],color:{...currentColor},lw:currentLW}); // ③ 絶対px値で保存
       }
-      sketching=false;sketchPts=[];scheduleOverlay();scheduleSave();
+      sketching=false;sketchPts=[];scheduleOverlay();doSave(); // V0_103: 即時保存
     }return;
   }
   panning=false;dragImageStart=null;selectedImage=null;

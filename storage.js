@@ -27,7 +27,7 @@ function doSave(){
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       strokes,dims,savedViews,tx,ty,scale,fitScale,
       bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
-      currentTool,currentColor,currentLW,currentFileName,
+      currentTool,currentColor,currentLW,currentFileName,fileSize:currentFileSize,
       currentHL_Color,currentHL_LW,currentDimColor,
       dimensionTextMode,inputMode
     }));
@@ -54,6 +54,7 @@ async function tryRestore(){
       const bin=atob(b64);const buf=new ArrayBuffer(bin.length);const arr=new Uint8Array(buf);
       for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
       currentFileName=name;
+      currentFileSize=buf.byteLength; // V0_103
       if(name.toLowerCase().endsWith('.pdf')){
         await loadPDF(buf);
       } else {
@@ -63,7 +64,10 @@ async function tryRestore(){
       updateFileNameDisplay();
     }
     const raw=localStorage.getItem(SAVE_KEY);if(!raw){buildLayerModal();return;}
-    const d=JSON.parse(raw);
+    // V0_103: ファイルIDチェック（サイズ不一致は別ファイルとみなし状態復元スキップ）
+    const _rawParsed=JSON.parse(raw);
+    if(fr&&_rawParsed.fileSize&&_rawParsed.fileSize!==currentFileSize){buildLayerModal();scheduleDraw();return;}
+    const d=_rawParsed;
     strokes=d.strokes||[];dims=d.dims||[];
     // V0_76: 旧バージョン(3スロット)との後方互換を保ちつつ5スロットに拡張
     {const sv=d.savedViews||[];savedViews=[sv[0]||null,sv[1]||null,sv[2]||null,sv[3]||null,sv[4]||null];}

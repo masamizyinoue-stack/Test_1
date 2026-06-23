@@ -124,18 +124,15 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
   btn.disabled = true;
   showGuide('PDFを生成中...');
   try{
-    // ── 1. バウンディングボックス計算 ────────────────────
-    let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+    // ── 1. バウンディングボックス計算（V0_103: computeBBox使用で全エンティティ対応）─
+    // computeBBoxはdoc全エンティティ(sen/enko/ten/moji/solid)+pdfImage+images を含む
+    const _bb=computeBBox();
+    let mnX=isFinite(_bb.minx)?_bb.minx:Infinity;
+    let mnY=isFinite(_bb.miny)?_bb.miny:Infinity;
+    let mxX=isFinite(_bb.maxx)?_bb.maxx:-Infinity;
+    let mxY=isFinite(_bb.maxy)?_bb.maxy:-Infinity;
     function upd(x,y){if(!isFinite(x)||!isFinite(y))return;mnX=Math.min(mnX,x);mxX=Math.max(mxX,x);mnY=Math.min(mnY,y);mxY=Math.max(mxY,y);}
-    const allEnts=[...(doc?.sen||[]),...(doc?.enko||[]),...(doc?.ten||[]),...(doc?.moji||[]),...(doc?.solid||[])];
-    for(const e of allEnts){
-      if(hiddenLayers.has(e.layer))continue;
-      if(e.x1!=null){upd(e.x1,e.y1);upd(e.x2!=null?e.x2:e.x1,e.y2!=null?e.y2:e.y1);}
-      if(e.cx!=null){const r=e.r||Math.max(e.rx||0,e.ry||0)||0;upd(e.cx-r,e.cy-r);upd(e.cx+r,e.cy+r);}
-      if(e.pts){for(const p of e.pts)upd(p.x,p.y);}
-      if(e.x!=null&&e.y!=null)upd(e.x,e.y);
-    }
-    if(pdfImage){upd(pdfImage.wx,pdfImage.wy);upd(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
+    // ペン・寸法（ユーザー追記）もboundsに含める
     for(const s of strokes)for(const p of s.pts)upd(p.x,p.y);
     for(const d of dims){
       for(const l of(d.lines||[]))upd(l.x1,l.y1),upd(l.x2,l.y2);

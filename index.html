@@ -305,7 +305,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_102</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_103</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -364,7 +364,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_102</div>
+  <div id="ver-label">DXF_View V0_103</div>
 </div>
 
 <div id="colorOverlay">
@@ -490,7 +490,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_102';
+const APP_VERSION = 'V0_103';
 
 // =========================================================
 // グローバル状態
@@ -504,6 +504,7 @@ var currentHL_Color={r:255,g:255,b:0}; // 蛍光ペン色（黄）
 var currentHL_LW=4;                     // 蛍光ペン線幅
 var currentDimColor='#f39c12';          // 寸法色
 var dims=[];
+var currentFileSize=0;   // V0_103: ファイルサイズ(自動保存ID用)
 var strokes=[];
 let images=[];
 var savedViews=[null,null,null,null,null]; // V0_76: 5スロットに拡張
@@ -834,6 +835,7 @@ const fileInput=document.getElementById('file');
 document.getElementById('openFileBtnMain').addEventListener('click',()=>fileInput.click());
 fileInput.addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;
+  if(currentFileIdx>=0) saveCurrentFileState(); // V0_103: 切替前に現ファイル状態保存
   currentFileName=f.name;
   const buf=await f.arrayBuffer();
   doc=null;pdfDoc=null;pdfImage=null;
@@ -845,9 +847,10 @@ fileInput.addEventListener('change',async e=>{
   } else {
     try{
       doc=parseDXF(buf);
+      currentFileSize=f.size; // V0_103
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット
       buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();_idbSave(f.name,buf,_searchIdx.map(function(m){return m.text;}));{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
-      saveFile(buf,f.name);scheduleSave();updateFileNameDisplay();
+      saveFile(buf,f.name);doSave();updateFileNameDisplay();
       document.body.classList.remove('settings-open');
     }catch(err){alert('ファイルを開けません: '+err.message);}
   }
@@ -1012,7 +1015,7 @@ document.getElementById('undoBtn').addEventListener('click',undo);
 document.getElementById('redoBtn').addEventListener('click',redo);
 
 document.getElementById('clearBtn').addEventListener('click',()=>{
-  if(confirm('全てのスケッチと寸法を消去しますか？')){snapshot();dims=[];strokes=[];scheduleOverlay();scheduleSave();}
+  if(confirm('全てのスケッチと寸法を消去しますか？')){snapshot();dims=[];strokes=[];scheduleOverlay();doSave();} // V0_103: 即時保存
 });
 // savePDFBtn addEventListener → export.js
 
@@ -1728,7 +1731,7 @@ function confirmDIM(p3){
   if(d){
     snapshot();
     dims.push(d);
-    scheduleSave(); scheduleDraw();
+    doSave(); scheduleDraw(); // V0_103: 即時保存
     showGuide('寸法を追加しました ↩ で取消', 2000);
   }
   // 次の寸法へ
@@ -2171,7 +2174,7 @@ LP.handleUp=function(sx,sy){
     var pArrow=LP.cur||{x:wp[0],y:wp[1]};
     var dim=buildLinePtDim(LP.selLine,LP.selPt,pArrow);
     console.log('[LP] dim placed: '+(dim?dim.text:'null'));
-    if(dim){ snapshot(); dims.push(dim); scheduleSave(); scheduleDraw(); }
+    if(dim){ snapshot(); dims.push(dim); doSave(); scheduleDraw(); } // V0_103: 即時保存
     LP.selLine=null; LP.selPt=null; LP.footPt=null; LP.phase=0; LP.cur=null;
     showGuide(LP_GUIDES.LINE,0);
     console.log('[LP] → phase0: reset');
@@ -2319,13 +2322,17 @@ function openAllSearchPanel(){
   if(inp.value.trim()) doAllSearch();
   setTimeout(function(){inp.focus();},120);
 }
+var _allSearchGen=0; // V0_103: 重複防止用世代カウンタ
 function doAllSearch(){
+  var gen=++_allSearchGen;
   var kw=document.getElementById('allSearchInput').value.trim().toLowerCase();
   var list=document.getElementById('allSearchResultList');
   var cnt=document.getElementById('allSearchCount');
   list.innerHTML='';
   if(!kw){cnt.textContent='';return;}
   _idbGetAll(function(records){
+    if(gen!==_allSearchGen) return; // V0_103: 旧世代コールバックは破棄
+    list.innerHTML=''; // 最新世代のみリスト再構築
     var hits=[];
     records.forEach(function(rec){
       var matched=(rec.texts||[]).filter(function(t){return t.toLowerCase().indexOf(kw)>=0;});
@@ -2352,7 +2359,9 @@ function doAllSearch(){
 }
 function openDxfFromDb(name,buf){
   try{
+    if(currentFileIdx>=0) saveCurrentFileState(); // V0_103: 切替前に現ファイル状態保存
     doc=parseDXF(buf);
+    currentFileSize=buf.byteLength; // V0_103
     hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];
     [0,1,2,3,4].forEach(function(i){updateViewmemoState(i);});
     buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();
@@ -2479,7 +2488,7 @@ function _dimTextDragMove(sx,sy){
 }
 function _dimTextDragUp(){
   if(!_dimTextDrag) return false;
-  if(_dimTextDrag.moved) scheduleSave();
+  if(_dimTextDrag.moved) doSave(); // V0_103: 即時保存
   _dimTextDrag=null;
   return true;
 }
