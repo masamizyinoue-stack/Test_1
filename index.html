@@ -268,7 +268,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_94</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_95</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -327,7 +327,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_94</div>
+  <div id="ver-label">DXF_View V0_95</div>
 </div>
 
 <div id="colorOverlay">
@@ -412,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_94';
+const APP_VERSION = 'V0_95';
 
 // =========================================================
 // グローバル状態
@@ -1084,13 +1084,6 @@ if(vd) vd.textContent = APP_VERSION;
 // V0_78: 寸法文字サイズモード対応ヘルパー
 function getDimFontSize(d, PS) {
   PS = PS || 1;
-  // V0_94: PDF書出し時は画面表示と同じ物理サイズ（画面スケール基準）
-  if (window._pdfScale) {
-    var worldH2 = (d && d.worldFontH) ? d.worldFontH : (17 / (scale || 1));
-    var sScale = window._pdfScreenScale || scale;
-    var px2 = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH2 * sScale));
-    return px2 * PS;
-  }
   // 作成時のワールドフォント高（保存済みorフォールバック）
   var worldH = (d && d.worldFontH) ? d.worldFontH : (17 / (scale || 1));
   if (dimensionTextMode === 'fixed') {
@@ -1108,13 +1101,12 @@ function needsUnderbar(str){
   return digits.length>0&&/^[69]+$/.test(digits);
 }
 function drawDimEntity(ctx,d){
-  var PS=window._pdfScale||1;
+  var PS=1; // V0_95: PDF時もPS=1固定（PSCALE倍しない）
   var col=d.color||'#f39c12';
   ctx.strokeStyle=col;ctx.fillStyle=col;
   // V0_89: 作成時サイズ固定モード時は線幅・矢印・オフセットもズームに比例させる
   var fixedRatio=1;
-  // V0_94: PDF時はfixedRatio=1（画面表示と同じサイズ）
-  if(!window._pdfScale&&dimensionTextMode==='fixed'&&d&&d.worldFontH){fixedRatio=(d.worldFontH*scale)/17;}
+  if(dimensionTextMode==='fixed'&&d&&d.worldFontH){fixedRatio=(d.worldFontH*scale)/17;}
   ctx.lineWidth=1.5*PS*fixedRatio;ctx.setLineDash([]);
   for(const l of d.lines){
     const[sx1,sy1]=w2s(l.x1,l.y1);const[sx2,sy2]=w2s(l.x2,l.y2);

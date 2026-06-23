@@ -179,7 +179,6 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     ovEl.width=CW; ovEl.height=CH;
     // PDF用線幅スケール: CW/CSS_W（CSS幅比率）
     window._pdfScale=CW*dprSave/sv_ow;
-    window._pdfScreenScale=sv.scale; // V0_94: 画面表示時のscaleを保存（寸法サイズ用）
 
     const acEl=document.createElement('canvas');
     acEl.width=CW; acEl.height=CH;
@@ -204,7 +203,6 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
       // 描画エラー時も必ず状態を復元
       try{Object.defineProperty(window,'devicePixelRatio',{get:()=>dprSave,configurable:true});}catch(e){}
       window._pdfScale=undefined;
-      window._pdfScreenScale=undefined; // V0_94
       tx=sv.tx; ty=sv.ty; scale=sv.scale;
       cvEl.width=sv_cw; cvEl.height=sv_ch;
       ovEl.width=sv_ow; ovEl.height=sv_oh;
