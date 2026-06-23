@@ -179,6 +179,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .dim-group{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
 .dim-group-label{font-size:9px;color:rgba(232,168,74,0.8);letter-spacing:0.5px;line-height:1;pointer-events:none;user-select:none}
 .dim-group-btns{display:flex;align-items:center;gap:1px}
+/* V0_98: 文字検索パネル */
+#searchOverlay{display:none;position:fixed;inset:0;z-index:299}
+#searchOverlay.open{display:block}
+#searchBg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+#searchPanel{position:absolute;right:0;top:0;bottom:0;width:320px;max-width:85vw;background:var(--bg-panel);display:flex;flex-direction:column;overflow:hidden;z-index:1}
+#searchInput{width:100%;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);font-size:16px;box-sizing:border-box;-webkit-appearance:none;outline:none}
+#searchInput:focus{border-color:var(--accent)}
+.search-result-item{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;font-size:14px;color:var(--text);word-break:break-all;-webkit-tap-highlight-color:rgba(0,212,255,.2)}
+.search-result-item:active{background:rgba(0,212,255,.15)}
 </style>
 </head>
 <body>
@@ -234,6 +243,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
 </button>
+  <button class="tb-btn" id="searchBtn" title="文字検索">
+  <span class="tb-tool-label">検索</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+</button>
 </div>
 
 <div class="stage" id="stage">
@@ -268,7 +281,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_97</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_98</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -327,7 +340,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_97</div>
+  <div id="ver-label">DXF_View V0_98</div>
 </div>
 
 <div id="colorOverlay">
@@ -401,6 +414,22 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
 </div>
 
+<!-- V0_98: 文字検索パネル -->
+<div id="searchOverlay">
+  <div id="searchBg"></div>
+  <div id="searchPanel">
+    <div class="sp-header">
+      <span class="sp-title">文字検索</span>
+      <button class="sp-close" id="searchClose">✕</button>
+    </div>
+    <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+      <input type="search" id="searchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div id="searchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
+    </div>
+    <div id="searchResultList" style="flex:1;overflow-y:auto"></div>
+  </div>
+</div>
+
 <input type="file" id="file" hidden>
 
 <script src="layer.js"></script>
@@ -412,7 +441,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_97';
+const APP_VERSION = 'V0_98';
 
 // =========================================================
 // グローバル状態
@@ -731,6 +760,14 @@ function drawOverlay(){
       }
     }
   }
+  // V0_98: 検索ハイライト点滅
+  if(typeof _searchHighlight!=='undefined'&&_searchHighlight){
+    var[_shx,_shy]=w2s(_searchHighlight.x,_searchHighlight.y);
+    var _shr=Math.max(20,(_searchHighlight.h||1)*scale*3);
+    octx.save();octx.strokeStyle='#ffff00';octx.lineWidth=3;octx.globalAlpha=0.9;
+    octx.beginPath();octx.arc(_shx,_shy,_shr,0,Math.PI*2);octx.stroke();
+    octx.restore();
+  }
   octx.restore();
 }
 
@@ -760,7 +797,7 @@ fileInput.addEventListener('change',async e=>{
     try{
       doc=parseDXF(buf);
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット
-      buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
+      buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
       saveFile(buf,f.name);scheduleSave();updateFileNameDisplay();
       document.body.classList.remove('settings-open');
     }catch(err){alert('ファイルを開けません: '+err.message);}
@@ -806,7 +843,7 @@ function switchToFile(idx){
   if(typeof buildLayerModal==='function') buildLayerModal();
   if(typeof buildSnapCache==='function') buildSnapCache();
   if(typeof checkPerfMode==='function') checkPerfMode();
-  fit(); scheduleDraw(); scheduleOverlay();
+  fit(); scheduleDraw(); scheduleOverlay();buildSearchIndex();
   updateFileNameDisplay(); scheduleSave();
   var ppc=document.getElementById('pdfPageCtrl');
   if(ppc) ppc.style.display=pdfDoc?'':'none';
@@ -2108,6 +2145,70 @@ window.LP=LP;
 console.log('[LP] module initialized');
 
 })(); // end D
+
+// ── V0_98: 文字検索 ────────────────────────────────────────
+var _searchIdx=[];
+var _searchHighlight=null;
+
+function buildSearchIndex(){
+  _searchIdx=[];
+  if(!doc||!doc.moji) return;
+  for(var i=0;i<doc.moji.length;i++){
+    var m=doc.moji[i];
+    if(m.text&&m.text.trim()) _searchIdx.push({text:m.text,x:m.x,y:m.y,h:m.h||1});
+  }
+}
+
+function doSearch(){
+  var kw=(document.getElementById('searchInput').value||'').trim().toLowerCase();
+  var list=document.getElementById('searchResultList');
+  var countEl=document.getElementById('searchCount');
+  list.innerHTML='';
+  if(!kw){countEl.textContent='';return;}
+  var results=_searchIdx.filter(function(m){return m.text.toLowerCase().includes(kw);});
+  countEl.textContent='検索結果: '+results.length+'件';
+  results.slice(0,200).forEach(function(item){
+    var li=document.createElement('div');
+    li.className='search-result-item';
+    li.textContent=item.text;
+    li.addEventListener('click',function(){jumpToSearchResult(item);});
+    list.appendChild(li);
+  });
+  if(results.length>200){
+    var more=document.createElement('div');
+    more.style.cssText='padding:10px 16px;font-size:12px;color:var(--text-dim)';
+    more.textContent='… 他'+(results.length-200)+'件（絞り込んでください）';
+    list.appendChild(more);
+  }
+}
+
+function jumpToSearchResult(item){
+  var dpr=window.devicePixelRatio||1;
+  var W=cv.width/dpr,H=cv.height/dpr;
+  var targetScale=Math.min(fitScale*15, Math.max(fitScale*1.5, 40/(item.h||1)));
+  scale=targetScale;
+  tx=W/2-item.x*scale;
+  ty=H/2+item.y*scale;
+  scheduleDraw();scheduleOverlay();
+  // ハイライト点滅（6回 ≈ 2.4秒）
+  _searchHighlight=item;
+  var cnt=0;
+  var iv=setInterval(function(){
+    cnt++;
+    _searchHighlight=(cnt%2===0)?null:item;
+    scheduleOverlay();
+    if(cnt>=6){clearInterval(iv);_searchHighlight=item;scheduleOverlay();}
+  },400);
+}
+
+document.getElementById('searchBtn').addEventListener('click',function(){
+  document.getElementById('searchOverlay').classList.add('open');
+  setTimeout(function(){document.getElementById('searchInput').focus();},120);
+});
+function closeSearch(){document.getElementById('searchOverlay').classList.remove('open');}
+document.getElementById('searchClose').addEventListener('click',closeSearch);
+document.getElementById('searchBg').addEventListener('click',closeSearch);
+document.getElementById('searchInput').addEventListener('input',doSearch);
 
 </script>
 <div id="guideMsg" st
