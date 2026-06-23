@@ -224,7 +224,8 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const orient=pageMM_W>=pageMM_H?'l':'p';
     const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
     // V0_92: JPEG 0.98（PNG at 45MP → jsPDF/iOS failure の回避、高品質維持）
-    const imgData=comp.toDataURL('image/jpeg',0.98);
+    // V0_95: JPEG品質 0.98→1.0（最高品質）
+    const imgData=comp.toDataURL('image/jpeg',1.0);
     pdf.addImage(imgData,'JPEG',0,0,pageMM_W,pageMM_H);
     const ts=new Date().toISOString().slice(0,10);
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_${ts}.pdf`;
