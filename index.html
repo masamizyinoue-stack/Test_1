@@ -319,7 +319,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_109</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_110</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -378,7 +378,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_109</div>
+  <div id="ver-label">DXF_View V0_110</div>
 </div>
 
 <div id="colorOverlay">
@@ -484,7 +484,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         フォルダを選択してインデックス作成
       </button>
       <div id="folderProgress"></div>
-      <div style="display:flex;gap:4px;align-items:center"><input type="search" id="allSearchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="asrInputClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button></div>
+      <div style="display:flex;gap:4px;align-items:center"><input type="search" id="allSearchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="asrInputClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button><!-- V0_110: 音声入力 --><button id="voiceSearchBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0" title="音声入力">🎤</button><!-- /V0_110: 音声入力 --></div>
       <div id="allSearchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
       <button id="allSearchClearBtn">インデックスをクリア</button>
     </div>
@@ -504,7 +504,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_109';
+const APP_VERSION = 'V0_110';
 
 // =========================================================
 // グローバル状態
@@ -2617,5 +2617,55 @@ function _dimTextDragUp(){
   _dimTextDrag=null;
   return true;
 }
+
+
+// =========================================================
+// V0_110: 音声入力 ここから（削除時はこのブロックごと削除）
+// =========================================================
+(function(){
+  var btn = document.getElementById('voiceSearchBtn');
+  if(!btn) return;
+  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRec){
+    btn.style.display='none'; // 非対応ブラウザでは非表示
+    return;
+  }
+  var rec = new SpeechRec();
+  rec.lang = 'ja-JP';
+  rec.continuous = false;
+  rec.interimResults = false;
+  var listening = false;
+
+  btn.addEventListener('click', function(){
+    if(listening){ rec.stop(); return; }
+    try{
+      rec.start();
+    }catch(e){}
+  });
+
+  rec.onstart = function(){
+    listening = true;
+    btn.textContent = '🔴';
+    btn.title = '録音中（タップで停止）';
+  };
+  rec.onend = function(){
+    listening = false;
+    btn.textContent = '🎤';
+    btn.title = '音声入力';
+  };
+  rec.onresult = function(e){
+    var text = e.results[0][0].transcript;
+    var inp = document.getElementById('allSearchInput');
+    if(inp){ inp.value = text; inp.dispatchEvent(new Event('input')); }
+  };
+  rec.onerror = function(e){
+    listening = false;
+    btn.textContent = '🎤';
+    showGuide('音声認識エラー: ' + e.error, 2000);
+  };
+})();
+// =========================================================
+// V0_110: 音声入力 ここまで
+// =========================================================
 
 </script>
