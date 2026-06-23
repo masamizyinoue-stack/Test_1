@@ -117,5 +117,19 @@ async function tryRestore(){
     if(d.inputMode)inputMode=d.inputMode;
     if(typeof updateInputModeUI==='function')updateInputModeUI();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
+    // V0_111: 復元ファイルをopenFiles[]に登録
+    if(currentFileName && typeof openFiles!=='undefined' && openFiles.length===0){
+      openFiles.push({name:currentFileName});
+      currentFileIdx=0;
+      if(typeof saveCurrentFileState==='function') saveCurrentFileState();
+      if(typeof updateFileNavUI==='function') updateFileNavUI();
+    }
+  }catch(e){}
+}
+ame});
+      currentFileIdx=0;
+      if(typeof saveCurrentFileState==='function') saveCurrentFileState();
+      if(typeof updateFileNavUI==='function') updateFileNavUI();
+    }
   }catch(e){console.warn('restore:',e);}
 }

@@ -1,7 +1,7 @@
 // ui.js — UI状態管理関数
 // DXF Viewer V0_63
 // 依存グローバル: savedViews (var宣言)
-// DOM依存: guideMsg, undoBtn, redoBtn, .mem-btn, .show-btn
+// DOM依存: snap-hint, undoBtn, redoBtn, .mem-btn, .show-btn
 
 // =========================================================
 // ガイドメッセージ
@@ -9,7 +9,7 @@
 let _guideTimer = null;
 
 function showGuide(msg, autoHideMs){
-  const el = document.getElementById('guideMsg');
+  const el = document.getElementById('snap-hint');
   if(!el) return;
   el.textContent = msg;
   el.style.display = msg ? 'block' : 'none';
@@ -18,7 +18,7 @@ function showGuide(msg, autoHideMs){
 }
 
 function hideGuide(){
-  const el = document.getElementById('guideMsg');
+  const el = document.getElementById('snap-hint');
   if(el) el.style.display = 'none';
   clearTimeout(_guideTimer);
 }
@@ -30,5 +30,5 @@ function updateViewmemoState(i){
   const mb=document.querySelector('.mem-btn[data-vi="'+i+'"]');
   const sb=document.querySelector('.show-btn[data-vs="'+i+'"]');
   if(mb) mb.classList.toggle('vm-saved',!!savedViews[i]);
-  if(sb) sb.classList.toggle('vm-saved',!!savedViews[i]);
-}
+  if(sb) sb.classList.toggle('vm-saved',!!savedViews[i]);}
+

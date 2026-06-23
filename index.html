@@ -319,7 +319,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_110</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_111</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -378,7 +378,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_110</div>
+  <div id="ver-label">DXF_View V0_111</div>
 </div>
 
 <div id="colorOverlay">
@@ -504,7 +504,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_110';
+const APP_VERSION = 'V0_111';
 
 // =========================================================
 // グローバル状態
@@ -980,7 +980,31 @@ function closeTab(idx){
     var pdfBtn=document.getElementById('savePDFBtn');
     if(pdfBtn) pdfBtn.click();
   });
-  makeBtn('そのまま閉じる','#c0392b','#fff',function(){doCloseTab(idx);});
+  makeBtn('そのまま閉じる','#c0392b','#fff',function(){ // V0_111: 二段確認
+    var dlg2=document.createElement('div');
+    dlg2.style.cssText='position:fixed;inset:0;z-index:9100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72)';
+    var box2=document.createElement('div');
+    box2.style.cssText='background:#131921;border:1px solid #c0392b;border-radius:14px;padding:22px 18px;min-width:260px;max-width:90vw;display:flex;flex-direction:column;gap:10px';
+    var msg2=document.createElement('div');
+    msg2.style.cssText='font-size:13px;color:#fff;font-weight:600;text-align:center;margin-bottom:2px';
+    msg2.textContent='本当に閉じても宜しいですか？';
+    var sub2=document.createElement('div');
+    sub2.style.cssText='font-size:12px;color:#e74c3c;text-align:center';
+    sub2.textContent='未保存のPDFは作成されません。';
+    box2.appendChild(msg2);box2.appendChild(sub2);
+    function makeBtn2(label,bg,fg,cb){
+      var b=document.createElement('button');
+      b.textContent=label;
+      b.style.cssText='width:100%;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:'+bg+';color:'+fg+';border:1px solid '+(bg==='transparent'?'#3a4050':'transparent');
+      b.addEventListener('click',function(){document.body.removeChild(dlg2);cb();});
+      box2.appendChild(b);
+    }
+    makeBtn2('閉じる','#c0392b','#fff',function(){doCloseTab(idx);});
+    makeBtn2('戻る','transparent','#6b7f99',function(){});
+    dlg2.appendChild(box2);
+    dlg2.addEventListener('click',function(e){if(e.target===dlg2){document.body.removeChild(dlg2);}});
+    document.body.appendChild(dlg2);
+  });
   makeBtn('キャンセル','transparent','#6b7f99',function(){});
   dlg.appendChild(box);
   dlg.addEventListener('click',function(e){if(e.target===dlg){document.body.removeChild(dlg);}});
@@ -995,7 +1019,7 @@ function doCloseTab(idx){
     strokes=[];dims=[];
     if(typeof images!=='undefined') images=[];
     savedViews=[];
-    hiddenLayers=new Set();hiddenLayersArr=[];
+    hiddenLayers=new Set();
     currentFileName='';currentFileSize=0;
     var fd=document.getElementById('fileNameDisplay');if(fd) fd.textContent='---';
     var nd=document.getElementById('noDrawingMsg');if(nd) nd.style.display='';

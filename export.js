@@ -124,13 +124,25 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
   btn.disabled = true;
   showGuide('PDFを生成中...');
   try{
-    // ── 1. バウンディングボックス計算（V0_103: computeBBox使用で全エンティティ対応）─
-    // computeBBoxはdoc全エンティティ(sen/enko/ten/moji/solid)+pdfImage+images を含む
-    const _bb=computeBBox();
-    let mnX=isFinite(_bb.minx)?_bb.minx:Infinity;
-    let mnY=isFinite(_bb.miny)?_bb.miny:Infinity;
-    let mxX=isFinite(_bb.maxx)?_bb.maxx:-Infinity;
-    let mxY=isFinite(_bb.maxy)?_bb.maxy:-Infinity;
+    // ── 1. バウンディングボックス計算（V0_111: 全エンティティ対象・hiddenLayer無視）─
+    // PDF出力はDXF全体を対象とするため、非表示レイヤも含めてBoundsを計算する
+    function _expAll(x,y){if(!isFinite(x)||!isFinite(y))return;if(x<_allMnX)_allMnX=x;if(y<_allMnY)_allMnY=y;if(x>_allMxX)_allMxX=x;if(y>_allMxY)_allMxY=y;}
+    var _allMnX=Infinity,_allMnY=Infinity,_allMxX=-Infinity,_allMxY=-Infinity;
+    if(doc){
+      for(const e of doc.sen){_expAll(e.x1,e.y1);_expAll(e.x2,e.y2);}
+      for(const e of doc.enko){const r=e.rx||e.r||0;_expAll(e.cx-r,e.cy-r);_expAll(e.cx+r,e.cy+r);}
+      for(const e of doc.ten){_expAll(e.x,e.y);}
+      for(const e of doc.moji){_expAll(e.x,e.y);}
+      for(const e of doc.solid){for(const p of e.pts)_expAll(p.x,p.y);}
+    }
+    if(pdfImage){_expAll(pdfImage.wx,pdfImage.wy);_expAll(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
+    for(const img of images){_expAll(img.wx,img.wy);_expAll(img.wx+img.ww,img.wy-img.wh);}
+    // データなし時はcomputeBBox()にフォールバック
+    const _bbFull=isFinite(_allMnX)?{minx:_allMnX,miny:_allMnY,maxx:_allMxX,maxy:_allMxY}:computeBBox();
+    let mnX=isFinite(_bbFull.minx)?_bbFull.minx:Infinity;
+    let mnY=isFinite(_bbFull.miny)?_bbFull.miny:Infinity;
+    let mxX=isFinite(_bbFull.maxx)?_bbFull.maxx:-Infinity;
+    let mxY=isFinite(_bbFull.maxy)?_bbFull.maxy:-Infinity;
     function upd(x,y){if(!isFinite(x)||!isFinite(y))return;mnX=Math.min(mnX,x);mxX=Math.max(mxX,x);mnY=Math.min(mnY,y);mxY=Math.max(mxY,y);}
     // ペン・寸法（ユーザー追記）もboundsに含める
     for(const s of strokes)for(const p of s.pts)upd(p.x,p.y);
@@ -330,4 +342,4 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
 // =========================================================
 // DXF書き出しボタン
 // =========================================================
-document.getElementById('exportDxfBtn').addEventLis
+document.getElementById('exportDxfBtn').addEventListener('click',exportSketchDxf);
