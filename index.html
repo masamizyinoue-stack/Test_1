@@ -268,7 +268,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_93</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_94</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -327,7 +327,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_93</div>
+  <div id="ver-label">DXF_View V0_94</div>
 </div>
 
 <div id="colorOverlay">
@@ -412,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_93';
+const APP_VERSION = 'V0_94';
 
 // =========================================================
 // グローバル状態
@@ -482,7 +482,7 @@ function drawAnnotation(targetCtx) {
       atc.lineCap = 'round';
     } else {
       atc.globalAlpha = 1;
-      atc.strokeStyle = 'rgba('+s.color.r+','+s.color.g+','+s.color.b+',0.9)';
+      atc.strokeStyle = 'rgb('+s.color.r+','+s.color.g+','+s.color.b+')'; // V0_94: 不透明
       atc.lineWidth = Math.max(dpr, s.lw * (scale / lwRef) * dpr * PS);  // V0_87: zoom比例・最小1px
       atc.lineCap = 'round';
     }
@@ -516,7 +516,7 @@ function drawAnnotation(targetCtx) {
       atc.lineWidth = currentHL_LW * (scale / lwRef) * dpr * PS;  // V0_87: zoom比例
     } else {
       atc.globalAlpha = 1;
-      atc.strokeStyle = 'rgba('+currentColor.r+','+currentColor.g+','+currentColor.b+',0.9)';
+      atc.strokeStyle = 'rgb('+currentColor.r+','+currentColor.g+','+currentColor.b+')'; // V0_94: 不透明
       atc.lineWidth = Math.max(dpr, currentLW * (scale / lwRef) * dpr * PS);  // V0_87: zoom比例・最小1px
     }
     atc.lineCap = 'round';
@@ -1084,6 +1084,13 @@ if(vd) vd.textContent = APP_VERSION;
 // V0_78: 寸法文字サイズモード対応ヘルパー
 function getDimFontSize(d, PS) {
   PS = PS || 1;
+  // V0_94: PDF書出し時は画面表示と同じ物理サイズ（画面スケール基準）
+  if (window._pdfScale) {
+    var worldH2 = (d && d.worldFontH) ? d.worldFontH : (17 / (scale || 1));
+    var sScale = window._pdfScreenScale || scale;
+    var px2 = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH2 * sScale));
+    return px2 * PS;
+  }
   // 作成時のワールドフォント高（保存済みorフォールバック）
   var worldH = (d && d.worldFontH) ? d.worldFontH : (17 / (scale || 1));
   if (dimensionTextMode === 'fixed') {
@@ -1095,13 +1102,19 @@ function getDimFontSize(d, PS) {
   var px = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH * scale));
   return px * PS;
 }
+// V0_94: 6と9のみで構成される数値はアンダーバーが必要（上下判別のため）
+function needsUnderbar(str){
+  var digits=(str||'').replace(/[^0-9]/g,'');
+  return digits.length>0&&/^[69]+$/.test(digits);
+}
 function drawDimEntity(ctx,d){
   var PS=window._pdfScale||1;
   var col=d.color||'#f39c12';
   ctx.strokeStyle=col;ctx.fillStyle=col;
   // V0_89: 作成時サイズ固定モード時は線幅・矢印・オフセットもズームに比例させる
+  // V0_94: PDF時はfixedRatio=1（画面表示と同じサイズ）
   var fixedRatio=1;
-  if(dimensionTextMode==='fixed'&&d&&d.worldFontH){fixedRatio=(d.worldFontH*scale)/17;}
+  if(!window._pdfScale&&dimensionTextMode==='fixed'&&d&&d.worldFontH){fixedRatio=(d.worldFontH*scale)/17;}
   ctx.lineWidth=1.5*PS*fixedRatio;ctx.setLineDash([]);
   for(const l of d.lines){
     const[sx1,sy1]=w2s(l.x1,l.y1);const[sx2,sy2]=w2s(l.x2,l.y2);
@@ -1121,7 +1134,14 @@ function drawDimEntity(ctx,d){
     ctx.font='bold '+fSize+'px sans-serif';
     ctx.textAlign='center';ctx.textBaseline='bottom';
     ctx.fillStyle=col;
-    ctx.fillText(d.text,0,-gap);ctx.restore();
+    ctx.fillText(d.text,0,-gap);
+    // V0_94: 6・9のみの数値にアンダーバー（上下判別用）
+    if(needsUnderbar(d.text)){
+      var tw=ctx.measureText(d.text).width;
+      ctx.beginPath();ctx.moveTo(-tw/2,-gap+2);ctx.lineTo(tw/2,-gap+2);
+      ctx.lineWidth=Math.max(1*PS,fSize*0.07*PS);ctx.stroke();
+    }
+    ctx.restore();
   }
   // センターマーク（直径・半径寸法）
   if(d.centerMark){
@@ -2067,35 +2087,4 @@ LP.handleUp=function(sx,sy){
   } else if(LP.phase===2){
     var wp=s2w(sx,sy);
     var pArrow=LP.cur||{x:wp[0],y:wp[1]};
-    var dim=buildLinePtDim(LP.selLine,LP.selPt,pArrow);
-    console.log('[LP] dim placed: '+(dim?dim.text:'null'));
-    if(dim){ snapshot(); dims.push(dim); scheduleSave(); scheduleDraw(); }
-    LP.selLine=null; LP.selPt=null; LP.footPt=null; LP.phase=0; LP.cur=null;
-    showGuide(LP_GUIDES.LINE,0);
-    console.log('[LP] → phase0: reset');
-  }
-  scheduleOverlay();
-};
-
-// ─ ツール切り替えフック ─────────────────────────────────────────────
-document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
-  btn.addEventListener('click',function(){
-    var t=this.dataset.tool;
-    if(t==='lp'){
-      if(window.DIM) window.DIM.active=false;
-      resetLP(); LP.active=true; LP.phase=0;
-      showGuide(LP_GUIDES.LINE,0);
-      console.log('[LP] tool activated');
-    } else {
-      resetLP();
-    }
-  });
-});
-
-window.LP=LP;
-console.log('[LP] module initialized');
-
-})(); // end D
-
-</script>
-<div id="guideMsg" st
+    var dim=buildLin
