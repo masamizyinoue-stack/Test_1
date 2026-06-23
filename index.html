@@ -203,6 +203,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .asr-fname{font-size:13px;font-weight:600;color:#7cb8f5}
 .asr-hit{font-size:12px;color:var(--text-dim,#6b7f99);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #allSearchClearBtn{align-self:flex-end;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--text-dim,#6b7f99);background:transparent;color:var(--text-dim,#6b7f99);cursor:pointer}
+/* V0_101: フォルダ一括インデックス */
+#folderIndexBtn{width:100%;padding:10px 0;border-radius:9px;border:none;background:var(--accent,#00d4ff);color:#000;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+#folderIndexBtn:active{opacity:.8}
+#folderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center}
 </style>
 </head>
 <body>
@@ -300,7 +304,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_100</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_101</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -359,7 +363,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_100</div>
+  <div id="ver-label">DXF_View V0_101</div>
 </div>
 
 <div id="colorOverlay">
@@ -457,6 +461,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="sp-close" id="allSearchClose">✕</button>
     </div>
     <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+      <button id="folderIndexBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+        フォルダを選択してインデックス作成
+      </button>
+      <div id="folderProgress"></div>
       <input type="search" id="allSearchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false">
       <div id="allSearchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
       <button id="allSearchClearBtn">インデックスをクリア</button>
@@ -466,6 +475,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 </div>
 
 <input type="file" id="file" hidden>
+<input type="file" id="folderInput" webkitdirectory accept=".dxf" hidden>
 
 <script src="layer.js"></script>
 <script src="viewer.js"></script>
@@ -476,7 +486,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_100';
+const APP_VERSION = 'V0_101';
 
 // =========================================================
 // グローバル状態
@@ -2359,6 +2369,67 @@ document.getElementById('allSearchClearBtn').addEventListener('click',function()
     document.getElementById('allSearchCount').textContent='インデックスをクリアしました';
   }
 });
+
+// V0_101: フォルダ一括インデックス ──────────────────────────────────
+document.getElementById('folderIndexBtn').addEventListener('click', function(){
+  document.getElementById('folderInput').click();
+});
+document.getElementById('folderInput').addEventListener('change', function(e){
+  var files = Array.from(e.target.files).filter(function(f){
+    return f.name.toLowerCase().endsWith('.dxf');
+  });
+  if(files.length === 0){
+    document.getElementById('folderProgress').textContent = 'DXFファイルが見つかりません';
+    return;
+  }
+  processFolderFiles(files);
+  e.target.value = '';
+});
+function processFolderFiles(files){
+  var prog = document.getElementById('folderProgress');
+  var total = files.length;
+  var done = 0;
+  var errors = 0;
+  prog.textContent = '準備中… (0 / ' + total + '件)';
+  // 非同期で順番に処理
+  function next(idx){
+    if(idx >= total){
+      prog.textContent = '完了: ' + (total - errors) + '件インデックス済み' + (errors > 0 ? '（' + errors + '件エラー）' : '');
+      // 検索入力に値があれば再検索
+      var inp = document.getElementById('allSearchInput');
+      if(inp.value.trim()) doAllSearch();
+      return;
+    }
+    var f = files[idx];
+    prog.textContent = '処理中… ' + (idx + 1) + ' / ' + total + '件: ' + f.name;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try{
+        var buf = ev.target.result;
+        var d = parseDXF(buf);
+        var texts = [];
+        if(d && d.moji){
+          d.moji.forEach(function(m){
+            var t = (m.text || '').trim();
+            if(t) texts.push(t);
+          });
+        }
+        _idbSave(f.name, buf, texts);
+        done++;
+      }catch(err){
+        errors++;
+        console.warn('[FolderIndex] ' + f.name + ':', err.message);
+      }
+      setTimeout(function(){ next(idx + 1); }, 0);
+    };
+    reader.onerror = function(){
+      errors++;
+      setTimeout(function(){ next(idx + 1); }, 0);
+    };
+    reader.readAsArrayBuffer(f);
+  }
+  next(0);
+}
 
 </script>
 <div id="guideMsg" st
