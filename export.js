@@ -227,6 +227,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'.pdf'; // V0_96: DXFファイル名をそのまま使用
     pdf.save(fname);
     showGuide('PDFを保存しました',2000);
+    if(typeof window._afterPDFExport==='function'){var _cb=window._afterPDFExport;window._afterPDFExport=null;setTimeout(_cb,600);} // V0_105
 
   }catch(err){
     console.error('PDF export error:',err);

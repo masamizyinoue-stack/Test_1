@@ -209,6 +209,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #folderIndexBtn{width:100%;padding:10px 0;border-radius:9px;border:none;background:var(--accent,#00d4ff);color:#000;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
 #folderIndexBtn:active{opacity:.8}
 #folderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center}
+/* V0_105: タブバー */
+#tabBar{display:flex;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;background:#0d1117;border-bottom:1px solid #2a3040;min-height:0;max-height:40px;flex-shrink:0}
+#tabBar:empty{max-height:0;border-bottom:none}
+.tab-item{display:flex;align-items:center;padding:0 6px 0 12px;min-width:80px;max-width:180px;height:40px;background:#0d1117;border-right:1px solid #2a3040;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;gap:4px;box-sizing:border-box}
+.tab-item.active{background:#1a2535;border-bottom:2px solid var(--accent,#00d4ff)}
+.tab-name{font-size:12px;color:#b0bec5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.tab-item.active .tab-name{color:#fff}
+.tab-close{font-size:13px;color:#6b7f99;min-width:24px;min-height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:none;background:transparent;cursor:pointer;padding:0;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.tab-close:active{background:rgba(255,255,255,.15)}
 </style>
 </head>
 <body>
@@ -221,9 +230,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <span class="logo-sub">Viewer</span>
     </div>
     <div class="logo-file-area">
-      <button id="prevFileBtn" class="logo-file-nav">◀</button>
       <div id="fileNameDisplay" class="logo-file-name" title="">---</div>
-      <button id="nextFileBtn" class="logo-file-nav">▶</button>
     </div>
   </div>
   <div class="tb-sep"></div>
@@ -273,7 +280,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
 </button>
 </div>
-
+<div id="tabBar"></div>
 <div class="stage" id="stage">
   <canvas id="cv"></canvas>
   <canvas id="ac"></canvas>
@@ -307,7 +314,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_104</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_105</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -366,7 +373,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_104</div>
+  <div id="ver-label">DXF_View V0_105</div>
 </div>
 
 <div id="colorOverlay">
@@ -492,7 +499,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_104';
+const APP_VERSION = 'V0_105';
 
 // =========================================================
 // グローバル状態
@@ -921,15 +928,84 @@ function switchToFile(idx){
 }
 
 function updateFileNavUI(){
-  var prev=document.getElementById('prevFileBtn');
-  var next=document.getElementById('nextFileBtn');
-  var n=openFiles.length;
-  if(prev) prev.style.display=n>1?'inline':'none';
-  if(next) next.style.display=n>1?'inline':'none';
+  var bar=document.getElementById('tabBar');
+  if(!bar) return;
+  bar.innerHTML='';
+  for(var i=0;i<openFiles.length;i++){
+    (function(idx){
+      var item=document.createElement('div');
+      item.className='tab-item'+(idx===currentFileIdx?' active':'');
+      var name=document.createElement('span');
+      name.className='tab-name';
+      name.textContent=openFiles[idx].currentFileName||'---';
+      name.title=openFiles[idx].currentFileName||'';
+      var close=document.createElement('button');
+      close.className='tab-close';
+      close.textContent='✕';
+      close.addEventListener('click',function(e){e.stopPropagation();closeTab(idx);});
+      item.appendChild(name);
+      item.appendChild(close);
+      item.addEventListener('click',function(){if(idx!==currentFileIdx) switchToFile(idx);});
+      bar.appendChild(item);
+    })(i);
+  }
 }
 
-document.getElementById('prevFileBtn').addEventListener('click',function(){if(currentFileIdx>0) switchToFile(currentFileIdx-1);});
-document.getElementById('nextFileBtn').addEventListener('click',function(){if(currentFileIdx<openFiles.length-1) switchToFile(currentFileIdx+1);});
+function closeTab(idx){
+  var fname=openFiles[idx]?openFiles[idx].currentFileName||'このファイル':'このファイル';
+  var dlg=document.createElement('div');
+  dlg.style.cssText='position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.65)';
+  var box=document.createElement('div');
+  box.style.cssText='background:#131921;border:1px solid #2a3040;border-radius:14px;padding:22px 18px;min-width:260px;max-width:90vw;display:flex;flex-direction:column;gap:10px';
+  var title=document.createElement('div');
+  title.style.cssText='font-size:13px;color:#ccc;font-weight:600;text-align:center;margin-bottom:2px;word-break:break-all';
+  title.textContent=fname+' を閉じますか？';
+  box.appendChild(title);
+  function makeBtn(label,bg,fg,cb){
+    var b=document.createElement('button');
+    b.textContent=label;
+    b.style.cssText='width:100%;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:'+bg+';color:'+fg+';border:1px solid '+(bg==='transparent'?'#3a4050':'transparent');
+    b.addEventListener('click',function(){document.body.removeChild(dlg);cb();});
+    box.appendChild(b);
+  }
+  makeBtn('PDF書出しして閉じる','#00d4ff','#000',function(){
+    window._afterPDFExport=function(){doCloseTab(idx);};
+    var pdfBtn=document.getElementById('savePDFBtn');
+    if(pdfBtn) pdfBtn.click();
+  });
+  makeBtn('そのまま閉じる','#c0392b','#fff',function(){doCloseTab(idx);});
+  makeBtn('キャンセル','transparent','#6b7f99',function(){});
+  dlg.appendChild(box);
+  dlg.addEventListener('click',function(e){if(e.target===dlg){document.body.removeChild(dlg);}});
+  document.body.appendChild(dlg);
+}
+
+function doCloseTab(idx){
+  openFiles.splice(idx,1);
+  if(openFiles.length===0){
+    currentFileIdx=-1;
+    doc=null;pdfDoc=null;pdfImage=null;
+    strokes=[];dims=[];
+    if(typeof images!=='undefined') images=[];
+    savedViews=[];
+    hiddenLayers=new Set();hiddenLayersArr=[];
+    currentFileName='';currentFileSize=0;
+    var fd=document.getElementById('fileNameDisplay');if(fd) fd.textContent='---';
+    var nd=document.getElementById('noDrawingMsg');if(nd) nd.style.display='';
+    scheduleDraw();scheduleOverlay();
+    updateFileNavUI();scheduleSave();
+    return;
+  }
+  var newIdx;
+  if(idx<currentFileIdx){newIdx=currentFileIdx-1;}
+  else if(idx===currentFileIdx){newIdx=idx<openFiles.length?idx:openFiles.length-1;}
+  else{newIdx=currentFileIdx;}
+  currentFileIdx=-1;
+  switchToFile(newIdx);
+  updateFileNavUI();
+}
+
+// V0_105: prevFileBtn/nextFileBtn removed (replaced by tab bar)
 
 
 // サイドバー
