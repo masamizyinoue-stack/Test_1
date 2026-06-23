@@ -200,8 +200,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #allSearchInput:focus{border-color:var(--accent)}
 .asr-item{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;display:flex;flex-direction:column;gap:3px;-webkit-tap-highlight-color:rgba(0,212,255,.2)}
 .asr-item:active{background:rgba(0,212,255,.12)}
-#markPopup{display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:200;background:rgba(10,14,20,.93);border:1.5px solid rgba(255,215,0,.75);border-radius:10px;padding:10px 22px;color:#fff;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 14px rgba(0,0,0,.5);user-select:none}
-#markPopup.visible{display:flex;align-items:center;gap:6px}
+/* V0_108: markPopup を全体ボタン左へ移動 */
+#markFitRow{grid-column:1/-1;display:flex;gap:4px;align-items:stretch;}
+#markFitRow #fitBtn{flex:1;}
+#markPopup{display:none;min-height:48px;padding:4px 10px;font-size:12px;border:1.5px solid rgba(255,215,0,.75);border-radius:8px;background:rgba(10,14,20,.88);color:#ffd700;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 14px rgba(0,0,0,.5);user-select:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);align-items:center;justify-content:center;gap:4px;white-space:nowrap;flex-shrink:0;}
+#markPopup.visible{display:flex;}
 .asr-fname{font-size:13px;font-weight:600;color:#7cb8f5}
 .asr-hit{font-size:12px;color:#d4e3f7;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #allSearchClearBtn{align-self:flex-end;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--text-dim,#6b7f99);background:transparent;color:var(--text-dim,#6b7f99);cursor:pointer}
@@ -299,7 +302,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <span class="nd-text">NO DRAWING LOADED</span>
   </div>
   <div class="viewmemo" id="viewmemo">
-    <button class="fit-btn full-row" id="fitBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><polyline points="8 3 3 3 3 8"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="3 16 3 21 8 21"/></svg>全体</button>
+    <div id="markFitRow">
+      <div id="markPopup"><span style="font-size:15px">●</span>マーク ✕</div>
+      <button class="fit-btn" id="fitBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><polyline points="8 3 3 3 3 8"/><polyline points="16 3 21 3 21 8"/><polyline points="21 16 21 21 16 21"/><polyline points="3 16 3 21 8 21"/></svg>全体</button>
+    </div>
     <button class="mem-btn" data-vi="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
     <button class="mem-btn" data-vi="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
     <button class="mem-btn" data-vi="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
@@ -307,14 +313,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button class="mem-btn" data-vi="4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button>
   </div>
   <div id="snap-hint"></div>
-  <div id="markPopup"><span style="color:#ffd700;font-size:15px;margin-right:4px">●</span>マーク<span style="font-size:12px;color:rgba(255,215,0,0.65);margin-left:8px">✕ 解除</span></div>
 </div>
 
 <div id="settingsOverlay"></div>
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_107</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_109</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -373,7 +378,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_107</div>
+  <div id="ver-label">DXF_View V0_109</div>
 </div>
 
 <div id="colorOverlay">
@@ -499,7 +504,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_107';
+const APP_VERSION = 'V0_109';
 
 // =========================================================
 // グローバル状態
@@ -1019,13 +1024,21 @@ function updateBwToggleBtn(){
   var btn=document.getElementById('bwToggleBtn');
   var fitBtn=document.getElementById('fitBtn');
   if(!btn)return;
+  var asrClear=document.getElementById('asrInputClearBtn');
+  var idxClear=document.getElementById('allSearchClearBtn');
   if(bwMode){
     btn.style.background='#e8e8e8';btn.style.color='#222';btn.title='白背景（タップで黒へ）';
     // V0_89: 白背景時は「全体」ボタンの枠・文字を黒に
     if(fitBtn){fitBtn.style.borderColor='rgba(0,0,0,0.65)';fitBtn.style.color='rgba(0,0,0,0.85)';}
+    // V0_109: 白背景時はフォルダ検索✕・インデックスをクリアを黒に
+    if(asrClear){asrClear.style.color='#000';}
+    if(idxClear){idxClear.style.color='#000';idxClear.style.borderColor='#000';}
   } else {
     btn.style.background='#222';btn.style.color='#fff';btn.title='黒背景（タップで白へ）';
     if(fitBtn){fitBtn.style.borderColor='';fitBtn.style.color='';}
+    // V0_109: 黒背景時は元に戻す
+    if(asrClear){asrClear.style.color='';}
+    if(idxClear){idxClear.style.color='';idxClear.style.borderColor='';}
   }
 }
 document.getElementById('bwToggleBtn').addEventListener('click',()=>{
