@@ -33,6 +33,8 @@ function handlePointerDown(sx,sy,isPenInput){
   if(window.DIM&&window.DIM.active)return;
   if(window.LP&&window.LP.active)return;
   const[wx,wy]=s2w(sx,sy);
+  // V0_102: dim text drag (水・鉛/斜めツール)
+  if((currentTool==='dxdy'||currentTool==='diag')&&typeof _dimTextHit==='function'){var _dth=_dimTextHit(sx,sy);if(_dth>=0){_dimTextDrag={idx:_dth,osx:sx,osy:sy,otx:dims[_dth].tx,oty:dims[_dth].ty,moved:false};return;}}
   // 寸法ツール: ペン入力のみ（指は touchstart でパン処理済み）
   if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
     if(isPenInput){
@@ -92,6 +94,7 @@ function handlePointerDown(sx,sy,isPenInput){
 // ポインタムーブ処理
 // =========================================================
 function handlePointerMove(sx,sy,isPenInput){
+  if(typeof _dimTextDrag!=='undefined'&&_dimTextDrag&&typeof _dimTextDragMove==='function'&&_dimTextDragMove(sx,sy)) return; // V0_102
   // DIMシステムがアクティブな場合は DIM の pointermove ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
   if(window.LP&&window.LP.active)return;
@@ -123,6 +126,7 @@ function handlePointerMove(sx,sy,isPenInput){
 // ポインタアップ処理
 // =========================================================
 function handlePointerUp(sx,sy,isPenInput){
+  if(typeof _dimTextDragUp==='function'&&_dimTextDragUp()) return; // V0_102
   // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
   if(window.LP&&window.LP.active)return;

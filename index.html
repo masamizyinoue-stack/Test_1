@@ -176,7 +176,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #colorOverlay[data-mode="hl"] .co-hl-section{display:block}
 #colorOverlay[data-mode="dim"] .co-dim-section{display:block}
 /* V0_74: 計測グループラベル */
-.dim-group{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+.dim-group{display:flex;align-items:center;flex-shrink:0}
 .dim-group-label{font-size:9px;color:rgba(232,168,74,0.8);letter-spacing:0.5px;line-height:1;pointer-events:none;user-select:none}
 .dim-group-btns{display:flex;align-items:center;gap:1px}
 /* V0_98: 文字検索パネル */
@@ -234,7 +234,6 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="tb-sep"></div>
   <!-- V0_74: 計測グループ（ラベル付き） -->
   <div class="dim-group">
-    <span class="dim-group-label">計測</span>
     <div class="dim-group-btns">
       <button class="tool-color-dot" id="dimColorDot" title="寸法色" style="display:none;background:#f39c12;margin-right:8px"></button>
       <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
@@ -248,6 +247,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
   <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.95"/></svg></button>
+  <div class="tb-sep"></div>
 
   <button class="tb-btn" id="bwToggleBtn" title="白/黒背景切替" style="font-size:12px;min-width:36px;padding:0 6px;">
   <span class="tb-tool-label">画面</span>
@@ -262,12 +262,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
 </button>
-  <button class="tb-btn" id="searchBtn" title="文字検索">
-  <span class="tb-tool-label">検索</span>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="searchBtn" title="画面検索">
+  <span class="tb-tool-label">画面検索</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 </button>
-  <button class="tb-btn" id="allSearchBtn" title="全図面検索">
-  <span class="tb-tool-label">図面検索</span>
+  <button class="tb-btn" id="allSearchBtn" title="フォルダ検索">
+  <span class="tb-tool-label">フォルダ検索</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/><line x1="10" y1="7" x2="10" y2="13"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
 </button>
 </div>
@@ -304,7 +305,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_101</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_102</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -329,7 +330,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
         <input type="radio" name="dimTextMode" id="dimTextAuto" value="auto" checked style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
-        <span>自動（推奨）</span>
+        <span>自動（拡縮追随）</span>
       </label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
         <input type="radio" name="dimTextMode" id="dimTextFixed" value="fixed" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
@@ -363,7 +364,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_101</div>
+  <div id="ver-label">DXF_View V0_102</div>
 </div>
 
 <div id="colorOverlay">
@@ -381,9 +382,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="co-label">ペン線幅</div>
     <div class="co-lw">
       <button class="lw-btn" data-lw="0.4">0.4</button>
-      <button class="lw-btn" data-lw="0.6">0.6</button>
+      <button class="lw-btn active" data-lw="0.6">0.6</button>
       <button class="lw-btn" data-lw="0.8">0.8</button>
-      <button class="lw-btn active" data-lw="1">1</button>
+      <button class="lw-btn" data-lw="1">1</button>
       <button class="lw-btn" data-lw="2">2</button>
       <button class="lw-btn" data-lw="3">3</button>
       <button class="lw-btn" data-lw="4">4</button>
@@ -407,13 +408,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="hl-lw-btn" data-lw="1">1</button>
       <button class="hl-lw-btn" data-lw="2">2</button>
       <button class="hl-lw-btn" data-lw="3">3</button>
-      <button class="hl-lw-btn" data-lw="4">4</button>
+      <button class="hl-lw-btn active" data-lw="4">4</button>
       <button class="hl-lw-btn" data-lw="5">5</button>
       <button class="hl-lw-btn" data-lw="6">6</button>
       <button class="hl-lw-btn" data-lw="7">7</button>
       <button class="hl-lw-btn" data-lw="8">8</button>
       <button class="hl-lw-btn" data-lw="9">9</button>
-      <button class="hl-lw-btn active" data-lw="10">10</button>
+      <button class="hl-lw-btn" data-lw="10">10</button>
     </div>
   </div>
   <div class="co-dim-section">
@@ -446,7 +447,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="sp-close" id="searchClose">✕</button>
     </div>
     <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
-      <input type="search" id="searchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="search" id="searchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;width:auto;min-width:0">
+        <button id="searchClearBtn" style="background:none;border:none;color:var(--text-dim,#6b7f99);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button>
+      </div>
       <div id="searchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
     </div>
     <div id="searchResultList" style="flex:1;overflow-y:auto"></div>
@@ -486,7 +490,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_101';
+const APP_VERSION = 'V0_102';
 
 // =========================================================
 // グローバル状態
@@ -495,9 +499,9 @@ const APP_VERSION = 'V0_101';
 let scaleDenom=1;
 var currentTool='sketch';
 var currentColor={r:255,g:0,b:0};
-var currentLW=1;
+var currentLW=0.6;
 var currentHL_Color={r:255,g:255,b:0}; // 蛍光ペン色（黄）
-var currentHL_LW=10;                    // 蛍光ペン線幅
+var currentHL_LW=4;                     // 蛍光ペン線幅
 var currentDimColor='#f39c12';          // 寸法色
 var dims=[];
 var strokes=[];
@@ -2105,6 +2109,8 @@ LP.handleDown=function(sx,sy){
   var wp=s2w(sx,sy);
   LP._hoverPos={x:wp[0],y:wp[1]};
   LP.penDown=true;
+  // V0_102: dim text drag
+  {var _lph=_dimTextHit(sx,sy);if(_lph>=0){_dimTextDrag={idx:_lph,osx:sx,osy:sy,otx:dims[_lph].tx,oty:dims[_lph].ty,moved:false};return;}}
   if(LP.phase===0){
     _updateHoverLine(wp[0],wp[1]);
   } else if(LP.phase===1){
@@ -2116,6 +2122,7 @@ LP.handleDown=function(sx,sy){
 };
 
 LP.handleMove=function(sx,sy){
+  if(_dimTextDrag&&_dimTextDragMove(sx,sy)) return; // V0_102
   var wp=s2w(sx,sy);
   LP._hoverPos={x:wp[0],y:wp[1]};
   if(!LP.penDown){scheduleOverlay();return;}
@@ -2130,6 +2137,7 @@ LP.handleMove=function(sx,sy){
 };
 
 LP.handleUp=function(sx,sy){
+  if(_dimTextDragUp()) return; // V0_102
   if(!LP.penDown) return;
   LP.penDown=false;
   if(LP.phase===0){
@@ -2264,7 +2272,7 @@ document.getElementById('searchBtn').addEventListener('click',function(){
   if(inp.value.trim()) doSearch();
   setTimeout(function(){inp.focus();},120);
 });
-function closeSearch(){document.getElementById('searchOverlay').classList.remove('open');}
+function closeSearch(){document.getElementById('searchOverlay').classList.remove('open');_searchHighlight=null;scheduleOverlay();}
 document.getElementById('searchClose').addEventListener('click',closeSearch);
 document.getElementById('searchBg').addEventListener('click',closeSearch);
 document.getElementById('searchInput').addEventListener('input',doSearch);
@@ -2429,6 +2437,51 @@ function processFolderFiles(files){
     reader.readAsArrayBuffer(f);
   }
   next(0);
+}
+
+// V0_102: 画面検索 ✕ボタン
+document.getElementById('searchClearBtn').addEventListener('click',function(){
+  var inp=document.getElementById('searchInput');
+  inp.value='';
+  document.getElementById('searchResultList').innerHTML='';
+  document.getElementById('searchCount').textContent='';
+  _searchHighlight=null;
+  scheduleOverlay();
+});
+
+// V0_102: dim text drag ヘルパー（水・鉛/線と点 寸法値位置調整）
+var _dimTextDrag=null;
+function _dimTextHit(sx,sy){
+  var r=26;
+  for(var _dti=dims.length-1;_dti>=0;_dti--){
+    var _dtd=dims[_dti];
+    if(_dtd.tx===undefined||_dtd.ty===undefined) continue;
+    var _dts=w2s(_dtd.tx,_dtd.ty);
+    if(Math.hypot(sx-_dts[0],sy-_dts[1])<r) return _dti;
+  }
+  return -1;
+}
+function _dimTextDragMove(sx,sy){
+  if(!_dimTextDrag) return false;
+  var _dd=dims[_dimTextDrag.idx];
+  if(!_dd){_dimTextDrag=null;return false;}
+  if(!_dimTextDrag.moved&&Math.hypot(sx-_dimTextDrag.osx,sy-_dimTextDrag.osy)>5){
+    snapshot();_dimTextDrag.moved=true;
+  }
+  if(_dimTextDrag.moved){
+    var _wo=s2w(_dimTextDrag.osx,_dimTextDrag.osy);
+    var _wn=s2w(sx,sy);
+    _dd.tx=_dimTextDrag.otx+(_wn[0]-_wo[0]);
+    _dd.ty=_dimTextDrag.oty+(_wn[1]-_wo[1]);
+    scheduleOverlay();
+  }
+  return true;
+}
+function _dimTextDragUp(){
+  if(!_dimTextDrag) return false;
+  if(_dimTextDrag.moved) scheduleSave();
+  _dimTextDrag=null;
+  return true;
 }
 
 </script>
