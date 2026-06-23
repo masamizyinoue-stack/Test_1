@@ -126,10 +126,3 @@ async function tryRestore(){
     }
   }catch(e){}
 }
-ame});
-      currentFileIdx=0;
-      if(typeof saveCurrentFileState==='function') saveCurrentFileState();
-      if(typeof updateFileNavUI==='function') updateFileNavUI();
-    }
-  }catch(e){console.warn('restore:',e);}
-}
