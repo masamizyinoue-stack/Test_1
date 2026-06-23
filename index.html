@@ -268,7 +268,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_95</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_97</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -327,7 +327,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_95</div>
+  <div id="ver-label">DXF_View V0_97</div>
 </div>
 
 <div id="colorOverlay">
@@ -412,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_95';
+const APP_VERSION = 'V0_97';
 
 // =========================================================
 // グローバル状態
@@ -1089,7 +1089,7 @@ function getDimFontSize(d, PS) {
   if (dimensionTextMode === 'fixed') {
     // 作成時サイズ固定: ワールド座標基準でズームに比例して拡縮
     // → 図面上に描かれた文字のように、ズームアウトで小さく・ズームインで大きく
-    return Math.max(4, worldH * scale) * PS;
+    return Math.max(4, worldH * scale) * PS * 1.5; // V0_97: 1.5倍
   }
   // auto（推奨）: DIM_TEXT_MIN/MAX_PXでクランプ → 常に読みやすいサイズを維持
   var px = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH * scale));
@@ -1121,7 +1121,7 @@ function drawDimEntity(ctx,d){
   if(d.text){
     const[sx,sy]=w2s(d.tx,d.ty);
     var fSize=getDimFontSize(d,PS); // V0_78: dimensionTextModeに応じたサイズ
-    var gap=5*PS*fixedRatio; // 寸法線からの余白（V0_89: fixedRatio対応）
+    var gap=(dimensionTextMode==='fixed'?8:5)*PS*fixedRatio; // V0_97: fixed時8px（アンダーバー離隔確保）
     ctx.save();ctx.translate(sx,sy);ctx.rotate(d.tangle||0);
     ctx.font='bold '+fSize+'px sans-serif';
     ctx.textAlign='center';ctx.textBaseline='bottom';
