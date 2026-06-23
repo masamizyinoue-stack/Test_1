@@ -151,7 +151,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
 
-    const LONG_PX=6000;  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）
+    const LONG_PX=6500;  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）/ V0_95: 6000→6500（556DPI）
     const aspect=extW/extH;
     const CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);
     const CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;
@@ -224,8 +224,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const orient=pageMM_W>=pageMM_H?'l':'p';
     const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
     // V0_92: JPEG 0.98（PNG at 45MP → jsPDF/iOS failure の回避、高品質維持）
-    // V0_95: JPEG品質 0.98→1.0（最高品質）
-    const imgData=comp.toDataURL('image/jpeg',1.0);
+    const imgData=comp.toDataURL('image/jpeg',0.97);
     pdf.addImage(imgData,'JPEG',0,0,pageMM_W,pageMM_H);
     const ts=new Date().toISOString().slice(0,10);
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_${ts}.pdf`;
