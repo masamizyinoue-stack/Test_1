@@ -281,7 +281,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_98</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_99</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -340,7 +340,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_98</div>
+  <div id="ver-label">DXF_View V0_99</div>
 </div>
 
 <div id="colorOverlay">
@@ -441,7 +441,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_98';
+const APP_VERSION = 'V0_99';
 
 // =========================================================
 // グローバル状態
@@ -2152,11 +2152,14 @@ var _searchHighlight=null;
 
 function buildSearchIndex(){
   _searchIdx=[];
-  if(!doc||!doc.moji) return;
+  if(!doc||!doc.moji){console.log('[Search] doc.mojiなし');return;}
+  console.log('[Search] doc.moji件数:',doc.moji.length);
   for(var i=0;i<doc.moji.length;i++){
     var m=doc.moji[i];
-    if(m.text&&m.text.trim()) _searchIdx.push({text:m.text,x:m.x,y:m.y,h:m.h||1});
+    var t=(m.text||'').trim();
+    if(t) _searchIdx.push({text:t,x:m.x,y:m.y,h:m.h||1});
   }
+  console.log('[Search] インデックス件数:',_searchIdx.length);
 }
 
 function doSearch(){
@@ -2164,7 +2167,11 @@ function doSearch(){
   var list=document.getElementById('searchResultList');
   var countEl=document.getElementById('searchCount');
   list.innerHTML='';
-  if(!kw){countEl.textContent='';return;}
+  if(!kw){countEl.textContent=_searchIdx.length>0?_searchIdx.length+'件の文字をインデックス済':'';return;}
+  if(_searchIdx.length===0){
+    countEl.textContent='インデックスが空です（DXFを再読込してください）';
+    return;
+  }
   var results=_searchIdx.filter(function(m){return m.text.toLowerCase().includes(kw);});
   countEl.textContent='検索結果: '+results.length+'件';
   results.slice(0,200).forEach(function(item){
@@ -2202,8 +2209,15 @@ function jumpToSearchResult(item){
 }
 
 document.getElementById('searchBtn').addEventListener('click',function(){
+  // DXFが開かれていたら再インデックス（念のため）
+  if(doc&&doc.moji) buildSearchIndex();
   document.getElementById('searchOverlay').classList.add('open');
-  setTimeout(function(){document.getElementById('searchInput').focus();},120);
+  // インデックス件数をプレースホルダーに表示
+  var inp=document.getElementById('searchInput');
+  inp.placeholder=_searchIdx.length>0?'キーワードを入力… ('+_searchIdx.length+'件の文字)':'文字なし（DXFを確認）';
+  // 既存のキーワードがあれば再検索
+  if(inp.value.trim()) doSearch();
+  setTimeout(function(){inp.focus();},120);
 });
 function closeSearch(){document.getElementById('searchOverlay').classList.remove('open');}
 document.getElementById('searchClose').addEventListener('click',closeSearch);

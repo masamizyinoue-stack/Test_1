@@ -357,7 +357,9 @@ function convertOne(P,si,layerMap,ltypeMap,blockMap,depth){
   } else if(type==='TEXT'||type==='ATTRIB'){
     result.push({type:'moji',x:gf(10),y:gf(20),text:gv(1,'')||'',h:gf(40,1),angle:gf(50,0),color,layer,widthFactor:gf(41,1)||1});
   } else if(type==='MTEXT'){
-    let txt=gv(1,'')||'';
+    // group code 3 (continuation) + 1 (last/only part) を結合
+    var _mt3=extras.filter(function(e){return e[0]===3;}).map(function(e){return e[1];}).join('');
+    let txt=_mt3+(gv(1,'')||'');
     txt=txt.replace(/\\[pP]/g,'\n').replace(/\{\\[^;]+;/g,'').replace(/\}/g,'').replace(/\\[A-Za-z][^;]*;/g,'').replace(/%%[cCdDpP]/g,'');
     result.push({type:'moji',x:gf(10),y:gf(20),text:txt,h:gf(40,1),angle:0,color,layer,widthFactor:1});
   } else if(type==='SOLID'||type==='TRACE'){
