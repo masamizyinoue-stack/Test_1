@@ -375,6 +375,14 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="exportDxfviewBtn" class="sp-action-btn">.dxfview保存</button>
   </div>
   <div class="sp-section">
+    <div class="sp-label">PDF解像度（試験）</div>
+    <div style="display:flex;gap:6px">
+      <button id="pdfRes1Btn" class="sp-toggle-btn active">1x</button>
+      <button id="pdfRes2Btn" class="sp-toggle-btn">2x</button>
+      <button id="pdfRes3Btn" class="sp-toggle-btn">3x</button>
+    </div>
+  </div>
+    <div class="sp-section">
     <button id="hybridPDFBtn" class="sp-action-btn">HD-PDF書出（試験）</button>
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
@@ -384,7 +392,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_124</div>
+  <div id="ver-label">DXF_View V0_126</div>
 </div>
 
 <div id="colorOverlay">
@@ -507,10 +515,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="ui.js"></script>
 <script src="dialog.js"></script>
 <script src="storage.js"></script>
+<script src="fonts/NotoSansJP.js"></script>
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_124';
+const APP_VERSION = 'V0_126';
 
 // =========================================================
 // グローバル状態

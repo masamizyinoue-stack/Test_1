@@ -160,7 +160,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
 
-    const LONG_PX=6500;  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）/ V0_95: 6000→6500（556DPI）
+    const LONG_PX=Math.round(6500*_pdfResMulti);  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）/ V0_95: 6000→6500（556DPI）
     const aspect=extW/extH;
     let CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);  // V0_117: let（サイズ制限時に縮小）
     let CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;  // V0_117: let
@@ -635,3 +635,24 @@ async function exportHybridPDF(){
   }
 }
 document.getElementById('hybridPDFBtn').addEventListener('click',exportHybridPDF);
+
+// V0_126: PDF解像度倍率（1x/2x/3x）
+var _pdfResMulti=1;
+(function(){
+  var btns=[
+    {id:'pdfRes1Btn',v:1},
+    {id:'pdfRes2Btn',v:2},
+    {id:'pdfRes3Btn',v:3}
+  ];
+  function setRes(v){
+    _pdfResMulti=v;
+    btns.forEach(function(b){
+      var el=document.getElementById(b.id);
+      if(el) el.classList.toggle('active',b.v===v);
+    });
+  }
+  btns.forEach(function(b){
+    var el=document.getElementById(b.id);
+    if(el) el.addEventListener('click',function(){setRes(b.v);});
+  });
+})();
