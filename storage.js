@@ -131,6 +131,7 @@ function doSave(){
       localStorage.removeItem(MULTI_KEY);
     }
     scheduleBkSave(); // V0_121: クールダウン方式バックアップをスケジュール
+    _dvAutoSave(); // V0_127: .dxfview自動保存
   }catch(e){}
 }
 
@@ -416,4 +417,35 @@ function scheduleBkSave(){
   }else{
     _bkTimer=setTimeout(_doBkSave,remaining);
   }
+}
+
+// =========================================================
+// V0_127: .dxfview 自動保存（IndexedDB: dxfViewerDxfviewDB）
+// doSave() のたびに dims/strokes を IDB へ自動保存する
+// =========================================================
+var _DV_IDB_NAME='dxfViewerDxfviewDB';
+function _dvAutoSave(){
+  try{
+    if((!dims||dims.length===0)&&(!strokes||strokes.length===0)) return;
+    var fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
+    if(!fk) return;
+    var r=indexedDB.open(_DV_IDB_NAME,1);
+    r.onupgradeneeded=function(e){e.target.result.createObjectStore('dv',{keyPath:'fk'});};
+    r.onsuccess=function(e){
+      var db=e.target.result;
+      try{
+        var tx=db.transaction('dv','readwrite');
+        tx.objectStore('dv').put({
+          fk:fk,
+          format:'dxfview',version:1,
+          fileName:currentFileName||'',fileSize:currentFileSize||0,
+          savedAt:new Date().toISOString(),
+          dims:dims.slice(),
+          strokes:strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});})
+        });
+        tx.onerror=function(ev){console.warn('[dxfview auto-save] tx error',ev.target.error);};
+      }catch(er){console.warn('[dxfview auto-save] put error',er);}
+    };
+    r.onerror=function(e){console.warn('[dxfview auto-save] open error',e.target.error);};
+  }catch(e){console.warn('[dxfview auto-save]',e);}
 }

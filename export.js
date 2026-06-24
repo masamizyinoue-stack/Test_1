@@ -378,23 +378,37 @@ document.getElementById('exportDxfBtn').addEventListener('click',exportSketchDxf
 // =========================================================
 // V0_122: .dxfview書出し（dims + strokes のみ）
 // =========================================================
-function exportDxfview(){
+// V0_127: .dxfview自動保存対応。IDB(自動保存)→メモリの頪で読み込み、ダウンロード
+async function exportDxfview(){
   try{
-    if((!dims||dims.length===0)&&(!strokes||strokes.length===0)){
-      showGuide('保存する寸法・手書きがありません',2000);return;
-    }
     const fk=(_fileKey?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
-    const payload={
-      format:'dxfview',
-      version:1,
-      appVersion:APP_VERSION,
-      fileName:currentFileName||'',
-      fileSize:currentFileSize||0,
-      fileKey:fk,
-      exportedAt:new Date().toISOString(),
-      dims:dims,
-      strokes:strokes
-    };
+    // IDBから自動保存データを読み込む
+    let payload=await new Promise(function(resolve){
+      try{
+        var r=indexedDB.open('dxfViewerDxfviewDB',1);
+        r.onupgradeneeded=function(e){e.target.result.createObjectStore('dv',{keyPath:'fk'});};
+        r.onsuccess=function(e){
+          try{
+            var tx=e.target.result.transaction('dv','readonly');
+            var gr=tx.objectStore('dv').get(fk);
+            gr.onsuccess=function(){resolve(gr.result||null);};
+            gr.onerror=function(){resolve(null);};
+          }catch(er){resolve(null);}
+        };
+        r.onerror=function(){resolve(null);};
+      }catch(e){resolve(null);}
+    });
+    // IDBになければメモリから取得
+    if(!payload){
+      if((!dims||dims.length===0)&&(!strokes||strokes.length===0)){
+        showGuide('保存するデータがありません',2000);return;
+      }
+      payload={format:'dxfview',version:1,
+        fileName:currentFileName||'',fileSize:currentFileSize||0,
+        fileKey:fk,dims:dims,strokes:strokes};
+    }
+    payload.appVersion=APP_VERSION;
+    payload.exportedAt=new Date().toISOString();
     const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
     const base=(currentFileName||'export').replace(/\.[^.]+$/,'');
     const date=new Date().toISOString().slice(0,10);
