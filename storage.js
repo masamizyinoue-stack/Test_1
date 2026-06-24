@@ -14,6 +14,8 @@ const SAVE_KEY='dxfview_v1';
 const FILE_KEY='dxfview_v1_file';
 const MULTI_KEY='dxfview_v1_multi'; // V0_112: マルチファイル復元用
 let saveTimer=null;
+let _bkTimer=null;   // V0_121: バックアップタイマー
+let _bkLastTs=0;     // V0_121: 最後のバックアップ時刻(ms)
 
 // =========================================================
 // V0_114: IndexedDB（復元用バイナリ専用）
@@ -128,6 +130,7 @@ function doSave(){
     }else{
       localStorage.removeItem(MULTI_KEY);
     }
+    scheduleBkSave(); // V0_121: クールダウン方式バックアップをスケジュール
   }catch(e){}
 }
 
@@ -334,4 +337,83 @@ async function tryRestore(){
       if(typeof updateFileNavUI==='function') updateFileNavUI();
     }
   }catch(e){}
+}
+
+// =========================================================
+// V0_121: 自動バックアップ（dxfViewerBackupDB）
+// 既存の dxfViewerFilesDB とは完全に別DB — 既存処理へ影響ゼロ
+// =========================================================
+const _BK_IDB_NAME='dxfViewerBackupDB';
+const _BK_IDB_VER=1;
+const _BK_IDB_STORE='backups';
+const _BK_COOLDOWN=60000; // 60秒
+const _BK_KEEP=5;         // ファイルごとに保持する世代数
+
+function _bkIdbOpen(cb){
+  var req=indexedDB.open(_BK_IDB_NAME,_BK_IDB_VER);
+  req.onupgradeneeded=function(e){
+    var db=e.target.result;
+    if(!db.objectStoreNames.contains(_BK_IDB_STORE)){
+      var store=db.createObjectStore(_BK_IDB_STORE,{keyPath:'id',autoIncrement:true});
+      store.createIndex('fileKey','fileKey',{unique:false});
+      store.createIndex('ts','ts',{unique:false});
+    }
+  };
+  req.onsuccess=function(e){cb(null,e.target.result);};
+  req.onerror=function(e){cb(e.target.error,null);};
+}
+
+// dims/strokes をバックアップ保存し、古い世代を削除する
+function _bkPut(fileKey,dims,strokes){
+  if(!fileKey) return;
+  _bkIdbOpen(function(err,db){
+    if(err) return;
+    // 保存
+    var wtx=db.transaction(_BK_IDB_STORE,'readwrite');
+    wtx.onerror=function(e){console.warn('[Backup] wtx failed',e.target.error);};
+    var store=wtx.objectStore(_BK_IDB_STORE);
+    var addReq=store.add({fileKey:fileKey,ts:Date.now(),dims:dims,strokes:strokes});
+    addReq.onerror=function(e){console.warn('[Backup] add failed',e.target.error);};
+    wtx.oncomplete=function(){
+      // 世代削除: fileKey の全レコードを ts 昇順で取得し、_BK_KEEP 超過分を削除
+      var rtx=db.transaction(_BK_IDB_STORE,'readwrite');
+      var rstore=rtx.objectStore(_BK_IDB_STORE);
+      var idx=rstore.index('fileKey');
+      var req2=idx.getAll(fileKey);
+      req2.onerror=function(e){console.warn('[Backup] getAll failed',e.target.error);};
+      req2.onsuccess=function(ev){
+        var recs=ev.target.result;
+        if(recs.length<=_BK_KEEP) return;
+        recs.sort(function(a,b){return a.ts-b.ts;});
+        var del=recs.slice(0,recs.length-_BK_KEEP);
+        var dtx=db.transaction(_BK_IDB_STORE,'readwrite');
+        dtx.onerror=function(e){console.warn('[Backup] dtx failed',e.target.error);};
+        var dstore=dtx.objectStore(_BK_IDB_STORE);
+        del.forEach(function(r){dstore.delete(r.id);});
+      };
+    };
+  });
+}
+
+// バックアップ実行
+function _doBkSave(){
+  _bkTimer=null;
+  _bkLastTs=Date.now();
+  var fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName;
+  if(!fk) return;
+  _bkPut(fk,dims.slice(),strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});}));
+}
+
+// クールダウン方式スケジューラ
+// 最後のバックアップから60秒以上経過 → 即時実行
+// 60秒未満 → 残り時間後に実行（上書きスケジュール）
+function scheduleBkSave(){
+  clearTimeout(_bkTimer);
+  var elapsed=Date.now()-_bkLastTs;
+  var remaining=_BK_COOLDOWN-elapsed;
+  if(remaining<=0){
+    _doBkSave();
+  }else{
+    _bkTimer=setTimeout(_doBkSave,remaining);
+  }
 }

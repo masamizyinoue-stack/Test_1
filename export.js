@@ -374,3 +374,40 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
 // DXF書き出しボタン
 // =========================================================
 document.getElementById('exportDxfBtn').addEventListener('click',exportSketchDxf);
+
+// =========================================================
+// V0_122: .dxfview書出し（dims + strokes のみ）
+// =========================================================
+function exportDxfview(){
+  try{
+    if((!dims||dims.length===0)&&(!strokes||strokes.length===0)){
+      showGuide('保存する寸法・手書きがありません',2000);return;
+    }
+    const fk=(_fileKey?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
+    const payload={
+      format:'dxfview',
+      version:1,
+      appVersion:APP_VERSION,
+      fileName:currentFileName||'',
+      fileSize:currentFileSize||0,
+      fileKey:fk,
+      exportedAt:new Date().toISOString(),
+      dims:dims,
+      strokes:strokes
+    };
+    const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+    const base=(currentFileName||'export').replace(/\.[^.]+$/,'');
+    const date=new Date().toISOString().slice(0,10);
+    const fname=base+'_'+date+'.dxfview';
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=fname;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    showGuide('.dxfviewを保存しました',2000);
+  }catch(e){
+    console.warn('[dxfview export] failed',e);
+    showGuide('.dxfview保存に失敗しました',2000);
+  }
+}
+document.getElementById('exportDxfviewBtn').addEventListener('click',exportDxfview);
