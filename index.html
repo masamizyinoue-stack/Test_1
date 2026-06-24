@@ -378,7 +378,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_119</div>
+  <div id="ver-label">DXF_View V0_120</div>
 </div>
 
 <div id="colorOverlay">
@@ -504,7 +504,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_119';
+const APP_VERSION = 'V0_120';
 
 // =========================================================
 // グローバル状態
@@ -1530,6 +1530,7 @@ function formatDim(d){
   window.snapAt=function(wx,wy){
     var base=_origSnapAt(wx,wy);
     if(!doc) return base;
+    if(perfMode) return base; // V0_120: 大容量DXF時は拡張スナップをスキップ
     var extras=[];
     var sr=24/scale;
     var sen=doc.sen||[], enko=doc.enko||[];
