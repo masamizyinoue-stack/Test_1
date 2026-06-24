@@ -310,15 +310,17 @@ document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
     // Step2: html2canvasでUIレイヤー（ヘッダー等）取得 → ステージ領域を実canvas内容で上書き
     if(typeof html2canvas !== 'undefined'){
       try{
+        // V0_118: stageRectをhtml2canvas実行前に取得し、scrollオフセットも加算
+        // （html2canvas完了後に取得するとレイアウト変化で座標がずれる場合があるため）
+        const stageRect = stageEl.getBoundingClientRect();
+        const sx = Math.round((stageRect.left + window.scrollX) * dpr);
+        const sy = Math.round((stageRect.top  + window.scrollY) * dpr);
         const uiCanvas = await html2canvas(document.body, {
           scale: dpr,
           backgroundColor: bwMode ? '#ffffff' : '#0b0f16',
           logging: false,
           imageTimeout: 8000
         });
-        const stageRect = stageEl.getBoundingClientRect();
-        const sx = Math.round(stageRect.left * dpr);
-        const sy = Math.round(stageRect.top * dpr);
         const bctx = uiCanvas.getContext('2d');
         bctx.fillStyle = bwMode ? '#ffffff' : '#1e2430';
         bctx.fillRect(sx, sy, W, H);
