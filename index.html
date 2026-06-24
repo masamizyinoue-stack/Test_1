@@ -392,7 +392,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_127</div>
+  <div id="ver-label">DXF_View V0_130</div>
 </div>
 
 <div id="colorOverlay">
@@ -519,7 +519,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_127';
+const APP_VERSION = 'V0_130';
 
 // =========================================================
 // グローバル状態
@@ -910,6 +910,8 @@ fileInput.addEventListener('change',async e=>{
       doc=parseDXF(buf);
       currentFileSize=f.size; // V0_103
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット
+      // V0_130: 同一ファイルの保存済みデータを復元（タブ閉じ後に再ピッカー選択した場合）
+      try{var _fkR=_fileKey(f.name,f.size);var _svR=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(_svR&&_svR.fileKey===_fkR){if(_svR.dims&&_svR.dims.length>0)dims=_svR.dims;if(_svR.strokes&&_svR.strokes.length>0)strokes=_svR.strokes;if(_svR.hiddenLayers)hiddenLayers=new Set(_svR.hiddenLayers);if(_svR.savedViews&&_svR.savedViews.length>0)savedViews=_svR.savedViews;}}catch(_eR){}
       buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();_idbSave(f.name,buf,_searchIdx.map(function(m){return m.text;}));{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
       saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();// V0_113: openFiles[]登録後に保存されるようdoSave→scheduleSave
       document.body.classList.remove('settings-open');
@@ -1053,6 +1055,7 @@ function doCloseTab(idx){
   if(openFiles.length===0){
     currentFileIdx=-1;
     doc=null;pdfDoc=null;pdfImage=null;
+    doSave(); // V0_128: 即時保存（scheduleSaveは800ms非同期のため不可）
     strokes=[];dims=[];
     if(typeof images!=='undefined') images=[];
     savedViews=[];
@@ -1061,7 +1064,7 @@ function doCloseTab(idx){
     var fd=document.getElementById('fileNameDisplay');if(fd) fd.textContent='---';
     var nd=document.getElementById('noDrawingMsg');if(nd) nd.style.display='';
     scheduleDraw();scheduleOverlay();
-    updateFileNavUI();scheduleSave();
+    updateFileNavUI();
     return;
   }
   var newIdx;
@@ -1079,6 +1082,9 @@ function doCloseTab(idx){
 // サイドバー
 document.getElementById('settingsBtn').addEventListener('click',()=>document.body.classList.add('settings-open'));
 document.getElementById('settingsClose').addEventListener('click',()=>document.body.classList.remove('settings-open'));
+// V0_129: Safari終了・バックグラウンド移行時に即時保存
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')doSave();});
+window.addEventListener('pagehide',function(){doSave();});
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
 function updateBwToggleBtn(){
