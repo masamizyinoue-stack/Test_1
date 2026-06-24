@@ -392,7 +392,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_130</div>
+  <div id="ver-label">DXF_View V0_132</div>
 </div>
 
 <div id="colorOverlay">
@@ -519,7 +519,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_130';
+const APP_VERSION = 'V0_132';
 
 // =========================================================
 // グローバル状態
@@ -909,7 +909,10 @@ fileInput.addEventListener('change',async e=>{
     try{
       doc=parseDXF(buf);
       currentFileSize=f.size; // V0_103
+      if(currentFileName&&(dims.length>0||strokes.length>0))doSave(); // V0_132: データがある場合のみ保存（空データによるSAVE_KEY上書き防止）
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット
+      // V0_131: ファイル切替時にマーク自動クリア
+      _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
       // V0_130: 同一ファイルの保存済みデータを復元（タブ閉じ後に再ピッカー選択した場合）
       try{var _fkR=_fileKey(f.name,f.size);var _svR=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(_svR&&_svR.fileKey===_fkR){if(_svR.dims&&_svR.dims.length>0)dims=_svR.dims;if(_svR.strokes&&_svR.strokes.length>0)strokes=_svR.strokes;if(_svR.hiddenLayers)hiddenLayers=new Set(_svR.hiddenLayers);if(_svR.savedViews&&_svR.savedViews.length>0)savedViews=_svR.savedViews;}}catch(_eR){}
       buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();_idbSave(f.name,buf,_searchIdx.map(function(m){return m.text;}));{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
@@ -945,6 +948,8 @@ function saveCurrentFileState(){
 
 function switchToFile(idx){
   if(idx<0||idx>=openFiles.length) return;
+  // V0_131: タブ切替時にマーク自動クリア
+  _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
   saveCurrentFileState();
   currentFileIdx=idx;
   var f=openFiles[idx];
@@ -1083,8 +1088,8 @@ function doCloseTab(idx){
 document.getElementById('settingsBtn').addEventListener('click',()=>document.body.classList.add('settings-open'));
 document.getElementById('settingsClose').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // V0_129: Safari終了・バックグラウンド移行時に即時保存
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')doSave();});
-window.addEventListener('pagehide',function(){doSave();});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'&&currentFileName)doSave();}); // V0_132: ガード追加
+window.addEventListener('pagehide',function(){if(currentFileName)doSave();}); // V0_132: ガード追加
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
 function updateBwToggleBtn(){
@@ -2434,7 +2439,7 @@ function jumpToSearchResult(item){
     cnt++;
     _searchHighlight=(cnt%2===0)?null:item;
     scheduleOverlay();
-    if(cnt>=6){clearInterval(iv);_searchHighlight=item;scheduleOverlay();}
+    if(cnt>=6){clearInterval(iv);_searchHighlight=item;scheduleOverlay();var _mp2=document.getElementById('markPopup');if(_mp2)_mp2.classList.add('visible');} // V0_131
   },400);
 }
 
@@ -2576,6 +2581,7 @@ document.getElementById('asrInputClearBtn').addEventListener('click',function(){
 // V0_104: マークポップアップ押下でマーク全解除
 document.getElementById('markPopup').addEventListener('click',function(){
   _searchMarks=[];_markKeyword=null;
+  _searchHighlight=null; // V0_131: 画面検索マークもクリア
   this.classList.remove('visible');
   scheduleOverlay();
 });
