@@ -152,14 +152,15 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     }
     if(!isFinite(mnX)){showGuide('描画データがありません',2000);return;}
 
-    // ── 2. キャンバスサイズ決定 ─────────────────────────────
+    // ── 2. キャンバスサイズ決定（最高解像度: 684DPI相当 for A4）────
+    // V0_91: LONG_PX 5000→8000。Object.defineProperty(dpr=1)使用でcanvas=CW×CH
+    // iPadの安全canvas上限~67MPに対し 8000×5657=45.3MP で余裕あり
     const PAD=0.02;  // 余白2%
     const eW=mxX-mnX, eH=mxY-mnY;
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
 
-    // ★代替案反映: 解像度を上げてボケを抑制（6500 → 8000）
-    const LONG_PX=8000;  
+    const LONG_PX=6500;  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）/ V0_95: 6000→6500（556DPI）
     const aspect=extW/extH;
     let CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);  // V0_117: let（サイズ制限時に縮小）
     let CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;  // V0_117: let
@@ -200,7 +201,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
         if(!_found){showGuide('Canvasサイズが不足しています',3000);return;}
         pdfScale=Math.min(CW/extW,CH/extH);
         tx=-extMinX*pdfScale; ty=CH+extMinY*pdfScale; scale=pdfScale;
-        console.warn('[PDF] Canvasサイズ制限検知 → '+CW+'×'+CH+'px に縮小');
+        console.warn('[PDF] V0_117: Canvasサイズ制限検知 → '+CW+'×'+CH+'px に縮小');
       }
     }
 
@@ -248,7 +249,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     }
     if(!pdfComp){showGuide('描画に失敗しました',2000);return;}
 
-    // ── 5. jsPDF で PDF 生成 ─────────────────────────────
+    // ── 5. jsPDF で PDF 生成（JPEG 0.98: 高品質・大容量PNG回避）──────────
     if(typeof window.jspdf==='undefined'){
       const url=URL.createObjectURL(await new Promise(r=>pdfComp.toBlob(r,'image/png')));
       const a=document.createElement('a');
@@ -260,9 +261,8 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const {jsPDF}=window.jspdf;
     const orient=pageMM_W>=pageMM_H?'l':'p';
     const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
-    
-    // ★代替案反映: JPEG品質を下げることで、高解像度化による容量アップを相殺（0.97 → 0.88）
-    const imgData=pdfComp.toDataURL('image/jpeg',0.88);
+    // V0_92: JPEG 0.98（PNG at 45MP → jsPDF/iOS failure の回避、高品質維持）
+    const imgData=pdfComp.toDataURL('image/jpeg',0.97);
     pdf.addImage(imgData,'JPEG',0,0,pageMM_W,pageMM_H);
     const ts=new Date().toISOString().slice(0,10);
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'.pdf'; // V0_96: DXFファイル名をそのまま使用
@@ -411,3 +411,227 @@ function exportDxfview(){
   }
 }
 document.getElementById('exportDxfviewBtn').addEventListener('click',exportDxfview);
+
+// =========================================================
+// V0_123: ハイブリッドPDF書き出し（DXFベクター + 手書き/寸法ラスター）
+// 試験実装。設定パネルの「HD-PDF書出」ボタンから使用。
+// DXF線分・円弧 → jsPDFベクター描画（解像度無制限）
+// 手書き・寸法   → 透過PNGで重ねる（座標系共通で位置ずれなし）
+// V0_124: 日本語フォント外部ファイル（fonts/NotoSansJP.js）から動的ロード
+// =========================================================
+
+// V0_124: 日本語フォント動的ロード（fonts/NotoSansJP.js → window._notoSansJPBase64）
+var _jpFontLoaded=false;
+function _loadJPFont(){
+  return new Promise(function(resolve){
+    if(_jpFontLoaded||window._notoSansJPBase64){_jpFontLoaded=true;resolve();return;}
+    var s=document.createElement('script');
+    s.src='./fonts/NotoSansJP.js';
+    s.onload=function(){_jpFontLoaded=true;resolve();};
+    s.onerror=function(){console.warn('[HybridPDF] フォント読み込み失敗');resolve();};
+    document.head.appendChild(s);
+  });
+}
+
+async function exportHybridPDF(){
+  const btn=document.getElementById('hybridPDFBtn');
+  btn.disabled=true;
+  showGuide('HD-PDFを生成中...');
+  try{
+    // V0_124: 日本語フォントを事前ロード
+    await _loadJPFont();
+
+    // ── 1. バウンディングボックス（現行PDFと同じロジック）──
+    var _hMnX=Infinity,_hMnY=Infinity,_hMxX=-Infinity,_hMxY=-Infinity;
+    function _hExp(x,y){if(!isFinite(x)||!isFinite(y))return;if(x<_hMnX)_hMnX=x;if(y<_hMnY)_hMnY=y;if(x>_hMxX)_hMxX=x;if(y>_hMxY)_hMxY=y;}
+    if(doc){
+      for(const e of doc.sen){_hExp(e.x1,e.y1);_hExp(e.x2,e.y2);}
+      for(const e of doc.enko){const r=e.rx||e.r||0;_hExp(e.cx-r,e.cy-r);_hExp(e.cx+r,e.cy+r);}
+      for(const e of (doc.ten||[])){_hExp(e.x,e.y);}
+      for(const e of (doc.moji||[])){_hExp(e.x,e.y);}
+      for(const e of (doc.solid||[])){for(const p of e.pts)_hExp(p.x,p.y);}
+    }
+    if(typeof pdfImage!=='undefined'&&pdfImage){_hExp(pdfImage.wx,pdfImage.wy);_hExp(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
+    for(const img of (typeof images!=='undefined'?images:[])){_hExp(img.wx,img.wy);_hExp(img.wx+img.ww,img.wy-img.wh);}
+    for(const s of strokes)for(const p of s.pts)_hExp(p.x,p.y);
+    for(const d of dims){
+      for(const l of(d.lines||[])){_hExp(l.x1,l.y1);_hExp(l.x2,l.y2);}
+      if(d.tx!=null&&d.ty!=null)_hExp(d.tx,d.ty);
+    }
+    if(!isFinite(_hMnX)){showGuide('描画データがありません',2000);return;}
+
+    // ── 2. ページ・キャンバスサイズ決定（現行PDFと同じ定数）──
+    const PAD=0.02;
+    const eW=_hMxX-_hMnX, eH=_hMxY-_hMnY;
+    const extMinX=_hMnX-eW*PAD, extMinY=_hMnY-eH*PAD;
+    const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
+    const LONG_PX=6500;
+    const aspect=extW/extH;
+    const CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);
+    const CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;
+    const PDF_LONG_MM=297;
+    const pageMM_W=aspect>=1?PDF_LONG_MM:Math.round(PDF_LONG_MM*aspect);
+    const pageMM_H=aspect>=1?Math.round(PDF_LONG_MM/aspect):PDF_LONG_MM;
+    const pdfScale=Math.min(CW/extW, CH/extH);
+
+    // ── 3. 座標変換（ベクター・ラスター共通で位置ずれゼロ保証）──
+    // キャンバス用: tx_p/ty_p をグローバルに設定 → drawAnnotation/drawOverlay が使用
+    // ベクター用:   w2mx/w2my が同じ基点から mm に変換
+    // 検証: w2mx(wx) = (wx*pdfScale + tx_p) * (pageMM_W/CW)
+    //       w2my(wy) = (-wy*pdfScale + ty_p) * (pageMM_H/CH)
+    const tx_p = -extMinX * pdfScale;
+    const ty_p =  CH + extMinY * pdfScale;
+    const _sx = pageMM_W / CW;
+    const _sy = pageMM_H / CH;
+    const w2mx = wx => ( wx * pdfScale + tx_p) * _sx;
+    const w2my = wy => (-wy * pdfScale + ty_p) * _sy;
+
+    // ── 4. グローバル状態退避・PDF用設定 ──
+    const sv={tx,ty,scale};
+    const dprSave=window.devicePixelRatio||1;
+    const ovEl=document.getElementById('ov');
+    tx=tx_p; ty=ty_p; scale=pdfScale;
+    Object.defineProperty(window,'devicePixelRatio',{get:()=>1,configurable:true});
+
+    // 透過キャンバス（手書き用・寸法用）
+    const pdfAc=document.createElement('canvas'); pdfAc.width=CW; pdfAc.height=CH;
+    const pdfAcCtx=pdfAc.getContext('2d');
+    const pdfOv=document.createElement('canvas'); pdfOv.width=CW; pdfOv.height=CH;
+    const pdfOvCtx=pdfOv.getContext('2d');
+
+    // ov/octx を一時差し替え（drawOverlay が ov.width/height・octx を参照するため）
+    const _svOv=window.ov, _svOctx=window.octx;
+    window.ov=pdfOv; window.octx=pdfOvCtx;
+    window._pdfScale=CW*dprSave/(ovEl.width||CW);
+
+    try{
+      // 手書き（strokes）を透過キャンバスへ
+      if(typeof drawAnnotation==='function') drawAnnotation(pdfAcCtx);
+      // 寸法（dims）を透過キャンバスへ
+      if(typeof drawOverlay==='function') drawOverlay();
+      await new Promise(r=>requestAnimationFrame(r));
+    }finally{
+      try{Object.defineProperty(window,'devicePixelRatio',{get:()=>dprSave,configurable:true});}catch(e){}
+      window._pdfScale=undefined;
+      window.ov=_svOv; window.octx=_svOctx;
+      tx=sv.tx; ty=sv.ty; scale=sv.scale;
+      if(typeof scheduleDraw==='function') scheduleDraw();
+      if(typeof scheduleOverlay==='function') scheduleOverlay();
+    }
+
+    // ── 5. jsPDF 生成 ──
+    if(typeof window.jspdf==='undefined'){showGuide('jsPDFが読み込まれていません',2000);return;}
+    const {jsPDF}=window.jspdf;
+    const orient=pageMM_W>=pageMM_H?'l':'p';
+    const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
+
+    // 白背景
+    pdf.setFillColor(255,255,255);
+    pdf.rect(0,0,pageMM_W,pageMM_H,'F');
+
+    // 色設定ヘルパー（e.color は {r,g,b} オブジェクト。白背景用に近白色は黒に変換）
+    function _setPdfColor(col){
+      const css=(typeof rgbCss==='function')?rgbCss(col,false):'rgb(0,0,0)';
+      let r=0,g=0,b=0;
+      const m=css.match(/rgb\((\d+),(\d+),(\d+)\)/);
+      if(m){r=+m[1];g=+m[2];b=+m[3];}
+      else if(css.length>=7&&css[0]==='#'){r=parseInt(css.slice(1,3),16);g=parseInt(css.slice(3,5),16);b=parseInt(css.slice(5,7),16);}
+      pdf.setDrawColor(r,g,b);
+    }
+
+    // 線幅ヘルパー（現行canvas算出式と同じ: max(0.8, lw*scale*1.4) px → mm変換）
+    function _lwMM(lw){
+      return Math.max(0.1, Math.max(0.8,(lw||0)*pdfScale*1.4)*_sx);
+    }
+
+    // ── 6. DXF線分（sen）ベクター描画 ──
+    if(doc&&doc.sen){
+      for(const e of doc.sen){
+        if(hiddenLayers.has(e.layer)) continue;
+        _setPdfColor(e.color);
+        pdf.setLineWidth(_lwMM(e.lw));
+        pdf.line(w2mx(e.x1),w2my(e.y1),w2mx(e.x2),w2my(e.y2));
+      }
+    }
+
+    // ── 7. DXF円・円弧（enko）ベクター描画 ──
+    if(doc&&doc.enko){
+      for(const e of doc.enko){
+        if(hiddenLayers.has(e.layer)) continue;
+        _setPdfColor(e.color);
+        pdf.setLineWidth(_lwMM(e.lw));
+        const r=e.rx||e.r||0; if(r<=0) continue;
+        const a1=e.a1!=null?e.a1:0, a2=e.a2!=null?e.a2:360;
+        const cxmm=w2mx(e.cx), cymm=w2my(e.cy);
+        const rMM=r*pdfScale*_sx;
+        if(a1===0&&a2===360){
+          // 真円: jsPDF circle()
+          pdf.circle(cxmm,cymm,rMM,'S');
+        }else{
+          // 円弧: 36分割線分近似（DXF角度: X軸正から反時計回り）
+          const rad1=a1*Math.PI/180;
+          let rad2=a2*Math.PI/180;
+          if(rad2<=rad1) rad2+=2*Math.PI; // 折り返しアーク対応
+          const N=36;
+          let px0=cxmm+rMM*Math.cos(rad1), py0=cymm-rMM*Math.sin(rad1);
+          for(let i=1;i<=N;i++){
+            const a=rad1+(rad2-rad1)*i/N;
+            const px1=cxmm+rMM*Math.cos(a), py1=cymm-rMM*Math.sin(a);
+            pdf.line(px0,py0,px1,py1);
+            px0=px1; py0=py1;
+          }
+        }
+      }
+    }
+
+    // ── 7.5 文字（moji）をjsPDFベクタ�    // ── 7.5 文字（moji）をjsPDFベクター描画（V0_124: 日本語フォント対応）──
+    if(doc&&doc.moji&&doc.moji.length>0&&window._notoSansJPBase64){
+      try{
+        pdf.addFileToVFS('NotoSansJP.ttf',window._notoSansJPBase64);
+        pdf.addFont('NotoSansJP.ttf','NotoSansJP','normal');
+      }catch(er){/* 登録済みの場合は無視 */}
+      for(const e of doc.moji){
+        if(hiddenLayers.has(e.layer)) continue;
+        if(!e.text||!e.text.trim()) continue;
+        const xmm=w2mx(e.x);
+        const ymm=w2my(e.y);
+        const fsMM=e.h*pdfScale*_sx;
+        if(fsMM<0.3) continue;
+        const css=(typeof rgbCss==='function')?rgbCss(e.color,false):'rgb(0,0,0)';
+        const mc=css.match(/rgb\((\d+),(\d+),(\d+)\)/);
+        if(mc) pdf.setTextColor(+mc[1],+mc[2],+mc[3]);
+        pdf.setFont('NotoSansJP','normal');
+        pdf.setFontSize(fsMM*(72/25.4));
+        const lines=e.text.split('\n');
+        for(let i=0;i<lines.length;i++){
+          if(!lines[i].trim()) continue;
+          const opts={baseline:'alphabetic'};
+          if(e.angle&&Math.abs(e.angle)>0.1) opts.angle=e.angle;
+          // 複数行: PDF座標系（Y下向き）ではi行目をfsMM*i だけ上方向へ
+          pdf.text(lines[i],xmm,ymm-fsMM*i,opts);
+        }
+      }
+      pdf.setTextColor(0,0,0); // リセット
+    }
+
+    // ── 8. 手書き（strokes）を透過PNGで重ねる ──
+    const strokesPng=pdfAc.toDataURL('image/png');
+    pdf.addImage(strokesPng,'PNG',0,0,pageMM_W,pageMM_H);
+
+    // ── 9. 寸法（dims）を透過PNGで重ねる ──
+    const dimsPng=pdfOv.toDataURL('image/png');
+    pdf.addImage(dimsPng,'PNG',0,0,pageMM_W,pageMM_H);
+
+    // ── 10. 保存 ──
+    const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'_hd.pdf';
+    pdf.save(fname);
+    showGuide('HD-PDFを保存しました',2000);
+
+  }catch(err){
+    console.error('[HybridPDF]',err);
+    showGuide('HD-PDF出力に失敗しました: '+err.message,3000);
+  }finally{
+    btn.disabled=false;
+  }
+}
+document.getElementById('hybridPDFBtn').addEventListener('click',exportHybridPDF);
