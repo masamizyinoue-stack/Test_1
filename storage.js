@@ -1,17 +1,82 @@
 // storage.js — ローカルストレージ保存・復元
-// DXF Viewer V0_65
+// DXF Viewer V0_114
 // 依存グローバル: strokes, dims, savedViews (var), tx, ty, scale, bwMode, currentFileName (viewer.js)
 //               hiddenLayers (layer.js)
 //               currentTool, currentColor, currentLW (var, HTML inline script)
-// 依存関数: arrayBufferToB64 (utils.js)
-//           loadPDF, parseDXF, detectScale, updateFileNameDisplay, scheduleDraw, scheduleOverlay (viewer.js)
+//               openFiles, openFilesBufs, currentFileIdx (HTML inline script)
+// 依存関数: loadPDF, parseDXF, detectScale, updateFileNameDisplay, scheduleDraw, scheduleOverlay (viewer.js)
 //           buildLayerModal (layer.js)
 //           updateViewmemoState (ui.js)
 //           updateUndoRedo (HTML inline script)
+//           saveCurrentFileState, updateFileNavUI (HTML inline script)
 
 const SAVE_KEY='dxfview_v1';
 const FILE_KEY='dxfview_v1_file';
+const MULTI_KEY='dxfview_v1_multi'; // V0_112: マルチファイル復元用
 let saveTimer=null;
+
+// =========================================================
+// V0_114: IndexedDB（復元用バイナリ専用）
+// 既存 dxfViewerDB(dxfIndex) とは完全に別DB — バージョン競合なし
+// =========================================================
+const _LS_IDB_NAME='dxfViewerFilesDB';
+const _LS_IDB_VER=1;
+const _LS_IDB_STORE='dxfFiles';
+
+function _lsIdbOpen(cb){
+  var req=indexedDB.open(_LS_IDB_NAME,_LS_IDB_VER);
+  req.onupgradeneeded=function(e){
+    var db=e.target.result;
+    // dxfFilesストアのみ作成。dxfViewerDB/dxfIndexには一切触れない。
+    if(!db.objectStoreNames.contains(_LS_IDB_STORE))
+      db.createObjectStore(_LS_IDB_STORE,{keyPath:'name'});
+  };
+  req.onsuccess=function(e){cb(null,e.target.result);};
+  req.onerror=function(e){cb(e.target.error,null);};
+}
+
+// ArrayBufferをname(ファイル名)をキーとして保存
+function _lsIdbPut(name,buf){
+  _lsIdbOpen(function(err,db){
+    if(err)return;
+    var tx=db.transaction(_LS_IDB_STORE,'readwrite');
+    tx.objectStore(_LS_IDB_STORE).put({name:name,buf:buf,ts:Date.now()});
+  });
+}
+
+// IDB優先→localStorageフォールバック。cb(ArrayBuffer|null)
+function _lsIdbGet(name,lsKey,cb){
+  _lsIdbOpen(function(err,db){
+    if(err){_lsFromStorage(lsKey,cb);return;}
+    var tx=db.transaction(_LS_IDB_STORE,'readonly');
+    var req=tx.objectStore(_LS_IDB_STORE).get(name);
+    req.onsuccess=function(e){
+      if(e.target.result&&e.target.result.buf){cb(e.target.result.buf);}
+      else{_lsFromStorage(lsKey,cb);}
+    };
+    req.onerror=function(){_lsFromStorage(lsKey,cb);};
+  });
+}
+
+// localStorageのbase64バイナリをArrayBufferに変換して返す（旧データ互換）
+function _lsFromStorage(lsKey,cb){
+  try{
+    var fr=localStorage.getItem(lsKey);
+    if(!fr){cb(null);return;}
+    var obj=JSON.parse(fr);
+    if(!obj.b64){cb(null);return;}
+    var bin=atob(obj.b64);
+    var buf=new ArrayBuffer(bin.length);
+    var arr=new Uint8Array(buf);
+    for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+    cb(buf);
+  }catch(e){cb(null);}
+}
+
+// Promise版（tryRestore内でawait用）
+function _lsIdbGetP(name,lsKey){
+  return new Promise(function(resolve){_lsIdbGet(name,lsKey,resolve);});
+}
 
 // =========================================================
 // 自動保存スケジュール
@@ -19,10 +84,12 @@ let saveTimer=null;
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(doSave,800);}
 
 // =========================================================
-// localStorage へ保存
+// localStorage へ保存（DXFバイナリはIndexedDBへ）
 // =========================================================
 function doSave(){
   try{
+    // V0_112: 現在のファイル状態をopenFiles[]に反映
+    if(typeof saveCurrentFileState==='function') saveCurrentFileState();
     const sd=parseFloat(document.getElementById('scaleDenom').value)||1;
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       strokes,dims,savedViews,tx,ty,scale,fitScale,
@@ -31,65 +98,206 @@ function doSave(){
       currentHL_Color,currentHL_LW,currentDimColor,
       dimensionTextMode,inputMode
     }));
+    // V0_112: マルチファイル保存
+    if(typeof openFiles!=='undefined'&&openFiles.length>1&&typeof openFilesBufs!=='undefined'){
+      var _mStates=openFiles.map(function(f){
+        return {
+          name:f.name,currentFileName:f.currentFileName,
+          strokes:f.strokes||[],dims:f.dims||[],
+          savedViews:f.savedViews||[null,null,null,null,null],
+          hiddenLayersArr:f.hiddenLayersArr||[],
+          tx:f.tx||0,ty:f.ty||0,scale:f.scale||1,fitScale:f.fitScale||1,
+          fileSize:f.fileSize||0,scaleDenom:sd,
+          isPDF:!!(f.pdfDoc||f.pdfImage)
+        };
+      });
+      // V0_114: DXFバイナリはIndexedDBへ保存（サイズ制限・容量制限なし）
+      for(var _i=0;_i<openFiles.length;_i++){
+        var _buf=openFilesBufs[_i];
+        var _fname=openFiles[_i].currentFileName||openFiles[_i].name;
+        if(_buf&&_fname)_lsIdbPut(_fname,_buf);
+      }
+      try{
+        localStorage.setItem(MULTI_KEY,JSON.stringify({
+          count:openFiles.length,
+          currentFileIdx:currentFileIdx,
+          files:_mStates
+        }));
+      }catch(e2){localStorage.removeItem(MULTI_KEY);}
+    }else{
+      localStorage.removeItem(MULTI_KEY);
+    }
   }catch(e){}
 }
 
 // =========================================================
-// ファイルを localStorage へ保存（1.5MB 超は保存しない）
+// ファイルを IndexedDB へ保存（V0_114: localStorageから移行）
 // =========================================================
 function saveFile(buf,name){
-  if(!buf||buf.byteLength>1.5*1024*1024){localStorage.removeItem(FILE_KEY);return;}
-  try{localStorage.setItem(FILE_KEY,JSON.stringify({name,b64:arrayBufferToB64(buf)}));}
-  catch(e){localStorage.removeItem(FILE_KEY);}
+  if(!buf||!name)return;
+  _lsIdbPut(name,buf); // V0_114: IDBのみ保存（サイズ・容量制限なし）
 }
 
 // =========================================================
 // ページ読み込み時の復元
 // =========================================================
 async function tryRestore(){
+
+  // ── V0_112: マルチファイル復元 ──────────────────────────────
+  var _multiOk=false;
   try{
-    const fr=localStorage.getItem(FILE_KEY);
-    if(fr){
-      const{name,b64}=JSON.parse(fr);
-      const bin=atob(b64);const buf=new ArrayBuffer(bin.length);const arr=new Uint8Array(buf);
-      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
-      currentFileName=name;
-      currentFileSize=buf.byteLength; // V0_103
-      if(name.toLowerCase().endsWith('.pdf')){
-        await loadPDF(buf);
-      } else {
-        doc=parseDXF(buf);detectScale();
+    const _mr=localStorage.getItem(MULTI_KEY);
+    if(_mr){
+      const _md=JSON.parse(_mr);
+      if(_md.files&&_md.files.length>1){
+        var _restored=[];
+        var _rbufs=[];
+        var _activeLocal=-1;
+        for(var _i=0;_i<_md.files.length;_i++){
+          var _mf=_md.files[_i];
+          if(_mf.isPDF) continue;
+          var _fname=_mf.currentFileName||_mf.name;
+          // V0_114: IDB優先→localStorageフォールバック
+          var _buf2=await _lsIdbGetP(_fname,FILE_KEY+'_'+_i);
+          if(!_buf2) continue;
+          try{
+            var _pdoc=parseDXF(_buf2);
+            var _sv=(_mf.savedViews||[]).slice();
+            while(_sv.length<5)_sv.push(null);
+            var _fst={
+              name:_mf.currentFileName||_mf.name,
+              currentFileName:_mf.currentFileName||_mf.name,
+              doc:_pdoc,pdfDoc:null,pdfImage:null,pdfPageNum:1,
+              strokes:_mf.strokes||[],
+              dims:_mf.dims||[],
+              images:[],
+              savedViews:_sv,
+              hiddenLayersArr:_mf.hiddenLayersArr||[],
+              tx:_mf.tx||0,ty:_mf.ty||0,scale:_mf.scale||1,fitScale:_mf.fitScale||1,
+              fileSize:_mf.fileSize||0
+            };
+            if(_i===_md.currentFileIdx) _activeLocal=_restored.length;
+            _restored.push(_fst);
+            _rbufs.push(_buf2);
+          }catch(e2){}
+        }
+        if(_restored.length>=1){// V0_113: 1ファイルのみ復元可能な場合もマルチパスを使用
+          for(var _k=0;_k<_restored.length;_k++){
+            openFiles.push(_restored[_k]);
+            if(typeof openFilesBufs!=='undefined') openFilesBufs.push(_rbufs[_k]);
+          }
+          var _ai=(_activeLocal>=0)?_activeLocal:_restored.length-1;
+          currentFileIdx=_ai;
+          var _af=openFiles[_ai];
+          doc=_af.doc; pdfDoc=null; pdfImage=null;
+          strokes=_af.strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});});
+          dims=_af.dims.slice();
+          if(typeof images!=='undefined') images=[];
+          savedViews=_af.savedViews.slice();
+          hiddenLayers=new Set(_af.hiddenLayersArr);
+          currentFileName=_af.currentFileName;
+          currentFileSize=_af.fileSize;
+          tx=_af.tx; ty=_af.ty; scale=_af.scale;
+          if(_af.fitScale) fitScale=_af.fitScale;
+          const _raw2=localStorage.getItem(SAVE_KEY);
+          if(_raw2){
+            const _d2=JSON.parse(_raw2);
+            bwMode=!!_d2.bwMode;
+            currentTool=_d2.currentTool||'sketch';
+            if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
+            if(_d2.currentColor)currentColor=_d2.currentColor;
+            document.querySelectorAll('.color-btn').forEach(b=>{
+              const[r,g,b_]=b.dataset.color.split(',').map(Number);
+              b.classList.toggle('active',r===currentColor.r&&g===currentColor.g&&b_===currentColor.b);
+            });
+            if(_d2.currentLW)currentLW=_d2.currentLW;
+            document.querySelectorAll('.lw-btn').forEach(b=>{
+              b.classList.toggle('active',parseFloat(b.dataset.lw)===currentLW);
+            });
+            const _lwl=document.getElementById('lwLabel');if(_lwl)_lwl.textContent=currentLW;
+            if(_d2.currentHL_Color)currentHL_Color=_d2.currentHL_Color;
+            if(_d2.currentHL_LW)currentHL_LW=_d2.currentHL_LW;
+            if(_d2.currentDimColor)currentDimColor=_d2.currentDimColor;
+            document.querySelectorAll('.hl-color-btn').forEach(b=>{
+              const[r,g,b_]=b.dataset.color.split(',').map(Number);
+              b.classList.toggle('active',r===currentHL_Color.r&&g===currentHL_Color.g&&b_===currentHL_Color.b);
+            });
+            document.querySelectorAll('.hl-lw-btn').forEach(b=>{
+              b.classList.toggle('active',parseFloat(b.dataset.lw)===currentHL_LW);
+            });
+            document.querySelectorAll('.dim-color-btn').forEach(b=>{
+              b.classList.toggle('active',b.dataset.color===currentDimColor);
+            });
+            if(_d2.scaleDenom)document.getElementById('scaleDenom').value=_d2.scaleDenom;
+            if(typeof updateBwToggleBtn==='function')updateBwToggleBtn();
+            document.querySelectorAll('.tool-btn').forEach(b=>{
+              b.classList.toggle('active',b.dataset.tool===currentTool);
+            });
+            if(_d2.dimensionTextMode)dimensionTextMode=_d2.dimensionTextMode;
+            if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
+            if(_d2.inputMode)inputMode=_d2.inputMode;
+            if(typeof updateInputModeUI==='function')updateInputModeUI();
+            if(typeof updateToolColorDots==='function')updateToolColorDots();
+          }
+          const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';
+          updateFileNameDisplay();
+          [0,1,2,3,4].forEach(function(i){updateViewmemoState(i);});
+          buildLayerModal();
+          if(typeof buildSnapCache==='function')buildSnapCache();
+          if(typeof checkPerfMode==='function')checkPerfMode();
+          scheduleDraw();scheduleOverlay();updateUndoRedo();
+          if(typeof buildSearchIndex==='function')buildSearchIndex();
+          if(typeof updateFileNavUI==='function')updateFileNavUI();
+          _multiOk=true;
+        }
       }
-      const nd=document.getElementById('noDrawingMsg');if(nd)nd.style.display='none';
-      updateFileNameDisplay();
+    }
+  }catch(e){}
+  if(_multiOk) return;
+
+  // ── 単一ファイル復元（従来パス）─────────────────────────────
+  try{
+    var _restoreBuf=null;
+    // V0_114: ファイル名をSAVE_KEY→FILE_KEYの順で取得し、IDB優先→localStorageで復元
+    var _sfName=null;
+    try{var _sfRaw=localStorage.getItem(SAVE_KEY);if(_sfRaw)_sfName=JSON.parse(_sfRaw).currentFileName;}catch(e){}
+    if(!_sfName){try{var _sfFr=localStorage.getItem(FILE_KEY);if(_sfFr)_sfName=JSON.parse(_sfFr).name;}catch(e){}}
+    if(_sfName){
+      _restoreBuf=await _lsIdbGetP(_sfName,FILE_KEY); // V0_114: IDB→localStorageフォールバック
+      if(_restoreBuf){
+        currentFileName=_sfName;
+        currentFileSize=_restoreBuf.byteLength;
+        if(_sfName.toLowerCase().endsWith('.pdf')){
+          await loadPDF(_restoreBuf);
+        } else {
+          doc=parseDXF(_restoreBuf);detectScale();
+        }
+        const nd=document.getElementById('noDrawingMsg');if(nd)nd.style.display='none';
+        updateFileNameDisplay();
+      }
     }
     const raw=localStorage.getItem(SAVE_KEY);if(!raw){buildLayerModal();return;}
-    // V0_103: ファイルIDチェック（サイズ不一致は別ファイルとみなし状態復元スキップ）
     const _rawParsed=JSON.parse(raw);
-    if(fr&&_rawParsed.fileSize&&_rawParsed.fileSize!==currentFileSize){buildLayerModal();scheduleDraw();return;}
+    if(_restoreBuf&&_rawParsed.fileSize&&_rawParsed.fileSize!==currentFileSize){buildLayerModal();scheduleDraw();return;}
     const d=_rawParsed;
     strokes=d.strokes||[];dims=d.dims||[];
-    // V0_76: 旧バージョン(3スロット)との後方互換を保ちつつ5スロットに拡張
     {const sv=d.savedViews||[];savedViews=[sv[0]||null,sv[1]||null,sv[2]||null,sv[3]||null,sv[4]||null];}
     tx=d.tx||0;ty=d.ty||0;scale=d.scale||1;
-  if(d.fitScale) fitScale=d.fitScale; // V0_93: fitScale復元
+    if(d.fitScale) fitScale=d.fitScale;
     bwMode=!!d.bwMode;
     if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
     currentTool=d.currentTool||'sketch';
     if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
     if(d.currentColor)currentColor=d.currentColor;
-    // V0_76: スケッチ色ボタンのactive状態を復元
     document.querySelectorAll('.color-btn').forEach(b=>{
       const[r,g,b_]=b.dataset.color.split(',').map(Number);
       b.classList.toggle('active',r===currentColor.r&&g===currentColor.g&&b_===currentColor.b);
     });
     if(d.currentLW)currentLW=d.currentLW;
-    // ④ lw-btn active 状態を currentLW に合わせて更新
     document.querySelectorAll('.lw-btn').forEach(b=>{
       b.classList.toggle('active',parseFloat(b.dataset.lw)===currentLW);
     });
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
-    // ⑨ 蛍光ペン色・線幅、寸法色 復元（V0_70）
     if(d.currentHL_Color)currentHL_Color=d.currentHL_Color;
     if(d.currentHL_LW)currentHL_LW=d.currentHL_LW;
     if(d.currentDimColor)currentDimColor=d.currentDimColor;
@@ -108,10 +316,9 @@ async function tryRestore(){
     document.querySelectorAll('.tool-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.tool===currentTool);
     });
-    [0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット対応
-    buildLayerModal();  // hiddenLayers復元後に呼ぶ（チェックボックス状態を正しく反映）
+    [0,1,2,3,4].forEach(i=>updateViewmemoState(i));
+    buildLayerModal();
     scheduleDraw();scheduleOverlay();updateUndoRedo();
-    // dimensionTextMode復元
     if(d.dimensionTextMode)dimensionTextMode=d.dimensionTextMode;
     if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
     if(d.inputMode)inputMode=d.inputMode;
@@ -121,6 +328,7 @@ async function tryRestore(){
     if(currentFileName && typeof openFiles!=='undefined' && openFiles.length===0){
       openFiles.push({name:currentFileName});
       currentFileIdx=0;
+      if(typeof openFilesBufs!=='undefined'&&_restoreBuf) openFilesBufs[0]=_restoreBuf; // V0_112
       if(typeof saveCurrentFileState==='function') saveCurrentFileState();
       if(typeof updateFileNavUI==='function') updateFileNavUI();
     }
