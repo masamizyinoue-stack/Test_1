@@ -319,7 +319,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_115</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_117</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -378,7 +378,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_115</div>
+  <div id="ver-label">DXF_View V0_117</div>
 </div>
 
 <div id="colorOverlay">
@@ -504,7 +504,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_115';
+const APP_VERSION = 'V0_117';
 
 // =========================================================
 // グローバル状態
@@ -857,6 +857,9 @@ function drawOverlay(){
 // マウス/wheel/タッチ イベントリスナー → tool.js
 
 
+// V0_117: ファイル一意キー（name+size）。同名異サイズを別ファイルとして扱う
+function _fileKey(name,size){return name+'\x00'+size;}
+
 // ファイル
 const fileInput=document.getElementById('file');
 document.getElementById('openFileBtnMain').addEventListener('click',()=>fileInput.click());
@@ -869,7 +872,7 @@ fileInput.addEventListener('change',async e=>{
   document.getElementById('pdfPageCtrl').style.display='none';
   if(f.name.toLowerCase().endsWith('.pdf')){
     await loadPDF(buf);{const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
-    saveFile(buf,f.name);scheduleSave();updateFileNameDisplay();
+    saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();
     document.body.classList.remove('settings-open');
   } else {
     try{
@@ -877,12 +880,13 @@ fileInput.addEventListener('change',async e=>{
       currentFileSize=f.size; // V0_103
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット
       buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();_idbSave(f.name,buf,_searchIdx.map(function(m){return m.text;}));{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
-      saveFile(buf,f.name);scheduleSave();updateFileNameDisplay();// V0_113: openFiles[]登録後に保存されるようdoSave→scheduleSave
+      saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();// V0_113: openFiles[]登録後に保存されるようdoSave→scheduleSave
       document.body.classList.remove('settings-open');
     }catch(err){alert('ファイルを開けません: '+err.message);}
   }
   // V0_93: openFilesに登録
-  if(currentFileIdx<0){openFiles.push({name:f.name});currentFileIdx=0;}else{var _xi=openFiles.findIndex(function(x){return x.name===f.name;});if(_xi>=0){currentFileIdx=_xi;}else{openFiles.push({name:f.name});currentFileIdx=openFiles.length-1;}}openFilesBufs[currentFileIdx]=buf;saveCurrentFileState();updateFileNavUI();// V0_112
+  // V0_117: fileKeyベースで同名異サイズを別タブとして管理
+  if(currentFileIdx<0){openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=0;}else{var _xi=openFiles.findIndex(function(x){return x.fileKey===_fileKey(f.name,f.size);});if(_xi>=0){currentFileIdx=_xi;}else{openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=openFiles.length-1;}}openFilesBufs[currentFileIdx]=buf;saveCurrentFileState();updateFileNavUI();// V0_112
   e.target.value='';
 });
 

@@ -162,8 +162,8 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
 
     const LONG_PX=6500;  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）/ V0_95: 6000→6500（556DPI）
     const aspect=extW/extH;
-    const CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);
-    const CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;
+    let CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);  // V0_117: let（サイズ制限時に縮小）
+    let CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;  // V0_117: let
 
     const PDF_LONG_MM=297;
     const pageMM_W=aspect>=1?PDF_LONG_MM:Math.round(PDF_LONG_MM*aspect);
@@ -173,56 +173,85 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const sv={tx,ty,scale};
     const cvEl=document.getElementById('cv');
     const ovEl=document.getElementById('ov');
-    const sv_cw=cvEl.width,sv_ch=cvEl.height;
-    const sv_ow=ovEl.width,sv_oh=ovEl.height;
+    const sv_ow=ovEl.width;  // V0_117: _pdfScale計算用のみ（cvEl/ovElはリサイズしない）
     const dprSave=window.devicePixelRatio||1;
 
-    const pdfScale=Math.min(CW/extW,CH/extH);
-    tx=-extMinX*pdfScale;
-    ty=CH+extMinY*pdfScale;
-    scale=pdfScale;
+    let pdfScale=Math.min(CW/extW,CH/extH);
+    tx=-extMinX*pdfScale; ty=CH+extMinY*pdfScale; scale=pdfScale;
+
+    // V0_117: ④ Canvasサイズ制限の検知 / ⑤ 制限超過時はLONG_PX縮小で対応
+    {
+      const _tc=document.createElement('canvas');
+      _tc.width=CW; _tc.height=CH;
+      const _tc2=_tc.getContext('2d');
+      _tc2.fillStyle='#ff0000'; _tc2.fillRect(CW-1,CH-1,1,1);
+      if(_tc2.getImageData(CW-1,CH-1,1,1).data[3]===0){
+        // Canvas制限超過。LONG_PXを0.75倍ずつ縮小して再探索
+        let _lpx=Math.floor(LONG_PX*0.75);
+        let _found=false;
+        while(_lpx>=2000){
+          const _tCW=aspect>=1?_lpx:Math.round(_lpx*aspect);
+          const _tCH=aspect>=1?Math.round(_lpx/aspect):_lpx;
+          const _tc3=document.createElement('canvas'); _tc3.width=_tCW; _tc3.height=_tCH;
+          const _tc4=_tc3.getContext('2d');
+          _tc4.fillStyle='#ff0000'; _tc4.fillRect(_tCW-1,_tCH-1,1,1);
+          if(_tc4.getImageData(_tCW-1,_tCH-1,1,1).data[3]>0){CW=_tCW;CH=_tCH;_found=true;break;}
+          _lpx=Math.floor(_lpx*0.75);
+        }
+        if(!_found){showGuide('Canvasサイズが不足しています',3000);return;}
+        pdfScale=Math.min(CW/extW,CH/extH);
+        tx=-extMinX*pdfScale; ty=CH+extMinY*pdfScale; scale=pdfScale;
+        console.warn('[PDF] V0_117: Canvasサイズ制限検知 → '+CW+'×'+CH+'px に縮小');
+      }
+    }
 
     // draw()内部のctx.scale(dpr,dpr)をdpr=1に固定してcanvas=CW×CHで正確に描画させる
     Object.defineProperty(window,'devicePixelRatio',{get:()=>1,configurable:true});
-    cvEl.width=CW; cvEl.height=CH;
-    ovEl.width=CW; ovEl.height=CH;
     // PDF用線幅スケール: CW/CSS_W（CSS幅比率）
     window._pdfScale=CW*dprSave/sv_ow;
 
-    const acEl=document.createElement('canvas');
-    acEl.width=CW; acEl.height=CH;
-    const acCtx=acEl.getContext('2d');
+    // V0_117: ② PDF専用Canvas作成（画面表示用Canvasを使用しない）
+    const pdfCv=document.createElement('canvas'); pdfCv.width=CW; pdfCv.height=CH;
+    const pdfCtx=pdfCv.getContext('2d');
+    const pdfOv=document.createElement('canvas'); pdfOv.width=CW; pdfOv.height=CH;
+    const pdfOctx=pdfOv.getContext('2d');  // desynchronized不使用（確実な描画完了のため）
+    const pdfAc=document.createElement('canvas'); pdfAc.width=CW; pdfAc.height=CH;
+    const pdfAcCtx=pdfAc.getContext('2d');
+    // 描画グローバル（cv/ctx/ov/octx）をPDF専用Canvasに一時置換
+    const _svCv=window.cv,_svCtx=window.ctx,_svOv=window.ov,_svOctx=window.octx;
+    window.cv=pdfCv; window.ctx=pdfCtx; window.ov=pdfOv; window.octx=pdfOctx;
 
     // ── 4. 描画・合成（finally で必ず状態復元）──────────────
-    let comp=null;
+    let pdfComp=null;
     try{
       if(typeof draw==='function') draw();
-      if(typeof drawAnnotation==='function') drawAnnotation(acCtx);
+      if(typeof drawAnnotation==='function') drawAnnotation(pdfAcCtx);
       if(typeof drawOverlay==='function') drawOverlay();
+      // V0_117: ③ 描画完了を待つ（desynchronized canvas等の非同期描画に対応）
+      await new Promise(r=>requestAnimationFrame(r));
 
-      comp=document.createElement('canvas');
-      comp.width=CW; comp.height=CH;
-      const cctx=comp.getContext('2d');
-      cctx.fillStyle=bwMode?'#fff':'#1e2430';
-      cctx.fillRect(0,0,CW,CH);
-      cctx.drawImage(cvEl,0,0);
-      cctx.drawImage(acEl,0,0);
-      cctx.drawImage(ovEl,0,0);
+      // V0_117: PDF専用Canvasに合成（画面表示Canvasは不使用）
+      pdfComp=document.createElement('canvas'); pdfComp.width=CW; pdfComp.height=CH;
+      const pctx=pdfComp.getContext('2d');
+      pctx.fillStyle=bwMode?'#fff':'#1e2430';
+      pctx.fillRect(0,0,CW,CH);
+      pctx.drawImage(pdfCv,0,0);
+      pctx.drawImage(pdfAc,0,0);
+      pctx.drawImage(pdfOv,0,0);
     }finally{
       // 描画エラー時も必ず状態を復元
       try{Object.defineProperty(window,'devicePixelRatio',{get:()=>dprSave,configurable:true});}catch(e){}
       window._pdfScale=undefined;
+      window.cv=_svCv; window.ctx=_svCtx; window.ov=_svOv; window.octx=_svOctx;
       tx=sv.tx; ty=sv.ty; scale=sv.scale;
-      cvEl.width=sv_cw; cvEl.height=sv_ch;
-      ovEl.width=sv_ow; ovEl.height=sv_oh;
       if(typeof scheduleDraw==='function') scheduleDraw();
       if(typeof scheduleOverlay==='function') scheduleOverlay();
     }
-    if(!comp){showGuide('描画に失敗しました',2000);return;}
+    if(!pdfComp){showGuide('描画に失敗しました',2000);return;}
 
     // ── 5. jsPDF で PDF 生成（JPEG 0.98: 高品質・大容量PNG回避）──────────
     if(typeof window.jspdf==='undefined'){
-      const url=URL.createObjectURL(await new Promise(r=>comp.toBlob(r,'image/png')));
+      const url=URL.createObjectURL(await new Promise(r=>pdfComp.toBlob(r,'image/png')));
       const a=document.createElement('a');
       a.href=url; a.download=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+`_${new Date().toISOString().slice(0,10)}.png`;
       document.body.appendChild(a);a.click();document.body.removeChild(a);
@@ -233,7 +262,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const orient=pageMM_W>=pageMM_H?'l':'p';
     const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
     // V0_92: JPEG 0.98（PNG at 45MP → jsPDF/iOS failure の回避、高品質維持）
-    const imgData=comp.toDataURL('image/jpeg',0.97);
+    const imgData=pdfComp.toDataURL('image/jpeg',0.97);
     pdf.addImage(imgData,'JPEG',0,0,pageMM_W,pageMM_H);
     const ts=new Date().toISOString().slice(0,10);
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'.pdf'; // V0_96: DXFファイル名をそのまま使用

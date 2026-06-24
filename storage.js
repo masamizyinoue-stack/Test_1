@@ -1,5 +1,5 @@
 // storage.js — ローカルストレージ保存・復元
-// DXF Viewer V0_114
+// DXF Viewer V0_116
 // 依存グローバル: strokes, dims, savedViews (var), tx, ty, scale, bwMode, currentFileName (viewer.js)
 //               hiddenLayers (layer.js)
 //               currentTool, currentColor, currentLW (var, HTML inline script)
@@ -95,6 +95,7 @@ function doSave(){
       strokes,dims,savedViews,tx,ty,scale,fitScale,
       bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
       currentTool,currentColor,currentLW,currentFileName,fileSize:currentFileSize,
+      fileKey:(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null),
       currentHL_Color,currentHL_LW,currentDimColor,
       dimensionTextMode,inputMode
     }));
@@ -102,7 +103,7 @@ function doSave(){
     if(typeof openFiles!=='undefined'&&openFiles.length>1&&typeof openFilesBufs!=='undefined'){
       var _mStates=openFiles.map(function(f){
         return {
-          name:f.name,currentFileName:f.currentFileName,
+          name:f.name,currentFileName:f.currentFileName,fileKey:f.fileKey||null,
           strokes:f.strokes||[],dims:f.dims||[],
           savedViews:f.savedViews||[null,null,null,null,null],
           hiddenLayersArr:f.hiddenLayersArr||[],
@@ -114,7 +115,7 @@ function doSave(){
       // V0_114: DXFバイナリはIndexedDBへ保存（サイズ制限・容量制限なし）
       for(var _i=0;_i<openFiles.length;_i++){
         var _buf=openFilesBufs[_i];
-        var _fname=openFiles[_i].currentFileName||openFiles[_i].name;
+        var _fname=openFiles[_i].fileKey||openFiles[_i].currentFileName||openFiles[_i].name; // V0_116: fileKey優先
         if(_buf&&_fname)_lsIdbPut(_fname,_buf);
       }
       try{
@@ -156,7 +157,7 @@ async function tryRestore(){
         for(var _i=0;_i<_md.files.length;_i++){
           var _mf=_md.files[_i];
           if(_mf.isPDF) continue;
-          var _fname=_mf.currentFileName||_mf.name;
+          var _fname=_mf.fileKey||_mf.currentFileName||_mf.name; // V0_116: fileKey優先（後方互換fallback付き）
           // V0_114: IDB優先→localStorageフォールバック
           var _buf2=await _lsIdbGetP(_fname,FILE_KEY+'_'+_i);
           if(!_buf2) continue;
@@ -259,11 +260,11 @@ async function tryRestore(){
   try{
     var _restoreBuf=null;
     // V0_114: ファイル名をSAVE_KEY→FILE_KEYの順で取得し、IDB優先→localStorageで復元
-    var _sfName=null;
-    try{var _sfRaw=localStorage.getItem(SAVE_KEY);if(_sfRaw)_sfName=JSON.parse(_sfRaw).currentFileName;}catch(e){}
+    var _sfName=null,_sfKey=null;
+    try{var _sfRaw=localStorage.getItem(SAVE_KEY);if(_sfRaw){var _sfParsed=JSON.parse(_sfRaw);_sfName=_sfParsed.currentFileName;_sfKey=_sfParsed.fileKey||null;}}catch(e){}
     if(!_sfName){try{var _sfFr=localStorage.getItem(FILE_KEY);if(_sfFr)_sfName=JSON.parse(_sfFr).name;}catch(e){}}
     if(_sfName){
-      _restoreBuf=await _lsIdbGetP(_sfName,FILE_KEY); // V0_114: IDB→localStorageフォールバック
+      _restoreBuf=await _lsIdbGetP(_sfKey||_sfName,FILE_KEY); // V0_116: fileKey優先→name fallback→localStorageフォールバック
       if(_restoreBuf){
         currentFileName=_sfName;
         currentFileSize=_restoreBuf.byteLength;
