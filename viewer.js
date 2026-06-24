@@ -581,28 +581,44 @@ function draw(){
   }
   if(!doc){ctx.restore();return;}
   const mg=60; // ビューポート余白px
-  // Solids
+  // Solids（V0_119: ビューポートカリング追加）
   for(const e of doc.solid){
     if(hiddenLayers.has(e.layer)) continue;
     const pts=e.pts.filter(p=>isFinite(p.x)&&isFinite(p.y));
     if(pts.length<3) continue;
+    let _sxMn=Infinity,_syMn=Infinity,_sxMx=-Infinity,_syMx=-Infinity;
+    for(const _p of pts){const _sx=_p.x*scale+tx,_sy=-_p.y*scale+ty;if(_sx<_sxMn)_sxMn=_sx;if(_sx>_sxMx)_sxMx=_sx;if(_sy<_syMn)_syMn=_sy;if(_sy>_syMx)_syMx=_sy;}
+    if(_sxMx<-mg||_sxMn>W+mg||_syMx<-mg||_syMn>H+mg) continue;
     ctx.beginPath();
     const[sx0,sy0]=w2s(pts[0].x,pts[0].y);ctx.moveTo(sx0,sy0);
     for(let i=1;i<pts.length;i++){const[sx,sy]=w2s(pts[i].x,pts[i].y);ctx.lineTo(sx,sy);}
     ctx.closePath();
     ctx.fillStyle=bwMode?'#cccccc':rgbCss(e.color,darkBg);ctx.fill();
   }
-  // Lines（ビューポートカリング: 画面外スキップ）
-  for(const e of doc.sen){
-    if(hiddenLayers.has(e.layer)) continue;
-    const sx1=e.x1*scale+tx,sy1=-e.y1*scale+ty;
-    const sx2=e.x2*scale+tx,sy2=-e.y2*scale+ty;
-    if(Math.max(sx1,sx2)<-mg||Math.min(sx1,sx2)>W+mg||Math.max(sy1,sy2)<-mg||Math.min(sy1,sy2)>H+mg) continue;
-    ctx.beginPath();
-    ctx.strokeStyle=bwMode?'#000000':rgbCss(e.color,darkBg);
-    ctx.lineWidth=Math.max(0.8,e.lw*scale*1.4);
-    ctx.setLineDash(e.dash&&e.dash.length>0?e.dash.map(d=>d*scale):[]);
-    ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
+  // Lines（V0_119: ビューポートカリング + バッチ描画）
+  // 同一スタイル（色・線幅・破線）でグループ化し beginPath/stroke 回数を大幅削減
+  {
+    const _senBatch=new Map();
+    for(const e of doc.sen){
+      if(hiddenLayers.has(e.layer)) continue;
+      const sx1=e.x1*scale+tx,sy1=-e.y1*scale+ty;
+      const sx2=e.x2*scale+tx,sy2=-e.y2*scale+ty;
+      if(Math.max(sx1,sx2)<-mg||Math.min(sx1,sx2)>W+mg||Math.max(sy1,sy2)<-mg||Math.min(sy1,sy2)>H+mg) continue;
+      const _style=bwMode?'#000000':rgbCss(e.color,darkBg);
+      const _lw=Math.max(0.8,e.lw*scale*1.4);
+      const _dash=e.dash&&e.dash.length>0?e.dash:[];
+      const _key=_style+'|'+_lw.toFixed(2)+'|'+(_dash.length>0?_dash.join(','):'');
+      let _g=_senBatch.get(_key);
+      if(!_g){_g={style:_style,lw:_lw,dash:_dash,pts:[]};_senBatch.set(_key,_g);}
+      _g.pts.push(sx1,sy1,sx2,sy2);
+    }
+    for(const _g of _senBatch.values()){
+      ctx.beginPath();
+      ctx.strokeStyle=_g.style;ctx.lineWidth=_g.lw;
+      ctx.setLineDash(_g.dash.length>0?_g.dash.map(d=>d*scale):[]);
+      for(let _i=0;_i<_g.pts.length;_i+=4){ctx.moveTo(_g.pts[_i],_g.pts[_i+1]);ctx.lineTo(_g.pts[_i+2],_g.pts[_i+3]);}
+      ctx.stroke();
+    }
   }
   // Arcs（ビューポートカリング: 外接矩形で判定）
   for(const e of doc.enko){
