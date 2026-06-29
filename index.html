@@ -323,7 +323,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_139 RC1</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_140</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -396,7 +396,17 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_139 RC1</div>
+  <div class="sp-section" id="devModeSection">
+    <div class="sp-label">開発者モード</div>
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);padding:4px 0">
+      <input type="checkbox" id="verifyModeChk" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+      <span>Verify Mode
+        <small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">書込データ消失を検知・ログ収集</small>
+      </span>
+    </label>
+    <button id="exportVerifyLogBtn" class="sp-action-btn" style="margin-top:8px">Verifyログ保存</button>
+  </div>
+  <div id="ver-label">DXF_View V0_140</div>
 </div>
 
 <div id="colorOverlay">
@@ -522,8 +532,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="fonts/NotoSansJP.js"></script>
 <script src="export.js"></script>
 <script src="tool.js"></script>
+<script src="verify.js"></script>
 <script>
-const APP_VERSION = 'V0_139 RC1';
+const APP_VERSION = 'V0_140';
 
 // =========================================================
 // グローバル状態
@@ -900,8 +911,10 @@ const fileInput=document.getElementById('file');
 document.getElementById('openFileBtnMain').addEventListener('click',()=>fileInput.click());
 fileInput.addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;
+  verify('fileInput.change:start');
   resetToolStates(); // V0_139: ファイル切替時に計測ツール状態をリセット
-  if(currentFileIdx>=0) saveCurrentFileState(); // V0_103: 切替前に現ファイル状態保存
+  // V0_140: saveCurrentFileState廃止 → 前ファイルのviewport状態をinline同期
+  if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140fi=openFiles[currentFileIdx];_pf140fi.tx=tx;_pf140fi.ty=ty;_pf140fi.scale=scale;_pf140fi.fitScale=fitScale;_pf140fi.hiddenLayersArr=Array.from(hiddenLayers);}
   currentFileName=f.name;
   const buf=await f.arrayBuffer();
   doc=null;pdfDoc=null;pdfImage=null;
@@ -936,7 +949,11 @@ fileInput.addEventListener('change',async e=>{
   }
   // V0_93: openFilesに登録
   // V0_119: fileKeyベースで同名異サイズを別タブとして管理
-  if(currentFileIdx<0){openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=0;}else{var _xi=openFiles.findIndex(function(x){return x.fileKey===_fileKey(f.name,f.size);});if(_xi>=0){currentFileIdx=_xi;}else{openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=openFiles.length-1;}}openFilesBufs[currentFileIdx]=buf;saveCurrentFileState();updateFileNavUI();// V0_112
+  if(currentFileIdx<0){openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=0;}else{var _xi=openFiles.findIndex(function(x){return x.fileKey===_fileKey(f.name,f.size);});if(_xi>=0){currentFileIdx=_xi;}else{openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=openFiles.length-1;}}openFilesBufs[currentFileIdx]=buf;
+  // V0_140: saveCurrentFileState()削除 → strokes/dims/images/savedViewsをopenFiles[]に参照として設定
+  {var _nf140=openFiles[currentFileIdx];_nf140.strokes=strokes;_nf140.dims=dims;_nf140.images=typeof images!=='undefined'?images:[];_nf140.savedViews=savedViews;_nf140.doc=doc;_nf140.hiddenLayersArr=Array.from(hiddenLayers);_nf140.tx=tx;_nf140.ty=ty;_nf140.scale=scale;_nf140.fitScale=fitScale;_nf140.currentFileName=currentFileName;_nf140.fileSize=currentFileSize;}
+  updateFileNavUI();// V0_112
+  verify('fileInput.change:done');
   e.target.value='';
 });
 
@@ -952,36 +969,34 @@ function resetToolStates(){
   if(window.LP  && typeof resetLP ==='function') resetLP();
 }
 
-function saveCurrentFileState(){
-  if(currentFileIdx<0||currentFileIdx>=openFiles.length) return;
-  var pn=1; try{ if(typeof pdfPageNum!=='undefined') pn=pdfPageNum; }catch(e){}
-  openFiles[currentFileIdx]=Object.assign(openFiles[currentFileIdx],{
-    doc:doc, pdfDoc:pdfDoc, pdfImage:pdfImage, pdfPageNum:pn,
-    strokes: strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});}),
-    dims: dims.slice(),
-    images: (typeof images!=='undefined'?images.slice():[]),
-    savedViews: savedViews.slice(),
-    hiddenLayersArr: Array.from(hiddenLayers),
-    currentFileName: currentFileName,
-    tx:tx, ty:ty, scale:scale, fitScale:fitScale, fileSize:currentFileSize  // V0_112
-  });
-}
+// V0_140: saveCurrentFileState廃止（全呼び出しをinline viewport syncに置換済み）
+// 後方互換のため空関数として残す
+function saveCurrentFileState(){}
 
 function switchToFile(idx){
   if(idx<0||idx>=openFiles.length) return;
+  verify('switchToFile:before',{from:currentFileIdx,to:idx});
   // V0_131: タブ切替時にマーク自動クリア
   _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
   resetToolStates(); // V0_139: タブ切替時に計測ツール状態をリセット
-  saveCurrentFileState();
+  // V0_140: ビュー状態のみ同期（strokes/dimsは参照エイリアスで既に同期済み）
+  if(currentFileIdx>=0&&currentFileIdx<openFiles.length){
+    var _prevF=openFiles[currentFileIdx];
+    _prevF.tx=tx;_prevF.ty=ty;_prevF.scale=scale;_prevF.fitScale=fitScale;
+    var _pn2=1;try{if(typeof pdfPageNum!=='undefined')_pn2=pdfPageNum;}catch(e){}
+    _prevF.pdfPageNum=_pn2;
+    _prevF.hiddenLayersArr=Array.from(hiddenLayers);
+  }
   currentFileIdx=idx;
   var f=openFiles[idx];
   doc=f.doc; pdfDoc=f.pdfDoc; pdfImage=f.pdfImage;
   try{ if(typeof pdfPageNum!=='undefined') pdfPageNum=f.pdfPageNum||1; }catch(e){}
-  strokes=f.strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});});
-  dims=f.dims.slice();
-  if(typeof images!=='undefined') images=f.images.slice();
-  savedViews=f.savedViews.slice();
-  hiddenLayers=new Set(f.hiddenLayersArr);
+  // V0_140: 参照エイリアス（deep copyしない）― push/splice/assign はそのままopenFiles[]に反映
+  strokes=f.strokes||[];
+  dims=f.dims||[];
+  if(typeof images!=='undefined') images=f.images||[];
+  savedViews=f.savedViews||[null,null,null,null,null];
+  hiddenLayers=new Set(f.hiddenLayersArr||[]);
   currentFileName=f.currentFileName;
   currentFileSize=f.fileSize||0; // V0_138: タブ切替時にfileKeyが正しく生成されるよう修正
   if(typeof history!=='undefined'){history=[];redoStack=[];}
@@ -998,6 +1013,7 @@ function switchToFile(idx){
   if(nd) nd.style.display=(doc||pdfImage)?'none':'';
   [0,1,2,3,4].forEach(function(i){if(typeof updateViewmemoState==='function')updateViewmemoState(i);});
   if(typeof updateFileNavUI==='function') updateFileNavUI(); // V0_107: タブ強調表示を同期
+  verify('switchToFile:after');
 }
 
 function updateFileNavUI(){
@@ -1079,8 +1095,9 @@ function closeTab(idx){
 }
 
 function doCloseTab(idx){
-  // V0_134: 非アクティブタブ閉じ時、splice前に現ファイル状態を保存
-  if(idx!==currentFileIdx&&currentFileIdx>=0) saveCurrentFileState();
+  verify('doCloseTab',{idx:idx,currentFileIdx:currentFileIdx});
+  // V0_140: saveCurrentFileState廃止 → viewport状態のみinline同期
+  if(idx!==currentFileIdx&&currentFileIdx>=0&&currentFileIdx<openFiles.length){var _cv140=openFiles[currentFileIdx];_cv140.tx=tx;_cv140.ty=ty;_cv140.scale=scale;_cv140.fitScale=fitScale;_cv140.hiddenLayersArr=Array.from(hiddenLayers);}
   openFiles.splice(idx,1);
   if(typeof openFilesBufs!=='undefined') openFilesBufs.splice(idx,1); // V0_138: インデックスずれ修正
   if(openFiles.length===0){
@@ -1204,13 +1221,17 @@ function undo(){
   if(!history.length)return;
   redoStack.push({strokes:strokes.map(s=>({...s,pts:[...s.pts]})),dims:[...dims]});
   const st=history.pop();strokes=st.strokes;dims=st.dims;
-  scheduleOverlay();updateUndoRedo();scheduleSave();
+  // V0_140: undo後は新配列のためopenFiles[]に明示同期
+  if(currentFileIdx>=0&&openFiles[currentFileIdx]){openFiles[currentFileIdx].strokes=strokes;openFiles[currentFileIdx].dims=dims;}
+  scheduleOverlay();updateUndoRedo();scheduleSave();verify('Undo');
 }
 function redo(){
   if(!redoStack.length)return;
   history.push({strokes:strokes.map(s=>({...s,pts:[...s.pts]})),dims:[...dims]});
   const st=redoStack.pop();strokes=st.strokes;dims=st.dims;
-  scheduleOverlay();updateUndoRedo();scheduleSave();
+  // V0_140: redo後は新配列のためopenFiles[]に明示同期
+  if(currentFileIdx>=0&&openFiles[currentFileIdx]){openFiles[currentFileIdx].strokes=strokes;openFiles[currentFileIdx].dims=dims;}
+  scheduleOverlay();updateUndoRedo();scheduleSave();verify('Redo');
 }
 function updateUndoRedo(){
   const ub=document.getElementById('undoBtn');
@@ -1222,7 +1243,12 @@ document.getElementById('undoBtn').addEventListener('click',undo);
 document.getElementById('redoBtn').addEventListener('click',redo);
 
 document.getElementById('clearBtn').addEventListener('click',()=>{
-  if(confirm('全てのスケッチと寸法を消去しますか？')){snapshot();dims=[];strokes=[];scheduleOverlay();doSave();} // V0_103: 即時保存
+  if(confirm('全てのスケッチと寸法を消去しますか？')){
+    snapshot();dims=[];strokes=[];
+    // V0_140: 再代入後はopenFiles[]に明示同期
+    if(currentFileIdx>=0&&openFiles[currentFileIdx]){openFiles[currentFileIdx].strokes=strokes;openFiles[currentFileIdx].dims=dims;}
+    scheduleOverlay();doSave();verify('clear'); // V0_103: 即時保存
+  }
 });
 // savePDFBtn addEventListener → export.js
 
@@ -1242,7 +1268,7 @@ document.querySelectorAll('.mem-btn').forEach(btn=>{
     if(!savedViews[i]){
       // 未記憶 → 現在位置を記憶
       savedViews[i]={tx,ty,scale};
-      updateViewmemoState(i);scheduleSave();
+      updateViewmemoState(i);scheduleSave();verify('savedViews変更',{slot:i});
       btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
       showGuide('記憶'+(i+1)+'に保存しました',1500);
     } else {
@@ -1268,6 +1294,9 @@ document.querySelectorAll('.show-btn').forEach(btn=>{
       // 長押し: 全記憶VIEW削除確認
       if(confirm('全ての記憶Viewを削除してもいいですか？')){
         savedViews=[null,null,null,null,null];
+        // V0_140: 再代入後はopenFiles[]に明示同期
+        if(currentFileIdx>=0&&openFiles[currentFileIdx]) openFiles[currentFileIdx].savedViews=savedViews;
+        verify('savedViews変更',{reset:true});
         [0,1,2,3,4].forEach(i=>updateViewmemoState(i));
         scheduleSave();
         showGuide('全ての記憶Viewを削除しました',1500);
@@ -2546,11 +2575,12 @@ function doAllSearch(){
 // ・F-2: 既存タブ時はstrokes/dims/images/savedViewsを上書きせず保持
 // ・F-3: findIndexをfileKeyベースに変更（同名異サイズ問題を修正）
 async function openDxfFromDb(name,buf,keyword){
+  verify('openDxfFromDb:before',{name:name});
   try{
     // ① resetToolStates（計測ツール状態をリセット）
     resetToolStates();
-    // ② 現在タブを保存（切替前に現状を退避）
-    if(currentFileIdx>=0) saveCurrentFileState();
+    // ② V0_140: saveCurrentFileState廃止 → 前ファイルのビュー状態のみinline同期
+    if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140=openFiles[currentFileIdx];_pf140.tx=tx;_pf140.ty=ty;_pf140.scale=scale;_pf140.fitScale=fitScale;_pf140.hiddenLayersArr=Array.from(hiddenLayers);}
 
     // ③ DXF読込
     doc=parseDXF(buf);
@@ -2573,10 +2603,11 @@ async function openDxfFromDb(name,buf,keyword){
       openFiles[_xi].doc=doc; // パース結果のみ更新
       currentFileIdx=_xi;
       var _ef=openFiles[_xi];
-      strokes=(_ef.strokes||[]).map(function(s){return Object.assign({},s,{pts:s.pts.slice()});});
-      dims=(_ef.dims||[]).slice();
-      if(typeof images!=='undefined') images=(_ef.images||[]).slice();
-      savedViews=(_ef.savedViews||[null,null,null,null,null]).slice();
+      // V0_140: deep copy廃止 → 参照エイリアス（openFiles[]を唯一の本体とする）
+      strokes=_ef.strokes||[];
+      dims=_ef.dims||[];
+      if(typeof images!=='undefined') images=_ef.images||[];
+      savedViews=_ef.savedViews||[null,null,null,null,null];
       hiddenLayers=new Set(_ef.hiddenLayersArr||[]);
       tx=_ef.tx||0; ty=_ef.ty||0; scale=_ef.scale||1;
       if(_ef.fitScale) fitScale=_ef.fitScale;
@@ -2606,6 +2637,8 @@ async function openDxfFromDb(name,buf,keyword){
       // ⑧ openFilesへ登録
       openFiles.push({name:name,fileKey:_fk});
       currentFileIdx=openFiles.length-1;
+      // V0_140: 新タブ登録時にstrokes/dims/images/savedViewsの参照を設定
+      {var _nf140b=openFiles[currentFileIdx];_nf140b.strokes=strokes;_nf140b.dims=dims;_nf140b.images=typeof images!=='undefined'?images:[];_nf140b.savedViews=savedViews;_nf140b.doc=doc;_nf140b.hiddenLayersArr=Array.from(hiddenLayers);}
     }
 
     currentFileName=name;
@@ -2617,9 +2650,10 @@ async function openDxfFromDb(name,buf,keyword){
     scheduleDraw();scheduleOverlay();showInfo();buildSearchIndex();
     updateFileNameDisplay();updateUndoRedo();
 
-    // ⑨ saveCurrentFileState（確定した状態を保存）
-    saveCurrentFileState();
+    // V0_140: saveCurrentFileState廃止 → fit()後のviewport状態をinline同期
+    {if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _sf140=openFiles[currentFileIdx];_sf140.tx=tx;_sf140.ty=ty;_sf140.scale=scale;_sf140.fitScale=fitScale;_sf140.hiddenLayersArr=Array.from(hiddenLayers);_sf140.currentFileName=currentFileName;_sf140.fileSize=currentFileSize;}}
     updateFileNavUI();scheduleSave();
+    verify('openDxfFromDb:after');
 
     document.getElementById('allSearchOverlay').classList.remove('open');
     document.body.classList.remove('settings-open');
@@ -2767,47 +2801,4 @@ function _dimTextDragUp(){
 (function(){
   var btn = document.getElementById('voiceSearchBtn');
   if(!btn) return;
-  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRec){
-    btn.style.display='none'; // 非対応ブラウザでは非表示
-    return;
-  }
-  var rec = new SpeechRec();
-  rec.lang = 'ja-JP';
-  rec.continuous = false;
-  rec.interimResults = false;
-  var listening = false;
-
-  btn.addEventListener('click', function(){
-    if(listening){ rec.stop(); return; }
-    try{
-      rec.start();
-    }catch(e){}
-  });
-
-  rec.onstart = function(){
-    listening = true;
-    btn.textContent = '🔴';
-    btn.title = '録音中（タップで停止）';
-  };
-  rec.onend = function(){
-    listening = false;
-    btn.textContent = '🎤';
-    btn.title = '音声入力';
-  };
-  rec.onresult = function(e){
-    var text = e.results[0][0].transcript;
-    var inp = document.getElementById('allSearchInput');
-    if(inp){ inp.value = text; inp.dispatchEvent(new Event('input')); }
-  };
-  rec.onerror = function(e){
-    listening = false;
-    btn.textContent = '🎤';
-    showGuide('音声認識エラー: ' + e.error, 2000);
-  };
-})();
-// =========================================================
-// V0_110: 音声入力 
-</script>
-</body>
-</ht                                                                                    
+  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognitio

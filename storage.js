@@ -83,15 +83,24 @@ function _lsIdbGetP(name,lsKey){
 // =========================================================
 // 自動保存スケジュール
 // =========================================================
-function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(doSave,800);}
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(doSave,800);if(typeof verify==='function')verify('scheduleSave');}
 
 // =========================================================
 // localStorage へ保存（DXFバイナリはIndexedDBへ）
 // =========================================================
 function doSave(){
+  if(typeof verify==='function')verify('doSave:start');
   try{
-    // V0_112: 現在のファイル状態をopenFiles[]に反映
-    if(typeof saveCurrentFileState==='function') saveCurrentFileState();
+    // V0_140: saveCurrentFileState廃止 — openFiles[]は常に最新（参照エイリアス）
+    // ビュー状態（tx/ty/scale/hiddenLayersArr）のみ現在ファイルに同期する
+    if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&currentFileIdx<openFiles.length){
+      var _cfsv=openFiles[currentFileIdx];
+      _cfsv.tx=tx;_cfsv.ty=ty;_cfsv.scale=scale;_cfsv.fitScale=fitScale;
+      _cfsv.hiddenLayersArr=Array.from(hiddenLayers);
+      var _pnSv=1;try{if(typeof pdfPageNum!=='undefined')_pnSv=pdfPageNum;}catch(e){}
+      _cfsv.pdfPageNum=_pnSv;
+      _cfsv.currentFileName=currentFileName;_cfsv.fileSize=currentFileSize;
+    }
     const sd=parseFloat(document.getElementById('scaleDenom').value)||1;
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       strokes,dims,savedViews,tx,ty,scale,fitScale,
@@ -132,9 +141,10 @@ function doSave(){
     }else{
       localStorage.removeItem(MULTI_KEY);
     }
+    if(typeof verify==='function')verify('doSave:done');
     scheduleBkSave(); // V0_121: クールダウン方式バックアップをスケジュール
     _dvAutoSave(); // V0_127: .dxfview自動保存
-  }catch(e){}
+  }catch(e){if(typeof verifyWarn==='function')verifyWarn('localStorage保存失敗');}
 }
 
 // =========================================================
@@ -142,6 +152,7 @@ function doSave(){
 // =========================================================
 function saveFile(buf,name){
   if(!buf||!name)return;
+  if(typeof verify==='function')verify('saveFile',{name:name});
   _lsIdbPut(name,buf); // V0_114: IDBのみ保存（サイズ・容量制限なし）
 }
 
@@ -149,6 +160,7 @@ function saveFile(buf,name){
 // ページ読み込み時の復元
 // =========================================================
 async function tryRestore(){
+  if(typeof verify==='function')verify('tryRestore:start');
 
   // ── V0_112: マルチファイル復元 ──────────────────────────────
   var _multiOk=false;
@@ -197,10 +209,11 @@ async function tryRestore(){
           currentFileIdx=_ai;
           var _af=openFiles[_ai];
           doc=_af.doc; pdfDoc=null; pdfImage=null;
-          strokes=_af.strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});});
-          dims=_af.dims.slice();
-          if(typeof images!=='undefined') images=[];
-          savedViews=_af.savedViews.slice();
+          // V0_140: deep copy廃止 → 参照エイリアス（openFiles[]を唯一の本体とする）
+          strokes=_af.strokes;
+          dims=_af.dims;
+          if(typeof images!=='undefined') images=_af.images||[];
+          savedViews=_af.savedViews;
           hiddenLayers=new Set(_af.hiddenLayersArr);
           currentFileName=_af.currentFileName;
           currentFileSize=_af.fileSize;
@@ -339,13 +352,15 @@ async function tryRestore(){
     }
     // V0_111: 復元ファイルをopenFiles[]に登録
     if(currentFileName && typeof openFiles!=='undefined' && openFiles.length===0){
-      openFiles.push({name:currentFileName});
+      openFiles.push({name:currentFileName,fileKey:_sfKey||currentFileName});
       currentFileIdx=0;
       if(typeof openFilesBufs!=='undefined'&&_restoreBuf) openFilesBufs[0]=_restoreBuf; // V0_112
-      if(typeof saveCurrentFileState==='function') saveCurrentFileState();
+      // V0_140: saveCurrentFileState廃止 → strokes/dims/images/savedViewsを参照として設定
+      {var _singleF=openFiles[0];_singleF.strokes=strokes;_singleF.dims=dims;_singleF.images=typeof images!=='undefined'?images:[];_singleF.savedViews=savedViews;_singleF.doc=doc;_singleF.hiddenLayersArr=Array.from(hiddenLayers);_singleF.tx=tx;_singleF.ty=ty;_singleF.scale=scale;_singleF.fitScale=fitScale;_singleF.currentFileName=currentFileName;_singleF.fileSize=currentFileSize;}
       if(typeof updateFileNavUI==='function') updateFileNavUI();
     }
   }catch(e){}
+  if(typeof verify==='function')verify('tryRestore:done');
 }
 
 // =========================================================
@@ -408,9 +423,14 @@ function _bkPut(fileKey,dims,strokes){
 function _doBkSave(){
   _bkTimer=null;
   _bkLastTs=Date.now();
+  if(typeof verify==='function')verify('_doBkSave');
   var fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName;
   if(!fk) return;
-  _bkPut(fk,dims.slice(),strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});}));
+  // V0_140: openFiles[currentFileIdx]を直接参照（グローバル変数ではなく）
+  var _bkCf=(typeof openFiles!=='undefined'&&currentFileIdx>=0)?openFiles[currentFileIdx]:null;
+  var _bkStrokes=_bkCf&&_bkCf.strokes?_bkCf.strokes:strokes;
+  var _bkDims=_bkCf&&_bkCf.dims?_bkCf.dims:dims;
+  _bkPut(fk,_bkDims.slice(),_bkStrokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});}));
 }
 
 // クールダウン方式スケジューラ
@@ -436,6 +456,13 @@ function _dvAutoSave(){
   try{
     var fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
     if(!fk) return; // V0_134: fileKeyなし（ファイル未読込）のみスキップ。空データも保存して削除操作を反映
+    // V0_140: openFiles[currentFileIdx]を直接参照（グローバル変数ではなく）
+    var _dvCf=(typeof openFiles!=='undefined'&&currentFileIdx>=0)?openFiles[currentFileIdx]:null;
+    var _dvStrokes=_dvCf&&_dvCf.strokes?_dvCf.strokes:strokes;
+    var _dvDims=_dvCf&&_dvCf.dims?_dvCf.dims:dims;
+    var _dvFn=(_dvCf&&_dvCf.currentFileName)||currentFileName||'';
+    var _dvFs=(_dvCf&&_dvCf.fileSize!=null)?_dvCf.fileSize:currentFileSize||0;
+    if(typeof verify==='function')verify('IDB保存開始',{fk:fk});
     var r=indexedDB.open(_DV_IDB_NAME,1);
     r.onupgradeneeded=function(e){e.target.result.createObjectStore('dv',{keyPath:'fk'});};
     r.onsuccess=function(e){
@@ -445,14 +472,15 @@ function _dvAutoSave(){
         tx.objectStore('dv').put({
           fk:fk,
           format:'dxfview',          version:1,
-          fileName:currentFileName||'',fileSize:currentFileSize||0,
+          fileName:_dvFn,fileSize:_dvFs,
           savedAt:new Date().toISOString(),
-          dims:dims.slice(),
-          strokes:strokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});})
+          dims:_dvDims.slice(),
+          strokes:_dvStrokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});})
         });
-        tx.onerror=function(ev){console.warn('[dxfview auto-save] tx error',ev.target.error);};
+        tx.oncomplete=function(){if(typeof verify==='function')verify('IDB保存成功',{fk:fk});};
+        tx.onerror=function(ev){if(typeof verifyWarn==='function')verifyWarn('IDB保存失敗',{fk:fk,err:String(ev.target.error)});console.warn('[dxfview auto-save] tx error',ev.target.error);};
       }catch(er){console.warn('[dxfview auto-save] put error',er);}
     };
-    r.onerror=function(e){console.warn('[dxfview auto-save] open error',e.target.error);};
+    r.onerror=function(e){if(typeof verifyWarn==='function')verifyWarn('IDB保存失敗(open)',{fk:fk});console.warn('[dxfview auto-save] open error',e.target.error);};
   }catch(e){console.warn('[dxfview auto-save]',e);}
 }

@@ -461,6 +461,7 @@ function exportDxfviewManual(){
     a.href=url;a.download=fname;
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    if(typeof verify==='function')verify('バックアップ保存',{strokes:typeof strokes!=='undefined'?strokes.length:-1,dims:typeof dims!=='undefined'?dims.length:-1});
     showGuide('書込みデータを保存しました',2000);
   }catch(e){
     console.warn('[dxfview backup] failed',e);
@@ -505,6 +506,7 @@ function importDxfviewManual(){
         if(typeof scheduleOverlay==='function')scheduleOverlay();
         if(typeof updateUndoRedo==='function')updateUndoRedo();
         if(typeof scheduleSave==='function')scheduleSave();
+        if(typeof verify==='function')verify('バックアップ復元:done');
         showGuide('書込みデータを復元しました',2000);
       }catch(err){
         console.warn('[dxfview import] failed',err);
