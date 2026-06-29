@@ -319,7 +319,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_119</span>
+    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_135</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -392,7 +392,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div id="ver-label">DXF_View V0_132</div>
+  <div id="ver-label">DXF_View V0_135</div>
 </div>
 
 <div id="colorOverlay">
@@ -519,7 +519,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="export.js"></script>
 <script src="tool.js"></script>
 <script>
-const APP_VERSION = 'V0_132';
+const APP_VERSION = 'V0_135';
 
 // =========================================================
 // グローバル状態
@@ -909,12 +909,21 @@ fileInput.addEventListener('change',async e=>{
     try{
       doc=parseDXF(buf);
       currentFileSize=f.size; // V0_103
-      if(currentFileName&&(dims.length>0||strokes.length>0))doSave(); // V0_132: データがある場合のみ保存（空データによるSAVE_KEY上書き防止）
       hiddenLayers.clear();strokes=[];dims=[];images=[];savedViews=[null,null,null,null,null];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット
       // V0_131: ファイル切替時にマーク自動クリア
       _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
-      // V0_130: 同一ファイルの保存済みデータを復元（タブ閉じ後に再ピッカー選択した場合）
-      try{var _fkR=_fileKey(f.name,f.size);var _svR=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(_svR&&_svR.fileKey===_fkR){if(_svR.dims&&_svR.dims.length>0)dims=_svR.dims;if(_svR.strokes&&_svR.strokes.length>0)strokes=_svR.strokes;if(_svR.hiddenLayers)hiddenLayers=new Set(_svR.hiddenLayers);if(_svR.savedViews&&_svR.savedViews.length>0)savedViews=_svR.savedViews;}}catch(_eR){}
+      // V0_133: dxfViewerDxfviewDB(fileKey単位)から書き込みデータを復元
+      // ※SAVE_KEY復元は廃止（異ファイル間でデータが混入するバグを修正）
+      {var _fkR=_fileKey(f.name,f.size);
+      var _dvR=await new Promise(function(resolve){
+        try{
+          var _r=indexedDB.open('dxfViewerDxfviewDB',1);
+          _r.onupgradeneeded=function(e){e.target.result.createObjectStore('dv',{keyPath:'fk'});};
+          _r.onsuccess=function(e){try{var _tx2=e.target.result.transaction('dv','readonly');var _gr2=_tx2.objectStore('dv').get(_fkR);_gr2.onsuccess=function(){resolve(_gr2.result||null);};_gr2.onerror=function(){resolve(null);};}catch(e2){resolve(null);}};
+          _r.onerror=function(){resolve(null);};
+        }catch(e3){resolve(null);}
+      });
+      if(_dvR){if(_dvR.dims&&_dvR.dims.length>0)dims=_dvR.dims;if(_dvR.strokes&&_dvR.strokes.length>0)strokes=_dvR.strokes;}}
       buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();_idbSave(f.name,buf,_searchIdx.map(function(m){return m.text;}));{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
       saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();// V0_113: openFiles[]登録後に保存されるようdoSave→scheduleSave
       document.body.classList.remove('settings-open');
@@ -1056,6 +1065,8 @@ function closeTab(idx){
 }
 
 function doCloseTab(idx){
+  // V0_134: 非アクティブタブ閉じ時、splice前に現ファイル状態を保存
+  if(idx!==currentFileIdx&&currentFileIdx>=0) saveCurrentFileState();
   openFiles.splice(idx,1);
   if(openFiles.length===0){
     currentFileIdx=-1;
@@ -1090,6 +1101,7 @@ document.getElementById('settingsClose').addEventListener('click',()=>document.b
 // V0_129: Safari終了・バックグラウンド移行時に即時保存
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'&&currentFileName)doSave();}); // V0_132: ガード追加
 window.addEventListener('pagehide',function(){if(currentFileName)doSave();}); // V0_132: ガード追加
+window.addEventListener('beforeunload',function(){doSave();}); // V0_135: beforeunload追加（強制終了対策）
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
 function updateBwToggleBtn(){
@@ -1151,11 +1163,13 @@ document.getElementById('prevPage').addEventListener('click',async()=>{
   if(!pdfDoc||pdfPageNum<=1)return;
   pdfPageNum--;document.getElementById('pageInfo').textContent=`${pdfPageNum}/${pdfDoc.numPages}`;
   await renderPdfPage(pdfPageNum);
+  scheduleSave(); // V0_135: PDFページ変更を保存
 });
 document.getElementById('nextPage').addEventListener('click',async()=>{
   if(!pdfDoc||pdfPageNum>=pdfDoc.numPages)return;
   pdfPageNum++;document.getElementById('pageInfo').textContent=`${pdfPageNum}/${pdfDoc.numPages}`;
   await renderPdfPage(pdfPageNum);
+  scheduleSave(); // V0_135: PDFページ変更を保存
 });
 
 // tool-btn / color-btn / lw-btn イベントリスナー → tool.js
@@ -1200,7 +1214,7 @@ document.getElementById('clearBtn').addEventListener('click',()=>{
 // スクリーンショット保存ボタン (V0_13改善)
 // screenshotBtn addEventListener → export.js
 // rangeAreaPDFBtn addEventListener → export.js
-document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();}); // V0_74: fitBtnTbはトップバーから削除、viewmemoのfitBtnに統合
+document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();scheduleSave();}); // V0_74: fitBtnTbはトップバーから削除、viewmemoのfitBtnに統合 // V0_135: ビュー保存追加
 
 // exportSketchDxf / exportDxfBtn addEventListener → export.js
 

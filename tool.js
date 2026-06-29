@@ -163,7 +163,7 @@ function handlePointerUp(sx,sy,isPenInput){
       scheduleOverlay();return;
     }
   }
-  if(currentTool==='eraser'){eraserPos=null;scheduleOverlay();return;}
+  if(currentTool==='eraser'){eraserPos=null;scheduleOverlay();scheduleSave();return;}
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     if(sketching&&sketchPts.length>1){
       snapshot();
@@ -410,6 +410,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     } else {
       hideGuide();
     }
+    scheduleSave(); // V0_135: ツール切替を保存
   });
 });
 
@@ -421,6 +422,7 @@ document.querySelectorAll('.color-btn').forEach(btn=>{
     document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     const[r,g,b]=btn.dataset.color.split(',').map(Number);currentColor={r,g,b};document.getElementById('colorOverlay').classList.remove('open');if(typeof updateToolColorDots==='function')updateToolColorDots();
+    scheduleSave(); // V0_135: スケッチ色変更を保存
   });
 });
 
@@ -436,6 +438,7 @@ document.querySelectorAll('.lw-btn').forEach(btn=>{
     document.getElementById('colorOverlay').classList.remove('open');
     // ④ ボタン内の現在値表示を更新
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
+    scheduleSave(); // V0_135: ペン線幅変更を保存
   });
 });
 
@@ -450,6 +453,7 @@ document.querySelectorAll('.hl-color-btn').forEach(btn=>{
     currentHL_Color={r,g,b};
     document.getElementById('colorOverlay').classList.remove('open');
     if(typeof updateToolColorDots==='function')updateToolColorDots();
+    scheduleSave(); // V0_135: 蛍光ペン色変更を保存
   });
 });
 
@@ -462,6 +466,7 @@ document.querySelectorAll('.hl-lw-btn').forEach(btn=>{
     btn.classList.add('active');
     currentHL_LW=parseFloat(btn.dataset.lw);
     document.getElementById('colorOverlay').classList.remove('open');
+    scheduleSave(); // V0_135: 蛍光ペン線幅変更を保存
   });
 });
 
@@ -475,5 +480,6 @@ document.querySelectorAll('.dim-color-btn').forEach(btn=>{
     currentDimColor=btn.dataset.color;
     document.getElementById('colorOverlay').classList.remove('open');
         if(typeof updateToolColorDots==='function')updateToolColorDots();
+    scheduleSave(); // V0_135: 寸法色変更を保存
   });
 });

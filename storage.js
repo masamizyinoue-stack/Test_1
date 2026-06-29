@@ -99,7 +99,8 @@ function doSave(){
       currentTool,currentColor,currentLW,currentFileName,fileSize:currentFileSize,
       fileKey:(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null),
       currentHL_Color,currentHL_LW,currentDimColor,
-      dimensionTextMode,inputMode
+      dimensionTextMode,inputMode,
+      pdfPageNum:(typeof pdfPageNum!=='undefined'?pdfPageNum:1) // V0_135: PDFページ番号保存
     }));
     // V0_112: マルチファイル保存
     if(typeof openFiles!=='undefined'&&openFiles.length>1&&typeof openFilesBufs!=='undefined'){
@@ -111,7 +112,8 @@ function doSave(){
           hiddenLayersArr:f.hiddenLayersArr||[],
           tx:f.tx||0,ty:f.ty||0,scale:f.scale||1,fitScale:f.fitScale||1,
           fileSize:f.fileSize||0,scaleDenom:sd,
-          isPDF:!!(f.pdfDoc||f.pdfImage)
+          isPDF:!!(f.pdfDoc||f.pdfImage),
+          pdfPageNum:f.pdfPageNum||1 // V0_135: PDFページ番号保存
         };
       });
       // V0_114: DXFバイナリはIndexedDBへ保存（サイズ制限・容量制限なし）
@@ -329,6 +331,12 @@ async function tryRestore(){
     if(d.inputMode)inputMode=d.inputMode;
     if(typeof updateInputModeUI==='function')updateInputModeUI();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
+    // V0_135: PDFページ番号復元（loadPDFはpage1を表示するため、保存ページに再移動）
+    if(d.pdfPageNum&&d.pdfPageNum>1&&typeof pdfDoc!=='undefined'&&pdfDoc&&typeof renderPdfPage==='function'){
+      pdfPageNum=d.pdfPageNum;
+      var _pi=document.getElementById('pageInfo');if(_pi)_pi.textContent=pdfPageNum+'/'+pdfDoc.numPages;
+      renderPdfPage(pdfPageNum);
+    }
     // V0_111: 復元ファイルをopenFiles[]に登録
     if(currentFileName && typeof openFiles!=='undefined' && openFiles.length===0){
       openFiles.push({name:currentFileName});
@@ -426,9 +434,8 @@ function scheduleBkSave(){
 var _DV_IDB_NAME='dxfViewerDxfviewDB';
 function _dvAutoSave(){
   try{
-    if((!dims||dims.length===0)&&(!strokes||strokes.length===0)) return;
     var fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
-    if(!fk) return;
+    if(!fk) return; // V0_134: fileKeyなし（ファイル未読込）のみスキップ。空データも保存して削除操作を反映
     var r=indexedDB.open(_DV_IDB_NAME,1);
     r.onupgradeneeded=function(e){e.target.result.createObjectStore('dv',{keyPath:'fk'});};
     r.onsuccess=function(e){
