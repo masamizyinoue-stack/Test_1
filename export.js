@@ -7,6 +7,11 @@
 //               rgbToAci, dxfEncText (utils.js)
 //               showGuide, hideGuide (ui.js)
 //               drawOverlay (HTML inline script)
+// V0_141: PDF高画質化 — _pdfQualityDialog / savePDFBtn ハンドラ変更のみ
+//   - PDF専用Canvas解像度: 画面Canvas × 倍率（2x/3x/4x 選択ダイアログ）
+//   - デフォルト: 3x（高画質・推奨）
+//   - メモリ安全: 4x→3x→2x 自動調整（500MB上限）
+//   - PDF作成後に Canvas 解放（pdfCv/pdfOv/pdfAc/pdfComp を width=1 でメモリ返却）
 // V0_92: PDF黒画面バグ修正
 //   - LONG_PX: 8000→6000（iPad安全canvas範囲: ~25.5MP、513DPI for A4）
 //   - 出力形式: PNG→JPEG 0.98（大容量PNG→jsPDF失敗の回避、高品質維持）
@@ -117,12 +122,94 @@ function exportSketchDxf(){
 }
 
 // =========================================================
-// PDF出力ボタン（最高解像度・JPEG高品質出力）
+// V0_141: PDF品質選択定数・ダイアログ
+// 安全上限: 500MB（4 canvas × 4 bytes/px × CW × CH）
+// =========================================================
+var _PDF_SAFE_MEM_MB = 500;
+
+function _pdfQualityDialog(baseLong, estAspect) {
+  return new Promise(function(resolve) {
+    var safeBytes = _PDF_SAFE_MEM_MB * 1024 * 1024;
+    function _est(m) {
+      var lp = Math.round(baseLong * m);
+      var W = estAspect >= 1 ? lp : Math.round(lp * estAspect);
+      var H = estAspect >= 1 ? Math.round(lp / estAspect) : lp;
+      var mb = Math.round(W * H * 16 / 1048576);
+      return { W: W, H: H, mb: mb, ok: W * H * 16 <= safeBytes };
+    }
+    var e2 = _est(2), e3 = _est(3), e4 = _est(4);
+
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;font-family:-apple-system,sans-serif;';
+
+    var dlg = document.createElement('div');
+    dlg.style.cssText = 'background:#1e2430;color:#dde2f4;border-radius:14px;padding:24px 20px;width:320px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.7);';
+
+    var title = document.createElement('div');
+    title.style.cssText = 'font-size:15px;font-weight:700;margin-bottom:4px;color:#c8d0e8;';
+    title.textContent = 'PDF出力品質を選択';
+    var hint = document.createElement('div');
+    hint.style.cssText = 'font-size:11px;color:#667;margin-bottom:16px;';
+    hint.textContent = '推定メモリ: 4Canvas × W × H × 4byte';
+    dlg.appendChild(title);
+    dlg.appendChild(hint);
+
+    function mkBtn(multi, label, sub, est, isDefault) {
+      var b = document.createElement('button');
+      var bord = isDefault ? '#4a8eff' : '#2d3855';
+      var bg   = isDefault ? 'rgba(74,142,255,.13)' : '#252d40';
+      b.style.cssText = 'display:block;width:100%;margin:6px 0;padding:12px 14px;border-radius:8px;border:2px solid '+bord+';background:'+bg+';color:#dde2f4;cursor:pointer;text-align:left;line-height:1.6;';
+      var warnHtml = est.ok ? '' : '<span style="color:#f5a623;margin-left:4px;font-size:11px;">⚠ メモリ注意（自動調整あり）</span>';
+      b.innerHTML = '<strong style="font-size:14px;">'+label+'</strong>'+warnHtml
+        +'<br><span style="font-size:11px;color:#8898bb;">'+est.W+' × '+est.H+' px  /  約 '+est.mb+' MB</span>'
+        +'<br><span style="font-size:11px;color:#667;">'+sub+'</span>';
+      b.addEventListener('click', function(){ document.body.removeChild(ov); resolve(multi); });
+      return b;
+    }
+
+    dlg.appendChild(mkBtn(2, '標準（2倍）',    '標準品質・低メモリ消費',    e2, false));
+    dlg.appendChild(mkBtn(3, '高画質（3倍）★', '推奨・品質とメモリのバランス', e3, true));
+    dlg.appendChild(mkBtn(4, '超高画質（4倍）', '最高品質・大メモリ消費',    e4, false));
+
+    var sep = document.createElement('hr');
+    sep.style.cssText = 'border:none;border-top:1px solid #2d3855;margin:12px 0 8px;';
+    dlg.appendChild(sep);
+
+    var canc = document.createElement('button');
+    canc.textContent = 'キャンセル';
+    canc.style.cssText = 'display:block;width:100%;padding:9px;border-radius:8px;border:1px solid #2d3855;background:transparent;color:#8898bb;cursor:pointer;font-size:13px;';
+    canc.addEventListener('click', function(){ document.body.removeChild(ov); resolve(null); });
+    dlg.appendChild(canc);
+
+    ov.appendChild(dlg);
+    document.body.appendChild(ov);
+  });
+}
+
+// =========================================================
+// PDF出力ボタン（V0_141: 高画質オフスクリーンCanvas・品質選択ダイアログ）
+// V0_117: PDF専用Canvas作成（pdfCv/pdfOv/pdfAc/pdfComp）
+// V0_141: LONG_PX = 画面Canvas長辺 × 選択倍率（2x/3x/4x）
+//         メモリ安全: 4x→3x→2x 自動調整（500MB上限）
+//         PDF作成後: Canvas width=1 でピクセルバッファ即時解放
 // =========================================================
 document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('savePDFBtn');
   btn.disabled = true;
+
+  // ── V0_141: 品質選択ダイアログ ─────────────────────────────────
+  const _dlgCvEl = document.getElementById('cv');
+  const _dlgBaseLong = Math.max(_dlgCvEl.width, _dlgCvEl.height);
+  const _dlgAspect   = _dlgCvEl.width / (_dlgCvEl.height || 1);
+  const _dlgSel = await _pdfQualityDialog(_dlgBaseLong, _dlgAspect);
+  if (_dlgSel === null) { btn.disabled = false; return; } // キャンセル
+  // ────────────────────────────────────────────────────────────────
+
   showGuide('PDFを生成中...');
+
+  // V0_141: Canvas解放用参照（outer finally でクリア）
+  let _rCv=null, _rOv=null, _rAc=null, _rComp=null;
+
   try{
     // ── 1. バウンディングボックス計算（V0_111: 全エンティティ対象・hiddenLayer無視）─
     // PDF出力はDXF全体を対象とするため、非表示レイヤも含めてBoundsを計算する
@@ -152,31 +239,46 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     }
     if(!isFinite(mnX)){showGuide('描画データがありません',2000);return;}
 
-    // ── 2. キャンバスサイズ決定（最高解像度: 684DPI相当 for A4）────
-    // V0_91: LONG_PX 5000→8000。Object.defineProperty(dpr=1)使用でcanvas=CW×CH
-    // iPadの安全canvas上限~67MPに対し 8000×5657=45.3MP で余裕あり
-    const PAD=0.02;  // 余白2%
+    // ── 2. V0_141: キャンバスサイズ決定（高画質オフスクリーンCanvas）────────
+    const PAD=0.02;
     const eW=mxX-mnX, eH=mxY-mnY;
     const extMinX=mnX-eW*PAD, extMinY=mnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
-
-    const LONG_PX=Math.round(6500*_pdfResMulti);  // V0_92: 8000→6000（513DPI for A4、iPad安全25.5MP以内）/ V0_95: 6000→6500（556DPI）
     const aspect=extW/extH;
-    let CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);  // V0_117: let（サイズ制限時に縮小）
-    let CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;  // V0_117: let
 
     const PDF_LONG_MM=297;
     const pageMM_W=aspect>=1?PDF_LONG_MM:Math.round(PDF_LONG_MM*aspect);
     const pageMM_H=aspect>=1?Math.round(PDF_LONG_MM/aspect):PDF_LONG_MM;
 
-    // ── 3. 状態退避・PDF用設定 ─────────────────────────────
+    // V0_141: メモリ安全チェック（4x→3x→2x 自動調整）
+    const _PDF_MAX_MEM_B = _PDF_SAFE_MEM_MB * 1024 * 1024;
+    let _safeMulti = _dlgSel;
+    while (_safeMulti >= 2) {
+      const _lp = Math.round(_dlgBaseLong * _safeMulti);
+      const _cW = aspect >= 1 ? _lp : Math.round(_lp * aspect);
+      const _cH = aspect >= 1 ? Math.round(_lp / aspect) : _lp;
+      if (_cW * _cH * 16 <= _PDF_MAX_MEM_B) break;
+      _safeMulti--;
+    }
+    if (_safeMulti < 2) { showGuide('メモリ不足のため出力できません',3000); return; }
+    if (_safeMulti !== _dlgSel) {
+      console.warn('[PDF V0_141] メモリ制限: '+_dlgSel+'x → '+_safeMulti+'x に自動調整');
+      showGuide(_dlgSel+'x → '+_safeMulti+'x に自動調整中...',1500);
+      await new Promise(r=>setTimeout(r,800));
+    }
+
+    // ── 3. 状態退避・PDF用設定 ─────────────────────────────────────
     const sv={tx,ty,scale};
     const cvEl=document.getElementById('cv');
     const ovEl=document.getElementById('ov');
-    const sv_ow=ovEl.width;  // V0_117: _pdfScale計算用のみ（cvEl/ovElはリサイズしない）
+    const sv_ow=ovEl.width;  // _pdfScale計算用
     const dprSave=window.devicePixelRatio||1;
 
-    let pdfScale=Math.min(CW/extW,CH/extH);
+    // V0_141: LONG_PX = 画面Canvas長辺 × 選択倍率
+    let LONG_PX = Math.round(_dlgBaseLong * _safeMulti);
+    let CW = aspect>=1 ? LONG_PX : Math.round(LONG_PX*aspect);
+    let CH = aspect>=1 ? Math.round(LONG_PX/aspect) : LONG_PX;
+    let pdfScale = Math.min(CW/extW, CH/extH);
     tx=-extMinX*pdfScale; ty=CH+extMinY*pdfScale; scale=pdfScale;
 
     // V0_117: ④ Canvasサイズ制限の検知 / ⑤ 制限超過時はLONG_PX縮小で対応
@@ -184,7 +286,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
       const _tc=document.createElement('canvas');
       _tc.width=CW; _tc.height=CH;
       const _tc2=_tc.getContext('2d');
-      _tc2.fillStyle='#ff0000'; _tc2.fillRect(CW-1,CH-1,1,1);
+      _tc2.fillStyle='#f00'; _tc2.fillRect(CW-1,CH-1,1,1);
       if(_tc2.getImageData(CW-1,CH-1,1,1).data[3]===0){
         // Canvas制限超過。LONG_PXを0.75倍ずつ縮小して再探索
         let _lpx=Math.floor(LONG_PX*0.75);
@@ -194,14 +296,14 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
           const _tCH=aspect>=1?Math.round(_lpx/aspect):_lpx;
           const _tc3=document.createElement('canvas'); _tc3.width=_tCW; _tc3.height=_tCH;
           const _tc4=_tc3.getContext('2d');
-          _tc4.fillStyle='#ff0000'; _tc4.fillRect(_tCW-1,_tCH-1,1,1);
+          _tc4.fillStyle='#f00'; _tc4.fillRect(_tCW-1,_tCH-1,1,1);
           if(_tc4.getImageData(_tCW-1,_tCH-1,1,1).data[3]>0){CW=_tCW;CH=_tCH;_found=true;break;}
           _lpx=Math.floor(_lpx*0.75);
         }
         if(!_found){showGuide('Canvasサイズが不足しています',3000);return;}
         pdfScale=Math.min(CW/extW,CH/extH);
         tx=-extMinX*pdfScale; ty=CH+extMinY*pdfScale; scale=pdfScale;
-        console.warn('[PDF] V0_117: Canvasサイズ制限検知 → '+CW+'×'+CH+'px に縮小');
+        console.warn('[PDF V0_141] Canvasサイズ制限 → '+CW+'×'+CH+'px に縮小');
       }
     }
 
@@ -210,28 +312,31 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     // PDF用線幅スケール: CW/CSS_W（CSS幅比率）
     window._pdfScale=CW*dprSave/sv_ow;
 
-    // V0_117: ② PDF専用Canvas作成（画面表示用Canvasを使用しない）
+    // V0_141: PDF専用高画質オフスクリーンCanvas作成（画面表示用Canvasを使用しない）
     const pdfCv=document.createElement('canvas'); pdfCv.width=CW; pdfCv.height=CH;
     const pdfCtx=pdfCv.getContext('2d');
     const pdfOv=document.createElement('canvas'); pdfOv.width=CW; pdfOv.height=CH;
-    const pdfOctx=pdfOv.getContext('2d');  // desynchronized不使用（確実な描画完了のため）
+    const pdfOctx=pdfOv.getContext('2d');
     const pdfAc=document.createElement('canvas'); pdfAc.width=CW; pdfAc.height=CH;
     const pdfAcCtx=pdfAc.getContext('2d');
+    _rCv=pdfCv; _rOv=pdfOv; _rAc=pdfAc;  // 解放用参照
+
     // 描画グローバル（cv/ctx/ov/octx）をPDF専用Canvasに一時置換
     const _svCv=window.cv,_svCtx=window.ctx,_svOv=window.ov,_svOctx=window.octx;
     window.cv=pdfCv; window.ctx=pdfCtx; window.ov=pdfOv; window.octx=pdfOctx;
 
-    // ── 4. 描画・合成（finally で必ず状態復元）──────────────
+    // ── 4. 描画・合成（finally で必ず状態復元）──────────────────────
     let pdfComp=null;
     try{
       if(typeof draw==='function') draw();
       if(typeof drawAnnotation==='function') drawAnnotation(pdfAcCtx);
       if(typeof drawOverlay==='function') drawOverlay();
-      // V0_117: ③ 描画完了を待つ（desynchronized canvas等の非同期描画に対応）
+      // 描画完了を待つ（desynchronized canvas等の非同期描画に対応）
       await new Promise(r=>requestAnimationFrame(r));
 
-      // V0_117: PDF専用Canvasに合成（画面表示Canvasは不使用）
+      // PDF専用Canvasに合成（画面表示Canvasは不使用）
       pdfComp=document.createElement('canvas'); pdfComp.width=CW; pdfComp.height=CH;
+      _rComp=pdfComp;
       const pctx=pdfComp.getContext('2d');
       pctx.fillStyle=bwMode?'#fff':'#1e2430';
       pctx.fillRect(0,0,CW,CH);
@@ -239,7 +344,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
       pctx.drawImage(pdfAc,0,0);
       pctx.drawImage(pdfOv,0,0);
     }finally{
-      // 描画エラー時も必ず状態を復元
+      // 描画エラー時も必ず状態を復元（表示用Canvasへの影響ゼロ）
       try{Object.defineProperty(window,'devicePixelRatio',{get:()=>dprSave,configurable:true});}catch(e){}
       window._pdfScale=undefined;
       window.cv=_svCv; window.ctx=_svCtx; window.ov=_svOv; window.octx=_svOctx;
@@ -249,7 +354,7 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     }
     if(!pdfComp){showGuide('描画に失敗しました',2000);return;}
 
-    // ── 5. jsPDF で PDF 生成（JPEG 0.98: 高品質・大容量PNG回避）──────────
+    // ── 5. jsPDF で PDF 生成（JPEG 0.97: 高品質・大容量PNG回避）──────────
     if(typeof window.jspdf==='undefined'){
       const url=URL.createObjectURL(await new Promise(r=>pdfComp.toBlob(r,'image/png')));
       const a=document.createElement('a');
@@ -261,20 +366,25 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     const {jsPDF}=window.jspdf;
     const orient=pageMM_W>=pageMM_H?'l':'p';
     const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
-    // V0_92: JPEG 0.98（PNG at 45MP → jsPDF/iOS failure の回避、高品質維持）
     const imgData=pdfComp.toDataURL('image/jpeg',0.97);
     pdf.addImage(imgData,'JPEG',0,0,pageMM_W,pageMM_H);
-    const ts=new Date().toISOString().slice(0,10);
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'.pdf'; // V0_96: DXFファイル名をそのまま使用
     pdf.save(fname);
-    showGuide('PDFを保存しました',2000);
-    if(typeof window._afterPDFExport==='function'){var _cb=window._afterPDFExport;window._afterPDFExport=null;setTimeout(_cb,600);} // V0_105
+    showGuide('PDFを保存しました（'+_safeMulti+'x / '+CW+'×'+CH+'px）',2500);
+    if(typeof window._afterPDFExport==='function'){var _cb=window._afterPDFExport;window._afterPDFExport=null;setTimeout(_cb,600);}
 
   }catch(err){
     console.error('PDF export error:',err);
     showGuide('PDF出力に失敗しました: '+err.message,3000);
   }finally{
-    document.getElementById('savePDFBtn').disabled=false;
+    // V0_141: Canvas解放（ピクセルバッファを即時返却して GC を促進）
+    try{
+      if(_rCv)  { _rCv.width=1;   _rCv.height=1;   } _rCv=null;
+      if(_rOv)  { _rOv.width=1;   _rOv.height=1;   } _rOv=null;
+      if(_rAc)  { _rAc.width=1;   _rAc.height=1;   } _rAc=null;
+      if(_rComp){ _rComp.width=1; _rComp.height=1; } _rComp=null;
+    }catch(e){}
+    btn.disabled=false;
   }
 });
 
@@ -582,10 +692,6 @@ async function exportHybridPDF(){
     const pdfScale=Math.min(CW/extW, CH/extH);
 
     // ── 3. 座標変換（ベクター・ラスター共通で位置ずれゼロ保証）──
-    // キャンバス用: tx_p/ty_p をグローバルに設定 → drawAnnotation/drawOverlay が使用
-    // ベクター用:   w2mx/w2my が同じ基点から mm に変換
-    // 検証: w2mx(wx) = (wx*pdfScale + tx_p) * (pageMM_W/CW)
-    //       w2my(wy) = (-wy*pdfScale + ty_p) * (pageMM_H/CH)
     const tx_p = -extMinX * pdfScale;
     const ty_p =  CH + extMinY * pdfScale;
     const _sx = pageMM_W / CW;
@@ -740,7 +846,7 @@ async function exportHybridPDF(){
 }
 document.getElementById('hybridPDFBtn').addEventListener('click',exportHybridPDF);
 
-// V0_126: PDF解像度倍率（1x/2x/3x）
+// V0_126: PDF解像度倍率（1x/2x/3x）— 設定パネルボタン（既存UIを保持）
 var _pdfResMulti=1;
 (function(){
   var btns=[
