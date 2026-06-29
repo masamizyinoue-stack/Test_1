@@ -540,13 +540,62 @@ async function exportDxfview(){
 // V0_136: 書込バックアップ（ヘッダーボタン）
 // strokes / dims / savedViews / hiddenLayers を .dxfview に保存
 // =========================================================
-function exportDxfviewManual(){
+// =========================================================
+// V0_141.1: 書込バックアップ保存先フォルダ記憶
+// File System Access API (showSaveFilePicker) が利用可能な環境では
+// 前回のFileHandleをIDBに保存し、次回保存時のstartInに利用する。
+// FileHandleをstartInに渡すと「そのファイルがあるフォルダ」で開く。
+// API非対応環境（iPad Safari等）は従来の<a>ダウンロードへ自動フォールバック。
+// =========================================================
+var _BKDIR_IDB = 'dxfViewerSettingsDB'; // 既存DBとは分離した設定専用DB
+var _BKDIR_KEY = 'backupFileHandle';     // IDB内キー（FileSystemFileHandle）
+
+// 前回の保存FileHandleをIDBから非同期読み込み
+function _bkHandleLoad() {
+  return new Promise(function(resolve) {
+    try {
+      var r = indexedDB.open(_BKDIR_IDB, 1);
+      r.onupgradeneeded = function(e) { e.target.result.createObjectStore('s'); };
+      r.onsuccess = function(e) {
+        try {
+          var tx = e.target.result.transaction('s', 'readonly');
+          var req = tx.objectStore('s').get(_BKDIR_KEY);
+          req.onsuccess = function() { resolve(req.result || null); };
+          req.onerror   = function() { resolve(null); };
+        } catch(er) { resolve(null); }
+      };
+      r.onerror = function() { resolve(null); };
+    } catch(e) { resolve(null); }
+  });
+}
+
+// 今回の保存FileHandleをIDBに非同期書き込み（fire-and-forget）
+function _bkHandleSave(handle) {
+  try {
+    var r = indexedDB.open(_BKDIR_IDB, 1);
+    r.onupgradeneeded = function(e) { e.target.result.createObjectStore('s'); };
+    r.onsuccess = function(e) {
+      try {
+        var tx = e.target.result.transaction('s', 'readwrite');
+        tx.objectStore('s').put(handle, _BKDIR_KEY);
+      } catch(er) { console.warn('[bkDir] IDB write failed', er); }
+    };
+  } catch(e) { console.warn('[bkDir] IDB open failed', e); }
+}
+
+// =========================================================
+// V0_136: 書込バックアップ（ヘッダーボタン）
+// strokes / dims / savedViews / hiddenLayers を .dxfview に保存
+// V0_141.1: File System Access API 対応（保存先フォルダ記憶）
+// =========================================================
+async function exportDxfviewManual(){
   try{
     if((!dims||dims.length===0)&&(!strokes||strokes.length===0)&&
        (!savedViews||savedViews.every(function(v){return!v;}))&&
        (!hiddenLayers||hiddenLayers.size===0)){
       showGuide('保存するデータがありません',2000);return;
     }
+    // ── ペイロード作成（V0_136から変更なし）────────────────────────
     const fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
     const payload={
       version:1,
@@ -566,11 +615,43 @@ function exportDxfviewManual(){
     const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
     const base=(currentFileName||'').replace(/\.[^.]+$/,'')||null;
     const fname=(base?base+'_書込み':'書込み')+'.dxfview';
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download=fname;
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
-    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+
+    // ── V0_141.1: File System Access API でフォルダ記憶保存 ────────
+    var _fsaSaved = false;
+    if (typeof window.showSaveFilePicker === 'function') {
+      try {
+        // 前回のFileHandleをIDBから取得（startInに渡すと前回フォルダで開く）
+        var _prevHandle = await _bkHandleLoad();
+        var opts = {
+          suggestedName: fname,
+          types: [{ description: 'DXFView Backup', accept: { 'application/json': ['.dxfview'] } }]
+        };
+        if (_prevHandle) {
+          // 前回ハンドルをstartInに指定（無効な場合はブラウザが自動的にデフォルトへ）
+          try { opts.startIn = _prevHandle; } catch(e) {}
+        }
+        var fh = await window.showSaveFilePicker(opts);
+        var writable = await fh.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        _bkHandleSave(fh); // 今回のFileHandleを記憶（次回のstartIn用）
+        _fsaSaved = true;
+      } catch(e) {
+        if (e && e.name === 'AbortError') return; // ユーザーキャンセル → 静かに終了
+        // APIエラー（権限・非対応等）→ 従来方式でフォールバック
+        console.warn('[backup] showSaveFilePicker failed, fallback to <a>:', e);
+      }
+    }
+
+    // ── フォールバック: 従来の <a> ダウンロード（iPad Safari等）────
+    if (!_fsaSaved) {
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=fname;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    }
+
     if(typeof verify==='function')verify('バックアップ保存',{strokes:typeof strokes!=='undefined'?strokes.length:-1,dims:typeof dims!=='undefined'?dims.length:-1});
     showGuide('書込みデータを保存しました',2000);
   }catch(e){
