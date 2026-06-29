@@ -2801,47 +2801,4 @@ function _dimTextDragUp(){
 (function(){
   var btn = document.getElementById('voiceSearchBtn');
   if(!btn) return;
-  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SpeechRec){
-    btn.style.display='none'; // 非対応ブラウザでは非表示
-    return;
-  }
-  var rec = new SpeechRec();
-  rec.lang = 'ja-JP';
-  rec.continuous = false;
-  rec.interimResults = false;
-  var listening = false;
-
-  btn.addEventListener('click', function(){
-    if(listening){ rec.stop(); return; }
-    try{
-      rec.start();
-    }catch(e){}
-  });
-
-  rec.onstart = function(){
-    listening = true;
-    btn.textContent = '🔴';
-    btn.title = '録音中（タップで停止）';
-  };
-  rec.onend = function(){
-    listening = false;
-    btn.textContent = '🎤';
-    btn.title = '音声入力';
-  };
-  rec.onresult = function(e){
-    var text = e.results[0][0].transcript;
-    var inp = document.getElementById('allSearchInput');
-    if(inp){ inp.value = text; inp.dispatchEvent(new Event('input')); }
-  };
-  rec.onerror = function(e){
-    listening = false;
-    btn.textContent = '🎤';
-    showGuide('音声認識エラー: ' + e.error, 2000);
-  };
-})();
-// =========================================================
-// V0_110: 音声入力 
-</script>
-</body>
-</html>
+  var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognitio
