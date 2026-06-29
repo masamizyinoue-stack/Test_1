@@ -444,7 +444,7 @@ function _dvAutoSave(){
         var tx=db.transaction('dv','readwrite');
         tx.objectStore('dv').put({
           fk:fk,
-          format:'dxfview',version:1,
+          format:'dxfview',          version:1,
           fileName:currentFileName||'',fileSize:currentFileSize||0,
           savedAt:new Date().toISOString(),
           dims:dims.slice(),

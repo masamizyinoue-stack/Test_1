@@ -424,7 +424,98 @@ async function exportDxfview(){
     showGuide('.dxfview保存に失敗しました',2000);
   }
 }
-document.getElementById('exportDxfviewBtn').addEventListener('click',exportDxfview);
+// V0_136: exportDxfviewBtnは削除（書込バックアップ/書込復元に置き換え）
+
+// =========================================================
+// V0_136: 書込バックアップ（ヘッダーボタン）
+// strokes / dims / savedViews / hiddenLayers を .dxfview に保存
+// =========================================================
+function exportDxfviewManual(){
+  try{
+    if((!dims||dims.length===0)&&(!strokes||strokes.length===0)&&
+       (!savedViews||savedViews.every(function(v){return!v;}))&&
+       (!hiddenLayers||hiddenLayers.size===0)){
+      showGuide('保存するデータがありません',2000);return;
+    }
+    const fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
+    const payload={
+      version:1,
+      format:'dxfview-backup',
+      createdAt:new Date().toISOString(),
+      appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),
+      meta:{
+        fileName:currentFileName||'',
+        fileSize:currentFileSize||0,
+        fileKey:fk
+      },
+      strokes:(typeof strokes!=='undefined'?strokes:[]),
+      dims:(typeof dims!=='undefined'?dims:[]),
+      savedViews:(typeof savedViews!=='undefined'?savedViews:[null,null,null,null,null]),
+      hiddenLayers:(typeof hiddenLayers!=='undefined'?[...hiddenLayers]:[])
+    };
+    const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+    const base=(currentFileName||'').replace(/\.[^.]+$/,'')||null;
+    const fname=(base?base+'_書込み':'書込み')+'.dxfview';
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=fname;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    showGuide('書込みデータを保存しました',2000);
+  }catch(e){
+    console.warn('[dxfview backup] failed',e);
+    showGuide('バックアップ保存に失敗しました',2000);
+  }
+}
+document.getElementById('writeBackupBtn').addEventListener('click',exportDxfviewManual);
+
+// =========================================================
+// V0_136: 書込復元（設定パネルボタン）
+// .dxfview ファイルを選択して strokes / dims / savedViews / hiddenLayers を復元
+// =========================================================
+function importDxfviewManual(){
+  if(!confirm('現在の書込み内容は上書きされます。よろしいですか？'))return;
+  var input=document.createElement('input');
+  input.type='file';
+  input.accept='.dxfview';
+  input.onchange=function(e){
+    var file=e.target.files[0];
+    if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        var d=JSON.parse(ev.target.result);
+        if(!d||!d.format||(d.format!=='dxfview'&&d.format!=='dxfview-backup')){
+          showGuide('無効な.dxfviewファイルです',2000);return;
+        }
+        if(typeof snapshot==='function')snapshot();
+        if(typeof strokes!=='undefined') strokes=d.strokes||[];
+        if(typeof dims!=='undefined') dims=d.dims||[];
+        if(typeof savedViews!=='undefined'){
+          var sv=d.savedViews||[];
+          savedViews=[sv[0]||null,sv[1]||null,sv[2]||null,sv[3]||null,sv[4]||null];
+        }
+        if(typeof hiddenLayers!=='undefined'&&d.hiddenLayers){
+          hiddenLayers=new Set(d.hiddenLayers);
+        }
+        // UI更新
+        for(var i=0;i<5;i++){if(typeof updateViewmemoState==='function')updateViewmemoState(i);}
+        if(typeof buildLayerModal==='function')buildLayerModal();
+        if(typeof scheduleDraw==='function')scheduleDraw(); // V0_138: 書込復元後にDXF本体Canvasを再描画
+        if(typeof scheduleOverlay==='function')scheduleOverlay();
+        if(typeof updateUndoRedo==='function')updateUndoRedo();
+        if(typeof scheduleSave==='function')scheduleSave();
+        showGuide('書込みデータを復元しました',2000);
+      }catch(err){
+        console.warn('[dxfview import] failed',err);
+        showGuide('.dxfview読み込みに失敗しました',2000);
+      }
+    };
+    reader.readAsText(file,'UTF-8');
+  };
+  input.click();
+}
+document.getElementById('importDxfviewBtn').addEventListener('click',importDxfviewManual);
 
 // =========================================================
 // V0_123: ハイブリッドPDF書き出し（DXFベクター + 手書き/寸法ラスター）
@@ -579,13 +670,11 @@ async function exportHybridPDF(){
         const cxmm=w2mx(e.cx), cymm=w2my(e.cy);
         const rMM=r*pdfScale*_sx;
         if(a1===0&&a2===360){
-          // 真円: jsPDF circle()
           pdf.circle(cxmm,cymm,rMM,'S');
         }else{
-          // 円弧: 36分割線分近似（DXF角度: X軸正から反時計回り）
           const rad1=a1*Math.PI/180;
           let rad2=a2*Math.PI/180;
-          if(rad2<=rad1) rad2+=2*Math.PI; // 折り返しアーク対応
+          if(rad2<=rad1) rad2+=2*Math.PI;
           const N=36;
           let px0=cxmm+rMM*Math.cos(rad1), py0=cymm-rMM*Math.sin(rad1);
           for(let i=1;i<=N;i++){
@@ -598,12 +687,12 @@ async function exportHybridPDF(){
       }
     }
 
-    // ── 7.5 文字（moji）をjsPDFベクタ�    // ── 7.5 文字（moji）をjsPDFベクター描画（V0_124: 日本語フォント対応）──
+    // ── 7.5 文字（moji）をjsPDFベクター描画（V0_124: 日本語フォント対応）──
     if(doc&&doc.moji&&doc.moji.length>0&&window._notoSansJPBase64){
       try{
         pdf.addFileToVFS('NotoSansJP.ttf',window._notoSansJPBase64);
         pdf.addFont('NotoSansJP.ttf','NotoSansJP','normal');
-      }catch(er){/* 登録済みの場合は無視 */}
+      }catch(er){}
       for(const e of doc.moji){
         if(hiddenLayers.has(e.layer)) continue;
         if(!e.text||!e.text.trim()) continue;
@@ -621,11 +710,10 @@ async function exportHybridPDF(){
           if(!lines[i].trim()) continue;
           const opts={baseline:'alphabetic'};
           if(e.angle&&Math.abs(e.angle)>0.1) opts.angle=e.angle;
-          // 複数行: PDF座標系（Y下向き）ではi行目をfsMM*i だけ上方向へ
           pdf.text(lines[i],xmm,ymm-fsMM*i,opts);
         }
       }
-      pdf.setTextColor(0,0,0); // リセット
+      pdf.setTextColor(0,0,0);
     }
 
     // ── 8. 手書き（strokes）を透過PNGで重ねる ──

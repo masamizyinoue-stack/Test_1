@@ -241,7 +241,7 @@ ov.addEventListener('touchstart',e=>{
       panning=false;
       if(window.DIM&&window.DIM.active){
         window.DIM.handleDown(sx,sy);
-        console.log('[DIM] touchstart(pencil) → handleDown');
+
       } else if(window.LP&&window.LP.active){
         window.LP.handleDown(sx,sy);
       } else { handlePointerDown(sx,sy,true); }
@@ -335,7 +335,7 @@ ov.addEventListener('touchend',e=>{
   if(liftedStylus.length>0&&isPen&&mouseDown){
     if(window.DIM&&window.DIM.active){
       window.DIM.handleUp(lastMX,lastMY);
-      console.log('[DIM] touchend(pencil) → handleUp');
+
     } else if(window.LP&&window.LP.active){
       window.LP.handleUp(lastMX,lastMY);
     } else { handlePointerUp(lastMX,lastMY,true); }
@@ -392,7 +392,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     btn.classList.add('active');currentTool=btn.dataset.tool;
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
-    console.log('[Tool] switched to:', currentTool, 'DIM.active=', window.DIM&&window.DIM.active);
+
     // ガイドメッセージ
     const guideMap={
       'sketch':'Apple Pencilまたはマウスでスケッチ',
@@ -479,7 +479,7 @@ document.querySelectorAll('.dim-color-btn').forEach(btn=>{
     btn.classList.add('active');
     currentDimColor=btn.dataset.color;
     document.getElementById('colorOverlay').classList.remove('open');
-        if(typeof updateToolColorDots==='function')updateToolColorDots();
+    if(typeof updateToolColorDots==='function')updateToolColorDots();
     scheduleSave(); // V0_135: 寸法色変更を保存
   });
 });
