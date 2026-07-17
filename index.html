@@ -123,7 +123,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   border:1.5px solid #c0392b;background:rgba(192,57,43,.1);color:#e74c3c;cursor:pointer;
   -webkit-tap-highlight-color:transparent}
 .sp-danger-btn:active{background:rgba(192,57,43,.22)}
-#ver-label{font-size:11px;color:var(--text-dim);text-align:center;padding:16px;margin-top:auto}
+/* V0_143: #ver-labelはsp-header内spanのinline styleで完結。旧ブロック用ルールは削除 */
 #colorOverlay{display:none;position:fixed;z-index:400;top:0;left:0;
   background:var(--sb-bg);border:1px solid var(--border);border-radius:16px;
   padding:14px 16px;min-width:252px;max-height:80vh;overflow-y:auto;
@@ -323,7 +323,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="settingsPanel">
   <div class="sp-header">
     <span class="sp-title">設定</span>
-    <span style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_141.2</span>
+    <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_146</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -406,7 +407,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     </label>
     <button id="exportVerifyLogBtn" class="sp-action-btn" style="margin-top:8px">Verifyログ保存</button>
   </div>
-  <div id="ver-label">DXF_View V0_142</div>
+  <!-- V0_143: 下部のバージョン表示（旧#ver-label）は削除。表示はsp-header内の上部spanに一本化 -->
 </div>
 
 <div id="colorOverlay">
@@ -534,7 +535,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="tool.js"></script>
 <script src="verify.js"></script>
 <script>
-const APP_VERSION = 'V0_142';
+const APP_VERSION = 'V0_146';
 
 // =========================================================
 // グローバル状態
@@ -1057,11 +1058,13 @@ function closeTab(idx){
     b.addEventListener('click',function(){document.body.removeChild(dlg);cb();});
     box.appendChild(b);
   }
-  makeBtn('PDF書出しして閉じる','#00d4ff','#000',function(){
+  makeBtn('書込バックアップして閉じる','#00d4ff','#000',function(){
     if(idx!==currentFileIdx) switchToFile(idx); // V0_107: 対象タブのdoc/strokes/dimsを確実にロード
-    window._afterPDFExport=function(){doCloseTab(idx);};
-    var pdfBtn=document.getElementById('savePDFBtn');
-    if(pdfBtn) pdfBtn.click();
+    // V0_145: PDF書出し→書込バックアップ(.dxfview)に変更
+    // exportDxfviewManualの完了(false=キャンセル/失敗)を待ってから閉じる
+    Promise.resolve(exportDxfviewManual()).then(function(ok){
+      if(ok!==false) doCloseTab(idx);
+    });
   });
   makeBtn('そのまま閉じる','#c0392b','#fff',function(){ // V0_111: 二段確認
     var dlg2=document.createElement('div');
@@ -1073,7 +1076,7 @@ function closeTab(idx){
     msg2.textContent='本当に閉じても宜しいですか？';
     var sub2=document.createElement('div');
     sub2.style.cssText='font-size:12px;color:#e74c3c;text-align:center';
-    sub2.textContent='未保存のPDFは作成されません。';
+    sub2.textContent='書込みバックアップは作成されません。'; // V0_145: 文言をバックアップに変更
     box2.appendChild(msg2);box2.appendChild(sub2);
     function makeBtn2(label,bg,fg,cb){
       var b=document.createElement('button');
@@ -1133,7 +1136,7 @@ document.getElementById('settingsClose').addEventListener('click',()=>document.b
 // V0_129: Safari終了・バックグラウンド移行時に即時保存
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'&&currentFileName)doSave();}); // V0_132: ガード追加
 window.addEventListener('pagehide',function(){if(currentFileName)doSave();}); // V0_132: ガード追加
-window.addEventListener('beforeunload',function(){doSave();}); // V0_135: beforeunload追加（強制終了対策）
+window.addEventListener('beforeunload',function(){if(currentFileName)doSave();}); // V0_135: beforeunload追加（強制終了対策）// V0_144: ガード追加（ファイル未読込時にdoSaveすると復元前の保存データを空で上書きし消失するため）
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
 function updateBwToggleBtn(){
@@ -2076,6 +2079,7 @@ DIM.handleUp = function(sx, sy) {
 };
 
 window.DIM = DIM;
+window.resetDIM = resetDIM; // V0_144: resetToolStates()から呼べるようグローバル公開（IIFE内に閉じていてV0_139のリセットが機能していなかったバグ修正）
 
 })(); // end C
 
@@ -2415,6 +2419,7 @@ document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
 });
 
 window.LP=LP;
+window.resetLP = resetLP; // V0_144: resetToolStates()から呼べるようグローバル公開（同上バグ修正）
 
 })(); // end D
 

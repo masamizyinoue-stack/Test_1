@@ -593,7 +593,7 @@ async function exportDxfviewManual(){
     if((!dims||dims.length===0)&&(!strokes||strokes.length===0)&&
        (!savedViews||savedViews.every(function(v){return!v;}))&&
        (!hiddenLayers||hiddenLayers.size===0)){
-      showGuide('保存するデータがありません',2000);return;
+      showGuide('保存するデータがありません',2000);return true; // V0_145: データなし=バックアップ不要なので閉じる処理は継続
     }
     // ── ペイロード作成（V0_136から変更なし）────────────────────────
     const fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
@@ -637,13 +637,36 @@ async function exportDxfviewManual(){
         _bkHandleSave(fh); // 今回のFileHandleを記憶（次回のstartIn用）
         _fsaSaved = true;
       } catch(e) {
-        if (e && e.name === 'AbortError') return; // ユーザーキャンセル → 静かに終了
+        if (e && e.name === 'AbortError') return false; // ユーザーキャンセル → 静かに終了（V0_145: 閉じる連携用にfalseを返す）
         // APIエラー（権限・非対応等）→ 従来方式でフォールバック
         console.warn('[backup] showSaveFilePicker failed, fallback to <a>:', e);
       }
     }
 
-    // ── フォールバック: 従来の <a> ダウンロード（iPad Safari等）────
+    // ── V0_146: PWA（ホーム画面起動）時は Web Share API で共有シートを直接表示 ──
+    // PWAでは<a download>が使えず、iOSのプレビュー画面→「その他...」→フォルダ選択という
+    // 遠回りな動線になり、ファイル名にも勝手に「.json」が付く。
+    // navigator.share(File) ならプレビューを飛ばして共有シート（ファイルに保存）へ直行し、
+    // .dxfviewのファイル名もそのまま保持される。
+    // 通常のSafari起動時は従来の<a>ダウンロードのまま（ダウンロード先設定で1タップ保存が最速のため）。
+    if (!_fsaSaved) {
+      var _isStandalone = (window.navigator.standalone === true) ||
+                          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      if (_isStandalone && navigator.share && typeof navigator.canShare === 'function') {
+        try {
+          var shareFile = new File([blob], fname, { type: 'application/json' });
+          if (navigator.canShare({ files: [shareFile] })) {
+            await navigator.share({ files: [shareFile], title: fname });
+            _fsaSaved = true; // 共有完了扱い
+          }
+        } catch (e) {
+          if (e && e.name === 'AbortError') return false; // 共有シートでキャンセル → 閉じ処理も中断
+          console.warn('[backup] navigator.share failed, fallback to <a>:', e);
+        }
+      }
+    }
+
+    // ── フォールバック: 従来の <a> ダウンロード（Safari等）────
     if (!_fsaSaved) {
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
@@ -655,9 +678,11 @@ async function exportDxfviewManual(){
     if(typeof verify==='function')verify('バックアップ保存',{strokes:typeof strokes!=='undefined'?strokes.length:-1,dims:typeof dims!=='undefined'?dims.length:-1});
     _abMarkSaved(); // V0_141.2: バックアップ成功時に自動バックアップ促進タイマーをリセット
     showGuide('書込みデータを保存しました',2000);
+    return true; // V0_145: 保存成功（閉じる連携用）
   }catch(e){
     console.warn('[dxfview backup] failed',e);
     showGuide('バックアップ保存に失敗しました',2000);
+    return false; // V0_145: 保存失敗時は閉じない（データ消失防止）
   }
 }
 document.getElementById('writeBackupBtn').addEventListener('click',exportDxfviewManual);
@@ -831,7 +856,8 @@ function _abCheck() {
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
     // 800msデバウンス中のsaveTimerが未発火でも即時保存（データ消失防止）
-    try { if(typeof doSave==='function') doSave(); } catch(e) {}
+    // V0_144: currentFileNameガード追加（ファイル未読込時にdoSaveすると空データで保存を上書きし消失するため。V0_132のHTML側ハンドラと同一パターン）
+    try { if(typeof doSave==='function' && typeof currentFileName!=='undefined' && currentFileName) doSave(); } catch(e) {}
     // 変更があればバナーを表示（ユーザーがSafariに戻った時に確認できる）
     _abCheck();
   }
