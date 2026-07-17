@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- V0_147: html2canvas削除（スクショ機能廃止に伴い不要） -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -274,10 +274,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">フォルダ検索</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/><line x1="10" y1="7" x2="10" y2="13"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
 </button>
-  <button class="tb-btn" id="screenshotBtn" title="スクリーンショット">
-  <span class="tb-tool-label">スクショ</span>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-</button>
+  <!-- V0_147: スクショボタン削除 -->
   <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
   <span class="tb-tool-label">PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
@@ -324,7 +321,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_146</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_148</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -535,7 +532,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="tool.js"></script>
 <script src="verify.js"></script>
 <script>
-const APP_VERSION = 'V0_146';
+const APP_VERSION = 'V0_148';
 
 // =========================================================
 // グローバル状態
@@ -912,6 +909,16 @@ const fileInput=document.getElementById('file');
 document.getElementById('openFileBtnMain').addEventListener('click',()=>fileInput.click());
 fileInput.addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;
+  // V0_148: 同名ファイルの二重オープン防止（気付かず2つ開いて別々に書き込む事故を防ぐ）
+  // 状態を一切変更する前にチェックし、既に開いていればそのタブへ切り替えるだけ
+  {var _dupIdx=openFiles.findIndex(function(x){return (x.currentFileName||x.name)===f.name;});
+  if(_dupIdx>=0){
+    if(_dupIdx!==currentFileIdx) switchToFile(_dupIdx);
+    document.body.classList.remove('settings-open');
+    showGuide('「'+f.name+'」は既に開いています。開いているタブに切り替えました',3000);
+    e.target.value='';
+    return;
+  }}
   verify('fileInput.change:start');
   resetToolStates(); // V0_139: ファイル切替時に計測ツール状態をリセット
   // V0_140: saveCurrentFileState廃止 → 前ファイルのviewport状態をinline同期
@@ -1256,7 +1263,7 @@ document.getElementById('clearBtn').addEventListener('click',()=>{
 // savePDFBtn addEventListener → export.js
 
 // スクリーンショット保存ボタン (V0_13改善)
-// screenshotBtn addEventListener → export.js
+// V0_147: screenshotBtn削除（スクショ機能廃止）
 // rangeAreaPDFBtn addEventListener → export.js
 document.getElementById('fitBtn').addEventListener('click',()=>{fit();scheduleDraw();scheduleSave();}); // V0_74: fitBtnTbはトップバーから削除、viewmemoのfitBtnに統合 // V0_135: ビュー保存追加
 
@@ -2582,6 +2589,16 @@ function doAllSearch(){
 async function openDxfFromDb(name,buf,keyword){
   verify('openDxfFromDb:before',{name:name});
   try{
+    // V0_148: 同名ファイルの二重オープン防止
+    // 同名かつ同一fileKey（同内容）は従来のF-2/F-3再利用パスに任せる。
+    // 同名だが内容が異なる場合のみここでブロックし、既存タブへ切り替える。
+    {var _fk148=_fileKey(name,buf.byteLength);
+    var _dup148=openFiles.findIndex(function(x){return (x.currentFileName||x.name)===name && x.fileKey!==_fk148;});
+    if(_dup148>=0){
+      if(_dup148!==currentFileIdx) switchToFile(_dup148);
+      showGuide('「'+name+'」は既に開いています。開いているタブに切り替えました',3000);
+      return;
+    }}
     // ① resetToolStates（計測ツール状態をリセット）
     resetToolStates();
     // ② V0_140: saveCurrentFileState廃止 → 前ファイルのビュー状態のみinline同期

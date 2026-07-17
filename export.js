@@ -16,7 +16,7 @@
 //   - LONG_PX: 8000→6000（iPad安全canvas範囲: ~25.5MP、513DPI for A4）
 //   - 出力形式: PNG→JPEG 0.98（大容量PNG→jsPDF失敗の回避、高品質維持）
 // V0_91: PDF最高解像度対応（LONG_PX=8000、PNG、try-finally）
-// V0_90: スクショ修正（html2canvas+実canvas合成ハイブリッド、bwMode対応）
+// V0_147: スクショ機能削除
 
 // =========================================================
 // DXF書き出し（元データ + 書き込みストローク）
@@ -389,96 +389,8 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
 });
 
 // =========================================================
-// スクリーンショット保存ボタン（V0_90: html2canvas+実canvas合成）
+// V0_147: スクリーンショット機能削除（screenshotBtnハンドラ・html2canvas依存を廃止）
 // =========================================================
-document.getElementById('screenshotBtn').addEventListener('click', async ()=>{
-  const btn = document.getElementById('screenshotBtn');
-  btn.disabled = true;
-  showGuide('スクリーンショットを保存中...');
-  try{
-    // html2canvasはcanvas内容を描画できないため、実canvasを直接合成する
-    // html2canvasはUIレイヤー（ヘッダー等）取得のみに使い、ステージ領域を実canvasで上書き
-    const dpr = window.devicePixelRatio || 1;
-    const cvEl = document.getElementById('cv');
-    const acEl = document.getElementById('ac');
-    const ovEl = document.getElementById('ov');
-    const stageEl = document.getElementById('stage');
-
-    // Step1: 実canvasを合成（DXF + アノテーション + オーバーレイ）
-    const W = cvEl.width, H = cvEl.height;
-    const stageCanvas = document.createElement('canvas');
-    stageCanvas.width = W; stageCanvas.height = H;
-    const sctx = stageCanvas.getContext('2d');
-    sctx.fillStyle = bwMode ? '#ffffff' : '#1e2430';
-    sctx.fillRect(0, 0, W, H);
-    sctx.drawImage(cvEl, 0, 0);
-    sctx.drawImage(acEl, 0, 0);
-    sctx.drawImage(ovEl, 0, 0);
-
-    let imageBlob = null;
-
-    // Step2: html2canvasでUIレイヤー（ヘッダー等）取得 → ステージ領域を実canvas内容で上書き
-    if(typeof html2canvas !== 'undefined'){
-      try{
-        // V0_118: stageRectをhtml2canvas実行前に取得し、scrollオフセットも加算
-        // （html2canvas完了後に取得するとレイアウト変化で座標がずれる場合があるため）
-        const stageRect = stageEl.getBoundingClientRect();
-        const sx = Math.round((stageRect.left + window.scrollX) * dpr);
-        const sy = Math.round((stageRect.top  + window.scrollY) * dpr);
-        const uiCanvas = await html2canvas(document.body, {
-          scale: dpr,
-          backgroundColor: bwMode ? '#ffffff' : '#0b0f16',
-          logging: false,
-          imageTimeout: 8000
-        });
-        const bctx = uiCanvas.getContext('2d');
-        bctx.fillStyle = bwMode ? '#ffffff' : '#1e2430';
-        bctx.fillRect(sx, sy, W, H);
-        bctx.drawImage(stageCanvas, sx, sy);
-        imageBlob = await new Promise(res => uiCanvas.toBlob(res, 'image/png'));
-      }catch(e){
-        console.warn('html2canvas failed, fallback to canvas composite:', e);
-      }
-    }
-
-    // Step3: フォールバック（html2canvas失敗またはなし）
-    if(!imageBlob){
-      imageBlob = await new Promise(res => stageCanvas.toBlob(res, 'image/png'));
-    }
-
-    const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    const baseName = (currentFileName||'screenshot').replace(/\.[^.]+$/,'');
-    const fileName = `${baseName}_${ts}.png`;
-    const file = new File([imageBlob], fileName, {type:'image/png'});
-
-    let shared = false;
-    if(navigator.share && typeof navigator.canShare === 'function' && navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file], title:fileName});
-        shared = true;
-      }catch(shareErr){
-        if(shareErr.name === 'AbortError'){ hideGuide(); return; }
-      }
-    }
-    if(!shared){
-      const url = URL.createObjectURL(imageBlob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(()=>URL.revokeObjectURL(url), 2000);
-    }
-    showGuide('保存しました', 2000);
-  }catch(err){
-    if(err.name !== 'AbortError'){
-      console.error('Screenshot error:', err);
-      hideGuide();
-    } else {
-      hideGuide();
-    }
-  }finally{
-    btn.disabled = false;
-  }
-});
 
 // =========================================================
 // DXF書き出しボタン
