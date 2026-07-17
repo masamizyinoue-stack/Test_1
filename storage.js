@@ -225,6 +225,7 @@ async function tryRestore(){
             bwMode=!!_d2.bwMode;
             currentTool=_d2.currentTool||'sketch';
             if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
+            if(currentTool==='circDim'||currentTool==='radDim'||currentTool==='lp')currentTool='sketch'; // V0_148.1: DIM/LP系は状態機械(active)を復元できずボタン表示と実動作が食い違うためsketchに正規化
             if(_d2.currentColor)currentColor=_d2.currentColor;
             document.querySelectorAll('.color-btn').forEach(b=>{
               const[r,g,b_]=b.dataset.color.split(',').map(Number);
@@ -308,6 +309,7 @@ async function tryRestore(){
     if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
     currentTool=d.currentTool||'sketch';
     if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
+    if(currentTool==='circDim'||currentTool==='radDim'||currentTool==='lp')currentTool='sketch'; // V0_148.1: DIM/LP系は状態機械(active)を復元できずボタン表示と実動作が食い違うためsketchに正規化
     if(d.currentColor)currentColor=d.currentColor;
     document.querySelectorAll('.color-btn').forEach(b=>{
       const[r,g,b_]=b.dataset.color.split(',').map(Number);
