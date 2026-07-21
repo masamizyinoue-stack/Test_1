@@ -266,6 +266,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">画面</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z" fill="currentColor"/></svg>
 </button>
+  <button class="tb-btn" id="subWinBtn" title="サブ窓（範囲を拡大表示する独立ウィンドウ）"> <!-- V0_154: 画面ボタンの右に移動 -->
+  <span class="tb-tool-label">サブ窓</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1" fill="currentColor" fill-opacity="0.25"/></svg>
+</button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="searchBtn" title="画面検索">
   <span class="tb-tool-label">画面検索</span>
@@ -275,18 +279,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">フォルダ検索</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/><line x1="10" y1="7" x2="10" y2="13"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
 </button>
-  <!-- V0_147: スクショボタン削除 -->
-  <button class="tb-btn" id="savePDFBtn" title="図面全体をPDF出力">
-  <span class="tb-tool-label">PDF書出</span>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="10" x2="11" y2="10"/></svg>
-</button>
+  <!-- V0_147: スクショボタン削除 / V0_154: PDF書出ボタンは設定パネルへ移動 -->
   <button class="tb-btn" id="writeBackupBtn" title="書込みデータをバックアップ保存（.dxfview）"> <!-- V0_136: 書込バックアップボタン -->
   <span class="tb-tool-label">書込バックアップ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-</button>
-  <button class="tb-btn" id="subWinBtn" title="サブ窓（範囲を拡大表示する独立ウィンドウ）"> <!-- V0_153.1: サブ窓ボタン -->
-  <span class="tb-tool-label">サブ窓</span>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1" fill="currentColor" fill-opacity="0.25"/></svg>
 </button>
 </div>
 <div id="tabBar"></div>
@@ -326,7 +322,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_153.1</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_154</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -357,15 +353,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <input type="radio" name="dimTextMode" id="dimTextFixed" value="fixed" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
         <span>作成時サイズ固定</span>
       </label>
-      <!-- V0_149: サイズ指定モード追加（数値でpx指定・ズームに関係なく常に指定サイズで表示） -->
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
-        <input type="radio" name="dimTextMode" id="dimTextManual" value="manual" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
-        <span>サイズ指定</span>
-      </label>
-      <div style="display:flex;align-items:center;gap:8px;padding-left:28px;margin-top:-4px">
-        <input type="number" id="dimTextManualSize" value="20" min="4" max="200" step="1" class="sp-input" style="width:80px;padding:8px 10px">
-        <span style="font-size:12px;color:var(--text-dim)">px（サイズ指定選択時に反映）</span>
-      </div>
+      <!-- V0_154: 「サイズ指定」モードを削除 -->
     </div>
   </div>
 
@@ -385,21 +373,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="layerBtn" class="sp-action-btn">レイヤ設定</button>
   </div>
   <div class="sp-section">
-    <button id="exportDxfBtn" class="sp-action-btn" title="書き込みをDXF書き出し">DXF書き込み書出し</button>
+    <button id="savePDFBtn" class="sp-action-btn" title="図面全体をPDF出力（高画質3倍で出力）">PDF書出</button> <!-- V0_154: ヘッダーから移動・品質選択廃止(3倍固定) -->
   </div>
   <div class="sp-section">
     <button id="importDxfviewBtn" class="sp-action-btn">書込復元</button> <!-- V0_136: .dxfview保存→書込復元に変更 -->
-  </div>
-  <div class="sp-section">
-    <div class="sp-label">PDF解像度（試験）</div>
-    <div style="display:flex;gap:6px">
-      <button id="pdfRes1Btn" class="sp-toggle-btn active">1x</button>
-      <button id="pdfRes2Btn" class="sp-toggle-btn">2x</button>
-      <button id="pdfRes3Btn" class="sp-toggle-btn">3x</button>
-    </div>
-  </div>
-    <div class="sp-section">
-    <button id="hybridPDFBtn" class="sp-action-btn">HD-PDF書出（試験）</button>
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
@@ -408,16 +385,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
   </div>
-  <div class="sp-section" id="devModeSection">
-    <div class="sp-label">開発者モード</div>
-    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);padding:4px 0">
-      <input type="checkbox" id="verifyModeChk" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
-      <span>Verify Mode
-        <small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">書込データ消失を検知・ログ収集</small>
-      </span>
-    </label>
-    <button id="exportVerifyLogBtn" class="sp-action-btn" style="margin-top:8px">Verifyログ保存</button>
-  </div>
+  <!-- V0_154: 開発者モードを削除 -->
   <!-- V0_143: 下部のバージョン表示（旧#ver-label）は削除。表示はsp-header内の上部spanに一本化 -->
 </div>
 
@@ -537,18 +505,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=01531"></script>
-<script src="viewer.js?v=01531"></script>
-<script src="utils.js?v=01531"></script>
-<script src="ui.js?v=01531"></script>
-<script src="dialog.js?v=01531"></script>
-<script src="storage.js?v=01531"></script>
-<script src="fonts/NotoSansJP.js?v=01531"></script>
-<script src="export.js?v=01531"></script>
-<script src="tool.js?v=01531"></script>
-<script src="verify.js?v=01531"></script>
+<script src="layer.js?v=0154"></script>
+<script src="viewer.js?v=0154"></script>
+<script src="utils.js?v=0154"></script>
+<script src="ui.js?v=0154"></script>
+<script src="dialog.js?v=0154"></script>
+<script src="storage.js?v=0154"></script>
+<script src="fonts/NotoSansJP.js?v=0154"></script>
+<script src="export.js?v=0154"></script>
+<script src="tool.js?v=0154"></script>
+<script src="verify.js?v=0154"></script>
 <script>
-const APP_VERSION = 'V0_153.1';
+const APP_VERSION = 'V0_154';
 
 // =========================================================
 // グローバル状態
@@ -1200,35 +1168,11 @@ document.querySelectorAll('input[name="dimTextMode"]').forEach(function(r){
 function updateDimTextModeUI(){
   var autoR=document.getElementById('dimTextAuto');
   var fixedR=document.getElementById('dimTextFixed');
-  var manualR=document.getElementById('dimTextManual'); // V0_149
   if(autoR)autoR.checked=(dimensionTextMode==='auto');
   if(fixedR)fixedR.checked=(dimensionTextMode==='fixed');
-  if(manualR)manualR.checked=(dimensionTextMode==='manual'); // V0_149
-  var sizeInput=document.getElementById('dimTextManualSize'); // V0_149
-  if(sizeInput&&typeof dimTextManualPx!=='undefined') sizeInput.value=dimTextManualPx;
 }
 updateDimTextModeUI();
-// V0_149: サイズ指定の数値入力
-{
-  var _dimTextManualInput=document.getElementById('dimTextManualSize');
-  if(_dimTextManualInput){
-    _dimTextManualInput.addEventListener('input',function(){
-      var v=parseFloat(this.value);
-      dimTextManualPx=(isFinite(v)&&v>0)?v:20;
-      if(dimensionTextMode==='manual'){scheduleOverlay();}
-      scheduleSave();
-    });
-    // 数値入力を操作したら自動的に「サイズ指定」を選択状態にする（UX向上）
-    _dimTextManualInput.addEventListener('focus',function(){
-      var manualR=document.getElementById('dimTextManual');
-      if(manualR&&!manualR.checked){
-        manualR.checked=true;
-        dimensionTextMode='manual';
-        scheduleOverlay();scheduleSave();
-      }
-    });
-  }
-}
+// V0_154: 「サイズ指定」の数値入力ロジックを削除
 // V0_79: モード選択
 document.querySelectorAll('input[name="inputMode"]').forEach(function(r){
   r.addEventListener('change',function(){
@@ -1468,11 +1412,6 @@ function getDimFontSize(d, PS) {
     // 作成時サイズ固定: ワールド座標基準でズームに比例して拡縮
     // → 図面上に描かれた文字のように、ズームアウトで小さく・ズームインで大きく
     return Math.max(4, worldH * scale) * PS * 1.5; // V0_97: 1.5倍
-  }
-  if (dimensionTextMode === 'manual') {
-    // V0_149: サイズ指定 - ユーザー指定の絶対pxサイズ（ズームに関係なく常に一定）
-    var manualPx=(typeof dimTextManualPx!=='undefined'&&dimTextManualPx>0)?dimTextManualPx:20;
-    return Math.max(4, manualPx) * PS;
   }
   // auto（推奨）: DIM_TEXT_MIN/MAX_PXでクランプ → 常に読みやすいサイズを維持
   var px = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH * scale));

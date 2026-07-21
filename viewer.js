@@ -21,10 +21,9 @@ var currentFileName='';
 var tx=0,ty=0,scale=1;
 var fitScale=1;       // V0_83: 全体表示時のscaleを記録（drawAnnotation lineWidth基準用）
 var bwMode=true;  // false=黒背景
-var dimensionTextMode='fixed'; // 'auto' | 'fixed' | 'manual'  寸法文字サイズモード（V0_149: manual追加）
+var dimensionTextMode='fixed'; // 'auto' | 'fixed'  寸法文字サイズモード（V0_154: 「サイズ指定」(manual)は廃止）
 var DIM_TEXT_MIN_PX=11;  // autoモード: 最小スクリーンpx
 var DIM_TEXT_MAX_PX=30;  // autoモード: 最大スクリーンpx
-var dimTextManualPx=20;  // V0_149: サイズ指定モード（manual）のユーザー指定px値
 var inputMode='pen'; // 'pen' | 'freehand'  入力モード
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;

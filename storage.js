@@ -108,7 +108,7 @@ function doSave(){
       currentTool,currentColor,currentLW,currentFileName,fileSize:currentFileSize,
       fileKey:(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null),
       currentHL_Color,currentHL_LW,currentDimColor,
-      dimensionTextMode,dimTextManualPx,inputMode, // V0_149: dimTextManualPx追加
+      dimensionTextMode,inputMode, // V0_154: dimTextManualPxは「サイズ指定」廃止に伴い削除
       pdfPageNum:(typeof pdfPageNum!=='undefined'?pdfPageNum:1) // V0_135: PDFページ番号保存
     }));
     // V0_112: マルチファイル保存
@@ -254,8 +254,7 @@ async function tryRestore(){
             document.querySelectorAll('.tool-btn').forEach(b=>{
               b.classList.toggle('active',b.dataset.tool===currentTool);
             });
-            if(_d2.dimensionTextMode)dimensionTextMode=_d2.dimensionTextMode;
-            if(_d2.dimTextManualPx)dimTextManualPx=_d2.dimTextManualPx; // V0_149
+            if(_d2.dimensionTextMode&&_d2.dimensionTextMode!=='manual')dimensionTextMode=_d2.dimensionTextMode; // V0_154: manual廃止
             if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
             if(_d2.inputMode)inputMode=_d2.inputMode;
             if(typeof updateInputModeUI==='function')updateInputModeUI();
@@ -342,8 +341,7 @@ async function tryRestore(){
     [0,1,2,3,4].forEach(i=>updateViewmemoState(i));
     buildLayerModal();
     scheduleDraw();scheduleOverlay();updateUndoRedo();
-    if(d.dimensionTextMode)dimensionTextMode=d.dimensionTextMode;
-    if(d.dimTextManualPx)dimTextManualPx=d.dimTextManualPx; // V0_149
+    if(d.dimensionTextMode&&d.dimensionTextMode!=='manual')dimensionTextMode=d.dimensionTextMode; // V0_154: manual廃止
     if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
     if(d.inputMode)inputMode=d.inputMode;
     if(typeof updateInputModeUI==='function')updateInputModeUI();
