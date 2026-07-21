@@ -322,7 +322,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_155</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_155.1</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -505,18 +505,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=0155"></script>
-<script src="viewer.js?v=0155"></script>
-<script src="utils.js?v=0155"></script>
-<script src="ui.js?v=0155"></script>
-<script src="dialog.js?v=0155"></script>
-<script src="storage.js?v=0155"></script>
-<script src="fonts/NotoSansJP.js?v=0155"></script>
-<script src="export.js?v=0155"></script>
-<script src="tool.js?v=0155"></script>
-<script src="verify.js?v=0155"></script>
+<script src="layer.js?v=01551"></script>
+<script src="viewer.js?v=01551"></script>
+<script src="utils.js?v=01551"></script>
+<script src="ui.js?v=01551"></script>
+<script src="dialog.js?v=01551"></script>
+<script src="storage.js?v=01551"></script>
+<script src="fonts/NotoSansJP.js?v=01551"></script>
+<script src="export.js?v=01551"></script>
+<script src="tool.js?v=01551"></script>
+<script src="verify.js?v=01551"></script>
 <script>
-const APP_VERSION = 'V0_155';
+const APP_VERSION = 'V0_155.1';
 
 // =========================================================
 // グローバル状態
@@ -2203,6 +2203,12 @@ function buildLinePtDim(line,pt,pArrow){
   if(dist<1e-9) return null;
   var ux=perpX/dist,uy=perpY/dist;
   var offset=(pArrow.x-foot.x)*lux+(pArrow.y-foot.y)*luy;
+  // V0_155.1: 寸法位置の指定(offset)が大きくなりすぎ、寸法線・補助線が計測対象の
+  // 線/点から画面上大きく離れた位置に表示されてしまう不具合を修正。
+  // 画面上一定距離(100px相当)を超えてスライドしないようクランプする。
+  var maxOffset=100/scale;
+  if(offset>maxOffset) offset=maxOffset;
+  else if(offset<-maxOffset) offset=-maxOffset;
   var d1={x:foot.x+lux*offset,y:foot.y+luy*offset};
   var d2={x:pt.x  +lux*offset,y:pt.y  +luy*offset};
   var ext=8/scale,sig=offset>=0?1:-1;
