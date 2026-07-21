@@ -32,6 +32,7 @@ function handlePointerDown(sx,sy,isPenInput){
   // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
   if(window.LP&&window.LP.active)return;
+  if(window.LL&&window.LL.active)return; // V0_153: 2線間
   if(window.SW&&window.SW.active){window.SW.handleDown(sx,sy);return;} // V0_150: サブ窓 矩形範囲選択
   const[wx,wy]=s2w(sx,sy);
   // V0_102: dim text drag (水・鉛/斜めツール)
@@ -100,6 +101,7 @@ function handlePointerMove(sx,sy,isPenInput){
   // DIMシステムがアクティブな場合は DIM の pointermove ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
   if(window.LP&&window.LP.active)return;
+  if(window.LL&&window.LL.active)return; // V0_153: 2線間
   if(window.SW&&window.SW.active){window.SW.handleMove(sx,sy);return;} // V0_150: サブ窓 矩形範囲選択
   const[wx,wy]=s2w(sx,sy);
   currentCursorWorld={x:wx,y:wy}; // 寸法プレビュー用カーソル世界座標を更新
@@ -133,6 +135,7 @@ function handlePointerUp(sx,sy,isPenInput){
   // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
   if(window.LP&&window.LP.active)return;
+  if(window.LL&&window.LL.active)return; // V0_153: 2線間
   if(window.SW&&window.SW.active){window.SW.handleUp(sx,sy);return;} // V0_150: サブ窓 矩形範囲選択
   if(dimPendingDown&&isPenInput){
     dimPendingDown=false;
@@ -211,6 +214,8 @@ ov.addEventListener('mousedown',e=>{
     window.DIM.handleDown(p.x,p.y);
   } else if(window.LP&&window.LP.active){
     window.LP.handleDown(p.x,p.y);
+  } else if(window.LL&&window.LL.active){ // V0_153: 2線間
+    window.LL.handleDown(p.x,p.y);
   } else { handlePointerDown(p.x,p.y,false); }
 });
 window.addEventListener('mousemove',e=>{
@@ -219,6 +224,8 @@ window.addEventListener('mousemove',e=>{
     window.DIM.handleMove(p.x,p.y); // mouseDown不要: ホバー中も_hoverPos更新
   } else if(window.LP&&window.LP.active){
     window.LP.handleMove(p.x,p.y);
+  } else if(window.LL&&window.LL.active){ // V0_153: 2線間
+    window.LL.handleMove(p.x,p.y);
   } else { handlePointerMove(p.x,p.y,false); }
   lastMX=p.x;lastMY=p.y;
 });
@@ -229,6 +236,8 @@ window.addEventListener('mouseup',e=>{
     window.DIM.handleUp(p.x,p.y);
   } else if(window.LP&&window.LP.active){
     window.LP.handleUp(p.x,p.y);
+  } else if(window.LL&&window.LL.active){ // V0_153: 2線間
+    window.LL.handleUp(p.x,p.y);
   } else { handlePointerUp(p.x,p.y,false); }
 });
 ov.addEventListener('wheel',e=>{
@@ -257,6 +266,8 @@ ov.addEventListener('touchstart',e=>{
 
       } else if(window.LP&&window.LP.active){
         window.LP.handleDown(sx,sy);
+      } else if(window.LL&&window.LL.active){ // V0_153: 2線間
+        window.LL.handleDown(sx,sy);
       } else { handlePointerDown(sx,sy,true); }
     }
   } else if(fingers.length>=2){
@@ -302,6 +313,8 @@ ov.addEventListener('touchmove',e=>{
       window.DIM.handleMove(sx,sy);
     } else if(window.LP&&window.LP.active){
       window.LP.handleMove(sx,sy);
+    } else if(window.LL&&window.LL.active){ // V0_153: 2線間
+      window.LL.handleMove(sx,sy);
     } else { handlePointerMove(sx,sy,true); }
     lastMX=sx;lastMY=sy;
   } else if(fingers.length>=2&&pinchDist!==null){
@@ -352,6 +365,8 @@ ov.addEventListener('touchend',e=>{
 
     } else if(window.LP&&window.LP.active){
       window.LP.handleUp(lastMX,lastMY);
+    } else if(window.LL&&window.LL.active){ // V0_153: 2線間
+      window.LL.handleUp(lastMX,lastMY);
     } else { handlePointerUp(lastMX,lastMY,true); }
     mouseDown=false;isPen=false;
     if(remFing.length>=2){
