@@ -273,12 +273,13 @@ ov.addEventListener('touchstart',e=>{
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     isPen=false;mouseDown=true;lastMX=sx;lastMY=sy;
     // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
+    // V0_152.2: 手書きモード + サブ窓作成中(SW.active) → 指1本で対角ドラッグできるように追加
     if(inputMode==='freehand'
-        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')
+        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||(window.SW&&window.SW.active))
         &&!(window.DIM&&window.DIM.active)
         &&!(window.LP&&window.LP.active)){
       panning=false;
-      handlePointerDown(sx,sy,false); // currentTool===sketch/hlなので描画開始
+      handlePointerDown(sx,sy,false); // currentTool===sketch/hl/サブ窓作成中 なので描画(操作)開始
     } else {
       // ペンモード or 手書きモード+非描画ツール: パンのみ（既存動作）
       if(sketching){sketching=false;sketchPts=[];}
@@ -318,8 +319,8 @@ ov.addEventListener('touchmove',e=>{
     }
     tx=mid.x-wx*scale;ty=mid.y+wy*scale;
     pinchDist=dist;pinchMid=mid;scheduleDraw();
-  } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
-    // V0_79: 手書きモード 指1本描画中
+  } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
+    // V0_79: 手書きモード 指1本描画中 / V0_152.2: サブ窓作成の対角ドラッグ中も含む
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     if(window.DIM&&window.DIM.active){
@@ -369,7 +370,8 @@ ov.addEventListener('touchend',e=>{
   // 全タッチ終了
   if(remaining.length===0){
     // V0_79: 手書きモードで指描画中だった場合はストロークを確定
-    if(!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
+    // V0_152.2: サブ窓作成の対角ドラッグ中(指を離して矩形確定)も含む
+    if(!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
       handlePointerUp(lastMX,lastMY,false);
     }
     if(!isPen){panning=false;mouseDown=false;}
@@ -382,10 +384,11 @@ ov.addEventListener('touchend',e=>{
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     mouseDown=true;lastMX=sx;lastMY=sy;
     // V0_79: 手書きモード+描画ツールなら描画再開、そうでなければパン
-    if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl')
+    // V0_152.2: サブ窓作成中(SW.active)も対象に追加
+    if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||(window.SW&&window.SW.active))
         &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)){
       panning=false;
-      handlePointerDown(sx,sy,false); // 新しい指で描画再開
+      handlePointerDown(sx,sy,false); // 新しい指で描画(操作)再開
     } else {
       panning=true;
     }
