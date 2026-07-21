@@ -322,7 +322,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_155.2</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_154</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -505,18 +505,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=01552"></script>
-<script src="viewer.js?v=01552"></script>
-<script src="utils.js?v=01552"></script>
-<script src="ui.js?v=01552"></script>
-<script src="dialog.js?v=01552"></script>
-<script src="storage.js?v=01552"></script>
-<script src="fonts/NotoSansJP.js?v=01552"></script>
-<script src="export.js?v=01552"></script>
-<script src="tool.js?v=01552"></script>
-<script src="verify.js?v=01552"></script>
+<script src="layer.js?v=0154"></script>
+<script src="viewer.js?v=0154"></script>
+<script src="utils.js?v=0154"></script>
+<script src="ui.js?v=0154"></script>
+<script src="dialog.js?v=0154"></script>
+<script src="storage.js?v=0154"></script>
+<script src="fonts/NotoSansJP.js?v=0154"></script>
+<script src="export.js?v=0154"></script>
+<script src="tool.js?v=0154"></script>
+<script src="verify.js?v=0154"></script>
 <script>
-const APP_VERSION = 'V0_155.2';
+const APP_VERSION = 'V0_154';
 
 // =========================================================
 // グローバル状態
@@ -2203,25 +2203,12 @@ function buildLinePtDim(line,pt,pArrow){
   if(dist<1e-9) return null;
   var ux=perpX/dist,uy=perpY/dist;
   var offset=(pArrow.x-foot.x)*lux+(pArrow.y-foot.y)*luy;
-  // V0_155.1: 寸法位置の指定(offset)が大きくなりすぎ、寸法線・補助線が計測対象の
-  // 線/点から画面上大きく離れた位置に表示されてしまう不具合を修正。
-  // 画面上一定距離(100px相当)を超えてスライドしないようクランプする。
-  var maxOffset=100/scale;
-  if(offset>maxOffset) offset=maxOffset;
-  else if(offset<-maxOffset) offset=-maxOffset;
   var d1={x:foot.x+lux*offset,y:foot.y+luy*offset};
   var d2={x:pt.x  +lux*offset,y:pt.y  +luy*offset};
   var ext=8/scale,sig=offset>=0?1:-1;
-  // V0_155: 補助線が元の線(line/2線間の相手線)とかぶって見にくい問題を修正。
-  // 補助線は本来lineの方向(lux,luy)に平行なため、始点をfoot/ptちょうどに置くと
-  // 元の線の上に重なって見える。標準的な製図と同様、垂直方向(ux,uy)に
-  // 小さな隙間(gap)を空けて、元の線から離れた位置から補助線を引き出す。
-  var gap=Math.min(4/scale,dist*0.3); // V0_155: 距離が小さい時に補助線同士が交差しないよう安全策
-  var g1={x:foot.x+ux*gap,y:foot.y+uy*gap};
-  var g2={x:pt.x  -ux*gap,y:pt.y  -uy*gap};
   var lines=[
-    {x1:g1.x,y1:g1.y,x2:d1.x+lux*sig*ext+ux*gap,y2:d1.y+luy*sig*ext+uy*gap},
-    {x1:g2.x,y1:g2.y,x2:d2.x+lux*sig*ext-ux*gap,y2:d2.y+luy*sig*ext-uy*gap},
+    {x1:foot.x,y1:foot.y,x2:d1.x+lux*sig*ext,y2:d1.y+luy*sig*ext},
+    {x1:pt.x,  y1:pt.y,  x2:d2.x+lux*sig*ext,y2:d2.y+luy*sig*ext},
     {x1:d1.x,  y1:d1.y,  x2:d2.x,             y2:d2.y}
   ];
   var screenAng=Math.atan2(-uy,ux);
@@ -2446,8 +2433,7 @@ var LL={
   active:false, phase:0,
   selLine1:null, selLine2:null,
   penDown:false, cur:null,
-  _hoverLine:null, _hoverPos:null,
-  _line2AnchorPt:null // V0_155.2: 2本目の線を選択した際にペンを当てていた位置（世界座標）
+  _hoverLine:null, _hoverPos:null
 };
 
 var LL_GUIDES={
@@ -2460,16 +2446,6 @@ function resetLL(){
   LL.active=false; LL.phase=0;
   LL.selLine1=null; LL.selLine2=null;
   LL.penDown=false; LL.cur=null; LL._hoverLine=null; LL._hoverPos=null;
-  LL._line2AnchorPt=null; // V0_155.2
-}
-
-// V0_155.2: 2本目の線(selLine2)上で、_line2AnchorPt(選択時にペンを当てていた位置)に
-// 最も近い点を返す。通り芯のような非常に長い線では、線全体の中点を基準にすると
-// 現在表示中の範囲から大きく離れた位置が寸法の基準になってしまうため、
-// 「ユーザーが実際に選択した付近」を基準点として使う。
-function _llRefPtOnLine2(){
-  var anchor=LL._line2AnchorPt||{x:(LL.selLine2.x1+LL.selLine2.x2)/2,y:(LL.selLine2.y1+LL.selLine2.y2)/2};
-  return computeFoot(LL.selLine2,anchor);
 }
 
 // 2本の線が平行かどうか判定（向きの正負は無視。約1度の誤差まで許容）
@@ -2533,9 +2509,10 @@ function drawLLOverlay(){
     ctx2.beginPath(); ctx2.moveTo(ls21[0],ls21[1]); ctx2.lineTo(ls22[0],ls22[1]); ctx2.stroke();
     ctx2.restore();
   }
-  // Phase2: プレビュー（2本目の選択位置付近の点を「点」としてbuildLinePtDimを再利用）
+  // Phase2: プレビュー（2本目の中点を「点」としてbuildLinePtDimを再利用）
   if(LL.phase===2&&LL.cur&&LL.selLine1&&LL.selLine2){
-    drawLPPreview(ctx2,buildLinePtDim(LL.selLine1,_llRefPtOnLine2(),LL.cur));
+    var midPtPv={x:(LL.selLine2.x1+LL.selLine2.x2)/2, y:(LL.selLine2.y1+LL.selLine2.y2)/2};
+    drawLPPreview(ctx2,buildLinePtDim(LL.selLine1,midPtPv,LL.cur));
   }
 
   ctx2.restore();
@@ -2589,16 +2566,13 @@ LL.handleUp=function(sx,sy){
     } else {
       LL.selLine2=LL._hoverLine;
       LL._hoverLine=null;
-      // V0_155.2: 2本目の線を確定した瞬間にペンを当てていた位置(=LL._hoverPos)を
-      // 基準点として記録。線全体の中点ではなく、ここを基準に寸法を組み立てる。
-      LL._line2AnchorPt=LL._hoverPos?{x:LL._hoverPos.x,y:LL._hoverPos.y}:null;
       LL.phase=2; LL.cur=null;
       showGuide(LL_GUIDES.POS,0);
     }
   } else if(LL.phase===2){
     var wp2=s2w(sx,sy);
     var pArrow=LL.cur||{x:wp2[0],y:wp2[1]};
-    var midPt=_llRefPtOnLine2();
+    var midPt={x:(LL.selLine2.x1+LL.selLine2.x2)/2, y:(LL.selLine2.y1+LL.selLine2.y2)/2};
     var dim=buildLinePtDim(LL.selLine1,midPt,pArrow);
     if(dim){ snapshot(); dims.push(dim); doSave(); scheduleDraw(); } // V0_103と同様: 即時保存
     LL.selLine1=null; LL.selLine2=null; LL.phase=0; LL.cur=null;
@@ -3041,7 +3015,6 @@ function _swAttachInput(sw){
     withCtx(function(){
       if(window.DIM&&window.DIM.active) window.DIM.handleDown(p.x,p.y);
       else if(window.LP&&window.LP.active) window.LP.handleDown(p.x,p.y);
-      else if(window.LL&&window.LL.active) window.LL.handleDown(p.x,p.y); // V0_155: 2線間のサブ窓対応
       else handlePointerDown(p.x,p.y,false);
     });
   });
@@ -3050,7 +3023,6 @@ function _swAttachInput(sw){
     withCtx(function(){
       if(window.DIM&&window.DIM.active) window.DIM.handleMove(p.x,p.y);
       else if(window.LP&&window.LP.active) window.LP.handleMove(p.x,p.y);
-      else if(window.LL&&window.LL.active) window.LL.handleMove(p.x,p.y); // V0_155
       else if(_mDown) handlePointerMove(p.x,p.y,false);
     });
   });
@@ -3061,7 +3033,6 @@ function _swAttachInput(sw){
     withCtx(function(){
       if(window.DIM&&window.DIM.active) window.DIM.handleUp(p.x,p.y);
       else if(window.LP&&window.LP.active) window.LP.handleUp(p.x,p.y);
-      else if(window.LL&&window.LL.active) window.LL.handleUp(p.x,p.y); // V0_155
       else handlePointerUp(p.x,p.y,false);
     });
   });
@@ -3084,7 +3055,6 @@ function _swAttachInput(sw){
         withCtx(function(){
           if(window.DIM&&window.DIM.active) window.DIM.handleDown(sx,sy);
           else if(window.LP&&window.LP.active) window.LP.handleDown(sx,sy);
-          else if(window.LL&&window.LL.active) window.LL.handleDown(sx,sy); // V0_155: 2線間のサブ窓対応
           else handlePointerDown(sx,sy,true);
         });
       }
@@ -3101,7 +3071,7 @@ function _swAttachInput(sw){
       var sxf=tf.clientX-r.left,syf=tf.clientY-r.top;
       isPen=false;mouseDown=true;lastMX=sxf;lastMY=syf;
       if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')
-          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)&&!(window.LL&&window.LL.active)){
+          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)){
         panning=false;
         withCtx(function(){ handlePointerDown(sxf,syf,false); });
       } else {
@@ -3124,7 +3094,6 @@ function _swAttachInput(sw){
       withCtx(function(){
         if(window.DIM&&window.DIM.active) window.DIM.handleMove(sx,sy);
         else if(window.LP&&window.LP.active) window.LP.handleMove(sx,sy);
-        else if(window.LL&&window.LL.active) window.LL.handleMove(sx,sy); // V0_155
         else handlePointerMove(sx,sy,true);
       });
       lastMX=sx;lastMY=sy;
@@ -3150,7 +3119,6 @@ function _swAttachInput(sw){
       withCtx(function(){
         if(window.DIM&&window.DIM.active) window.DIM.handleMove(sxf,syf);
         else if(window.LP&&window.LP.active) window.LP.handleMove(sxf,syf);
-        else if(window.LL&&window.LL.active) window.LL.handleMove(sxf,syf); // V0_155
         else handlePointerMove(sxf,syf,false);
       });
       lastMX=sxf;lastMY=syf;
@@ -3176,7 +3144,6 @@ function _swAttachInput(sw){
       withCtx(function(){
         if(window.DIM&&window.DIM.active) window.DIM.handleUp(lastMX,lastMY);
         else if(window.LP&&window.LP.active) window.LP.handleUp(lastMX,lastMY);
-        else if(window.LL&&window.LL.active) window.LL.handleUp(lastMX,lastMY); // V0_155
         else handlePointerUp(lastMX,lastMY,true);
       });
       mouseDown=false;isPen=false;
@@ -3205,7 +3172,7 @@ function _swAttachInput(sw){
       var sx=t.clientX-r.left,sy=t.clientY-r.top;
       mouseDown=true;lastMX=sx;lastMY=sy;
       if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl')
-          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)&&!(window.LL&&window.LL.active)){
+          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)){
         panning=false;
         withCtx(function(){ handlePointerDown(sx,sy,false); });
       } else {
