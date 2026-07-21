@@ -283,6 +283,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">書込バックアップ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
+  <button class="tb-btn" id="subWinBtn" title="サブ窓（範囲を拡大表示する独立ウィンドウ）"> <!-- V0_150: サブ窓ボタン -->
+  <span class="tb-tool-label">サブ窓</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1" fill="currentColor" fill-opacity="0.25"/></svg>
+</button>
 </div>
 <div id="tabBar"></div>
 <div class="stage" id="stage">
@@ -321,12 +325,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_148.1</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_150</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
-    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF / PDF 対応</small></span>
+    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF 対応</small></span> <!-- V0_148.3: 表記のみ変更（機能は変更なし） -->
   </button>
   <div class="sp-section">
     <div class="sp-label">モード選択</div>
@@ -352,6 +356,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <input type="radio" name="dimTextMode" id="dimTextFixed" value="fixed" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
         <span>作成時サイズ固定</span>
       </label>
+      <!-- V0_149: サイズ指定モード追加（数値でpx指定・ズームに関係なく常に指定サイズで表示） -->
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="dimTextMode" id="dimTextManual" value="manual" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>サイズ指定</span>
+      </label>
+      <div style="display:flex;align-items:center;gap:8px;padding-left:28px;margin-top:-4px">
+        <input type="number" id="dimTextManualSize" value="20" min="4" max="200" step="1" class="sp-input" style="width:80px;padding:8px 10px">
+        <span style="font-size:12px;color:var(--text-dim)">px（サイズ指定選択時に反映）</span>
+      </div>
     </div>
   </div>
 
@@ -523,18 +536,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=0148_1"></script>
-<script src="viewer.js?v=0148_1"></script>
-<script src="utils.js?v=0148_1"></script>
-<script src="ui.js?v=0148_1"></script>
-<script src="dialog.js?v=0148_1"></script>
-<script src="storage.js?v=0148_1"></script>
-<script src="fonts/NotoSansJP.js?v=0148_1"></script>
-<script src="export.js?v=0148_1"></script>
-<script src="tool.js?v=0148_1"></script>
-<script src="verify.js?v=0148_1"></script>
+<script src="layer.js?v=0150"></script>
+<script src="viewer.js?v=0150"></script>
+<script src="utils.js?v=0150"></script>
+<script src="ui.js?v=0150"></script>
+<script src="dialog.js?v=0150"></script>
+<script src="storage.js?v=0150"></script>
+<script src="fonts/NotoSansJP.js?v=0150"></script>
+<script src="export.js?v=0150"></script>
+<script src="tool.js?v=0150"></script>
+<script src="verify.js?v=0150"></script>
 <script>
-const APP_VERSION = 'V0_148.1';
+const APP_VERSION = 'V0_150';
 
 // =========================================================
 // グローバル状態
@@ -977,6 +990,7 @@ var openFilesBufs=[];  // V0_112: ファイルバイナリキャッシュ（マ�
 function resetToolStates(){
   if(window.DIM && typeof resetDIM==='function') resetDIM();
   if(window.LP  && typeof resetLP ==='function') resetLP();
+  if(window.SW  && typeof resetSW ==='function'){ resetSW(); if(typeof _swUpdateBtnUI==='function')_swUpdateBtnUI(false); } // V0_150
 }
 
 // V0_140: saveCurrentFileState廃止（全呼び出しをinline viewport syncに置換済み）
@@ -1184,10 +1198,35 @@ document.querySelectorAll('input[name="dimTextMode"]').forEach(function(r){
 function updateDimTextModeUI(){
   var autoR=document.getElementById('dimTextAuto');
   var fixedR=document.getElementById('dimTextFixed');
+  var manualR=document.getElementById('dimTextManual'); // V0_149
   if(autoR)autoR.checked=(dimensionTextMode==='auto');
   if(fixedR)fixedR.checked=(dimensionTextMode==='fixed');
+  if(manualR)manualR.checked=(dimensionTextMode==='manual'); // V0_149
+  var sizeInput=document.getElementById('dimTextManualSize'); // V0_149
+  if(sizeInput&&typeof dimTextManualPx!=='undefined') sizeInput.value=dimTextManualPx;
 }
 updateDimTextModeUI();
+// V0_149: サイズ指定の数値入力
+{
+  var _dimTextManualInput=document.getElementById('dimTextManualSize');
+  if(_dimTextManualInput){
+    _dimTextManualInput.addEventListener('input',function(){
+      var v=parseFloat(this.value);
+      dimTextManualPx=(isFinite(v)&&v>0)?v:20;
+      if(dimensionTextMode==='manual'){scheduleOverlay();}
+      scheduleSave();
+    });
+    // 数値入力を操作したら自動的に「サイズ指定」を選択状態にする（UX向上）
+    _dimTextManualInput.addEventListener('focus',function(){
+      var manualR=document.getElementById('dimTextManual');
+      if(manualR&&!manualR.checked){
+        manualR.checked=true;
+        dimensionTextMode='manual';
+        scheduleOverlay();scheduleSave();
+      }
+    });
+  }
+}
 // V0_79: モード選択
 document.querySelectorAll('input[name="inputMode"]').forEach(function(r){
   r.addEventListener('change',function(){
@@ -1427,6 +1466,11 @@ function getDimFontSize(d, PS) {
     // 作成時サイズ固定: ワールド座標基準でズームに比例して拡縮
     // → 図面上に描かれた文字のように、ズームアウトで小さく・ズームインで大きく
     return Math.max(4, worldH * scale) * PS * 1.5; // V0_97: 1.5倍
+  }
+  if (dimensionTextMode === 'manual') {
+    // V0_149: サイズ指定 - ユーザー指定の絶対pxサイズ（ズームに関係なく常に一定）
+    var manualPx=(typeof dimTextManualPx!=='undefined'&&dimTextManualPx>0)?dimTextManualPx:20;
+    return Math.max(4, manualPx) * PS;
   }
   // auto（推奨）: DIM_TEXT_MIN/MAX_PXでクランプ → 常に読みやすいサイズを維持
   var px = Math.max(DIM_TEXT_MIN_PX, Math.min(DIM_TEXT_MAX_PX, worldH * scale));
@@ -2431,6 +2475,302 @@ window.LP=LP;
 window.resetLP = resetLP; // V0_144: resetToolStates()から呼べるようグローバル公開（同上バグ修正）
 
 })(); // end D
+
+// ── E. サブ窓（矩形範囲選択 + フローティング独立ウィンドウ） ────────────────
+// V0_150 Phase1: 表示・移動・リサイズ・メインとの自動リアルタイム同期のみ実装。
+// サブ窓内での書込み・計測操作はPhase2（次バージョン）で追加予定。
+;(function(){
+
+// ─ 状態: 矩形範囲選択（DIM/LPと同一パターン: down=探索開始, move=スナップ追従, up=確定） ─
+var SW={active:false, phase:0, penDown:false, cur:null, p1:null};
+function resetSW(){
+  SW.active=false; SW.phase=0; SW.penDown=false; SW.cur=null; SW.p1=null;
+}
+
+SW.handleDown=function(sx,sy){
+  var wp=s2w(sx,sy);
+  var snp=snapAt(wp[0],wp[1]);
+  SW.penDown=true;
+  SW.cur=snp||{x:wp[0],y:wp[1]};
+  scheduleOverlay();
+};
+SW.handleMove=function(sx,sy){
+  if(!SW.penDown)return;
+  var wp=s2w(sx,sy);
+  var snp=snapAt(wp[0],wp[1]);
+  SW.cur=snp||{x:wp[0],y:wp[1]};
+  scheduleOverlay();
+};
+SW.handleUp=function(sx,sy){
+  if(!SW.penDown)return;
+  SW.penDown=false;
+  // プレビューと確定位置を一致させる（DIM/LPと同じ原則: handleUpで再計算しない）
+  var pt=SW.cur;
+  if(!pt){var wp=s2w(sx,sy);pt={x:wp[0],y:wp[1]};}
+  if(SW.phase===0){
+    SW.p1={x:pt.x,y:pt.y};
+    SW.phase=1;
+    SW.cur=null;
+    showGuide('サブ窓：対角点（2点目）を選択してください',0);
+    scheduleOverlay();
+  }else if(SW.phase===1){
+    var p2={x:pt.x,y:pt.y};
+    var rectWorld={
+      x1:Math.min(SW.p1.x,p2.x), y1:Math.min(SW.p1.y,p2.y),
+      x2:Math.max(SW.p1.x,p2.x), y2:Math.max(SW.p1.y,p2.y)
+    };
+    resetSW();
+    hideGuide();
+    if(typeof _swUpdateBtnUI==='function')_swUpdateBtnUI(false);
+    if((rectWorld.x2-rectWorld.x1)>1e-6&&(rectWorld.y2-rectWorld.y1)>1e-6){
+      createSubWindow(rectWorld);
+    }else{
+      showGuide('範囲が小さすぎます',1500);
+    }
+  }
+};
+
+// ─ drawOverlay フック（矩形プレビュー表示） ───────────────────────
+var _origDO_SW=window.drawOverlay;
+window.drawOverlay=function(){
+  _origDO_SW();
+  if(SW.active) drawSWOverlay();
+};
+function drawSWOverlay(){
+  if(SW.phase===1&&SW.p1&&SW.cur){
+    var p1s=w2s(SW.p1.x,SW.p1.y);
+    var p2s=w2s(SW.cur.x,SW.cur.y);
+    octx.save();
+    octx.strokeStyle='#4ecdc4';octx.lineWidth=1.5;octx.setLineDash([6,4]);
+    octx.strokeRect(Math.min(p1s[0],p2s[0]),Math.min(p1s[1],p2s[1]),Math.abs(p2s[0]-p1s[0]),Math.abs(p2s[1]-p1s[1]));
+    octx.restore();
+  }
+  if(SW.cur){
+    var ps=w2s(SW.cur.x,SW.cur.y);
+    octx.save();
+    octx.strokeStyle='#4ecdc4';octx.lineWidth=2;
+    octx.beginPath();octx.arc(ps[0],ps[1],6,0,Math.PI*2);octx.stroke();
+    octx.restore();
+  }
+}
+
+window.SW=SW;
+window.resetSW=resetSW;
+
+// ─ サブ窓ボタン ────────────────────────────────────────────
+function _swUpdateBtnUI(on){
+  var b=document.getElementById('subWinBtn');
+  if(!b)return;
+  if(on){b.style.background='rgba(0,212,255,.22)';b.style.borderColor='#00d4ff';b.style.color='#00d4ff';}
+  else{b.style.background='';b.style.borderColor='';b.style.color='';}
+}
+document.getElementById('subWinBtn').addEventListener('click',function(){
+  if(SW.active){ // 選択中に再度押した場合はキャンセル
+    resetSW();hideGuide();_swUpdateBtnUI(false);return;
+  }
+  if(!doc&&!pdfImage){showGuide('図面がありません',1500);return;}
+  resetToolStates(); // V0_139: 他の計測ツール状態を安全にリセット
+  resetSW();
+  SW.active=true;
+  document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
+  _swUpdateBtnUI(true);
+  showGuide('サブ窓：1点目を選択してください（対角範囲の開始点）',0);
+});
+
+// =========================================================
+// サブ窓 管理（生成・ドラッグ移動・リサイズ・自動同期・削除）
+// =========================================================
+var subWindows=[]; // [{id, el, cvEl, ctxEl, acEl, acCtx, ovEl, octxEl, tx,ty,scale, rectWorld, W,H}]
+var _swIdSeq=0;
+
+function _swComputeScale(rectWorld,W,H){
+  var eW=rectWorld.x2-rectWorld.x1, eH=rectWorld.y2-rectWorld.y1;
+  var pad=0.06;
+  var s=Math.min(W*(1-2*pad)/eW, H*(1-2*pad)/eH);
+  if(!isFinite(s)||s<=0) s=1;
+  return s;
+}
+
+function createSubWindow(rectWorld){
+  if(subWindows.length>=3){showGuide('サブ窓は3個まで開けます',2000);return;}
+  var id='sw'+(_swIdSeq++);
+  var W=320,H=240; // 初期サイズ(CSS px)
+  // 複数開いた際に重ならないよう少しずつオフセット
+  var offset=subWindows.length*28;
+
+  var el=document.createElement('div');
+  el.className='sw-window';
+  el.id=id;
+  el.style.cssText='position:fixed;left:'+(40+offset)+'px;top:'+(80+offset)+'px;width:'+W+'px;height:'+H+'px;'+
+    'z-index:5000;background:#131921;border:1.5px solid #3a4a68;border-radius:10px;'+
+    'box-shadow:0 8px 30px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;touch-action:none;';
+
+  var header=document.createElement('div');
+  header.className='sw-header';
+  header.style.cssText='height:30px;flex-shrink:0;background:#1c2536;display:flex;align-items:center;'+
+    'padding:0 8px;cursor:move;touch-action:none;border-bottom:1px solid #2a3550;';
+  header.innerHTML='<span style="font-size:12px;color:#8fa8c8;flex:1;">サブ窓</span>'+
+    '<button class="sw-close" style="background:none;border:none;color:#c86;font-size:16px;cursor:pointer;padding:2px 8px;line-height:1;">×</button>';
+
+  var body=document.createElement('div');
+  body.style.cssText='position:relative;flex:1;overflow:hidden;background:'+(bwMode?'#ffffff':'#1e2430')+';';
+
+  var cvEl=document.createElement('canvas');
+  var acEl=document.createElement('canvas');
+  var ovEl=document.createElement('canvas');
+  [cvEl,acEl,ovEl].forEach(function(c){c.style.cssText='position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;';});
+  body.appendChild(cvEl);body.appendChild(acEl);body.appendChild(ovEl);
+
+  var resizeHandle=document.createElement('div');
+  resizeHandle.className='sw-resize';
+  resizeHandle.style.cssText='position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;touch-action:none;'+
+    'background:linear-gradient(135deg,transparent 50%,#4a5a78 50%);border-bottom-right-radius:10px;';
+  body.appendChild(resizeHandle);
+
+  el.appendChild(header);el.appendChild(body);
+  document.body.appendChild(el);
+
+  var sw={
+    id:id, el:el, cvEl:cvEl, acEl:acEl, ovEl:ovEl,
+    ctxEl:cvEl.getContext('2d'), acCtxEl:acEl.getContext('2d'), octxEl:ovEl.getContext('2d'),
+    rectWorld:rectWorld, W:W, H:H, tx:0, ty:0, scale:1
+  };
+  _swResizeCanvases(sw);
+  subWindows.push(sw);
+
+  // V0_150: window.addEventListenerで登録したドラッグ/リサイズ用リスナーを
+  // 閉じる時に確実に解放するため、参照を配列に集めておく（メモリリーク防止）
+  var _swCleanupFns=[];
+
+  // ── ドラッグ移動（ヘッダー） ──
+  (function(){
+    var dragging=false, startX=0, startY=0, elStartLeft=0, elStartTop=0;
+    function onDown(e){
+      dragging=true;
+      var p=_swPointerPos(e);
+      startX=p.x; startY=p.y;
+      elStartLeft=parseFloat(el.style.left)||0; elStartTop=parseFloat(el.style.top)||0;
+      // 最前面に
+      subWindows.forEach(function(s){s.el.style.zIndex=5000;});
+      el.style.zIndex=5001;
+      e.preventDefault();
+    }
+    function onMove(e){
+      if(!dragging)return;
+      var p=_swPointerPos(e);
+      el.style.left=(elStartLeft+(p.x-startX))+'px';
+      el.style.top=(elStartTop+(p.y-startY))+'px';
+      e.preventDefault();
+    }
+    function onUp(){dragging=false;}
+    header.addEventListener('mousedown',onDown);
+    header.addEventListener('touchstart',onDown,{passive:false});
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('touchmove',onMove,{passive:false});
+    window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchend',onUp);
+    _swCleanupFns.push(function(){
+      window.removeEventListener('mousemove',onMove);
+      window.removeEventListener('touchmove',onMove);
+      window.removeEventListener('mouseup',onUp);
+      window.removeEventListener('touchend',onUp);
+    });
+  })();
+
+  // ── リサイズ（右下ハンドル） ──
+  (function(){
+    var resizing=false, startX=0, startY=0, startW=0, startH=0;
+    function onDown(e){
+      resizing=true;
+      var p=_swPointerPos(e);
+      startX=p.x; startY=p.y;
+      startW=el.offsetWidth; startH=el.offsetHeight;
+      e.preventDefault(); e.stopPropagation();
+    }
+    function onMove(e){
+      if(!resizing)return;
+      var p=_swPointerPos(e);
+      var newW=Math.max(160,startW+(p.x-startX));
+      var newH=Math.max(120,startH+(p.y-startY));
+      el.style.width=newW+'px'; el.style.height=newH+'px';
+      sw.W=newW; sw.H=newH-30; // ヘッダー分を除いた実表示高さ
+      _swResizeCanvases(sw);
+      _swRenderOne(sw);
+      e.preventDefault();
+    }
+    function onUp(){resizing=false;}
+    resizeHandle.addEventListener('mousedown',onDown);
+    resizeHandle.addEventListener('touchstart',onDown,{passive:false});
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('touchmove',onMove,{passive:false});
+    window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchend',onUp);
+    _swCleanupFns.push(function(){
+      window.removeEventListener('mousemove',onMove);
+      window.removeEventListener('touchmove',onMove);
+      window.removeEventListener('mouseup',onUp);
+      window.removeEventListener('touchend',onUp);
+    });
+  })();
+
+  // ── 閉じるボタン ──
+  header.querySelector('.sw-close').addEventListener('click',function(){
+    document.body.removeChild(el);
+    _swCleanupFns.forEach(function(fn){fn();}); // V0_150: window付けリスナーを解放
+    var idx=subWindows.indexOf(sw);
+    if(idx>=0)subWindows.splice(idx,1);
+  });
+
+  _swRenderOne(sw);
+  showGuide('サブ窓を作成しました',1500);
+}
+
+function _swPointerPos(e){
+  if(e.touches&&e.touches.length>0) return {x:e.touches[0].clientX,y:e.touches[0].clientY};
+  if(e.changedTouches&&e.changedTouches.length>0) return {x:e.changedTouches[0].clientX,y:e.changedTouches[0].clientY};
+  return {x:e.clientX,y:e.clientY};
+}
+
+// キャンバスの物理ピクセルサイズをdprに合わせて設定し、tx/ty/scaleを再計算
+function _swResizeCanvases(sw){
+  var dpr=window.devicePixelRatio||1;
+  var W=sw.W,H=sw.H;
+  [sw.cvEl,sw.acEl,sw.ovEl].forEach(function(c){
+    c.width=Math.round(W*dpr); c.height=Math.round(H*dpr);
+  });
+  sw.scale=_swComputeScale(sw.rectWorld,W,H);
+  var cx=(sw.rectWorld.x1+sw.rectWorld.x2)/2, cy=(sw.rectWorld.y1+sw.rectWorld.y2)/2;
+  sw.tx=W/2-cx*sw.scale;
+  sw.ty=H/2+cy*sw.scale;
+}
+
+// 1つのサブ窓を再描画（グローバルcv/ctx/ov/octx/tx/ty/scaleを一時退避・置換して既存のdraw()等を再利用）
+function _swRenderOne(sw){
+  var _svCv=window.cv,_svCtx=window.ctx,_svOv=window.ov,_svOctx=window.octx;
+  var _svTx=tx,_svTy=ty,_svScale=scale;
+  var _svDpr=Object.getOwnPropertyDescriptor(window,'devicePixelRatio');
+  try{
+    window.cv=sw.cvEl; window.ctx=sw.ctxEl;
+    window.ov=sw.ovEl; window.octx=sw.octxEl;
+    tx=sw.tx; ty=sw.ty; scale=sw.scale;
+    if(typeof draw==='function') draw();
+    if(typeof drawAnnotation==='function') drawAnnotation(sw.acCtxEl);
+    if(typeof drawOverlay==='function') drawOverlay();
+  }catch(e){
+    console.warn('[SubWindow] render failed',e);
+  }finally{
+    window.cv=_svCv; window.ctx=_svCtx; window.ov=_svOv; window.octx=_svOctx;
+    tx=_svTx; ty=_svTy; scale=_svScale;
+  }
+}
+
+// V0_150: メイン表示の更新のたびに全サブ窓を再描画（viewer.js rafLoopから呼ばれる）
+window._renderAllSubWindows=function(){
+  if(subWindows.length===0)return;
+  for(var i=0;i<subWindows.length;i++) _swRenderOne(subWindows[i]);
+};
+
+})(); // end E
 
 // ── V0_98: 文字検索 ────────────────────────────────────────
 var _searchIdx=[];

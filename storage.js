@@ -108,7 +108,7 @@ function doSave(){
       currentTool,currentColor,currentLW,currentFileName,fileSize:currentFileSize,
       fileKey:(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null),
       currentHL_Color,currentHL_LW,currentDimColor,
-      dimensionTextMode,inputMode,
+      dimensionTextMode,dimTextManualPx,inputMode, // V0_149: dimTextManualPx追加
       pdfPageNum:(typeof pdfPageNum!=='undefined'?pdfPageNum:1) // V0_135: PDFページ番号保存
     }));
     // V0_112: マルチファイル保存
@@ -255,6 +255,7 @@ async function tryRestore(){
               b.classList.toggle('active',b.dataset.tool===currentTool);
             });
             if(_d2.dimensionTextMode)dimensionTextMode=_d2.dimensionTextMode;
+            if(_d2.dimTextManualPx)dimTextManualPx=_d2.dimTextManualPx; // V0_149
             if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
             if(_d2.inputMode)inputMode=_d2.inputMode;
             if(typeof updateInputModeUI==='function')updateInputModeUI();
@@ -342,6 +343,7 @@ async function tryRestore(){
     buildLayerModal();
     scheduleDraw();scheduleOverlay();updateUndoRedo();
     if(d.dimensionTextMode)dimensionTextMode=d.dimensionTextMode;
+    if(d.dimTextManualPx)dimTextManualPx=d.dimTextManualPx; // V0_149
     if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
     if(d.inputMode)inputMode=d.inputMode;
     if(typeof updateInputModeUI==='function')updateInputModeUI();

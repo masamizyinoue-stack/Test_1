@@ -312,37 +312,60 @@ document.getElementById('savePDFBtn').addEventListener('click', async ()=>{
     // PDF用線幅スケール: CW/CSS_W（CSS幅比率）
     window._pdfScale=CW*dprSave/sv_ow;
 
-    // V0_141: PDF専用高画質オフスクリーンCanvas作成（画面表示用Canvasを使用しない）
-    const pdfCv=document.createElement('canvas'); pdfCv.width=CW; pdfCv.height=CH;
-    const pdfCtx=pdfCv.getContext('2d');
-    const pdfOv=document.createElement('canvas'); pdfOv.width=CW; pdfOv.height=CH;
-    const pdfOctx=pdfOv.getContext('2d');
-    const pdfAc=document.createElement('canvas'); pdfAc.width=CW; pdfAc.height=CH;
-    const pdfAcCtx=pdfAc.getContext('2d');
-    _rCv=pdfCv; _rOv=pdfOv; _rAc=pdfAc;  // 解放用参照
-
-    // 描画グローバル（cv/ctx/ov/octx）をPDF専用Canvasに一時置換
+    // 描画グローバル（cv/ctx/ov/octx）退避（finally で必ず復元）
     const _svCv=window.cv,_svCtx=window.ctx,_svOv=window.ov,_svOctx=window.octx;
-    window.cv=pdfCv; window.ctx=pdfCtx; window.ov=pdfOv; window.octx=pdfOctx;
 
-    // ── 4. 描画・合成（finally で必ず状態復元）──────────────────────
+    // V0_148.2: PDF専用Canvasを3枚同時に持たず「描画→合成→即解放」を1枚ずつ行う方式に変更。
+    // 【背景】従来はpdfCv+pdfAc+pdfOv+pdfComp の計4枚(各CW×CH)を同時に保持していたため、
+    // 高画質(3x/4x)選択時にiPadでメモリが逼迫し、Canvasへの描画が一部しか反映されない
+    // （PDF範囲が部分的になる）不具合が発生していた。アプリ起動直後などメモリに余裕がない
+    // タイミングで再現しやすく、キャンセルして再試行すると正常になる、という報告と一致する。
+    // 1枚ずつ生成→drawImageで合成先へ焼き込み→即座にwidth=1で解放することで、
+    // 同時に存在する大きなCanvasを最大2枚（作業用1枚+合成先pdfComp）まで削減する。
+    // draw()はcv/ctxのみ、drawOverlay()はov/octxのみ、drawAnnotation()は引数ctxのみで
+    // 完結しており、3者は互いに独立して呼び出せることを確認済み（既存の描画ロジックは無変更）。
     let pdfComp=null;
     try{
-      if(typeof draw==='function') draw();
-      if(typeof drawAnnotation==='function') drawAnnotation(pdfAcCtx);
-      if(typeof drawOverlay==='function') drawOverlay();
-      // 描画完了を待つ（desynchronized canvas等の非同期描画に対応）
-      await new Promise(r=>requestAnimationFrame(r));
-
-      // PDF専用Canvasに合成（画面表示Canvasは不使用）
       pdfComp=document.createElement('canvas'); pdfComp.width=CW; pdfComp.height=CH;
       _rComp=pdfComp;
       const pctx=pdfComp.getContext('2d');
       pctx.fillStyle=bwMode?'#fff':'#1e2430';
       pctx.fillRect(0,0,CW,CH);
-      pctx.drawImage(pdfCv,0,0);
-      pctx.drawImage(pdfAc,0,0);
-      pctx.drawImage(pdfOv,0,0);
+
+      // ① メインDXF図形（draw: cv/ctxのみ使用）
+      {
+        const pdfCv=document.createElement('canvas'); pdfCv.width=CW; pdfCv.height=CH;
+        const pdfCtx=pdfCv.getContext('2d');
+        _rCv=pdfCv;
+        window.cv=pdfCv; window.ctx=pdfCtx;
+        if(typeof draw==='function') draw();
+        pctx.drawImage(pdfCv,0,0);
+        pdfCv.width=1; pdfCv.height=1; _rCv=null; // 即解放
+      }
+
+      // ② 手書き・蛍光ペン（drawAnnotation: 引数ctxのみで完結、グローバル不要）
+      {
+        const pdfAc=document.createElement('canvas'); pdfAc.width=CW; pdfAc.height=CH;
+        const pdfAcCtx=pdfAc.getContext('2d');
+        _rAc=pdfAc;
+        if(typeof drawAnnotation==='function') drawAnnotation(pdfAcCtx);
+        pctx.drawImage(pdfAc,0,0);
+        pdfAc.width=1; pdfAc.height=1; _rAc=null; // 即解放
+      }
+
+      // ③ 寸法（drawOverlay: ov/octxのみ使用）
+      {
+        const pdfOv=document.createElement('canvas'); pdfOv.width=CW; pdfOv.height=CH;
+        const pdfOctx=pdfOv.getContext('2d');
+        _rOv=pdfOv;
+        window.ov=pdfOv; window.octx=pdfOctx;
+        if(typeof drawOverlay==='function') drawOverlay();
+        pctx.drawImage(pdfOv,0,0);
+        pdfOv.width=1; pdfOv.height=1; _rOv=null; // 即解放
+      }
+
+      // 描画完了を待つ（V0_141由来の安全待機）
+      await new Promise(r=>requestAnimationFrame(r));
     }finally{
       // 描画エラー時も必ず状態を復元（表示用Canvasへの影響ゼロ）
       try{Object.defineProperty(window,'devicePixelRatio',{get:()=>dprSave,configurable:true});}catch(e){}
