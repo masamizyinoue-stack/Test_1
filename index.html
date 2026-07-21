@@ -283,7 +283,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">書込バックアップ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
-  <button class="tb-btn" id="subWinBtn" title="サブ窓（範囲を拡大表示する独立ウィンドウ）"> <!-- V0_151: サブ窓ボタン -->
+  <button class="tb-btn" id="subWinBtn" title="サブ窓（範囲を拡大表示する独立ウィンドウ）"> <!-- V0_152: サブ窓ボタン -->
   <span class="tb-tool-label">サブ窓</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1" fill="currentColor" fill-opacity="0.25"/></svg>
 </button>
@@ -325,7 +325,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_151</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_152</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -536,18 +536,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=0151"></script>
-<script src="viewer.js?v=0151"></script>
-<script src="utils.js?v=0151"></script>
-<script src="ui.js?v=0151"></script>
-<script src="dialog.js?v=0151"></script>
-<script src="storage.js?v=0151"></script>
-<script src="fonts/NotoSansJP.js?v=0151"></script>
-<script src="export.js?v=0151"></script>
-<script src="tool.js?v=0151"></script>
-<script src="verify.js?v=0151"></script>
+<script src="layer.js?v=0152"></script>
+<script src="viewer.js?v=0152"></script>
+<script src="utils.js?v=0152"></script>
+<script src="ui.js?v=0152"></script>
+<script src="dialog.js?v=0152"></script>
+<script src="storage.js?v=0152"></script>
+<script src="fonts/NotoSansJP.js?v=0152"></script>
+<script src="export.js?v=0152"></script>
+<script src="tool.js?v=0152"></script>
+<script src="verify.js?v=0152"></script>
 <script>
-const APP_VERSION = 'V0_151';
+const APP_VERSION = 'V0_152';
 
 // =========================================================
 // グローバル状態
@@ -990,7 +990,7 @@ var openFilesBufs=[];  // V0_112: ファイルバイナリキャッシュ（マ�
 function resetToolStates(){
   if(window.DIM && typeof resetDIM==='function') resetDIM();
   if(window.LP  && typeof resetLP ==='function') resetLP();
-  if(window.SW  && typeof resetSW ==='function'){ resetSW(); if(typeof _swUpdateBtnUI==='function')_swUpdateBtnUI(false); } // V0_151
+  if(window.SW  && typeof resetSW ==='function'){ resetSW(); if(typeof _swUpdateBtnUI==='function')_swUpdateBtnUI(false); } // V0_152
 }
 
 // V0_140: saveCurrentFileState廃止（全呼び出しをinline viewport syncに置換済み）
@@ -2477,11 +2477,11 @@ window.resetLP = resetLP; // V0_144: resetToolStates()から呼べるようグ�
 })(); // end D
 
 // ── E. サブ窓（矩形範囲選択 + フローティング独立ウィンドウ） ────────────────
-// V0_151 Phase1: 表示・移動・リサイズ・メインとの自動リアルタイム同期のみ実装。
+// V0_152 Phase1: 表示・移動・リサイズ・メインとの自動リアルタイム同期のみ実装。
 // サブ窓内での書込み・計測操作はPhase2（次バージョン）で追加予定。
 ;(function(){
 
-// ─ 状態: 矩形範囲選択（V0_151: M_Viewer同様、1回の連続ドラッグで矩形を確定） ─
+// ─ 状態: 矩形範囲選択（V0_152: M_Viewer同様、1回の連続ドラッグで矩形を確定） ─
 // down=p1確定+ドラッグ開始, move=p2追従（プレビュー更新）, up=p2確定→サブ窓作成
 var SW={active:false, penDown:false, p1:null, cur:null};
 function resetSW(){
@@ -2493,7 +2493,7 @@ SW.handleDown=function(sx,sy){
   SW.penDown=true;
   SW.p1={x:wp[0],y:wp[1]};
   SW.cur={x:wp[0],y:wp[1]};
-  hideGuide(); // V0_151: M_Viewer同様、ドラッグ開始で案内を消す
+  hideGuide(); // V0_152: M_Viewer同様、ドラッグ開始で案内を消す
   scheduleOverlay();
 };
 SW.handleMove=function(sx,sy){
@@ -2514,7 +2514,7 @@ SW.handleUp=function(sx,sy){
   resetSW();
   if(typeof _swUpdateBtnUI==='function')_swUpdateBtnUI(false);
   scheduleOverlay();
-  // V0_151: M_Viewer踏襲。画面上5px相当をワールド座標の最小サイズ閾値とする
+  // V0_152: M_Viewer踏襲。画面上5px相当をワールド座標の最小サイズ閾値とする
   var minWorld=5/Math.max(scale,1e-6);
   if((rectWorld.x2-rectWorld.x1)>minWorld&&(rectWorld.y2-rectWorld.y1)>minWorld){
     createSubWindow(rectWorld); // 上限チェック(2個まで)はcreateSubWindow内で実施
@@ -2524,7 +2524,7 @@ SW.handleUp=function(sx,sy){
 };
 
 // ─ drawOverlay フック（矩形プレビュー表示） ───────────────────────
-// V0_151: 2件のバグを修正
+// V0_152: 2件のバグを修正
 //  ①dprスケール未適用: 本家drawOverlay()はoctx.save();octx.scale(dpr,dpr);...octx.restore()で
 //    囲まれており、_origDO_SW()実行後はoctxの変換が既にidentityに戻っている。そこへ
 //    w2s()のCSS px座標をそのまま描画していたため、Retina端末(dpr=2〜3)ではドラッグ位置と
@@ -2538,7 +2538,41 @@ var _swInnerRender=false; // _swRenderOne実行中はtrue（_swRenderOne側で�
 window.drawOverlay=function(){
   _origDO_SW();
   if(SW.active&&!_swInnerRender) drawSWOverlay();
+  if(!_swInnerRender) _drawSubRangeOverlays(); // V0_152: メイン画面にサブ窓の表示範囲を色分け表示
 };
+
+// V0_152: サブ窓ごとに固有の色を割り当てる（M_Viewer踏襲）。
+// サブ窓のボーダー色と、メイン画面に表示する範囲枠・塗りつぶしの色を揃えることで、
+// どのサブ窓がメイン画面のどの範囲を映しているか一目でわかるようにする。
+var SW_COLORS=['#f07800','#00a0ff','#00c060','#ff40a0'];
+var SW_FILLS=['rgba(240,120,0,.12)','rgba(0,160,255,.12)','rgba(0,200,80,.12)','rgba(255,64,160,.12)'];
+
+// メイン画面に、各サブ窓が現在映している範囲を色分けした矩形で表示する。
+// サブ窓内でパン/ピンチズームすると sw.tx/ty/scale が変わるため、
+// 通常の描画サイクル(scheduleDraw/scheduleOverlay→drawOverlay)に乗るだけで
+// 常に最新の表示範囲に追従する（M_Viewerのsubwin:transformイベントに相当する
+// 専用の仕組みは不要。既存のrafLoopがメイン画面の再描画のたびに呼ばれるため）。
+function _drawSubRangeOverlays(){
+  if(subWindows.length===0)return;
+  var dpr=window.devicePixelRatio||1;
+  octx.save();
+  octx.scale(dpr,dpr);
+  subWindows.forEach(function(sw){
+    // サブ窓canvasの4隅(0,0)〜(W,H)をサブ窓自身のtx/ty/scaleでワールド座標に戻し、
+    // それをメイン画面の(現在の)tx/ty/scaleで画面座標に変換する。
+    var wx1=(0-sw.tx)/sw.scale, wy1=-(0-sw.ty)/sw.scale;
+    var wx2=(sw.W-sw.tx)/sw.scale, wy2=-(sw.H-sw.ty)/sw.scale;
+    var p1=w2s(wx1,wy1), p2=w2s(wx2,wy2);
+    var rx=Math.min(p1[0],p2[0]), ry=Math.min(p1[1],p2[1]);
+    var rw=Math.abs(p2[0]-p1[0]), rh=Math.abs(p2[1]-p1[1]);
+    var col=sw.swColor||'#f07800', fill=sw.swFill||'rgba(240,120,0,.12)';
+    octx.fillStyle=fill; octx.fillRect(rx,ry,rw,rh);
+    octx.strokeStyle=col; octx.lineWidth=2; octx.setLineDash([8,4]);
+    octx.strokeRect(rx,ry,rw,rh);
+  });
+  octx.setLineDash([]);
+  octx.restore();
+}
 function drawSWOverlay(){
   if(SW.p1&&SW.cur){
     var dpr=window.devicePixelRatio||1;
@@ -2576,7 +2610,7 @@ document.getElementById('subWinBtn').addEventListener('click',function(){
   SW.active=true;
   document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
   _swUpdateBtnUI(true);
-  showGuide('サブ窓：範囲を対角にドラッグしてください',0); // V0_151: 2タップ→ドラッグ方式に変更
+  showGuide('サブ窓：範囲を対角にドラッグしてください',0); // V0_152: 2タップ→ドラッグ方式に変更
 });
 
 // =========================================================
@@ -2593,22 +2627,22 @@ function _swComputeScale(rectWorld,W,H){
   return s;
 }
 
-// V0_151 Phase2: keepView=trueの場合、キャンバスの物理ピクセルサイズだけ更新し、
+// V0_152 Phase2: keepView=trueの場合、キャンバスの物理ピクセルサイズだけ更新し、
 // scale/tx/tyは変更しない（ユーザーがサブ窓内でパン/ズーム済みの場合、
 // リサイズのたびに表示位置が初期状態にリセットされてしまうのを防ぐ）。
 
 function createSubWindow(rectWorld){
-  if(subWindows.length>=2){showGuide('サブ窓は2個まで開けます',2000);return;} // V0_151: 3個→2個に変更
+  if(subWindows.length>=2){showGuide('サブ窓は2個まで開けます',2000);return;} // V0_152: 3個→2個に変更
   var id='sw'+(_swIdSeq++);
   var HEADER_H=30;
 
-  // V0_151: ドラッグした矩形の画面上の位置・大きさにそのままサブ窓を合わせる。
+  // V0_152: ドラッグした矩形の画面上の位置・大きさにそのままサブ窓を合わせる。
   // createSubWindow呼び出し時点ではグローバルtx/ty/scaleはまだメイン画面の値のまま
   // （drawSWOverlayのプレビュー矩形と同じw2s()変換式）なので、ここで計算すれば
   // ドラッグ中に見えていたプレビュー矩形とサブ窓の位置・サイズが一致する。
   var ps1=w2s(rectWorld.x1,rectWorld.y2); // world左上（Y上向きなのでy2が画面上側）
   var ps2=w2s(rectWorld.x2,rectWorld.y1); // world右下
-  // V0_151: w2s()が返すのはcanvas(#ov)内の相対座標。サブ窓はposition:fixedで
+  // V0_152: w2s()が返すのはcanvas(#ov)内の相対座標。サブ窓はposition:fixedで
   // 画面(ビューポート)基準に配置するため、canvasがツールバー分だけ下にオフセットして
   // 配置されている分（stage要素の位置）を足さないと、これまでのバージョンのように
   // ツールバーの高さ分だけ上に(左に)ずれて表示されてしまう。ここでその補正を追加する。
@@ -2617,24 +2651,28 @@ function createSubWindow(rectWorld){
   var bx=canvasBx+_swStageR.left, by=canvasBy+_swStageR.top; // ビューポート座標（ウィンドウ配置用）
   var bw=Math.abs(ps2[0]-ps1[0]), bh=Math.abs(ps2[1]-ps1[1]);
   var W=Math.max(160,Math.round(bw));         // ウィンドウ全体の幅
-  var H=Math.max(120+HEADER_H,Math.round(bh)); // V0_151: ウィンドウ全体(ヘッダー込み)の高さを
+  var H=Math.max(120+HEADER_H,Math.round(bh)); // V0_152: ウィンドウ全体(ヘッダー込み)の高さを
                                                 // ドラッグ範囲の高さそのものに一致させる
   var bodyH=H-HEADER_H;                        // 本体(キャンバス)の高さ＝全体からヘッダー分を引いた残り
 
   // 複数開いた際に重ならないよう少しずつオフセット
   var offset=subWindows.length*28;
-  // V0_151: ヘッダー分だけ上にずらしていたのを廃止。ウィンドウ全体(ヘッダー込み)の左上を
+  // V0_152: ヘッダー分だけ上にずらしていたのを廃止。ウィンドウ全体(ヘッダー込み)の左上を
   // ドラッグ範囲の左上にそのまま一致させ、「真上」＝ドラッグした場所にちょうど重なるようにする。
   var left=bx+offset, top=by+offset;
   // 画面外にはみ出さないようクランプ
   left=Math.max(4,Math.min(window.innerWidth-W-4,left));
   top=Math.max(4,Math.min(window.innerHeight-H-4,top));
 
+  // V0_152: サブ窓ごとに固有の色を割り当てる（メイン画面の範囲表示と対応させるため）
+  var _swColorIdx=subWindows.length%SW_COLORS.length;
+  var _swColor=SW_COLORS[_swColorIdx], _swFill=SW_FILLS[_swColorIdx];
+
   var el=document.createElement('div');
   el.className='sw-window';
   el.id=id;
   el.style.cssText='position:fixed;left:'+left+'px;top:'+top+'px;width:'+W+'px;height:'+H+'px;'+
-    'z-index:5000;background:#131921;border:1.5px solid #3a4a68;border-radius:10px;'+
+    'z-index:5000;background:#131921;border:1.5px solid '+_swColor+';border-radius:10px;'+
     'box-shadow:0 8px 30px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;touch-action:none;';
 
   var header=document.createElement('div');
@@ -2653,7 +2691,7 @@ function createSubWindow(rectWorld){
   [cvEl,acEl,ovEl].forEach(function(c){c.style.cssText='position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;';});
   body.appendChild(cvEl);body.appendChild(acEl);body.appendChild(ovEl);
 
-  // V0_151: リサイズハンドルは左上・左下・右下の3隅のみ（右上は×ボタンと近く誤操作の恐れがあるため除外）
+  // V0_152: リサイズハンドルは左上・左下・右下の3隅のみ（右上は×ボタンと近く誤操作の恐れがあるため除外）
   var _swHandleStyles={
     tl:'left:0;top:0;cursor:nwse-resize;border-top-left-radius:10px;background:linear-gradient(315deg,transparent 50%,#4a5a78 50%);',
     bl:'left:0;bottom:0;cursor:nesw-resize;border-bottom-left-radius:10px;background:linear-gradient(45deg,transparent 50%,#4a5a78 50%);',
@@ -2674,11 +2712,12 @@ function createSubWindow(rectWorld){
   var sw={
     id:id, el:el, cvEl:cvEl, acEl:acEl, ovEl:ovEl,
     ctxEl:cvEl.getContext('2d'), acCtxEl:acEl.getContext('2d'), octxEl:ovEl.getContext('2d'),
-    rectWorld:rectWorld, W:W, H:bodyH, tx:0, ty:0, scale:1, // V0_151: H→bodyH（ヘッダーを含まない実高さ。リサイズ時と統一し縦横比のずれを解消）
-    _userNavigated:false // V0_151 Phase2: サブ窓内でパン/ピンチズームしたらtrueにする（以後リサイズしても表示を維持するため）
+    rectWorld:rectWorld, W:W, H:bodyH, tx:0, ty:0, scale:1, // V0_152: H→bodyH（ヘッダーを含まない実高さ。リサイズ時と統一し縦横比のずれを解消）
+    _userNavigated:false, // V0_152 Phase2: サブ窓内でパン/ピンチズームしたらtrueにする（以後リサイズしても表示を維持するため）
+    swColor:_swColor, swFill:_swFill // V0_152: メイン画面の範囲表示と対応させる固有色
   };
   _swResizeCanvases(sw);
-  // V0_151: 「ジャストで作成」— 中心合わせ(center-fit)ではなく、メイン画面と全く同じ
+  // V0_152: 「ジャストで作成」— 中心合わせ(center-fit)ではなく、メイン画面と全く同じ
   // 倍率・原点で「平行移動」するだけのマッピングに変更。
   // 従来(center-fit)は矩形の中心をキャンバス中心に合わせていたため、ヘッダー分(30px)だけ
   // 本体(body)がドラッグ範囲より下にずれて配置されている実態と食い違い、
@@ -2690,7 +2729,7 @@ function createSubWindow(rectWorld){
   sw.ty=ty-canvasBy-HEADER_H;
   subWindows.push(sw);
 
-  // V0_151: window.addEventListenerで登録したドラッグ/リサイズ用リスナーを
+  // V0_152: window.addEventListenerで登録したドラッグ/リサイズ用リスナーを
   // 閉じる時に確実に解放するため、参照を配列に集めておく（メモリリーク防止）
   var _swCleanupFns=[];
 
@@ -2698,7 +2737,7 @@ function createSubWindow(rectWorld){
   (function(){
     var dragging=false, startX=0, startY=0, elStartLeft=0, elStartTop=0;
     function onDown(e){
-      // V0_151: ×ボタン上のタッチはドラッグ扱いにしない（preventDefault()でclickが握り潰され閉じられないバグの修正）
+      // V0_152: ×ボタン上のタッチはドラッグ扱いにしない（preventDefault()でclickが握り潰され閉じられないバグの修正）
       if(e.target&&e.target.closest&&e.target.closest('.sw-close'))return;
       dragging=true;
       var p=_swPointerPos(e);
@@ -2732,7 +2771,7 @@ function createSubWindow(rectWorld){
   })();
 
   // ── リサイズ（3隅ハンドル共通処理） ──
-  // V0_151: 右上は×ボタンに近く誤操作の恐れがあるため除外し、左上・左下・右下の3隅に変更。
+  // V0_152: 右上は×ボタンに近く誤操作の恐れがあるため除外し、左上・左下・右下の3隅に変更。
   // ドラッグ中は「掴んでいない側の角」を固定点として計算することで、
   // 最小サイズにクランプされても反対側が動かず自然な挙動になる。
   ['tl','bl','br'].forEach(function(corner){
@@ -2759,7 +2798,7 @@ function createSubWindow(rectWorld){
       el.style.width=newW+'px'; el.style.height=newH+'px';
       el.style.left=newLeft+'px'; el.style.top=newTop+'px';
       sw.W=newW; sw.H=newH-30; // ヘッダー分を除いた実表示高さ
-      _swResizeCanvases(sw,sw._userNavigated); // V0_151: パン/ズーム済みなら現在の表示を維持
+      _swResizeCanvases(sw,sw._userNavigated); // V0_152: パン/ズーム済みなら現在の表示を維持
       _swRenderOne(sw);
       e.preventDefault();
     }
@@ -2778,13 +2817,13 @@ function createSubWindow(rectWorld){
     });
   });
 
-  // ── V0_151 Phase2: サブ窓内での書込み・計測・パン・ピンチズーム操作 ──
+  // ── V0_152 Phase2: サブ窓内での書込み・計測・パン・ピンチズーム操作 ──
   _swAttachInput(sw);
 
   // ── 閉じるボタン ──
   header.querySelector('.sw-close').addEventListener('click',function(){
     document.body.removeChild(el);
-    _swCleanupFns.forEach(function(fn){fn();}); // V0_151: window付けリスナーを解放
+    _swCleanupFns.forEach(function(fn){fn();}); // V0_152: window付けリスナーを解放
     var idx=subWindows.indexOf(sw);
     if(idx>=0)subWindows.splice(idx,1);
   });
@@ -2800,7 +2839,7 @@ function _swPointerPos(e){
 }
 
 // ─────────────────────────────────────────────────────────────
-// V0_151 Phase2: サブ窓内での書込み・計測・パン・ピンチズーム操作
+// V0_152 Phase2: サブ窓内での書込み・計測・パン・ピンチズーム操作
 // ─────────────────────────────────────────────────────────────
 // 方針: メイン画面(tool.js)のhandlePointerDown/Move/Up・DIM/LPの状態機械・
 // isPen/mouseDown/panning/sketching/dimState等の共有グローバル状態を「そのまま」
@@ -2900,7 +2939,7 @@ function _swAttachInput(sw){
       var x0=t0.clientX-r.left,y0=t0.clientY-r.top,x1=t1.clientX-r.left,y1=t1.clientY-r.top;
       pinchDist=Math.hypot(x1-x0,y1-y0);
       pinchMid={x:(x0+x1)/2,y:(y0+y1)/2};
-      sw._userNavigated=true; // V0_151: ピンチ操作を開始した時点でフラグを立てる
+      sw._userNavigated=true; // V0_152: ピンチ操作を開始した時点でフラグを立てる
     } else if(fingers.length===1){
       var tf=fingers[0];
       var sxf=tf.clientX-r.left,syf=tf.clientY-r.top;
@@ -3024,7 +3063,7 @@ function _swResizeCanvases(sw,keepView){
   [sw.cvEl,sw.acEl,sw.ovEl].forEach(function(c){
     c.width=Math.round(W*dpr); c.height=Math.round(H*dpr);
   });
-  if(keepView)return; // V0_151: 現在のパン/ズーム状態を維持（scale/tx/tyは変更しない）
+  if(keepView)return; // V0_152: 現在のパン/ズーム状態を維持（scale/tx/tyは変更しない）
   sw.scale=_swComputeScale(sw.rectWorld,W,H);
   var cx=(sw.rectWorld.x1+sw.rectWorld.x2)/2, cy=(sw.rectWorld.y1+sw.rectWorld.y2)/2;
   sw.tx=W/2-cx*sw.scale;
@@ -3036,7 +3075,7 @@ function _swRenderOne(sw){
   var _svCv=window.cv,_svCtx=window.ctx,_svOv=window.ov,_svOctx=window.octx;
   var _svTx=tx,_svTy=ty,_svScale=scale;
   var _svDpr=Object.getOwnPropertyDescriptor(window,'devicePixelRatio');
-  _swInnerRender=true; // V0_151: この間のdrawOverlay()呼び出しではSWのドラッグプレビューを描かない
+  _swInnerRender=true; // V0_152: この間のdrawOverlay()呼び出しではSWのドラッグプレビューを描かない
   try{
     window.cv=sw.cvEl; window.ctx=sw.ctxEl;
     window.ov=sw.ovEl; window.octx=sw.octxEl;
@@ -3053,7 +3092,7 @@ function _swRenderOne(sw){
   }
 }
 
-// V0_151: メイン表示の更新のたびに全サブ窓を再描画（viewer.js rafLoopから呼ばれる）
+// V0_152: メイン表示の更新のたびに全サブ窓を再描画（viewer.js rafLoopから呼ばれる）
 window._renderAllSubWindows=function(){
   if(subWindows.length===0)return;
   for(var i=0;i<subWindows.length;i++) _swRenderOne(subWindows[i]);
