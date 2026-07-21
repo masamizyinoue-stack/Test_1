@@ -221,6 +221,66 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .tab-item.active .tab-name{color:#fff}
 .tab-close{font-size:13px;color:#6b7f99;min-width:24px;min-height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:none;background:transparent;cursor:pointer;padding:0;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .tab-close:active{background:rgba(255,255,255,.15)}
+
+/* ── V0_158: 計算機（M_Viewer V7.06仕様移植） ── */
+#calc{
+  display:none;position:fixed;z-index:6000;
+  background:linear-gradient(180deg,#161c26 0%,#0d1117 100%);
+  border:1.5px solid #00d4ff;border-radius:14px;
+  width:296px;
+  max-height:75dvh;max-height:75vh;
+  flex-direction:column;
+  box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.02);
+  bottom:20px;right:16px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  overflow:hidden;
+}
+#calc.on{display:flex}
+#ctb{
+  padding:7px 12px 6px;display:flex;align-items:center;justify-content:space-between;
+  cursor:grab;border-bottom:1px solid rgba(0,212,255,.2);
+  touch-action:none;-webkit-user-select:none;user-select:none;
+  background:linear-gradient(180deg,rgba(0,212,255,.12) 0%,rgba(0,212,255,.03) 100%);
+}
+#ctb span{font-size:13px;font-weight:800;color:#00d4ff;letter-spacing:.08em}
+#cclose,#chist-btn{
+  background:rgba(255,255,255,.06);border:1.5px solid var(--border);color:var(--text-dim);
+  font-size:13px;cursor:pointer;padding:4px 10px;border-radius:5px;font-weight:700;
+  touch-action:manipulation;
+}
+#cclose:active,#chist-btn:active{background:rgba(0,212,255,.18);color:#00d4ff}
+#chist-btn.on{border-color:#00d4ff;color:#00d4ff;background:rgba(0,212,255,.12)}
+#chist{
+  display:none;flex:1;min-height:0;overflow-y:auto;
+  padding:4px 11px 6px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);
+}
+#chist.on{display:block}
+#chist-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px 4px;border-bottom:1px solid var(--border);background:rgba(0,212,255,.05);
+}
+#chist-hd span{font-size:13px;font-weight:700;color:var(--text-dim);letter-spacing:.06em}
+#chist-close{background:none;border:none;font-size:12px;color:var(--text-dim);cursor:pointer;padding:3px 7px;border-radius:4px;touch-action:manipulation}
+#chist-close:active{color:#e74c3c;background:rgba(231,76,60,.15)}
+.chi{font-size:12px;color:#bcd6e0;text-align:right;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:.03em;font-variant-numeric:tabular-nums;line-height:1.6}
+#cdsp{padding:7px 13px;text-align:right;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(0,0,0,.32) 0%,transparent 100%)}
+#cexpr{font-size:12px;color:#6b8896;min-height:15px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;letter-spacing:.03em;font-variant-numeric:tabular-nums;scrollbar-width:none}
+#cexpr::-webkit-scrollbar{display:none}
+#cval{font-size:48px;font-weight:600;color:var(--text);line-height:1.15;overflow:hidden;white-space:nowrap;font-variant-numeric:tabular-nums}
+#cdecrow{display:flex;align-items:center;gap:6px;padding:5px 11px;border-bottom:1px solid var(--border);background:rgba(0,212,255,.03)}
+#cdecrow label{font-size:12px;color:var(--text-dim);letter-spacing:.03em}
+#cdec{width:36px;text-align:center;background:rgba(255,255,255,.06);border:1.5px solid var(--border);color:var(--text);border-radius:5px;font-size:13px;padding:2px;font-variant-numeric:tabular-nums}
+#cdec:focus{outline:none;border-color:#00d4ff}
+#cbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:9px}
+.cb{height:52px;border-radius:11px;font-size:30px;font-weight:600;cursor:pointer;-webkit-user-select:none;user-select:none;transition:transform .08s;border:1.5px solid;line-height:1;touch-action:manipulation}
+.cb:active{transform:scale(.93)}
+.cbn{background:rgba(255,255,255,.05);color:var(--text);border-color:var(--border)}
+.cbo{background:rgba(0,212,255,.1);color:#00d4ff;border-color:rgba(0,212,255,.35)}
+.cbeq{background:#00a8d4;color:#fff;border-color:#00d4ff;box-shadow:0 0 14px rgba(0,212,255,.3)}
+.cbf{background:rgba(255,255,255,.03);color:var(--text-dim);font-size:24px;border-color:var(--border)}
+.cbw{grid-column:span 2}
+.cbrs{grid-row:span 2}
+@media(pointer:coarse){.cb{height:54px}}
 </style>
 </head>
 <body>
@@ -269,6 +329,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button class="tb-btn" id="subWinBtn" title="サブ窓（範囲を拡大表示する独立ウィンドウ）"> <!-- V0_154: 画面ボタンの右に移動 -->
   <span class="tb-tool-label">サブ窓</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1" fill="currentColor" fill-opacity="0.25"/></svg>
+</button>
+  <button class="tb-btn" id="calcBtn" title="計算機"> <!-- V0_158: 計算機ボタン（M_Viewer仕様） -->
+  <span class="tb-tool-label">計算機</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/><line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="12" y1="15" x2="12" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="8" y1="19" x2="8" y2="19.01"/><line x1="12" y1="19" x2="12" y2="19.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>
 </button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="searchBtn" title="画面検索">
@@ -322,7 +386,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_157</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_158</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -387,6 +451,39 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <!-- V0_154: 開発者モードを削除 -->
   <!-- V0_143: 下部のバージョン表示（旧#ver-label）は削除。表示はsp-header内の上部spanに一本化 -->
+</div>
+
+<!-- V0_158: 計算機（M_Viewer V7.06仕様移植） -->
+<div id="calc">
+  <div id="ctb"><span>計算機</span><div style="display:flex;gap:6px;align-items:center"><button id="chist-btn">履歴</button><button id="cclose">閉じる</button></div></div>
+  <div id="chist-hd" style="display:none"><span>計算履歴</span><button id="chist-close">✕</button></div>
+  <div id="chist"></div>
+  <div id="cdsp"><div id="cexpr"></div><div id="cval">0</div></div>
+  <div id="cdecrow"><label>小数点以下</label><input type="number" id="cdec" min="0" max="10" value="1">桁</div>
+  <div id="cbtns">
+    <button class="cb cbf" data-cfn="C">C</button>
+    <button class="cb cbf" data-cfn="sqrt">√</button>
+    <button class="cb cbf" data-cfn="sq">x²</button>
+    <button class="cb cbo" data-cop="/">÷</button>
+    <button class="cb cbf" data-cfn="⌫">⌫</button>
+    <button class="cb cbf" data-cfn="±">±</button>
+    <button class="cb cbf" data-cfn="%">%</button>
+    <button class="cb cbo" data-cop="*">×</button>
+    <button class="cb cbn" data-cnum="7">7</button>
+    <button class="cb cbn" data-cnum="8">8</button>
+    <button class="cb cbn" data-cnum="9">9</button>
+    <button class="cb cbo" data-cop="-">−</button>
+    <button class="cb cbn" data-cnum="4">4</button>
+    <button class="cb cbn" data-cnum="5">5</button>
+    <button class="cb cbn" data-cnum="6">6</button>
+    <button class="cb cbo" data-cop="+">＋</button>
+    <button class="cb cbn" data-cnum="1">1</button>
+    <button class="cb cbn" data-cnum="2">2</button>
+    <button class="cb cbn" data-cnum="3">3</button>
+    <button class="cb cbeq cbrs" data-cfn="=">=</button>
+    <button class="cb cbn cbw" data-cnum="0">0</button>
+    <button class="cb cbn" data-cnum=".">.</button>
+  </div>
 </div>
 
 <div id="colorOverlay">
@@ -505,18 +602,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=0157"></script>
-<script src="viewer.js?v=0157"></script>
-<script src="utils.js?v=0157"></script>
-<script src="ui.js?v=0157"></script>
-<script src="dialog.js?v=0157"></script>
-<script src="storage.js?v=0157"></script>
-<script src="fonts/NotoSansJP.js?v=0157"></script>
-<script src="export.js?v=0157"></script>
-<script src="tool.js?v=0157"></script>
-<script src="verify.js?v=0157"></script>
+<script src="layer.js?v=0158"></script>
+<script src="viewer.js?v=0158"></script>
+<script src="utils.js?v=0158"></script>
+<script src="ui.js?v=0158"></script>
+<script src="dialog.js?v=0158"></script>
+<script src="storage.js?v=0158"></script>
+<script src="fonts/NotoSansJP.js?v=0158"></script>
+<script src="export.js?v=0158"></script>
+<script src="tool.js?v=0158"></script>
+<script src="verify.js?v=0158"></script>
 <script>
-const APP_VERSION = 'V0_157';
+const APP_VERSION = 'V0_158';
 
 // =========================================================
 // グローバル状態
@@ -3240,6 +3337,246 @@ window._renderAllSubWindows=function(){
 };
 
 })(); // end E
+
+// ── F. 計算機（V0_158: M_Viewer V7.06仕様移植） ──────────────────────
+;(function(){
+
+/* 状態機械型電卓エンジン（iPhone/Windows電卓と同じ挙動。数字入力中は即時計算しない）
+   leftVal   : 左辺値（演算子押下後に保存）
+   pendingOp : 保留中の演算子（+ - × ÷）
+   curInput  : 現在入力中の数字文字列
+   _afterEq  : =押下直後フラグ（連続計算用）
+   _justOp   : 演算子押下直後フラグ（次の数字で入力リセット） */
+let leftVal='',pendingOp='',curInput='0';
+let _afterEq=false,_justOp=false;
+let _dispExpr=''; // 式表示用。=後も保持し新規入力開始時にクリア
+let _dispTokens=[]; // 表示用トークン（内部計算から分離）
+
+var _calcEl=document.getElementById('calc');
+if(!_calcEl) return; // HTML未挿入なら何もしない（安全側）
+var histEl=document.getElementById('chist');
+var exprEl=document.getElementById('cexpr');
+var valEl=document.getElementById('cval');
+var decEl=document.getElementById('cdec');
+
+var _OP_DISP={'+':'+','-':'−','*':'×','/':'÷'};
+function _tokensToStr(tks){return tks.map(function(tk){return tk.type==='op'?(_OP_DISP[tk.val]||tk.val):tk.val;}).join(' ');}
+
+function _disp(){
+  exprEl.textContent=_dispExpr;
+  valEl.textContent=curInput;
+  var len=curInput.replace(/[^0-9]/g,'').length;
+  valEl.style.fontSize=len>10?'28px':len>8?'38px':'52px';
+}
+
+// 二項演算：精度丸め付き
+function _calc(l,op,r){
+  var a=parseFloat(l||'0'),b=parseFloat(r||'0'),d=+decEl.value;
+  var res;
+  if(op==='+')res=a+b;
+  else if(op==='-')res=a-b;
+  else if(op==='*')res=a*b;
+  else if(op==='/')res=b!==0?a/b:NaN;
+  else return r;
+  return isFinite(res)?parseFloat(res.toFixed(d)).toString():'エラー';
+}
+
+// 履歴追加
+function _hist(expr,result){
+  var hi=document.createElement('div');hi.className='chi';
+  hi.textContent=expr+' = '+result;
+  histEl.appendChild(hi);histEl.scrollTop=histEl.scrollHeight;
+}
+
+document.getElementById('cclose').addEventListener('click',function(){
+  _calcEl.classList.remove('on');
+  var b=document.getElementById('calcBtn');if(b){b.style.background='';b.style.borderColor='';b.style.color='';}
+});
+
+function _toggleCalcHist(show){
+  var hist=document.getElementById('chist');
+  var hd=document.getElementById('chist-hd');
+  var btn=document.getElementById('chist-btn');
+  var open=(show!==undefined)?show:!hist.classList.contains('on');
+  hist.classList.toggle('on',open);
+  hd.style.display=open?'flex':'none';
+  btn.classList.toggle('on',open);
+  if(open) hist.scrollTop=hist.scrollHeight;
+}
+document.getElementById('chist-btn').addEventListener('click',function(){_toggleCalcHist();});
+document.getElementById('chist-close').addEventListener('click',function(){_toggleCalcHist(false);});
+decEl.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();e.target.blur();}});
+
+document.querySelectorAll('.cb').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var num=btn.dataset.cnum,op=btn.dataset.cop,fn=btn.dataset.cfn;
+
+    if(num!==undefined){
+      // 数字入力 — 演算子直後 or =直後なら入力リセット
+      if(_afterEq||_justOp){
+        curInput=(num==='.')?'0.':(num==='0'?'0':num);
+        if(_afterEq){_dispExpr='';_dispTokens=[];}
+        _afterEq=false;_justOp=false;
+        _dispTokens.push({type:'num',val:curInput});
+      }else{
+        if(num==='.'){
+          if(curInput.indexOf('.')<0) curInput+='.';
+        }else{
+          curInput=(curInput==='0')?num:curInput+num;
+        }
+        if(_dispTokens.length&&_dispTokens[_dispTokens.length-1].type==='num')
+          _dispTokens[_dispTokens.length-1].val=curInput;
+        else
+          _dispTokens.push({type:'num',val:curInput});
+      }
+      _dispExpr=_tokensToStr(_dispTokens);
+
+    }else if(op){
+      // 演算子押下 — 表示トークンと内部計算を分離
+      if(pendingOp&&!_justOp){
+        var result0=_calc(leftVal,pendingOp,curInput);
+        leftVal=result0;curInput=result0;
+      }else if(!pendingOp){
+        leftVal=curInput;
+      }
+      pendingOp=op;
+      _justOp=true;_afterEq=false;
+      if(_dispTokens.length&&_dispTokens[_dispTokens.length-1].type==='op')
+        _dispTokens[_dispTokens.length-1].val=op;
+      else
+        _dispTokens.push({type:'op',val:op});
+      _dispExpr=_tokensToStr(_dispTokens);
+
+    }else if(fn){
+      var d=+decEl.value;
+      var cur=parseFloat(curInput)||0;
+
+      if(fn==='C'){
+        leftVal='';pendingOp='';curInput='0';_afterEq=false;_justOp=false;
+        _dispExpr='';_dispTokens=[];
+      }else if(fn==='⌫'){
+        if(!_afterEq&&!_justOp) curInput=curInput.length>1?curInput.slice(0,-1):'0';
+      }else if(fn==='±'){
+        curInput=curInput.indexOf('-')===0?curInput.slice(1):'-'+curInput;
+      }else if(fn==='%'){
+        curInput=parseFloat((cur/100).toFixed(d)).toString();
+      }else if(fn==='sqrt'){
+        var r=Math.sqrt(cur);
+        curInput=isFinite(r)?parseFloat(r.toFixed(d)).toString():'エラー';
+      }else if(fn==='sq'){
+        curInput=parseFloat(Math.pow(cur,2).toFixed(d)).toString();
+      }else if(fn==='='){
+        if(pendingOp&&leftVal!==''){
+          var toks=_dispTokens.slice();
+          if(toks.length&&toks[toks.length-1].type==='op')
+            toks.push({type:'num',val:curInput});
+          var dispForHist=_tokensToStr(toks);
+          var result=_calc(leftVal,pendingOp,curInput);
+          _hist(dispForHist,result);
+          curInput=result;
+          leftVal='';pendingOp='';
+          _dispExpr=dispForHist+' =';
+          _dispTokens=[];
+        }
+        _afterEq=true;_justOp=false;
+      }
+      if(['⌫','±','%','sqrt','sq'].indexOf(fn)>=0&&!_afterEq&&!_justOp){
+        if(_dispTokens.length&&_dispTokens[_dispTokens.length-1].type==='num')
+          _dispTokens[_dispTokens.length-1].val=curInput;
+        _dispExpr=_tokensToStr(_dispTokens);
+      }
+    }
+    _disp();
+  });
+});
+
+// ─ ドラッグ移動（pointer events統合。位置保存: localStorage） ─
+var ctbEl=document.getElementById('ctb');
+var _CALC_POS_KEY='dxfv_calc_pos_b';
+
+function _clampCalc(x,b){
+  var vw=window.visualViewport?window.visualViewport.width:window.innerWidth;
+  var vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+  var w=_calcEl.offsetWidth||296,tbH=ctbEl.offsetHeight||40;
+  return{x:Math.max(0,Math.min(vw-w,x)),b:Math.max(0,Math.min(vh-tbH,b))};
+}
+function _applyCalcPos(x,b){
+  _calcEl.style.left=x+'px';_calcEl.style.bottom=b+'px';
+  _calcEl.style.right='auto';_calcEl.style.top='auto';
+}
+function _saveCalcPos(x,b){
+  try{localStorage.setItem(_CALC_POS_KEY,JSON.stringify({x:x,b:b}));}catch(e){}
+}
+function _restoreCalcPos(){
+  try{
+    var s=localStorage.getItem(_CALC_POS_KEY);
+    if(!s)return;
+    var p=JSON.parse(s);
+    if(isFinite(p.x)&&isFinite(p.b)){var c=_clampCalc(p.x,p.b);_applyCalcPos(c.x,c.b);}
+  }catch(e){}
+}
+function _resetCalcPos(){
+  _calcEl.style.left='';_calcEl.style.top='';
+  _calcEl.style.right='16px';_calcEl.style.bottom='20px';
+  try{localStorage.removeItem(_CALC_POS_KEY);}catch(e){}
+}
+
+var _cdragging=false,_cdStartX=0,_cdStartY=0,_cdStartLeft=0,_cdStartBottom=0;
+
+ctbEl.addEventListener('pointerdown',function(e){
+  if(e.target.tagName==='BUTTON')return;
+  e.preventDefault();
+  ctbEl.setPointerCapture(e.pointerId);
+  var r=_calcEl.getBoundingClientRect();
+  var vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+  _cdStartX=e.clientX;_cdStartY=e.clientY;
+  _cdStartLeft=r.left;_cdStartBottom=vh-r.bottom;
+  _cdragging=true;
+  ctbEl.style.cursor='grabbing';
+});
+ctbEl.addEventListener('pointermove',function(e){
+  if(!_cdragging)return;
+  e.preventDefault();
+  var dx=e.clientX-_cdStartX,dy=e.clientY-_cdStartY;
+  var c=_clampCalc(_cdStartLeft+dx,_cdStartBottom-dy);
+  _applyCalcPos(c.x,c.b);
+});
+function _endDragCalc(){
+  if(!_cdragging)return;
+  _cdragging=false;ctbEl.style.cursor='grab';
+  var r=_calcEl.getBoundingClientRect();
+  var vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+  _saveCalcPos(r.left,vh-r.bottom);
+}
+ctbEl.addEventListener('pointerup',_endDragCalc);
+ctbEl.addEventListener('pointercancel',_endDragCalc);
+
+// ダブルタップ: 初期位置へリセット
+var _ctbTapTs=0;
+ctbEl.addEventListener('pointerdown',function(e){
+  if(e.target.tagName==='BUTTON')return;
+  var now=Date.now();
+  if(now-_ctbTapTs<350) _resetCalcPos();
+  _ctbTapTs=now;
+});
+
+// ヘッダーの計算機ボタン: 開閉トグル
+var _calcBtnEl=document.getElementById('calcBtn');
+function _calcBtnUI(on){
+  if(!_calcBtnEl)return;
+  if(on){_calcBtnEl.style.background='rgba(0,212,255,.22)';_calcBtnEl.style.borderColor='#00d4ff';_calcBtnEl.style.color='#00d4ff';}
+  else{_calcBtnEl.style.background='';_calcBtnEl.style.borderColor='';_calcBtnEl.style.color='';}
+}
+if(_calcBtnEl){
+  _calcBtnEl.addEventListener('click',function(){
+    var wasHidden=!_calcEl.classList.contains('on');
+    _calcEl.classList.toggle('on');
+    if(wasHidden&&_calcEl.classList.contains('on')) _restoreCalcPos();
+    _calcBtnUI(_calcEl.classList.contains('on'));
+  });
+}
+
+})(); // end F
 
 // ── V0_98: 文字検索 ────────────────────────────────────────
 var _searchIdx=[];
