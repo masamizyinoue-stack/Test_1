@@ -322,7 +322,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_155.1</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_155.2</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -505,18 +505,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=01551"></script>
-<script src="viewer.js?v=01551"></script>
-<script src="utils.js?v=01551"></script>
-<script src="ui.js?v=01551"></script>
-<script src="dialog.js?v=01551"></script>
-<script src="storage.js?v=01551"></script>
-<script src="fonts/NotoSansJP.js?v=01551"></script>
-<script src="export.js?v=01551"></script>
-<script src="tool.js?v=01551"></script>
-<script src="verify.js?v=01551"></script>
+<script src="layer.js?v=01552"></script>
+<script src="viewer.js?v=01552"></script>
+<script src="utils.js?v=01552"></script>
+<script src="ui.js?v=01552"></script>
+<script src="dialog.js?v=01552"></script>
+<script src="storage.js?v=01552"></script>
+<script src="fonts/NotoSansJP.js?v=01552"></script>
+<script src="export.js?v=01552"></script>
+<script src="tool.js?v=01552"></script>
+<script src="verify.js?v=01552"></script>
 <script>
-const APP_VERSION = 'V0_155.1';
+const APP_VERSION = 'V0_155.2';
 
 // =========================================================
 // グローバル状態
@@ -2446,7 +2446,8 @@ var LL={
   active:false, phase:0,
   selLine1:null, selLine2:null,
   penDown:false, cur:null,
-  _hoverLine:null, _hoverPos:null
+  _hoverLine:null, _hoverPos:null,
+  _line2AnchorPt:null // V0_155.2: 2本目の線を選択した際にペンを当てていた位置（世界座標）
 };
 
 var LL_GUIDES={
@@ -2459,6 +2460,16 @@ function resetLL(){
   LL.active=false; LL.phase=0;
   LL.selLine1=null; LL.selLine2=null;
   LL.penDown=false; LL.cur=null; LL._hoverLine=null; LL._hoverPos=null;
+  LL._line2AnchorPt=null; // V0_155.2
+}
+
+// V0_155.2: 2本目の線(selLine2)上で、_line2AnchorPt(選択時にペンを当てていた位置)に
+// 最も近い点を返す。通り芯のような非常に長い線では、線全体の中点を基準にすると
+// 現在表示中の範囲から大きく離れた位置が寸法の基準になってしまうため、
+// 「ユーザーが実際に選択した付近」を基準点として使う。
+function _llRefPtOnLine2(){
+  var anchor=LL._line2AnchorPt||{x:(LL.selLine2.x1+LL.selLine2.x2)/2,y:(LL.selLine2.y1+LL.selLine2.y2)/2};
+  return computeFoot(LL.selLine2,anchor);
 }
 
 // 2本の線が平行かどうか判定（向きの正負は無視。約1度の誤差まで許容）
@@ -2522,10 +2533,9 @@ function drawLLOverlay(){
     ctx2.beginPath(); ctx2.moveTo(ls21[0],ls21[1]); ctx2.lineTo(ls22[0],ls22[1]); ctx2.stroke();
     ctx2.restore();
   }
-  // Phase2: プレビュー（2本目の中点を「点」としてbuildLinePtDimを再利用）
+  // Phase2: プレビュー（2本目の選択位置付近の点を「点」としてbuildLinePtDimを再利用）
   if(LL.phase===2&&LL.cur&&LL.selLine1&&LL.selLine2){
-    var midPtPv={x:(LL.selLine2.x1+LL.selLine2.x2)/2, y:(LL.selLine2.y1+LL.selLine2.y2)/2};
-    drawLPPreview(ctx2,buildLinePtDim(LL.selLine1,midPtPv,LL.cur));
+    drawLPPreview(ctx2,buildLinePtDim(LL.selLine1,_llRefPtOnLine2(),LL.cur));
   }
 
   ctx2.restore();
@@ -2579,13 +2589,16 @@ LL.handleUp=function(sx,sy){
     } else {
       LL.selLine2=LL._hoverLine;
       LL._hoverLine=null;
+      // V0_155.2: 2本目の線を確定した瞬間にペンを当てていた位置(=LL._hoverPos)を
+      // 基準点として記録。線全体の中点ではなく、ここを基準に寸法を組み立てる。
+      LL._line2AnchorPt=LL._hoverPos?{x:LL._hoverPos.x,y:LL._hoverPos.y}:null;
       LL.phase=2; LL.cur=null;
       showGuide(LL_GUIDES.POS,0);
     }
   } else if(LL.phase===2){
     var wp2=s2w(sx,sy);
     var pArrow=LL.cur||{x:wp2[0],y:wp2[1]};
-    var midPt={x:(LL.selLine2.x1+LL.selLine2.x2)/2, y:(LL.selLine2.y1+LL.selLine2.y2)/2};
+    var midPt=_llRefPtOnLine2();
     var dim=buildLinePtDim(LL.selLine1,midPt,pArrow);
     if(dim){ snapshot(); dims.push(dim); doSave(); scheduleDraw(); } // V0_103と同様: 即時保存
     LL.selLine1=null; LL.selLine2=null; LL.phase=0; LL.cur=null;
