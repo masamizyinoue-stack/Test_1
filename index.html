@@ -322,7 +322,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_154</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_156</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -505,18 +505,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=0154"></script>
-<script src="viewer.js?v=0154"></script>
-<script src="utils.js?v=0154"></script>
-<script src="ui.js?v=0154"></script>
-<script src="dialog.js?v=0154"></script>
-<script src="storage.js?v=0154"></script>
-<script src="fonts/NotoSansJP.js?v=0154"></script>
-<script src="export.js?v=0154"></script>
-<script src="tool.js?v=0154"></script>
-<script src="verify.js?v=0154"></script>
+<script src="layer.js?v=0156"></script>
+<script src="viewer.js?v=0156"></script>
+<script src="utils.js?v=0156"></script>
+<script src="ui.js?v=0156"></script>
+<script src="dialog.js?v=0156"></script>
+<script src="storage.js?v=0156"></script>
+<script src="fonts/NotoSansJP.js?v=0156"></script>
+<script src="export.js?v=0156"></script>
+<script src="tool.js?v=0156"></script>
+<script src="verify.js?v=0156"></script>
 <script>
-const APP_VERSION = 'V0_154';
+const APP_VERSION = 'V0_156';
 
 // =========================================================
 // グローバル状態
@@ -3015,6 +3015,7 @@ function _swAttachInput(sw){
     withCtx(function(){
       if(window.DIM&&window.DIM.active) window.DIM.handleDown(p.x,p.y);
       else if(window.LP&&window.LP.active) window.LP.handleDown(p.x,p.y);
+      else if(window.LL&&window.LL.active) window.LL.handleDown(p.x,p.y); // V0_156: 2線間のサブ窓対応
       else handlePointerDown(p.x,p.y,false);
     });
   });
@@ -3023,6 +3024,7 @@ function _swAttachInput(sw){
     withCtx(function(){
       if(window.DIM&&window.DIM.active) window.DIM.handleMove(p.x,p.y);
       else if(window.LP&&window.LP.active) window.LP.handleMove(p.x,p.y);
+      else if(window.LL&&window.LL.active) window.LL.handleMove(p.x,p.y); // V0_156
       else if(_mDown) handlePointerMove(p.x,p.y,false);
     });
   });
@@ -3033,6 +3035,7 @@ function _swAttachInput(sw){
     withCtx(function(){
       if(window.DIM&&window.DIM.active) window.DIM.handleUp(p.x,p.y);
       else if(window.LP&&window.LP.active) window.LP.handleUp(p.x,p.y);
+      else if(window.LL&&window.LL.active) window.LL.handleUp(p.x,p.y); // V0_156
       else handlePointerUp(p.x,p.y,false);
     });
   });
@@ -3055,6 +3058,7 @@ function _swAttachInput(sw){
         withCtx(function(){
           if(window.DIM&&window.DIM.active) window.DIM.handleDown(sx,sy);
           else if(window.LP&&window.LP.active) window.LP.handleDown(sx,sy);
+          else if(window.LL&&window.LL.active) window.LL.handleDown(sx,sy); // V0_156: 2線間のサブ窓対応
           else handlePointerDown(sx,sy,true);
         });
       }
@@ -3071,7 +3075,7 @@ function _swAttachInput(sw){
       var sxf=tf.clientX-r.left,syf=tf.clientY-r.top;
       isPen=false;mouseDown=true;lastMX=sxf;lastMY=syf;
       if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')
-          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)){
+          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)&&!(window.LL&&window.LL.active)){
         panning=false;
         withCtx(function(){ handlePointerDown(sxf,syf,false); });
       } else {
@@ -3094,6 +3098,7 @@ function _swAttachInput(sw){
       withCtx(function(){
         if(window.DIM&&window.DIM.active) window.DIM.handleMove(sx,sy);
         else if(window.LP&&window.LP.active) window.LP.handleMove(sx,sy);
+        else if(window.LL&&window.LL.active) window.LL.handleMove(sx,sy); // V0_156
         else handlePointerMove(sx,sy,true);
       });
       lastMX=sx;lastMY=sy;
@@ -3119,6 +3124,7 @@ function _swAttachInput(sw){
       withCtx(function(){
         if(window.DIM&&window.DIM.active) window.DIM.handleMove(sxf,syf);
         else if(window.LP&&window.LP.active) window.LP.handleMove(sxf,syf);
+        else if(window.LL&&window.LL.active) window.LL.handleMove(sxf,syf); // V0_156
         else handlePointerMove(sxf,syf,false);
       });
       lastMX=sxf;lastMY=syf;
@@ -3144,6 +3150,7 @@ function _swAttachInput(sw){
       withCtx(function(){
         if(window.DIM&&window.DIM.active) window.DIM.handleUp(lastMX,lastMY);
         else if(window.LP&&window.LP.active) window.LP.handleUp(lastMX,lastMY);
+        else if(window.LL&&window.LL.active) window.LL.handleUp(lastMX,lastMY); // V0_156
         else handlePointerUp(lastMX,lastMY,true);
       });
       mouseDown=false;isPen=false;
@@ -3172,7 +3179,7 @@ function _swAttachInput(sw){
       var sx=t.clientX-r.left,sy=t.clientY-r.top;
       mouseDown=true;lastMX=sx;lastMY=sy;
       if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl')
-          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)){
+          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)&&!(window.LL&&window.LL.active)){
         panning=false;
         withCtx(function(){ handlePointerDown(sx,sy,false); });
       } else {
