@@ -412,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V0_160.1</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_00</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -629,18 +629,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=01601"></script>
-<script src="viewer.js?v=01601"></script>
-<script src="utils.js?v=01601"></script>
-<script src="ui.js?v=01601"></script>
-<script src="dialog.js?v=01601"></script>
-<script src="storage.js?v=01601"></script>
-<script src="fonts/NotoSansJP.js?v=01601"></script>
-<script src="export.js?v=01601"></script>
-<script src="tool.js?v=01601"></script>
-<script src="verify.js?v=01601"></script>
+<script src="layer.js?v=100"></script>
+<script src="viewer.js?v=100"></script>
+<script src="utils.js?v=100"></script>
+<script src="ui.js?v=100"></script>
+<script src="dialog.js?v=100"></script>
+<script src="storage.js?v=100"></script>
+<script src="fonts/NotoSansJP.js?v=100"></script>
+<script src="export.js?v=100"></script>
+<script src="tool.js?v=100"></script>
+<script src="verify.js?v=100"></script>
 <script>
-const APP_VERSION = 'V0_160.1';
+const APP_VERSION = 'V1_00';
 
 // =========================================================
 // グローバル状態
