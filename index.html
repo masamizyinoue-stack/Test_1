@@ -412,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_01</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_03</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -467,6 +467,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div class="sp-section">
     <button id="importDxfviewBtn" class="sp-action-btn">書込復元</button> <!-- V0_136: .dxfview保存→書込復元に変更 -->
+  </div>
+  <div class="sp-section"> <!-- V1_03: クラウド保存状況（Supabaseの保存件数・使用サイズ） -->
+    <div class="sp-label">クラウド保存状況（Supabase）</div>
+    <div class="info-box" id="sbUsageBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">-</div>
   </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
@@ -629,21 +633,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=101"></script>
-<script src="viewer.js?v=101"></script>
-<script src="utils.js?v=101"></script>
-<script src="ui.js?v=101"></script>
-<script src="dialog.js?v=101"></script>
-<script src="storage.js?v=101"></script>
-<script src="fonts/NotoSansJP.js?v=101"></script>
-<script src="export.js?v=101"></script>
-<script src="tool.js?v=101"></script>
-<script src="verify.js?v=101"></script>
+<script src="layer.js?v=103"></script>
+<script src="viewer.js?v=103"></script>
+<script src="utils.js?v=103"></script>
+<script src="ui.js?v=103"></script>
+<script src="dialog.js?v=103"></script>
+<script src="storage.js?v=103"></script>
+<script src="fonts/NotoSansJP.js?v=103"></script>
+<script src="export.js?v=103"></script>
+<script src="tool.js?v=103"></script>
+<script src="verify.js?v=103"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=101"></script>
+<script src="supabase-sync.js?v=103"></script>
 <script>
-const APP_VERSION = 'V1_01';
+const APP_VERSION = 'V1_03';
 
 // =========================================================
 // グローバル状態
@@ -1281,7 +1285,23 @@ function doCloseTab(idx){
 
 
 // サイドバー
-document.getElementById('settingsBtn').addEventListener('click',()=>document.body.classList.add('settings-open'));
+document.getElementById('settingsBtn').addEventListener('click',()=>{
+  document.body.classList.add('settings-open');
+  // V1_03: 設定を開くたびにSupabaseのクラウド保存状況（保存件数・使用サイズ）を取得して表示
+  var _sbBox=document.getElementById('sbUsageBox');
+  if(_sbBox&&typeof _sbGetUsageStats==='function'){
+    _sbBox.textContent='読み込み中…';
+    _sbGetUsageStats().then(function(stats){
+      if(!_sbBox) return;
+      if(!stats){ _sbBox.textContent='取得できませんでした（オフライン、またはSupabase未接続）'; return; }
+      var mb=(stats.tableBytes/1024/1024).toFixed(1);
+      var pct=(stats.usedRatio*100).toFixed(1);
+      _sbBox.innerHTML='保存件数: '+stats.rowCount+'件<br>使用量: 約'+mb+'MB / 500MB（Free枠の'+pct+'%）';
+    });
+  } else if(_sbBox){
+    _sbBox.textContent='Supabase未接続';
+  }
+});
 document.getElementById('settingsClose').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // V0_129: Safari終了・バックグラウンド移行時に即時保存
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'&&currentFileName)doSave();}); // V0_132: ガード追加
