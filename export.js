@@ -534,10 +534,15 @@ async function exportDxfviewManual(){
           if (navigator.canShare({ files: [shareFile] })) {
             // V1_13: titleを併せて渡すと、iOSが「ファイル YYYY-MM-DD..」という
             // タイトル文字列だけのテキストファイルを.dxfviewとは別にもう1つ
-            // 作成してしまう不具合が判明したため、title指定を削除（ファイル名は
-            // File自体(fname)に既に設定済みのため、titleが無くても保存される
-            // ファイル名には影響しない）
-            await navigator.share({ files: [shareFile] });
+            // 作成してしまう不具合が判明したため、title指定を一旦削除した。
+            // V1_14（実験的・実機確認要）: titleを外すと共有シートの選択肢
+            // （コピー・Dropbox保存等）も減ってしまうとの報告を受け、titleでは
+            // なくtextプロパティを渡す書き方に変更。共有シートが復活しつつ
+            // 余分なファイルが出ないことを期待しての変更だが、iOS側の内部
+            // 挙動に依存するため確実な保証はない。もしまた余分なファイルが
+            // 出る、または共有シートの選択肢が戻らない場合はV1_13
+            // （textもtitleも渡さない構成）へ戻すこと
+            await navigator.share({ files: [shareFile], text: fname });
             _fsaSaved = true; // 共有完了扱い
           }
         } catch (e) {
