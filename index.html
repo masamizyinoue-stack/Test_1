@@ -412,7 +412,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_00</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_01</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -629,18 +629,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=100"></script>
-<script src="viewer.js?v=100"></script>
-<script src="utils.js?v=100"></script>
-<script src="ui.js?v=100"></script>
-<script src="dialog.js?v=100"></script>
-<script src="storage.js?v=100"></script>
-<script src="fonts/NotoSansJP.js?v=100"></script>
-<script src="export.js?v=100"></script>
-<script src="tool.js?v=100"></script>
-<script src="verify.js?v=100"></script>
+<script src="layer.js?v=101"></script>
+<script src="viewer.js?v=101"></script>
+<script src="utils.js?v=101"></script>
+<script src="ui.js?v=101"></script>
+<script src="dialog.js?v=101"></script>
+<script src="storage.js?v=101"></script>
+<script src="fonts/NotoSansJP.js?v=101"></script>
+<script src="export.js?v=101"></script>
+<script src="tool.js?v=101"></script>
+<script src="verify.js?v=101"></script>
+<!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-sync.js?v=101"></script>
 <script>
-const APP_VERSION = 'V1_00';
+const APP_VERSION = 'V1_01';
 
 // =========================================================
 // グローバル状態
@@ -1058,6 +1061,14 @@ fileInput.addEventListener('change',async e=>{
         }catch(e3){resolve(null);}
       });
       if(_dvR){if(_dvR.dims&&_dvR.dims.length>0)dims=_dvR.dims;if(_dvR.strokes&&_dvR.strokes.length>0)strokes=_dvR.strokes;}}
+      // V1_01: ローカルに注記が無い場合のみSupabaseから自動復元を試みる（既存のローカル
+      // 復元結果を上書きしないよう、strokes/dimsが両方とも空の時だけ実行する）
+      if(strokes.length===0&&dims.length===0&&typeof _sbPullAnnotations==='function'){
+        try{
+          var _sbA=await _sbPullAnnotations(_fkR);
+          if(_sbA){if(_sbA.strokes&&_sbA.strokes.length>0)strokes=_sbA.strokes;if(_sbA.dims&&_sbA.dims.length>0)dims=_sbA.dims;}
+        }catch(e){}
+      }
       buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();_idbSave(f.name,buf,_searchIdx.map(function(m){return m.text;}));{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
       saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();// V0_113: openFiles[]登録後に保存されるようdoSave→scheduleSave
       document.body.classList.remove('settings-open');
@@ -3858,6 +3869,13 @@ async function openDxfFromDb(name,buf,keyword){
       if(_dvR){
         if(_dvR.strokes&&_dvR.strokes.length>0) strokes=_dvR.strokes;
         if(_dvR.dims&&_dvR.dims.length>0) dims=_dvR.dims;
+      }
+      // V1_01: ローカルに注記が無い場合のみSupabaseから自動復元を試みる
+      if(strokes.length===0&&dims.length===0&&typeof _sbPullAnnotations==='function'){
+        try{
+          var _sbA2=await _sbPullAnnotations(_fk);
+          if(_sbA2){if(_sbA2.strokes&&_sbA2.strokes.length>0)strokes=_sbA2.strokes;if(_sbA2.dims&&_sbA2.dims.length>0)dims=_sbA2.dims;}
+        }catch(e){}
       }
       // ⑧ openFilesへ登録
       openFiles.push({name:name,fileKey:_fk});
