@@ -531,29 +531,30 @@ async function exportDxfviewManual(){
     // navigator.share(File) ならプレビューを飛ばして共有シート（ファイルに保存）へ直行し、
     // .dxfviewのファイル名もそのまま保持される。
     // 通常のSafari起動時は従来の<a>ダウンロードのまま（ダウンロード先設定で1タップ保存が最速のため）。
-    // V1_15（実験的・実機確認要）: navigator.share()にtitle/textを付けると共有シートの
-    // 選択肢（コピー・Dropbox保存等）は増えるが、iOSが同時に「余分なテキストファイル」
-    // まで保存してしまう不具合がV1_13・V1_14の両方で確認された（title/textどちらでも
-    // 再現）。Web Share API自体を使わず、standalone時も下の<a>ダウンロードへ回す
-    // ことで両問題が同時に解決するか試すため、一旦Web Share分岐を無効化する
-    // （false&&で無効化。コードは残し、ダメならtrueに戻すだけで復元できる）
+    //
+    // 【V1_13〜V1_17での検討経緯・最終方針】
+    // 実機検証の結果、以下3方式はいずれも一長一短でトレードオフの関係にあり、
+    // 「タップ無し・共有シートの選択肢が豊富・余分なファイルも出ない」を同時に
+    // 満たす方法はiOSの仕様上存在しないことを確認した：
+    //   (a) Web Share + textなし(V1_13): タップ無し／選択肢少ない(コピー・Dropbox等が
+    //       出ない)／余分ファイル無し
+    //   (b) Web Share + text指定(V1_14): タップ無し／選択肢豊富／余分な「ファイル
+    //       <日時>.txt」が毎回もう1つ保存される
+    //   (c) <a>ダウンロードに統一(V1_15/V1_16): 保存前にiOS標準のプレビュー画面
+    //       →「その他...」を押す一手間が必要／選択肢豊富／余分ファイル無し
+    // ユーザーと相談の上、「保存の一手間が無いこと」を最優先し、(b)のWeb Share+text
+    // 方式を最終採用とした（余分なテキストファイルが毎回1つ増える点は、ユーザーが
+    // 把握・許容の上で受け入れ済み）。
     if (!_fsaSaved) {
       var _isStandalone = (window.navigator.standalone === true) ||
                           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-      if (false && _isStandalone && navigator.share && typeof navigator.canShare === 'function') {
+      if (_isStandalone && navigator.share && typeof navigator.canShare === 'function') {
         try {
           var shareFile = new File([blob], fname, { type: 'application/json' });
           if (navigator.canShare({ files: [shareFile] })) {
-            // V1_13: titleを併せて渡すと、iOSが「ファイル YYYY-MM-DD..」という
-            // タイトル文字列だけのテキストファイルを.dxfviewとは別にもう1つ
-            // 作成してしまう不具合が判明したため、title指定を一旦削除した。
-            // V1_14（実験的・実機確認要）: titleを外すと共有シートの選択肢
-            // （コピー・Dropbox保存等）も減ってしまうとの報告を受け、titleでは
-            // なくtextプロパティを渡す書き方に変更。共有シートが復活しつつ
-            // 余分なファイルが出ないことを期待しての変更だが、iOS側の内部
-            // 挙動に依存するため確実な保証はない。もしまた余分なファイルが
-            // 出る、または共有シートの選択肢が戻らない場合はV1_13
-            // （textもtitleも渡さない構成）へ戻すこと
+            // V1_17: text指定のWeb Share方式（上記経緯により最終採用）。
+            // 余分なテキストファイルが毎回もう1つ保存されるのは既知・許容済みの
+            // 仕様上の制約であり、不具合ではない
             await navigator.share({ files: [shareFile], text: fname });
             _fsaSaved = true; // 共有完了扱い
           }
