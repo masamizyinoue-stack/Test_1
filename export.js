@@ -532,7 +532,12 @@ async function exportDxfviewManual(){
         try {
           var shareFile = new File([blob], fname, { type: 'application/json' });
           if (navigator.canShare({ files: [shareFile] })) {
-            await navigator.share({ files: [shareFile], title: fname });
+            // V1_13: titleを併せて渡すと、iOSが「ファイル YYYY-MM-DD..」という
+            // タイトル文字列だけのテキストファイルを.dxfviewとは別にもう1つ
+            // 作成してしまう不具合が判明したため、title指定を削除（ファイル名は
+            // File自体(fname)に既に設定済みのため、titleが無くても保存される
+            // ファイル名には影響しない）
+            await navigator.share({ files: [shareFile] });
             _fsaSaved = true; // 共有完了扱い
           }
         } catch (e) {

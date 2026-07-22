@@ -423,13 +423,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_11</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_13</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
     <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF 対応</small></span> <!-- V0_148.3: 表記のみ変更（機能は変更なし） -->
   </button>
+  <div class="sp-section"> <!-- V1_12: 画面説明PDFを開くボタン -->
+    <button id="screenGuideBtn" class="sp-action-btn">画面説明</button>
+  </div>
   <div class="sp-section">
     <div class="sp-label">モード選択</div>
     <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
@@ -667,21 +670,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=111"></script>
-<script src="viewer.js?v=111"></script>
-<script src="utils.js?v=111"></script>
-<script src="ui.js?v=111"></script>
-<script src="dialog.js?v=111"></script>
-<script src="storage.js?v=111"></script>
-<script src="fonts/NotoSansJP.js?v=111"></script>
-<script src="export.js?v=111"></script>
-<script src="tool.js?v=111"></script>
-<script src="verify.js?v=111"></script>
+<script src="layer.js?v=113"></script>
+<script src="viewer.js?v=113"></script>
+<script src="utils.js?v=113"></script>
+<script src="ui.js?v=113"></script>
+<script src="dialog.js?v=113"></script>
+<script src="storage.js?v=113"></script>
+<script src="fonts/NotoSansJP.js?v=113"></script>
+<script src="export.js?v=113"></script>
+<script src="tool.js?v=113"></script>
+<script src="verify.js?v=113"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=111"></script>
+<script src="supabase-sync.js?v=113"></script>
 <script>
-const APP_VERSION = 'V1_11';
+const APP_VERSION = 'V1_13';
 
 // =========================================================
 // グローバル状態
@@ -1056,6 +1059,10 @@ function _fileKey(name,size){return name+'\x00'+size;}
 // ファイル
 const fileInput=document.getElementById('file');
 document.getElementById('openFileBtnMain').addEventListener('click',()=>fileInput.click());
+// V1_12: 画面説明PDFを別タブで開く（アプリ本体とは別ファイル。書式・機能には影響しない）
+document.getElementById('screenGuideBtn').addEventListener('click',()=>{
+  window.open('screen-guide.pdf','_blank');
+});
 fileInput.addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;
   // V0_148: 同名ファイルの二重オープン防止（気付かず2つ開いて別々に書き込む事故を防ぐ）
