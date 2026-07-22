@@ -423,7 +423,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_07</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_08</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -650,29 +650,32 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
 </div>
 
-<!-- V1_07: accept未指定だとiOSが「写真/カメラ/ファイル」の選択肢シートを一旦表示し、
-     そこから更に「ファイルを選択」を押す必要があった。画像/動画に一致しない拡張子を
-     指定するとiOSがそのシートを省略し直接Filesアプリの選択画面を開くため追加 -->
-<input type="file" id="file" accept=".dxf,.pdf" hidden>
+<!-- V1_08: V1_07でaccept=".dxf,.pdf"を追加したところ、iOSが「.dxf」拡張子に対応する
+     システム標準の書類タイプ(UTI)を持たないため、Filesアプリ側でDXFファイルを
+     正しく認識・選択できなくなり「DXFが開けない」不具合が発生した。PDFは開ける
+     必要がないとの指示もあり、accept属性ごと削除して元の（全ファイルから選べる）
+     動作に戻した。「ファイルを選択」をもう一度タップする一手間は残るが、DXFが
+     確実に開けることを優先する -->
+<input type="file" id="file" hidden>
 <input type="file" id="folderInput" webkitdirectory accept=".dxf" hidden>
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=107"></script>
-<script src="viewer.js?v=107"></script>
-<script src="utils.js?v=107"></script>
-<script src="ui.js?v=107"></script>
-<script src="dialog.js?v=107"></script>
-<script src="storage.js?v=107"></script>
-<script src="fonts/NotoSansJP.js?v=107"></script>
-<script src="export.js?v=107"></script>
-<script src="tool.js?v=107"></script>
-<script src="verify.js?v=107"></script>
+<script src="layer.js?v=108"></script>
+<script src="viewer.js?v=108"></script>
+<script src="utils.js?v=108"></script>
+<script src="ui.js?v=108"></script>
+<script src="dialog.js?v=108"></script>
+<script src="storage.js?v=108"></script>
+<script src="fonts/NotoSansJP.js?v=108"></script>
+<script src="export.js?v=108"></script>
+<script src="tool.js?v=108"></script>
+<script src="verify.js?v=108"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=107"></script>
+<script src="supabase-sync.js?v=108"></script>
 <script>
-const APP_VERSION = 'V1_07';
+const APP_VERSION = 'V1_08';
 
 // =========================================================
 // グローバル状態
