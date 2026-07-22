@@ -488,7 +488,13 @@ async function exportDxfviewManual(){
       savedViews:(typeof savedViews!=='undefined'?savedViews:[null,null,null,null,null]),
       hiddenLayers:(typeof hiddenLayers!=='undefined'?[...hiddenLayers]:[])
     };
-    const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+    // V1_16: type:'application/json'のままだと、PWA(standalone)でのプレビュー画面
+    // 経由の保存時にiOSがJSONと認識して勝手に「.json」を末尾に付与してしまい、
+    // 「◯◯_書込み.dxfview.json」という名前で保存される不具合が判明した（書込復元側の
+    // accept='.dxfview'と拡張子が一致せず、復元時に選べなくなる恐れがある）。
+    // application/octet-stream（種類不明の汎用バイナリ）にすることで、iOSに拡張子を
+    // 推測・付与させず、ダウンロード時のファイル名(fname)をそのまま使わせる
+    const blob=new Blob([JSON.stringify(payload)],{type:'application/octet-stream'});
     const base=(currentFileName||'').replace(/\.[^.]+$/,'')||null;
     const fname=(base?base+'_書込み':'書込み')+'.dxfview';
 
@@ -500,7 +506,7 @@ async function exportDxfviewManual(){
         var _prevHandle = await _bkHandleLoad();
         var opts = {
           suggestedName: fname,
-          types: [{ description: 'DXFView Backup', accept: { 'application/json': ['.dxfview'] } }]
+          types: [{ description: 'DXFView Backup', accept: { 'application/octet-stream': ['.dxfview'] } }] // V1_16: blobのtype変更に合わせて一致させる
         };
         if (_prevHandle) {
           // 前回ハンドルをstartInに指定（無効な場合はブラウザが自動的にデフォルトへ）
