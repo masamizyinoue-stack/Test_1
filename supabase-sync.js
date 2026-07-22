@@ -1,4 +1,4 @@
-// supabase-sync.js — 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元する（V1_03）
+// supabase-sync.js — 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元する（V1_05）
 // 依存: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> をindex.htmlで先に読み込むこと
 // 依存グローバル: strokes, dims, currentFileIdx, openFiles, currentFileName, currentFileSize (viewer.js/HTML)
 //
@@ -18,10 +18,30 @@
 //   Supabase側のRLSはこのIDを検証していない（真の認証ではない）。社内の
 //   通常利用では他人のdevice_idを偽装される想定は低いが、厳密なアクセス制御
 //   （なりすまし防止）が必要な場合はSupabase Authの導入が別途必要になる。
+// ・V1_04: 「端末が変わっても氏名・合言葉で復元したい」という要望により、
+//   ランダムなdevice_idの代わりに「氏名+合言葉」から生成した固定キー(user_key)を
+//   使えるように拡張。設定画面で氏名・合言葉を登録すると、以後はそのキーで
+//   保存・復元される。別の端末で同じ氏名・合言葉を登録すれば同じキーになり、
+//   クラウド上の同じデータへ接続できる。未登録の場合は従来通りランダムな
+//   device_id（端末ごとに自動分離）のまま動作する。
+//   ※合言葉はSHA-256でハッシュ化してから使うが、サーバー側（RLS）では
+//   合言葉の正しさを検証していない（anon全開放のため）。これは真のログイン
+//   認証ではなく「知っていれば入れる合言葉」程度の簡易的な識別である旨、
+//   ユーザーに開示済み。
+// ・V1_05: 「複数人が使うとデータ量が増えて困る。データを必ず残す必要がある人だけ
+//   Supabaseを使えるようにしたい」という要望により、氏名・合言葉が未登録の場合は
+//   Supabaseへ一切保存・復元を行わない（ローカルのlocalStorage/IndexedDB保存の
+//   みで動作する）仕様に変更。従来のランダムなdevice_idによる自動同期は廃止し、
+//   「登録した人だけがクラウド同期を使う」オプトイン方式に一本化した。
+//   設定画面に「登録解除」ボタンも追加し、不要になった時点でクラウド同期を
+//   オフに戻せるようにした（解除してもクラウド上の既存データは削除されず、
+//   ローカルのlocalStorage/IndexedDBへの影響も一切ない）。
 
 const _SB_URL='https://opuylmqrsovtemygouwe.supabase.co';
 const _SB_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wdXlsbXFyc292dGVteWdvdXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NjM4NDMsImV4cCI6MjEwMDIzOTg0M30.cECPW5u5FCPOlmyCWGaJi_PbaizKB2vQbsmQaOJZ5bM';
 const _SB_DEVICE_ID_KEY='dxfv_device_id'; // V1_02
+const _SB_USER_KEY_STORAGE='dxfv_user_key'; // V1_04: 氏名+合言葉から生成したキー
+const _SB_USER_NAME_STORAGE='dxfv_user_name'; // V1_04: 表示用（平文の氏名のみ保存。合言葉は保存しない）
 
 let _sbClient=null;
 try{
@@ -34,25 +54,79 @@ try{
 // 格納できず保存が必ず失敗するため、Supabase送信専用に安全な区切り文字へ変換する
 function _sbSafeKey(fk){ return (fk==null)?fk:String(fk).split('\x00').join('::'); }
 
-// V1_02: この端末固有のIDをlocalStorageから取得。無ければ生成して保存する
+// V1_05: 氏名・合言葉による固定キー(user_key)が登録されている場合のみ値を返す。
+// 未登録ならnullを返し、Supabaseへは一切保存・復元を行わない（オプトイン方式）。
+// ※旧device_id方式(ランダムID自動生成)はV1_05で廃止。
 function _sbGetDeviceId(){
   try{
-    var id=localStorage.getItem(_SB_DEVICE_ID_KEY);
-    if(id) return id;
-    id=(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID()
-      :('dev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
-    localStorage.setItem(_SB_DEVICE_ID_KEY,id);
-    return id;
+    return localStorage.getItem(_SB_USER_KEY_STORAGE)||null;
   }catch(e){
-    // localStorageが使えない環境（プライベートブラウズ等）では毎回一時IDを発行
-    return 'dev-temp-'+Math.random().toString(36).slice(2);
+    return null;
   }
 }
-const _SB_DEVICE_ID=_sbGetDeviceId();
+let _SB_DEVICE_ID=_sbGetDeviceId(); // V1_04: user_key登録後に差し替えるためconst→let
+
+// V1_04: 文字列をSHA-256でハッシュ化しhex文字列で返す（Web Crypto非対応時は簡易フォールバック）
+async function _sbHashString(str){
+  try{
+    if(typeof crypto!=='undefined'&&crypto.subtle&&crypto.subtle.digest){
+      var enc=new TextEncoder().encode(str);
+      var buf=await crypto.subtle.digest('SHA-256',enc);
+      return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    }
+  }catch(e){console.warn('[SupabaseSync] ハッシュ化失敗、簡易方式に切替',e);}
+  var h=0;
+  for(var i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))|0; }
+  return 'fb'+(h>>>0).toString(16);
+}
+
+// V1_04: 氏名・合言葉からuser_keyを生成しlocalStorageへ登録。以後はこのキーで保存・復元する
+async function _sbSetUserCredentials(name,pass){
+  try{
+    var n=String(name||'').trim();
+    var p=String(pass||'');
+    if(!n||!p) return {ok:false,error:'お名前と合言葉の両方を入力してください'};
+    var hash=await _sbHashString(n.toLowerCase()+'::'+p);
+    var key='u_'+hash;
+    localStorage.setItem(_SB_USER_KEY_STORAGE,key);
+    localStorage.setItem(_SB_USER_NAME_STORAGE,n);
+    _SB_DEVICE_ID=key;
+    return {ok:true,name:n};
+  }catch(e){
+    console.warn('[SupabaseSync] 認証設定例外',e);
+    return {ok:false,error:'設定に失敗しました（localStorageが使用できない可能性があります）'};
+  }
+}
+
+// V1_05: 登録を解除する（クラウド同期をオフに戻す）。クラウド上の既存データは
+// 削除しない。ローカルのlocalStorage/IndexedDBのデータにも一切影響しない。
+function _sbClearUserCredentials(){
+  try{
+    localStorage.removeItem(_SB_USER_KEY_STORAGE);
+    localStorage.removeItem(_SB_USER_NAME_STORAGE);
+    _SB_DEVICE_ID=null;
+    return {ok:true};
+  }catch(e){
+    console.warn('[SupabaseSync] 解除例外',e);
+    return {ok:false,error:'解除に失敗しました'};
+  }
+}
+
+// V1_04: 現在の同期識別状態を返す（設定画面表示用）
+// V1_05: 未登録時は'device'ではなく'none'（クラウド同期オフ）を返すよう変更
+function _sbGetAuthStatus(){
+  try{
+    var name=localStorage.getItem(_SB_USER_NAME_STORAGE);
+    var key=localStorage.getItem(_SB_USER_KEY_STORAGE);
+    if(name&&key) return {mode:'user',name:name};
+  }catch(e){}
+  return {mode:'none',name:null};
+}
 
 // 現在のファイルの注記をSupabaseへ保存（非同期・失敗しても無視）
+// V1_05: 氏名・合言葉が未登録（_SB_DEVICE_ID===null）の場合はSupabaseへ一切保存しない
 function _sbPushCurrentAnnotations(){
-  if(!_sbClient) return;
+  if(!_sbClient||!_SB_DEVICE_ID) return;
   try{
     if(typeof currentFileIdx==='undefined'||currentFileIdx<0||!openFiles[currentFileIdx]) return;
     var _f=openFiles[currentFileIdx];
@@ -71,8 +145,9 @@ function _sbPushCurrentAnnotations(){
 }
 
 // 指定fileKeyの注記をSupabaseから取得（この端末が過去に保存した分のみ）。無い/失敗時はnullを返す
+// V1_05: 氏名・合言葉が未登録（_SB_DEVICE_ID===null）の場合はSupabaseへ問い合わせない
 async function _sbPullAnnotations(fileKey){
-  if(!_sbClient||!fileKey) return null;
+  if(!_sbClient||!fileKey||!_SB_DEVICE_ID) return null;
   try{
     var res=await _sbClient.from('dxf_annotations')
       .select('strokes,dims')
@@ -107,3 +182,6 @@ async function _sbGetUsageStats(){
 window._sbPushCurrentAnnotations=_sbPushCurrentAnnotations;
 window._sbPullAnnotations=_sbPullAnnotations;
 window._sbGetUsageStats=_sbGetUsageStats;
+window._sbSetUserCredentials=_sbSetUserCredentials; // V1_04
+window._sbGetAuthStatus=_sbGetAuthStatus; // V1_04
+window._sbClearUserCredentials=_sbClearUserCredentials; // V1_05
