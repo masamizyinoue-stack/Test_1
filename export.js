@@ -525,10 +525,16 @@ async function exportDxfviewManual(){
     // navigator.share(File) ならプレビューを飛ばして共有シート（ファイルに保存）へ直行し、
     // .dxfviewのファイル名もそのまま保持される。
     // 通常のSafari起動時は従来の<a>ダウンロードのまま（ダウンロード先設定で1タップ保存が最速のため）。
+    // V1_15（実験的・実機確認要）: navigator.share()にtitle/textを付けると共有シートの
+    // 選択肢（コピー・Dropbox保存等）は増えるが、iOSが同時に「余分なテキストファイル」
+    // まで保存してしまう不具合がV1_13・V1_14の両方で確認された（title/textどちらでも
+    // 再現）。Web Share API自体を使わず、standalone時も下の<a>ダウンロードへ回す
+    // ことで両問題が同時に解決するか試すため、一旦Web Share分岐を無効化する
+    // （false&&で無効化。コードは残し、ダメならtrueに戻すだけで復元できる）
     if (!_fsaSaved) {
       var _isStandalone = (window.navigator.standalone === true) ||
                           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-      if (_isStandalone && navigator.share && typeof navigator.canShare === 'function') {
+      if (false && _isStandalone && navigator.share && typeof navigator.canShare === 'function') {
         try {
           var shareFile = new File([blob], fname, { type: 'application/json' });
           if (navigator.canShare({ files: [shareFile] })) {
