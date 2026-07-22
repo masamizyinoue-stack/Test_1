@@ -423,7 +423,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_10</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_11</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -483,24 +483,24 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">クラウド保存状況（Supabase）</div>
     <div class="info-box" id="sbUsageBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">-</div>
   </div>
-  <div class="sp-section"> <!-- V1_04: 氏名・合言葉でクラウド同期先を指定（端末を変えても復元可能に） / V1_05: 未登録時はSupabase未使用(オプトイン方式)に変更 / V1_10: 誰でも自由に登録できないよう管理用パスワードで制限 -->
-    <div class="sp-label">クラウド同期の識別（お名前・合言葉）</div>
-    <div id="sbAuthStatus" style="font-size:12px;color:#888;margin-bottom:6px">-</div>
-    <input type="password" id="sbAdminPass" placeholder="設定用パスワード" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:6px;font-size:14px">
-    <input type="text" id="sbUserName" placeholder="お名前" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:6px;font-size:14px">
-    <input type="password" id="sbUserPass" placeholder="合言葉" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:6px;font-size:14px">
-    <div style="display:flex;gap:8px">
-      <button id="sbAuthSetBtn" class="sp-action-btn" style="flex:1">設定して同期</button>
-      <button id="sbAuthClearBtn" class="sp-danger-btn" style="flex:1">登録解除</button>
-    </div>
-    <div style="font-size:11px;color:#666;margin-top:6px;line-height:1.5">※お名前・合言葉を登録した人のみクラウド保存が有効になります。未登録の場合はSupabaseへ一切保存されず、従来通りこの端末内(localStorage/IndexedDB)のみの保存になります。別の端末で同じお名前・合言葉を設定すると、その端末からもクラウド上の同じデータに繋がります。厳密なパスワード認証ではなく簡易的な識別のためのものです。登録解除してもクラウド上の既存データやこの端末のローカル保存には影響しません。設定用パスワードを知っている人のみ登録・解除できます（誰でも自由に登録できないようにするための制限です）。</div>
-  </div>
   <div class="sp-section" style="display:flex;flex-direction:column;gap:8px">
     <button id="clearBtn" class="sp-danger-btn">書込み・寸法_全消去</button>
   </div>
   <div class="sp-section">
     <div class="sp-label">DXF情報</div>
     <div class="info-box" id="infoBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;min-height:44px;line-height:1.6">ファイルを開いてください</div>
+  </div>
+  <div class="sp-section"> <!-- V1_04: 氏名・合言葉でクラウド同期先を指定（端末を変えても復元可能に） / V1_05: 未登録時はSupabase未使用(オプトイン方式)に変更 / V1_10: 誰でも自由に登録できないよう承認用パスワードで制限 / V1_11: 設定画面の一番下へ移動、パスワードの呼称を「承認用パスワード」に変更 -->
+    <div class="sp-label">クラウド同期の識別（お名前・合言葉）</div>
+    <div id="sbAuthStatus" style="font-size:12px;color:#888;margin-bottom:6px">-</div>
+    <input type="password" id="sbAdminPass" placeholder="承認用パスワード" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:6px;font-size:14px">
+    <input type="text" id="sbUserName" placeholder="お名前" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:6px;font-size:14px">
+    <input type="password" id="sbUserPass" placeholder="合言葉" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:6px;font-size:14px">
+    <div style="display:flex;gap:8px">
+      <button id="sbAuthSetBtn" class="sp-action-btn" style="flex:1">設定して同期</button>
+      <button id="sbAuthClearBtn" class="sp-danger-btn" style="flex:1">登録解除</button>
+    </div>
+    <div style="font-size:11px;color:#666;margin-top:6px;line-height:1.5">※お名前・合言葉を登録した人のみクラウド保存が有効になります。未登録の場合はSupabaseへ一切保存されず、従来通りこの端末内(localStorage/IndexedDB)のみの保存になります。別の端末で同じお名前・合言葉を設定すると、その端末からもクラウド上の同じデータに繋がります。厳密なパスワード認証ではなく簡易的な識別のためのものです。登録解除してもクラウド上の既存データやこの端末のローカル保存には影響しません。承認用パスワードを知っている人のみ登録・解除できます（誰でも自由に登録できないようにするための制限です）。</div>
   </div>
   <!-- V0_154: 開発者モードを削除 -->
   <!-- V0_143: 下部のバージョン表示（旧#ver-label）は削除。表示はsp-header内の上部spanに一本化 -->
@@ -667,21 +667,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=110"></script>
-<script src="viewer.js?v=110"></script>
-<script src="utils.js?v=110"></script>
-<script src="ui.js?v=110"></script>
-<script src="dialog.js?v=110"></script>
-<script src="storage.js?v=110"></script>
-<script src="fonts/NotoSansJP.js?v=110"></script>
-<script src="export.js?v=110"></script>
-<script src="tool.js?v=110"></script>
-<script src="verify.js?v=110"></script>
+<script src="layer.js?v=111"></script>
+<script src="viewer.js?v=111"></script>
+<script src="utils.js?v=111"></script>
+<script src="ui.js?v=111"></script>
+<script src="dialog.js?v=111"></script>
+<script src="storage.js?v=111"></script>
+<script src="fonts/NotoSansJP.js?v=111"></script>
+<script src="export.js?v=111"></script>
+<script src="tool.js?v=111"></script>
+<script src="verify.js?v=111"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=110"></script>
+<script src="supabase-sync.js?v=111"></script>
 <script>
-const APP_VERSION = 'V1_10';
+const APP_VERSION = 'V1_11';
 
 // =========================================================
 // グローバル状態
@@ -1342,19 +1342,19 @@ document.getElementById('settingsBtn').addEventListener('click',()=>{
     var _st=_sbGetAuthStatus();
     _sbAuthStatus.textContent=(_st.mode==='user')?('現在: '+_st.name+' さんとして同期中'):'現在: 未登録（クラウド保存オフ・ローカル保存のみ）';
   }
-  // V1_10: 設定を開くたびに設定用パスワード欄をクリア（前回入力の残留防止）
+  // V1_10: 設定を開くたびに承認用パスワード欄をクリア（前回入力の残留防止）// V1_11: 呼称変更
   var _sbAdminEl=document.getElementById('sbAdminPass');
   if(_sbAdminEl) _sbAdminEl.value='';
 });
 // V1_10: クラウド同期の識別(氏名・合言葉)を誰でも自由に変更できないよう、
-// 設定用パスワードで登録・解除の操作を制限する（社内での誤操作・悪戯防止が
+// 承認用パスワードで登録・解除の操作を制限する（社内での誤操作・悪戯防止が
 // 目的の簡易的な制限であり、ページのソースを見れば分かるため厳密な秘匿では
-// ない旨はユーザーへ開示済み）
+// ない旨はユーザーへ開示済み）// V1_11: 「設定用パスワード」→「承認用パスワード」に呼称変更
 const _SB_ADMIN_PASS='1010';
 function _sbCheckAdminPass(){
   var _adminEl=document.getElementById('sbAdminPass');
   var ok=_adminEl&&_adminEl.value===_SB_ADMIN_PASS;
-  if(!ok) showGuide('設定用パスワードが違います',2000);
+  if(!ok) showGuide('承認用パスワードが違います',2000);
   return ok;
 }
 // V1_04: 氏名・合言葉を登録し、以後そのキーでクラウド同期する
