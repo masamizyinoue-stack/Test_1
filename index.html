@@ -130,6 +130,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   color:var(--accent);font-size:15px;cursor:pointer;text-align:left;width:calc(100% - 32px);
   -webkit-tap-highlight-color:transparent}
 #openFileBtnMain:active{background:rgba(46,204,113,.18)}
+/* V1_24: 「検索してファイルを開く」ボタン（フォルダインデックス検索）。#openFileBtnMainと
+   同じ箱サイズ（padding/border-radius/font-size/width）で並べ、役割の違いを色で示す */
+#openFileSearchBtnMain{display:flex;align-items:center;gap:12px;margin:0 16px 14px;padding:14px 16px;
+  background:rgba(0,212,255,.08);border:1.5px solid var(--border);border-radius:12px;
+  color:var(--text);font-size:15px;cursor:pointer;text-align:left;width:calc(100% - 32px);
+  -webkit-tap-highlight-color:transparent}
+#openFileSearchBtnMain:active{background:rgba(0,212,255,.18)}
 .sp-file-icon{font-size:26px;flex-shrink:0}
 .sp-section{padding:12px 16px;border-top:1px solid var(--border)}
 .sp-label{font-size:11px;color:var(--text-dim);margin-bottom:8px;
@@ -437,12 +444,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_23</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_24</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
     <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF 対応</small></span> <!-- V0_148.3: 表記のみ変更（機能は変更なし） -->
+  </button>
+  <!-- V1_24: 「ファイルを開く」の中で検索とネイティブ選択を両方行うのはわかりにくいとの
+       指摘を受け、検索してファイルを開く機能を別ボタンとして分離した -->
+  <button id="openFileSearchBtnMain">
+    <span class="sp-file-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+    <span>検索してファイルを開く<br><small style="font-size:12px;opacity:.7">フォルダをインデックス化して検索</small></span>
   </button>
   <div class="sp-section"> <!-- V1_12: 画面説明PDFを開くボタン -->
     <button id="screenGuideBtn" class="sp-action-btn">画面説明</button>
@@ -698,7 +711,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <div id="openFolderProgress"></div>
       <div style="display:flex;gap:4px;align-items:center"><input type="search" id="openFileSearchInput" placeholder="ファイル名で検索…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="openFileSearchClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button></div>
       <div id="openFileSearchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
-      <button id="openFileBtnNative" class="sp-action-btn">ネイティブのファイル選択を使う</button>
+      <!-- V1_24: ネイティブ選択は設定パネルの「ファイルを開く」ボタンに役割分離したため、
+           このパネル内の重複したフォールバックボタンは削除した -->
       <button id="openFileIndexClearBtn">インデックスをクリア</button>
     </div>
     <div id="openFileResultList" style="flex:1;overflow-y:auto"></div>
@@ -721,21 +735,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=123"></script>
-<script src="viewer.js?v=123"></script>
-<script src="utils.js?v=123"></script>
-<script src="ui.js?v=123"></script>
-<script src="dialog.js?v=123"></script>
-<script src="storage.js?v=123"></script>
-<script src="fonts/NotoSansJP.js?v=123"></script>
-<script src="export.js?v=123"></script>
-<script src="tool.js?v=123"></script>
-<script src="verify.js?v=123"></script>
+<script src="layer.js?v=124"></script>
+<script src="viewer.js?v=124"></script>
+<script src="utils.js?v=124"></script>
+<script src="ui.js?v=124"></script>
+<script src="dialog.js?v=124"></script>
+<script src="storage.js?v=124"></script>
+<script src="fonts/NotoSansJP.js?v=124"></script>
+<script src="export.js?v=124"></script>
+<script src="tool.js?v=124"></script>
+<script src="verify.js?v=124"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=123"></script>
+<script src="supabase-sync.js?v=124"></script>
 <script>
-const APP_VERSION = 'V1_23';
+const APP_VERSION = 'V1_24';
 
 // =========================================================
 // グローバル状態
@@ -1111,9 +1125,12 @@ function _fileKey(name,size){return name+'\x00'+size;}
 
 // ファイル
 const fileInput=document.getElementById('file');
-// V1_22: 「ファイルを開く」はまずインデックス検索パネルを開く（フォルダ未インデックス時は
-// パネル内の「ネイティブのファイル選択を使う」から従来通りfileInput.click()できる）
-document.getElementById('openFileBtnMain').addEventListener('click',()=>openOpenFilePanel());
+// V1_22で「ファイルを開く」をインデックス検索パネル経由に変更したが、検索と
+// ネイティブ選択が1つのボタンに同居してわかりにくいとの指摘を受け、
+// V1_24で元の単純なネイティブファイル選択に戻し、検索機能は別ボタン
+// (#openFileSearchBtnMain)に分離した
+document.getElementById('openFileBtnMain').addEventListener('click',()=>fileInput.click());
+document.getElementById('openFileSearchBtnMain').addEventListener('click',()=>openOpenFilePanel());
 // V1_12: 画面説明PDFを開く（アプリ本体とは別ファイル。書式・機能には影響しない）
 // V1_20: PWA単独起動時にwindow.openだと閉じるボタンの無いタブが開くことがあるため、
 // アプリ内オーバーレイ+専用閉じるボタン表示に変更
@@ -3909,14 +3926,21 @@ document.getElementById('searchInput').addEventListener('input',doSearch);
 
 // V0_100: IndexedDB 全図面検索 ───────────────────────────────────────
 var _IDB_NAME='dxfViewerDB', _IDB_VER=1, _IDB_STORE='dxfIndex';
+// V1_24: 「フォルダを選択してインデックス作成」実行中に落ちる不具合の修正。
+// 従来は_idbSave()を呼ぶたび（＝フォルダ内のファイル1件ごと）にindexedDB.open()で
+// 新しい接続を作っており、一度も閉じていなかった。数十〜数百件のフォルダを
+// インデックスすると同数の未クローズ接続が溜まり、WKWebView(PWA)のリソースを
+// 圧迫してクラッシュしていたと考えられる。接続を1つだけ作って使い回すように変更した
+var _idbConn=null;
 function _openIdb(cb){
+  if(_idbConn){cb(null,_idbConn);return;}
   var req=indexedDB.open(_IDB_NAME,_IDB_VER);
   req.onupgradeneeded=function(e){
     var db=e.target.result;
     if(!db.objectStoreNames.contains(_IDB_STORE))
       db.createObjectStore(_IDB_STORE,{keyPath:'name'});
   };
-  req.onsuccess=function(e){cb(null,e.target.result);};
+  req.onsuccess=function(e){_idbConn=e.target.result;cb(null,_idbConn);};
   req.onerror=function(e){cb(e.target.error,null);};
 }
 function _idbSave(name,buf,texts){
@@ -4187,10 +4211,6 @@ document.getElementById('openFileSearchInput').addEventListener('input',function
 document.getElementById('openFileSearchClearBtn').addEventListener('click',function(){
   document.getElementById('openFileSearchInput').value='';
   doOpenFileSearch();
-});
-document.getElementById('openFileBtnNative').addEventListener('click',function(){
-  closeOpenFilePanel();
-  fileInput.click();
 });
 document.getElementById('openFileIndexClearBtn').addEventListener('click',function(){
   if(confirm('検索インデックスを全て削除しますか？')){
