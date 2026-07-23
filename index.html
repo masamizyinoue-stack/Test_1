@@ -271,6 +271,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #openFileOverlay.open{display:block}
 #openFileBg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
 #openFilePanel{position:absolute;right:0;top:0;bottom:0;width:340px;max-width:88vw;background:var(--bg-panel);display:flex;flex-direction:column;overflow:hidden;z-index:1}
+/* V1_29: 「テキスト読込」ピック中の背景タップ通過（詳細は#searchOverlay.pickingのコメント参照） */
+#openFileOverlay.picking{pointer-events:none}
+#openFileOverlay.picking #openFilePanel{pointer-events:auto}
+#openFileOverlay.picking #openFileBg{background:rgba(0,0,0,.15)}
 #openFilePanel .sp-header{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 #openFilePanel .sp-title{font-size:15px;font-weight:600;color:var(--text);flex:1}
 #openFilePanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1}
@@ -463,7 +467,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_28</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_29</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -741,6 +745,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       </button>
       <div id="openFolderProgress"></div>
       <div style="display:flex;gap:4px;align-items:center"><input type="search" id="openFileSearchInput" placeholder="ファイル名・図面内の文字で検索…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="openFileSearchClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button></div>
+      <!-- V1_29: テキスト読込ボタン。押すと図面上の文字をタップして検索欄へ自動入力できる
+           （画面検索/全図面検索と同じ機能。検索欄の直下に配置） -->
+      <button id="openFileTextPickBtn" class="text-pick-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/></svg>
+        テキスト読込
+      </button>
       <div id="openFileSearchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
       <!-- V1_24: ネイティブ選択は設定パネルの「ファイルを開く」ボタンに役割分離したため、
            このパネル内の重複したフォールバックボタンは削除した -->
@@ -766,21 +776,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=128"></script>
-<script src="viewer.js?v=128"></script>
-<script src="utils.js?v=128"></script>
-<script src="ui.js?v=128"></script>
-<script src="dialog.js?v=128"></script>
-<script src="storage.js?v=128"></script>
-<script src="fonts/NotoSansJP.js?v=128"></script>
-<script src="export.js?v=128"></script>
-<script src="tool.js?v=128"></script>
-<script src="verify.js?v=128"></script>
+<script src="layer.js?v=129"></script>
+<script src="viewer.js?v=129"></script>
+<script src="utils.js?v=129"></script>
+<script src="ui.js?v=129"></script>
+<script src="dialog.js?v=129"></script>
+<script src="storage.js?v=129"></script>
+<script src="fonts/NotoSansJP.js?v=129"></script>
+<script src="export.js?v=129"></script>
+<script src="tool.js?v=129"></script>
+<script src="verify.js?v=129"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=128"></script>
+<script src="supabase-sync.js?v=129"></script>
 <script>
-const APP_VERSION = 'V1_28';
+const APP_VERSION = 'V1_29';
 
 // =========================================================
 // グローバル状態
@@ -3950,14 +3960,18 @@ function _setTextPickMode(target){
   _textPickTarget=target;
   var ov1=document.getElementById('searchOverlay');
   var ov2=document.getElementById('allSearchOverlay');
+  var ov3=document.getElementById('openFileOverlay'); // V1_29
   if(ov1) ov1.classList.toggle('picking', target==='screen');
   if(ov2) ov2.classList.toggle('picking', target==='all');
+  if(ov3) ov3.classList.toggle('picking', target==='openFile');
   if(target) showGuide('図面上の文字をタップしてください（もう一度ボタンを押すと中止）',0);
   else hideGuide();
   var b1=document.getElementById('screenTextPickBtn');
   var b2=document.getElementById('allTextPickBtn');
+  var b3=document.getElementById('openFileTextPickBtn'); // V1_29
   if(b1) b1.classList.toggle('picking', target==='screen');
   if(b2) b2.classList.toggle('picking', target==='all');
+  if(b3) b3.classList.toggle('picking', target==='openFile');
 }
 function _tapPickText(sx0,sy0){
   if(!doc||!doc.moji||doc.moji.length===0){showGuide('図面に文字がありません',2000);return;}
@@ -3997,6 +4011,9 @@ function _tapPickText(sx0,sy0){
   } else if(target==='all'){
     document.getElementById('allSearchInput').value=text;
     doAllSearch();
+  } else if(target==='openFile'){ // V1_29
+    document.getElementById('openFileSearchInput').value=text;
+    doOpenFileSearch();
   }
   showGuide('「'+text+'」を検索欄に入力しました',2200);
 }
@@ -4005,6 +4022,9 @@ document.getElementById('screenTextPickBtn').addEventListener('click',function()
 });
 document.getElementById('allTextPickBtn').addEventListener('click',function(){
   _setTextPickMode(_textPickTarget==='all'?null:'all');
+});
+document.getElementById('openFileTextPickBtn').addEventListener('click',function(){ // V1_29
+  _setTextPickMode(_textPickTarget==='openFile'?null:'openFile');
 });
 function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック処理を関数化）
   // DXFが開かれていたら再インデックス（念のため）
@@ -4262,7 +4282,7 @@ function openOpenFilePanel(){
   document.getElementById('openFileOverlay').classList.add('open');
   doOpenFileSearch();
 }
-function closeOpenFilePanel(){document.getElementById('openFileOverlay').classList.remove('open');}
+function closeOpenFilePanel(){document.getElementById('openFileOverlay').classList.remove('open');if(_textPickTarget==='openFile')_setTextPickMode(null);} // V1_29: パネルを閉じたらテキスト読込ピックモードも解除
 var _openFileSearchGen=0;
 var _openFileOpening=false; // V1_23: 開く処理の多重タップ防止
 // V1_23: bufを含まない軽量な一覧のみで表示・絞り込みを行い、タップされた1件だけ
