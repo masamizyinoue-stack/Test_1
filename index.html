@@ -467,7 +467,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_34</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_36</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -776,21 +776,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=134"></script>
-<script src="viewer.js?v=134"></script>
-<script src="utils.js?v=134"></script>
-<script src="ui.js?v=134"></script>
-<script src="dialog.js?v=134"></script>
-<script src="storage.js?v=134"></script>
-<script src="fonts/NotoSansJP.js?v=134"></script>
-<script src="export.js?v=134"></script>
-<script src="tool.js?v=134"></script>
-<script src="verify.js?v=134"></script>
+<script src="layer.js?v=136"></script>
+<script src="viewer.js?v=136"></script>
+<script src="utils.js?v=136"></script>
+<script src="ui.js?v=136"></script>
+<script src="dialog.js?v=136"></script>
+<script src="storage.js?v=136"></script>
+<script src="fonts/NotoSansJP.js?v=136"></script>
+<script src="export.js?v=136"></script>
+<script src="tool.js?v=136"></script>
+<script src="verify.js?v=136"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=134"></script>
+<script src="supabase-sync.js?v=136"></script>
 <script>
-const APP_VERSION = 'V1_34';
+const APP_VERSION = 'V1_36';
 
 // =========================================================
 // グローバル状態
@@ -4068,29 +4068,58 @@ function _openIdb(cb){
     if(!db.objectStoreNames.contains(_IDB_STORE))
       db.createObjectStore(_IDB_STORE,{keyPath:'name'});
   };
-  req.onsuccess=function(e){_idbConn=e.target.result;cb(null,_idbConn);};
+  req.onsuccess=function(e){
+    _idbConn=e.target.result;
+    // V1_36: 接続がブラウザ側で予期せず閉じられた場合にキャッシュを破棄し、
+    // 次回呼び出し時に自動で再接続できるようにする
+    _idbConn.onclose=function(){_idbConn=null;};
+    cb(null,_idbConn);
+  };
   req.onerror=function(e){cb(e.target.error,null);};
 }
-function _idbSave(name,buf,texts){
+// V1_36: 「同じフォルダを索引化すると初回は成功するが、2回目以降は全件エラーになる」
+// 「索引完了と表示されるのにキーワード検索が反応しない」という不具合の修正。
+// 原因はV1_24で導入した接続キャッシュ(_idbConn)が、大量ファイル処理後にブラウザ側
+// (WKWebView)によって無効化されることがあり、無効な接続のままdb.transaction()を
+// 呼ぶと例外が発生していたこと。この例外はprocessFolderFiles()側のtry/catchで
+// 「ファイル解析エラー」として誤ってカウントされてしまっていた。
+// ここでキャッシュ済み接続が無効かどうかを検知し、無効なら破棄して1回だけ
+// 再接続してから処理する共通ヘルパーに一本化した
+function _idbTx(mode,cb){
   _openIdb(function(err,db){
+    if(err){cb(err,null);return;}
+    try{
+      cb(null,db.transaction(_IDB_STORE,mode));
+    }catch(e){
+      _idbConn=null;
+      _openIdb(function(err2,db2){
+        if(err2){cb(err2,null);return;}
+        try{
+          cb(null,db2.transaction(_IDB_STORE,mode));
+        }catch(e2){
+          cb(e2,null);
+        }
+      });
+    }
+  });
+}
+function _idbSave(name,buf,texts){
+  _idbTx('readwrite',function(err,tx){
     if(err)return;
-    var tx=db.transaction(_IDB_STORE,'readwrite');
     tx.objectStore(_IDB_STORE).put({name:name,buf:buf,texts:texts,ts:Date.now()});
   });
 }
 function _idbGetAll(cb){
-  _openIdb(function(err,db){
+  _idbTx('readonly',function(err,tx){
     if(err){cb([]);return;}
-    var tx=db.transaction(_IDB_STORE,'readonly');
     var req=tx.objectStore(_IDB_STORE).getAll();
     req.onsuccess=function(e){cb(e.target.result||[]);};
     req.onerror=function(){cb([]);};
   });
 }
 function _idbClear(){
-  _openIdb(function(err,db){
+  _idbTx('readwrite',function(err,tx){
     if(err)return;
-    var tx=db.transaction(_IDB_STORE,'readwrite');
     tx.objectStore(_IDB_STORE).clear();
   });
 }
@@ -4101,9 +4130,8 @@ function _idbClear(){
 // V1_23: 開く時だけ1件分のbufを取得（全件同時読込を避け、必要な1ファイル分のみ
 // メモリに載せる）
 function _idbGetOne(name,cb){
-  _openIdb(function(err,db){
+  _idbTx('readonly',function(err,tx){
     if(err){cb(null);return;}
-    var tx=db.transaction(_IDB_STORE,'readonly');
     var req=tx.objectStore(_IDB_STORE).get(name);
     req.onsuccess=function(e){cb(e.target.result||null);};
     req.onerror=function(){cb(null);};
@@ -4117,10 +4145,9 @@ function _idbGetOne(name,cb){
 // 参照を残さない）、V1_23で修正した「全ファイルのbufを同時に保持し続けて重い・
 // 落ちる」問題を再発させない
 function _idbGetAllNameTexts(cb){
-  _openIdb(function(err,db){
+  _idbTx('readonly',function(err,tx){
     if(err){cb([]);return;}
     var out=[];
-    var tx=db.transaction(_IDB_STORE,'readonly');
     var req=tx.objectStore(_IDB_STORE).openCursor();
     req.onsuccess=function(e){
       var cursor=e.target.result;
@@ -4497,12 +4524,16 @@ function processFolderFiles(files, progEl, folderName){
   var total = files.length;
   var done = 0;
   var errors = 0;
+  var errorSamples=[]; // V1_35: エラー内容をユーザーに見せるため、代表的なメッセージを保持
   var fn = folderName ? '「'+folderName+'」' : ''; // V1_33: 進捗表示にフォルダ名を含める
   prog.textContent = (fn?fn+'を':'')+'準備中… (0 / ' + total + '件)';
   // 非同期で順番に処理
   function next(idx){
     if(idx >= total){
-      prog.textContent = (fn?fn+'の':'')+'インデックスが完了しました: ' + (total - errors) + '件' + (errors > 0 ? '（' + errors + '件エラー）' : '');
+      // V1_35: エラーがあった場合、原因がすぐ分かるよう代表的なエラー内容を併記する
+      // （従来はconsole.warnのみでユーザーからは原因が見えなかった）
+      var errMsg = errorSamples.length ? '（'+errors+'件エラー: '+errorSamples.join(' / ')+'）' : (errors>0?'（'+errors+'件エラー）':'');
+      prog.textContent = (fn?fn+'の':'')+'インデックスが完了しました: ' + (total - errors) + '件' + errMsg;
       if(folderName){ // V1_33: 次回パネルを開いた時のためにフォルダ名を保存
         _dxfIndexFolderName=folderName;
         try{localStorage.setItem('_dxfIndexFolderName',folderName);}catch(e){}
@@ -4531,6 +4562,8 @@ function processFolderFiles(files, progEl, folderName){
         done++;
       }catch(err){
         errors++;
+        var _emsg=(err&&err.message)?err.message:String(err);
+        if(errorSamples.length<3&&errorSamples.indexOf(_emsg)<0) errorSamples.push(_emsg); // V1_35
         console.warn('[FolderIndex] ' + f.name + ':', err.message);
       }
       setTimeout(function(){ next(idx + 1); }, 0);
