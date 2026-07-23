@@ -423,7 +423,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_17</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_19</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -670,21 +670,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=117"></script>
-<script src="viewer.js?v=117"></script>
-<script src="utils.js?v=117"></script>
-<script src="ui.js?v=117"></script>
-<script src="dialog.js?v=117"></script>
-<script src="storage.js?v=117"></script>
-<script src="fonts/NotoSansJP.js?v=117"></script>
-<script src="export.js?v=117"></script>
-<script src="tool.js?v=117"></script>
-<script src="verify.js?v=117"></script>
+<script src="layer.js?v=119"></script>
+<script src="viewer.js?v=119"></script>
+<script src="utils.js?v=119"></script>
+<script src="ui.js?v=119"></script>
+<script src="dialog.js?v=119"></script>
+<script src="storage.js?v=119"></script>
+<script src="fonts/NotoSansJP.js?v=119"></script>
+<script src="export.js?v=119"></script>
+<script src="tool.js?v=119"></script>
+<script src="verify.js?v=119"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=117"></script>
+<script src="supabase-sync.js?v=119"></script>
 <script>
-const APP_VERSION = 'V1_17';
+const APP_VERSION = 'V1_19';
 
 // =========================================================
 // グローバル状態
@@ -721,6 +721,8 @@ var dragImageStart=null;
 var isPen=false;
 var mouseDown=false,lastMX=0,lastMY=0,panning=false;
 var pinchDist=null,pinchMid=null;
+// V1_18: ダブルタップ全体表示用（パン中の単純タップのみ対象。詳細はtool.js touchend参照）
+var _tapStartTime=0,_tapStartX=0,_tapStartY=0,_lastTapTime=0,_lastTapX=0,_lastTapY=0;
 // ERASER_RADIUS_PX → tool.js
 
 // showGuide / hideGuide → ui.js
@@ -1652,8 +1654,9 @@ document.addEventListener('click',function(e){
 });
 // 初期表示（ページ読み込み時: スケッチが選択済み）
 updateToolColorDots();
-// ダブルタップ全体表示は削除（V0_80: 誤操作防止）
-// 全体表示は「全体」ボタン(fitBtn)のみで実行
+// V0_80: ダブルタップ全体表示は誤操作防止のため一旦廃止し「全体」ボタン(fitBtn)のみに限定していたが、
+// V1_18でユーザー要望により復活。tool.js touchendでパン中の単純タップに限定して判定し、
+// 描画・計測ツール操作中は対象外にすることで誤操作を防いでいる
 // 2本指パンと競合するため2本指タップUndoは廃止 → ↩ボタンで操作
 // viewmemo初期状態
 [0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_76: 5スロット対応
