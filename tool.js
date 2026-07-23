@@ -393,9 +393,17 @@ ov.addEventListener('touchend',e=>{
     // V1_18: ダブルタップ全体表示（V0_80で誤操作防止のため一旦廃止したが再要望により復活）。
     // パン中(panning===true)の単純タップに限定して判定することで、描画・計測ツール
     // 操作中（DIM/LP/LL/sketch/SW等）の誤爆は起きない設計にしている
+    // V1_34: DIM/LP/LLはツールボタンを選ぶと即座にactive=trueになる仕様のため、
+    // 「ツールを選んだだけでまだ何も点を拾っていない(phase===0)」段階まで一律で
+    // ダブルタップ全体表示を禁止すると、例えば「2線間」を選んだだけの状態でも
+    // 全体表示できなくなってしまっていた。実際に誤操作防止が必要なのは「計測が
+    // 進行中（1本目の線や1点目を選択済み＝phase>0）」の場合のみのため、
+    // phase>0の時だけダブルタップ全体表示を禁止するよう条件を絞り込んだ
     if(!isPen&&panning
         &&!sketching&&!(window.SW&&window.SW.active)
-        &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)&&!(window.LL&&window.LL.active)
+        &&!(window.DIM&&window.DIM.active&&window.DIM.phase>0)
+        &&!(window.LP&&window.LP.active&&window.LP.phase>0)
+        &&!(window.LL&&window.LL.active&&window.LL.phase>0)
         &&_tapStartTime){
       var _tapDt=Date.now()-_tapStartTime;
       var _tapDd=Math.hypot(lastMX-_tapStartX,lastMY-_tapStartY);
