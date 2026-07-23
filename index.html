@@ -37,17 +37,8 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   display:flex;align-items:center;gap:6px;padding:0 10px;position:relative;z-index:10;flex-shrink:0;
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none} /* V0_159: コマンドが収まらない場合は横スライドで全て選択可能に */
 .topbar::-webkit-scrollbar{display:none}
-#searchMenuPopup{display:none;position:fixed;top:0;left:0;background:var(--topbar-bg);
-  border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.5);
-  z-index:2000;min-width:150px} /* V0_159.1: .topbarのoverflow-y:hiddenでポップアップが
-  非表示になるバグを修正。absolute→fixedにし、topbarのクリッピングの影響を受けないようにした */
-#searchMenuPopup.open{display:flex;flex-direction:column}
-#searchMenuPopup button{display:flex;align-items:center;gap:8px;background:transparent;border:none;
-  color:var(--text);font-size:13px;padding:11px 14px;cursor:pointer;text-align:left;white-space:nowrap;
-  -webkit-tap-highlight-color:transparent}
-#searchMenuPopup button:active{background:rgba(255,255,255,.1)}
-#searchMenuPopup button+button{border-top:1px solid var(--border)}
-#searchMenuBtn.active{background:rgba(0,212,255,0.22);border-color:#00d4ff;color:#00d4ff} /* V0_159 */
+/* V1_38: フォルダ検索は「検索してファイルを開く」と機能が重複するため廃止。
+   検索ボタンは画面検索の単独ボタンとなったため、選択メニュー用CSS(#searchMenuPopup等)は削除した */
 .logo-block{display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex-shrink:0;padding:0 4px;max-width:150px;min-width:0}
 .logo-text{font-size:17px;font-weight:700;color:var(--accent);line-height:1.2;white-space:nowrap}
 .logo-sub{font-size:10px;color:var(--text-dim);white-space:nowrap}
@@ -407,23 +398,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/><line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="12" y1="15" x2="12" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="8" y1="19" x2="8" y2="19.01"/><line x1="12" y1="19" x2="12" y2="19.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>
 </button>
   <div class="tb-sep"></div>
-  <!-- V0_159: 「画面検索」「フォルダ検索」を「検索」ボタン+選択メニューに統合 -->
-  <div class="search-menu-wrap" style="position:relative">
-  <button class="tb-btn" id="searchMenuBtn" title="検索">
-  <span class="tb-tool-label">検索</span>
+  <!-- V1_38: フォルダ検索は「検索してファイルを開く」と重複するため削除。
+       検索ボタンは画面検索専用の単独ボタンに変更（旧V0_159の選択メニューを廃止） -->
+  <button class="tb-btn" id="searchMenuBtn" title="画面検索">
+  <span class="tb-tool-label">画面検索</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 </button>
-  <div id="searchMenuPopup">
-    <button id="searchMenuItemScreen">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      画面検索
-    </button>
-    <button id="searchMenuItemFolder">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/><line x1="10" y1="7" x2="10" y2="13"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
-      フォルダ検索
-    </button>
-  </div>
-  </div>
   <!-- V0_147: スクショボタン削除 / V0_154: PDF書出ボタンは設定パネルへ移動 -->
   <button class="tb-btn" id="writeBackupBtn" title="書込みデータをバックアップ保存（.dxfview）"> <!-- V0_136: 書込バックアップボタン -->
   <span class="tb-tool-label">書込バックアップ</span>
@@ -467,7 +447,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_37</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_39</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -776,21 +756,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=137"></script>
-<script src="viewer.js?v=137"></script>
-<script src="utils.js?v=137"></script>
-<script src="ui.js?v=137"></script>
-<script src="dialog.js?v=137"></script>
-<script src="storage.js?v=137"></script>
-<script src="fonts/NotoSansJP.js?v=137"></script>
-<script src="export.js?v=137"></script>
-<script src="tool.js?v=137"></script>
-<script src="verify.js?v=137"></script>
+<script src="layer.js?v=139"></script>
+<script src="viewer.js?v=139"></script>
+<script src="utils.js?v=139"></script>
+<script src="ui.js?v=139"></script>
+<script src="dialog.js?v=139"></script>
+<script src="storage.js?v=139"></script>
+<script src="fonts/NotoSansJP.js?v=139"></script>
+<script src="export.js?v=139"></script>
+<script src="tool.js?v=139"></script>
+<script src="verify.js?v=139"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=137"></script>
+<script src="supabase-sync.js?v=139"></script>
 <script>
-const APP_VERSION = 'V1_37';
+const APP_VERSION = 'V1_39';
 
 // =========================================================
 // グローバル状態
@@ -1309,7 +1289,14 @@ function switchToFile(idx){
   if(typeof buildLayerModal==='function') buildLayerModal();
   if(typeof buildSnapCache==='function') buildSnapCache();
   if(typeof checkPerfMode==='function') checkPerfMode();
-  fit(); scheduleDraw(); scheduleOverlay();buildSearchIndex();
+  // V1_39: タブ切替時に、そのタブの前回の表示状態（拡大率・位置）を復元する。
+  // 従来はここで無条件にfit()を呼んでいたため、Aを拡大表示→Bを開く→Aに戻る、
+  // という操作でAの拡大表示が失われ全体表示にリセットされてしまっていた。
+  // 保存済みのscaleがあればtx/ty/scale/fitScaleを復元し、初回表示等でまだ
+  // 記録が無い場合のみ従来通りfit()する
+  if(typeof f.scale==='number'){tx=f.tx||0;ty=f.ty||0;scale=f.scale;if(f.fitScale)fitScale=f.fitScale;}
+  else fit();
+  scheduleDraw(); scheduleOverlay();buildSearchIndex();
   updateFileNameDisplay(); scheduleSave();
   var ppc=document.getElementById('pdfPageCtrl');
   if(ppc) ppc.style.display=pdfDoc?'':'none';
@@ -4451,43 +4438,14 @@ document.getElementById('openFileIndexClearBtn').addEventListener('click',functi
     document.getElementById('allSearchCount').textContent='インデックスをクリアしました';
   }
 });
-// V0_159: 「画面検索」「フォルダ検索」を「検索」ボタン配下のポップアップメニューに統合
+// V1_38: フォルダ検索は「検索してファイルを開く」と重複するため削除。
+// 検索ボタンは画面検索専用となったため、選択メニュー(V0_159)は廃止し直接
+// openScreenSearch()を呼ぶだけのシンプルなボタンにした
 (function(){
   var menuBtn=document.getElementById('searchMenuBtn');
-  var popup=document.getElementById('searchMenuPopup');
-  if(!menuBtn||!popup) return;
-  function closeMenu(){popup.classList.remove('open');menuBtn.classList.remove('active');}
-  function toggleMenu(e){
-    e.stopPropagation();
-    var willOpen=!popup.classList.contains('open');
-    if(willOpen){
-      // V0_159.1: position:fixedのポップアップをボタン直下に配置（topbarのoverflow-y:hiddenで
-      // 隠れてしまうバグの修正。開くたびにボタンの実座標を取得して都度位置決めする）
-      var r=menuBtn.getBoundingClientRect();
-      popup.style.top=(r.bottom+6)+'px';
-      popup.style.left=r.left+'px'; // 仮配置（実幅が分かってから下でV1_32補正）
-      popup.classList.add('open');menuBtn.classList.add('active');
-      // V1_32: 検索ボタンが画面右寄りにある場合（長いファイル名でツールバーの
-      // レイアウトが変わる場合等）、ポップアップの右端が画面からはみ出す不具合を修正。
-      // 'open'クラス付与後の実幅(offsetWidth)を測ってから、画面右端をはみ出さない
-      // 位置に補正する（左端もはみ出さないよう下限も設ける）
-      var margin=8;
-      var pw=popup.offsetWidth;
-      var maxLeft=window.innerWidth-pw-margin;
-      var left=Math.min(r.left,maxLeft);
-      if(left<margin) left=margin;
-      popup.style.left=left+'px';
-    } else closeMenu();
-  }
-  menuBtn.addEventListener('click',toggleMenu);
-  document.getElementById('searchMenuItemScreen').addEventListener('click',function(e){
-    e.stopPropagation();closeMenu();openScreenSearch();
-  });
-  document.getElementById('searchMenuItemFolder').addEventListener('click',function(e){
-    e.stopPropagation();closeMenu();openAllSearchPanel();
-  });
-  document.addEventListener('click',function(e){
-    if(popup.classList.contains('open')&&!popup.contains(e.target)&&e.target!==menuBtn) closeMenu();
+  if(!menuBtn) return;
+  menuBtn.addEventListener('click',function(e){
+    e.stopPropagation();openScreenSearch();
   });
 })();
 function closeAllSearch(){document.getElementById('allSearchOverlay').classList.remove('open');if(_textPickTarget==='all')_setTextPickMode(null);} // V1_27: パネルを閉じたらテキスト読込ピックモードも解除
