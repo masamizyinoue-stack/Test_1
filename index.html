@@ -467,7 +467,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_36</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_37</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -776,21 +776,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=136"></script>
-<script src="viewer.js?v=136"></script>
-<script src="utils.js?v=136"></script>
-<script src="ui.js?v=136"></script>
-<script src="dialog.js?v=136"></script>
-<script src="storage.js?v=136"></script>
-<script src="fonts/NotoSansJP.js?v=136"></script>
-<script src="export.js?v=136"></script>
-<script src="tool.js?v=136"></script>
-<script src="verify.js?v=136"></script>
+<script src="layer.js?v=137"></script>
+<script src="viewer.js?v=137"></script>
+<script src="utils.js?v=137"></script>
+<script src="ui.js?v=137"></script>
+<script src="dialog.js?v=137"></script>
+<script src="storage.js?v=137"></script>
+<script src="fonts/NotoSansJP.js?v=137"></script>
+<script src="export.js?v=137"></script>
+<script src="tool.js?v=137"></script>
+<script src="verify.js?v=137"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=136"></script>
+<script src="supabase-sync.js?v=137"></script>
 <script>
-const APP_VERSION = 'V1_36';
+const APP_VERSION = 'V1_37';
 
 // =========================================================
 // グローバル状態
@@ -4106,7 +4106,22 @@ function _idbTx(mode,cb){
 function _idbSave(name,buf,texts){
   _idbTx('readwrite',function(err,tx){
     if(err)return;
-    tx.objectStore(_IDB_STORE).put({name:name,buf:buf,texts:texts,ts:Date.now()});
+    var req=tx.objectStore(_IDB_STORE).put({name:name,buf:buf,texts:texts,ts:Date.now()});
+    // V1_37: put()自体が失敗した場合（データ破損・容量超過等）に気づけるよう
+    // コンソールへ記録する。processFolderFiles()の成功/失敗カウントには
+    // 影響させない（従来通り解析成功時点でdone扱いとする）
+    req.onerror=function(e){console.warn('[_idbSave] 保存失敗:',name,e.target.error);};
+  });
+}
+// V1_37: 「前回のインデックス対象フォルダ」表示が、実際にインデックス済みなのか
+// 単に前回試みたフォルダ名を覚えているだけなのか分かりにくいとの指摘を受けて
+// 追加。実際にIndexedDBへ保存されている件数を数える
+function _idbCount(cb){
+  _idbTx('readonly',function(err,tx){
+    if(err){cb(0);return;}
+    var req=tx.objectStore(_IDB_STORE).count();
+    req.onsuccess=function(e){cb(e.target.result||0);};
+    req.onerror=function(){cb(0);};
   });
 }
 function _idbGetAll(cb){
@@ -4167,8 +4182,19 @@ function openAllSearchPanel(){
   document.getElementById('allSearchOverlay').classList.add('open');
   // V1_33: 進捗表示が空（インデックス処理中・完了直後の表示が残っていない）場合は
   // 直近にインデックスしたフォルダ名を表示し、どのフォルダの索引か分かるようにする
+  // V1_37: 「前回のインデックス対象フォルダ」という表示だと、実際に保存済みなのか
+  // 単に前回試みたフォルダ名を覚えているだけなのか分かりにくいとの指摘のため、
+  // 実際にIndexedDBへ保存されている件数を調べて表示するよう変更した
   var prog=document.getElementById('folderProgress');
-  if(prog&&!prog.textContent&&_dxfIndexFolderName) prog.textContent='前回のインデックス対象フォルダ: 「'+_dxfIndexFolderName+'」';
+  if(prog&&!prog.textContent&&_dxfIndexFolderName){
+    var _fn=_dxfIndexFolderName;
+    _idbCount(function(n){
+      if(prog.textContent) return; // 表示中に他の処理が進捗を書き換えていたら上書きしない
+      prog.textContent = n>0
+        ? 'インデックス済み: 「'+_fn+'」（'+n+'件 保存済み）'
+        : '「'+_fn+'」のインデックスは保存されていません。再度インデックス作成してください';
+    });
+  }
   var inp=document.getElementById('allSearchInput');
   if(inp.value.trim()) doAllSearch();
   setTimeout(function(){inp.focus();},120);
@@ -4322,8 +4348,17 @@ async function openDxfFromDb(name,buf,keyword){
 function openOpenFilePanel(){
   document.getElementById('openFileOverlay').classList.add('open');
   // V1_33: 進捗表示が空の場合は直近にインデックスしたフォルダ名を表示する
+  // V1_37: 実際の保存件数を調べて表示するよう変更（詳細はopenAllSearchPanel参照）
   var oprog=document.getElementById('openFolderProgress');
-  if(oprog&&!oprog.textContent&&_dxfIndexFolderName) oprog.textContent='前回のインデックス対象フォルダ: 「'+_dxfIndexFolderName+'」';
+  if(oprog&&!oprog.textContent&&_dxfIndexFolderName){
+    var _fn2=_dxfIndexFolderName;
+    _idbCount(function(n){
+      if(oprog.textContent) return;
+      oprog.textContent = n>0
+        ? 'インデックス済み: 「'+_fn2+'」（'+n+'件 保存済み）'
+        : '「'+_fn2+'」のインデックスは保存されていません。再度インデックス作成してください';
+    });
+  }
   doOpenFileSearch();
 }
 function closeOpenFilePanel(){document.getElementById('openFileOverlay').classList.remove('open');if(_textPickTarget==='openFile')_setTextPickMode(null);} // V1_29: パネルを閉じたらテキスト読込ピックモードも解除
