@@ -447,7 +447,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_39</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_40</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -756,21 +756,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=139"></script>
-<script src="viewer.js?v=139"></script>
-<script src="utils.js?v=139"></script>
-<script src="ui.js?v=139"></script>
-<script src="dialog.js?v=139"></script>
-<script src="storage.js?v=139"></script>
-<script src="fonts/NotoSansJP.js?v=139"></script>
-<script src="export.js?v=139"></script>
-<script src="tool.js?v=139"></script>
-<script src="verify.js?v=139"></script>
+<script src="layer.js?v=140"></script>
+<script src="viewer.js?v=140"></script>
+<script src="utils.js?v=140"></script>
+<script src="ui.js?v=140"></script>
+<script src="dialog.js?v=140"></script>
+<script src="storage.js?v=140"></script>
+<script src="fonts/NotoSansJP.js?v=140"></script>
+<script src="export.js?v=140"></script>
+<script src="tool.js?v=140"></script>
+<script src="verify.js?v=140"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=139"></script>
+<script src="supabase-sync.js?v=140"></script>
 <script>
-const APP_VERSION = 'V1_39';
+const APP_VERSION = 'V1_40';
 
 // =========================================================
 // グローバル状態
@@ -1174,6 +1174,12 @@ document.getElementById('screenGuideBtn').addEventListener('click',()=>{
 document.getElementById('screenGuideCloseBtn').addEventListener('click',()=>{
   document.getElementById('screenGuideOverlay').style.display='none';
 });
+// V1_40: ファイルを開く処理はparseDXF/PDF読込・IndexedDB復元・Supabase復元と
+// 複数のawaitをまたぐ非同期処理で、その途中でタブ切替やタブを閉じる操作を
+// 行うと、進行中の読込処理が完了した際に別タブのdoc/strokes/dims等を誤って
+// 上書きしてしまう競合状態(race condition)がありえた。ファイルを開いている間は
+// タブ切替・タブを閉じる操作をブロックする共通フラグを追加した
+var _isOpeningFileBusy=false;
 fileInput.addEventListener('change',async e=>{
   const f=e.target.files[0];if(!f)return;
   // V0_148: 同名ファイルの二重オープン防止（気付かず2つ開いて別々に書き込む事故を防ぐ）
@@ -1186,10 +1192,15 @@ fileInput.addEventListener('change',async e=>{
     e.target.value='';
     return;
   }}
+  if(_isOpeningFileBusy){e.target.value='';return;} // V1_40: 多重実行防止
+  _isOpeningFileBusy=true;
+  try{
   verify('fileInput.change:start');
   resetToolStates(); // V0_139: ファイル切替時に計測ツール状態をリセット
   // V0_140: saveCurrentFileState廃止 → 前ファイルのviewport状態をinline同期
-  if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140fi=openFiles[currentFileIdx];_pf140fi.tx=tx;_pf140fi.ty=ty;_pf140fi.scale=scale;_pf140fi.fitScale=fitScale;_pf140fi.hiddenLayersArr=Array.from(hiddenLayers);}
+  // V1_40: PDFタブの表示内容(pdfDoc/pdfImage/pdfPageNum)もここで退避しないと、
+  // 別ファイルを開いた後にこのタブへ戻った際PDFが消えてしまうため追加
+  if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140fi=openFiles[currentFileIdx];_pf140fi.tx=tx;_pf140fi.ty=ty;_pf140fi.scale=scale;_pf140fi.fitScale=fitScale;_pf140fi.hiddenLayersArr=Array.from(hiddenLayers);_pf140fi.pdfDoc=pdfDoc;_pf140fi.pdfImage=pdfImage;_pf140fi.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
   currentFileName=f.name;
   const buf=await f.arrayBuffer();
   doc=null;pdfDoc=null;pdfImage=null;
@@ -1234,10 +1245,13 @@ fileInput.addEventListener('change',async e=>{
   // V0_119: fileKeyベースで同名異サイズを別タブとして管理
   if(currentFileIdx<0){openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=0;}else{var _xi=openFiles.findIndex(function(x){return x.fileKey===_fileKey(f.name,f.size);});if(_xi>=0){currentFileIdx=_xi;}else{openFiles.push({name:f.name,fileKey:_fileKey(f.name,f.size)});currentFileIdx=openFiles.length-1;}}openFilesBufs[currentFileIdx]=buf;
   // V0_140: saveCurrentFileState()削除 → strokes/dims/images/savedViewsをopenFiles[]に参照として設定
-  {var _nf140=openFiles[currentFileIdx];_nf140.strokes=strokes;_nf140.dims=dims;_nf140.images=typeof images!=='undefined'?images:[];_nf140.savedViews=savedViews;_nf140.doc=doc;_nf140.hiddenLayersArr=Array.from(hiddenLayers);_nf140.tx=tx;_nf140.ty=ty;_nf140.scale=scale;_nf140.fitScale=fitScale;_nf140.currentFileName=currentFileName;_nf140.fileSize=currentFileSize;}
+  // V1_40: PDFを開いた場合、pdfDoc/pdfImage/pdfPageNumがopenFiles[]に一度も
+  // 保存されていなかったため、このタブから他タブへ移動して戻ると必ずPDFが
+  // 消えてしまう不具合があった。ここで初回登録時に保存するようにした
+  {var _nf140=openFiles[currentFileIdx];_nf140.strokes=strokes;_nf140.dims=dims;_nf140.images=typeof images!=='undefined'?images:[];_nf140.savedViews=savedViews;_nf140.doc=doc;_nf140.hiddenLayersArr=Array.from(hiddenLayers);_nf140.tx=tx;_nf140.ty=ty;_nf140.scale=scale;_nf140.fitScale=fitScale;_nf140.currentFileName=currentFileName;_nf140.fileSize=currentFileSize;_nf140.pdfDoc=pdfDoc;_nf140.pdfImage=pdfImage;_nf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
   updateFileNavUI();// V0_112
   verify('fileInput.change:done');
-  e.target.value='';
+  }finally{_isOpeningFileBusy=false;e.target.value='';} // V1_40
 });
 
 // V0_93: マルチファイル管理 ─────────────────────────────────────
@@ -1270,6 +1284,7 @@ function switchToFile(idx){
     _prevF.tx=tx;_prevF.ty=ty;_prevF.scale=scale;_prevF.fitScale=fitScale;
     var _pn2=1;try{if(typeof pdfPageNum!=='undefined')_pn2=pdfPageNum;}catch(e){}
     _prevF.pdfPageNum=_pn2;
+    _prevF.pdfDoc=pdfDoc;_prevF.pdfImage=pdfImage; // V1_40: PDF内容も退避
     _prevF.hiddenLayersArr=Array.from(hiddenLayers);
   }
   currentFileIdx=idx;
@@ -1331,10 +1346,10 @@ function updateFileNavUI(){
       var close=document.createElement('button');
       close.className='tab-close';
       close.textContent='✕';
-      close.addEventListener('click',function(e){e.stopPropagation();closeTab(idx);});
+      close.addEventListener('click',function(e){e.stopPropagation();if(_isOpeningFileBusy)return;closeTab(idx);}); // V1_40: 読込中は操作不可
       item.appendChild(name);
       item.appendChild(close);
-      item.addEventListener('click',function(){if(idx!==currentFileIdx) switchToFile(idx);});
+      item.addEventListener('click',function(){if(_isOpeningFileBusy)return;if(idx!==currentFileIdx) switchToFile(idx);}); // V1_40: 読込中は操作不可
       bar.appendChild(item);
     })(order[k]);
   }
@@ -1399,7 +1414,9 @@ function closeTab(idx){
 function doCloseTab(idx){
   verify('doCloseTab',{idx:idx,currentFileIdx:currentFileIdx});
   // V0_140: saveCurrentFileState廃止 → viewport状態のみinline同期
-  if(idx!==currentFileIdx&&currentFileIdx>=0&&currentFileIdx<openFiles.length){var _cv140=openFiles[currentFileIdx];_cv140.tx=tx;_cv140.ty=ty;_cv140.scale=scale;_cv140.fitScale=fitScale;_cv140.hiddenLayersArr=Array.from(hiddenLayers);}
+  // V1_40: 別タブを閉じる際も現在表示中タブのpdfDoc/pdfImage/pdfPageNumを
+  // 退避する（無いとPDF表示中に他タブを閉じただけでPDFが消える不具合があった）
+  if(idx!==currentFileIdx&&currentFileIdx>=0&&currentFileIdx<openFiles.length){var _cv140=openFiles[currentFileIdx];_cv140.tx=tx;_cv140.ty=ty;_cv140.scale=scale;_cv140.fitScale=fitScale;_cv140.hiddenLayersArr=Array.from(hiddenLayers);_cv140.pdfDoc=pdfDoc;_cv140.pdfImage=pdfImage;_cv140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
   // V0_160.1: 閉じるファイルを参照している記憶(savedViews)スロットをリセットする
   // （savedViewsはV0_160でファイル横断のグローバル項目になったため、記憶元ファイルが
   // 閉じられたまま残ると「表示」を押した時に必ず「開かれていません」となってしまう）
@@ -4226,6 +4243,12 @@ function doAllSearch(){
 // ・F-2: 既存タブ時はstrokes/dims/images/savedViewsを上書きせず保持
 // ・F-3: findIndexをfileKeyベースに変更（同名異サイズ問題を修正）
 async function openDxfFromDb(name,buf,keyword){
+  // V1_40: fileInput側と同じ「ファイルを開いている最中はタブ切替・新規オープンを
+  // ブロックする」フラグ。検索結果を連続タップした場合や、読込中にタブを
+  // 切替えた場合に、非同期処理完了時に別タブのdoc/strokes/dimsを誤って
+  // 上書きする競合状態を防ぐ
+  if(_isOpeningFileBusy) return;
+  _isOpeningFileBusy=true;
   verify('openDxfFromDb:before',{name:name});
   try{
     // V0_148: 同名ファイルの二重オープン防止
@@ -4328,7 +4351,7 @@ async function openDxfFromDb(name,buf,keyword){
     var _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';
     // マークポップアップ（V0_104）
     var _mp=document.getElementById('markPopup');if(_mp){if(_searchMarks.length>0)_mp.classList.add('visible');else _mp.classList.remove('visible');}
-  }catch(err){alert('図面を開けません: '+err.message);}
+  }catch(err){alert('図面を開けません: '+err.message);}finally{_isOpeningFileBusy=false;} // V1_40
 }
 // V1_22: 「ファイルを開く」フォルダインデックス検索パネル（全図面検索(V0_100〜)と同じ
 // dxfIndex(IndexedDB)を共有し、ファイル名で絞り込んで開けるようにしたもの）
