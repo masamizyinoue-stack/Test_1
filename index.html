@@ -444,7 +444,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_24</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_25</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -709,7 +709,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         フォルダを選択してインデックス作成
       </button>
       <div id="openFolderProgress"></div>
-      <div style="display:flex;gap:4px;align-items:center"><input type="search" id="openFileSearchInput" placeholder="ファイル名で検索…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="openFileSearchClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button></div>
+      <div style="display:flex;gap:4px;align-items:center"><input type="search" id="openFileSearchInput" placeholder="ファイル名・図面内の文字で検索…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="openFileSearchClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button></div>
       <div id="openFileSearchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
       <!-- V1_24: ネイティブ選択は設定パネルの「ファイルを開く」ボタンに役割分離したため、
            このパネル内の重複したフォールバックボタンは削除した -->
@@ -735,21 +735,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=124"></script>
-<script src="viewer.js?v=124"></script>
-<script src="utils.js?v=124"></script>
-<script src="ui.js?v=124"></script>
-<script src="dialog.js?v=124"></script>
-<script src="storage.js?v=124"></script>
-<script src="fonts/NotoSansJP.js?v=124"></script>
-<script src="export.js?v=124"></script>
-<script src="tool.js?v=124"></script>
-<script src="verify.js?v=124"></script>
+<script src="layer.js?v=125"></script>
+<script src="viewer.js?v=125"></script>
+<script src="utils.js?v=125"></script>
+<script src="ui.js?v=125"></script>
+<script src="dialog.js?v=125"></script>
+<script src="storage.js?v=125"></script>
+<script src="fonts/NotoSansJP.js?v=125"></script>
+<script src="export.js?v=125"></script>
+<script src="tool.js?v=125"></script>
+<script src="verify.js?v=125"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=124"></script>
+<script src="supabase-sync.js?v=125"></script>
 <script>
-const APP_VERSION = 'V1_24';
+const APP_VERSION = 'V1_25';
 
 // =========================================================
 // グローバル状態
@@ -3966,21 +3966,10 @@ function _idbClear(){
     tx.objectStore(_IDB_STORE).clear();
   });
 }
-// V1_23: 「ファイルを開く」パネルの不安定・重い・落ちる不具合の修正で追加。
-// _idbGetAll()は各レコードのbuf(ArrayBuffer実データ)まで全件メモリに読み込むため、
-// ファイル名一覧を出すだけの目的には過剰に重く、索引件数やファイルサイズが多いと
-// 検索欄に1文字打つたびに大量のバイナリを再読込してWKWebViewのメモリを圧迫し、
-// 不安定化・クラッシュの原因になっていた。getAllKeys()はbufを一切読み込まない
-// 軽量なキー(＝ファイル名)一覧のみ取得するため、一覧表示・絞り込みにはこちらを使う
-function _idbGetAllNames(cb){
-  _openIdb(function(err,db){
-    if(err){cb([]);return;}
-    var tx=db.transaction(_IDB_STORE,'readonly');
-    var req=tx.objectStore(_IDB_STORE).getAllKeys();
-    req.onsuccess=function(e){cb(e.target.result||[]);};
-    req.onerror=function(){cb([]);};
-  });
-}
+// V1_23: 「ファイルを開く」パネルの不安定・重い・落ちる不具合の修正で追加した
+// 軽量なファイル名一覧取得（getAllKeys()、bufを一切読み込まない）。
+// V1_25: 図面内の文字も検索対象にする際、texts[]も併せて軽量に取得できる
+// _idbGetAllNameTexts()（下記）に一本化したため、こちらは使用箇所がなくなり削除した。
 // V1_23: 開く時だけ1件分のbufを取得（全件同時読込を避け、必要な1ファイル分のみ
 // メモリに載せる）
 function _idbGetOne(name,cb){
@@ -3990,6 +3979,32 @@ function _idbGetOne(name,cb){
     var req=tx.objectStore(_IDB_STORE).get(name);
     req.onsuccess=function(e){cb(e.target.result||null);};
     req.onerror=function(){cb(null);};
+  });
+}
+// V1_25: 「検索してファイルを開く」でファイル名だけでなく図面内の文字も検索対象に
+// してほしいとの要望で追加。_idbGetAll()のようにgetAll()で全件のbufを含む完全な
+// レコードを一度にメモリへ載せるのではなく、カーソルで1件ずつ読みながら{name,
+// texts,ts}だけを取り出して積み上げる方式にしている。カーソル走査中は各レコードの
+// bufも一時的にデシリアライズされるが、そのレコード自体を保持しないため（v.bufへ
+// 参照を残さない）、V1_23で修正した「全ファイルのbufを同時に保持し続けて重い・
+// 落ちる」問題を再発させない
+function _idbGetAllNameTexts(cb){
+  _openIdb(function(err,db){
+    if(err){cb([]);return;}
+    var out=[];
+    var tx=db.transaction(_IDB_STORE,'readonly');
+    var req=tx.objectStore(_IDB_STORE).openCursor();
+    req.onsuccess=function(e){
+      var cursor=e.target.result;
+      if(cursor){
+        var v=cursor.value;
+        out.push({name:v.name,texts:v.texts||[],ts:v.ts||0});
+        cursor.continue();
+      } else {
+        cb(out);
+      }
+    };
+    req.onerror=function(){cb(out);};
   });
 }
 
@@ -4152,18 +4167,21 @@ function openOpenFilePanel(){
 function closeOpenFilePanel(){document.getElementById('openFileOverlay').classList.remove('open');}
 var _openFileSearchGen=0;
 var _openFileOpening=false; // V1_23: 開く処理の多重タップ防止
-// V1_23: bufを含まない軽量なファイル名一覧(_idbGetAllNames)のみで一覧・絞り込みを
-// 行い、タップされた1件だけ_idbGetOneでbufを取得して開く方式に変更（不安定・重い・
-// 落ちる不具合の修正。詳細は_idbGetAllNames定義部のコメント参照）
+// V1_23: bufを含まない軽量な一覧のみで表示・絞り込みを行い、タップされた1件だけ
+// _idbGetOneでbufを取得して開く方式（不安定・重い・落ちる不具合の修正）。
+// V1_25: ファイル名だけでなく図面内の文字（全図面検索と同じtexts[]）も検索対象に
+// 追加。一覧取得は_idbGetAllNameTexts()（bufを保持しない軽量版）を使うため、
+// V1_23で修正した「全ファイルのbufを同時に読み込んで重い・落ちる」問題は
+// 再発しない
 function doOpenFileSearch(){
   var gen=++_openFileSearchGen;
   var kw=document.getElementById('openFileSearchInput').value.trim().toLowerCase();
   var list=document.getElementById('openFileResultList');
   var cnt=document.getElementById('openFileSearchCount');
-  _idbGetAllNames(function(names){
+  _idbGetAllNameTexts(function(records){
     if(gen!==_openFileSearchGen) return;
     list.innerHTML='';
-    if(names.length===0){
+    if(records.length===0){
       cnt.textContent='';
       var d=document.createElement('div');
       d.style.cssText='padding:24px 16px;text-align:center;color:var(--text-dim,#6b7f99);font-size:13px';
@@ -4171,9 +4189,15 @@ function doOpenFileSearch(){
       list.appendChild(d);
       return;
     }
-    var filtered=kw?names.filter(function(n){return n.toLowerCase().indexOf(kw)>=0;}):names.slice();
-    filtered.sort(function(a,b){return a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});}); // V0_157と同じ自然順
-    cnt.textContent=filtered.length+'件（全'+names.length+'件）';
+    var filtered=[];
+    records.forEach(function(r){
+      if(!kw){filtered.push({name:r.name,matched:[]});return;}
+      var nameHit=r.name.toLowerCase().indexOf(kw)>=0;
+      var textHits=(r.texts||[]).filter(function(t){return t.toLowerCase().indexOf(kw)>=0;});
+      if(nameHit||textHits.length>0) filtered.push({name:r.name,matched:textHits});
+    });
+    filtered.sort(function(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'});}); // V0_157と同じ自然順
+    cnt.textContent=filtered.length+'件（全'+records.length+'件）';
     if(filtered.length===0){
       var d2=document.createElement('div');
       d2.style.cssText='padding:24px 16px;text-align:center;color:var(--text-dim,#6b7f99);font-size:13px';
@@ -4181,19 +4205,24 @@ function doOpenFileSearch(){
       list.appendChild(d2);
       return;
     }
-    filtered.forEach(function(name){
+    filtered.forEach(function(item){
       var el=document.createElement('div');el.className='asr-item';
-      var fn=document.createElement('div');fn.className='asr-fname';fn.textContent=name;
+      var fn=document.createElement('div');fn.className='asr-fname';fn.textContent=item.name;
       el.appendChild(fn);
+      if(item.matched&&item.matched.length>0){
+        var ht=document.createElement('div');ht.className='asr-hit';
+        ht.textContent=item.matched.slice(0,4).join(' / ')+(item.matched.length>4?' …':'');
+        el.appendChild(ht);
+      }
       el.addEventListener('click',function(){
         if(_openFileOpening) return; // 多重タップで複数ファイルを同時読込しない
         _openFileOpening=true;
-        fn.textContent=name+'　読込中…';
-        _idbGetOne(name,function(rec){
+        fn.textContent=item.name+'　読込中…';
+        _idbGetOne(item.name,function(rec){
           _openFileOpening=false;
-          if(!rec){showGuide('「'+name+'」を読み込めませんでした',2500);fn.textContent=name;return;}
+          if(!rec){showGuide('「'+item.name+'」を読み込めませんでした',2500);fn.textContent=item.name;return;}
           closeOpenFilePanel();
-          openDxfFromDb(rec.name,rec.buf,null);
+          openDxfFromDb(rec.name,rec.buf,kw||null); // V1_25: キーワードがあれば図面内マークも表示
         });
       });
       list.appendChild(el);
