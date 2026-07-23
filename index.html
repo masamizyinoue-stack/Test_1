@@ -131,12 +131,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   -webkit-tap-highlight-color:transparent}
 #openFileBtnMain:active{background:rgba(46,204,113,.18)}
 /* V1_24: 「検索してファイルを開く」ボタン（フォルダインデックス検索）。#openFileBtnMainと
-   同じ箱サイズ（padding/border-radius/font-size/width）で並べ、役割の違いを色で示す */
+   同じ箱サイズ（padding/border-radius/font-size/width）で並べた。
+   V1_26: 色も#openFileBtnMainと完全に同じ緑蛍光デザインに統一（要望により変更） */
 #openFileSearchBtnMain{display:flex;align-items:center;gap:12px;margin:0 16px 14px;padding:14px 16px;
-  background:rgba(0,212,255,.08);border:1.5px solid var(--border);border-radius:12px;
-  color:var(--text);font-size:15px;cursor:pointer;text-align:left;width:calc(100% - 32px);
+  background:rgba(46,204,113,.08);border:1.5px solid var(--accent);border-radius:12px;
+  color:var(--accent);font-size:15px;cursor:pointer;text-align:left;width:calc(100% - 32px);
   -webkit-tap-highlight-color:transparent}
-#openFileSearchBtnMain:active{background:rgba(0,212,255,.18)}
+#openFileSearchBtnMain:active{background:rgba(46,204,113,.18)}
 .sp-file-icon{font-size:26px;flex-shrink:0}
 .sp-section{padding:12px 16px;border-top:1px solid var(--border)}
 .sp-label{font-size:11px;color:var(--text-dim);margin-bottom:8px;
@@ -219,6 +220,14 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #searchOverlay.open{display:block}
 #searchBg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
 #searchPanel{position:absolute;right:0;top:0;bottom:0;width:320px;max-width:85vw;background:var(--bg-panel);display:flex;flex-direction:column;overflow:hidden;z-index:1}
+/* V1_27: 「テキスト読込」ピック中は背景の暗幕(searchBg/allSearchBg)へのタップを
+   無効化し、下の図面キャンバスへタップを届かせる。pointer-eventsは継承されるため
+   親(#searchOverlay等)をnoneにするだけでsearchBgも連動して無効化される。
+   パネル自体(#searchPanel等)はpointer-events:autoで再度有効化し、閉じるボタン等の
+   操作は引き続きできるようにする。暗幕も薄くして図面が見やすいようにする */
+#searchOverlay.picking{pointer-events:none}
+#searchOverlay.picking #searchPanel{pointer-events:auto}
+#searchOverlay.picking #searchBg{background:rgba(0,0,0,.15)}
 #searchInput{width:100%;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);font-size:16px;box-sizing:border-box;-webkit-appearance:none;outline:none}
 #searchInput:focus{border-color:var(--accent)}
 .search-result-item{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;font-size:14px;color:var(--text);word-break:break-all;-webkit-tap-highlight-color:rgba(0,212,255,.2)}
@@ -228,6 +237,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #allSearchOverlay.open{display:block}
 #allSearchBg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
 #allSearchPanel{position:absolute;right:0;top:0;bottom:0;width:340px;max-width:88vw;background:var(--bg-panel);display:flex;flex-direction:column;overflow:hidden;z-index:1}
+/* V1_27: 「テキスト読込」ピック中の背景タップ通過（詳細は#searchOverlay.pickingのコメント参照） */
+#allSearchOverlay.picking{pointer-events:none}
+#allSearchOverlay.picking #allSearchPanel{pointer-events:auto}
+#allSearchOverlay.picking #allSearchBg{background:rgba(0,0,0,.15)}
 #allSearchPanel .sp-header{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 #allSearchPanel .sp-title{font-size:15px;font-weight:600;color:var(--text);flex:1}
 #allSearchPanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1}
@@ -246,6 +259,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 /* V0_101: フォルダ一括インデックス */
 #folderIndexBtn{width:100%;padding:10px 0;border-radius:9px;border:none;background:var(--accent,#00d4ff);color:#000;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
 #folderIndexBtn:active{opacity:.8}
+/* V1_27: 「テキスト読込」ボタン（画面検索/全図面検索共通）。押すと図面上の文字を
+   タップして検索欄へ自動入力するピックモードに入る。ピック中は.pickingで
+   黄色表示にして待機中であることを示す */
+.text-pick-btn{width:100%;padding:10px 0;border-radius:9px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent}
+.text-pick-btn:active{background:rgba(255,255,255,.07)}
+.text-pick-btn.picking{border-color:#ffd700;background:rgba(255,215,0,.12);color:#ffd700}
 #folderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center}
 /* V1_22: 「ファイルを開く」フォルダインデックス検索パネル（全図面検索と同じdxfIndexを共有） */
 #openFileOverlay{display:none;position:fixed;inset:0;z-index:300}
@@ -444,7 +463,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_25</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_27</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -661,6 +680,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="sp-close" id="searchClose">✕</button>
     </div>
     <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+      <!-- V1_27: テキスト読込ボタン。押すと図面上の文字をタップして検索欄へ自動入力できる -->
+      <button id="screenTextPickBtn" class="text-pick-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/></svg>
+        テキスト読込
+      </button>
       <div style="display:flex;align-items:center;gap:6px">
         <input type="search" id="searchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;width:auto;min-width:0">
         <button id="searchClearBtn" style="background:none;border:none;color:var(--text-dim,#6b7f99);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button>
@@ -679,6 +703,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="sp-close" id="allSearchClose">✕</button>
     </div>
     <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+      <!-- V1_27: テキスト読込ボタン。押すと図面上の文字をタップして検索欄へ自動入力できる -->
+      <button id="allTextPickBtn" class="text-pick-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/></svg>
+        テキスト読込
+      </button>
       <button id="folderIndexBtn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
         フォルダを選択してインデックス作成
@@ -735,21 +764,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=125"></script>
-<script src="viewer.js?v=125"></script>
-<script src="utils.js?v=125"></script>
-<script src="ui.js?v=125"></script>
-<script src="dialog.js?v=125"></script>
-<script src="storage.js?v=125"></script>
-<script src="fonts/NotoSansJP.js?v=125"></script>
-<script src="export.js?v=125"></script>
-<script src="tool.js?v=125"></script>
-<script src="verify.js?v=125"></script>
+<script src="layer.js?v=127"></script>
+<script src="viewer.js?v=127"></script>
+<script src="utils.js?v=127"></script>
+<script src="ui.js?v=127"></script>
+<script src="dialog.js?v=127"></script>
+<script src="storage.js?v=127"></script>
+<script src="fonts/NotoSansJP.js?v=127"></script>
+<script src="export.js?v=127"></script>
+<script src="tool.js?v=127"></script>
+<script src="verify.js?v=127"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=125"></script>
+<script src="supabase-sync.js?v=127"></script>
 <script>
-const APP_VERSION = 'V1_25';
+const APP_VERSION = 'V1_27';
 
 // =========================================================
 // グローバル状態
@@ -3908,6 +3937,73 @@ function jumpToSearchResult(item){
   },400);
 }
 
+// V1_27: 「テキスト読込」機能。画面検索/全図面検索のどちらかのボタンを押すと
+// ピックモードに入り、次に図面上でタップした文字要素(doc.moji)の内容を
+// その検索欄へ自動入力する。ピック中はtool.js touchendのダブルタップ全体表示より
+// 優先して処理され（詳細はtool.js側のコメント参照）、また検索パネルの暗幕
+// (searchBg/allSearchBg)のタップも無効化して図面へタップが届くようにしている
+// (詳細は#searchOverlay.pickingのCSSコメント参照)
+var _textPickTarget=null; // null | 'screen' | 'all'
+function _setTextPickMode(target){
+  _textPickTarget=target;
+  var ov1=document.getElementById('searchOverlay');
+  var ov2=document.getElementById('allSearchOverlay');
+  if(ov1) ov1.classList.toggle('picking', target==='screen');
+  if(ov2) ov2.classList.toggle('picking', target==='all');
+  if(target) showGuide('図面上の文字をタップしてください（もう一度ボタンを押すと中止）',0);
+  else hideGuide();
+  var b1=document.getElementById('screenTextPickBtn');
+  var b2=document.getElementById('allTextPickBtn');
+  if(b1) b1.classList.toggle('picking', target==='screen');
+  if(b2) b2.classList.toggle('picking', target==='all');
+}
+function _tapPickText(sx0,sy0){
+  if(!doc||!doc.moji||doc.moji.length===0){showGuide('図面に文字がありません',2000);return;}
+  var mctx=document.getElementById('ov').getContext('2d');
+  var best=null,bestArea=Infinity;
+  for(var i=0;i<doc.moji.length;i++){
+    var e=doc.moji[i];
+    if(!e.text||!e.text.trim()) continue;
+    var pos=w2s(e.x,e.y);
+    var dx=sx0-pos[0], dy=sy0-pos[1];
+    var ang=(e.angle||0)*Math.PI/180;
+    var cos=Math.cos(ang), sin=Math.sin(ang);
+    // drawText()は-angleで回転して描画しているため、当たり判定は逆回転(+angle)で
+    // タップ座標を文字ローカル座標系に戻す
+    var lx=dx*cos-dy*sin, ly=dx*sin+dy*cos;
+    if(e.widthFactor&&Math.abs(e.widthFactor-1)>0.01) lx/=e.widthFactor;
+    var fs=Math.max(6,e.h*scale);
+    mctx.font=fs+'px sans-serif';
+    var lines=e.text.split('\n');
+    var maxW=0;
+    for(var li=0;li<lines.length;li++){var w=mctx.measureText(lines[li]).width;if(w>maxW)maxW=w;}
+    var n=lines.length;
+    var pad=Math.max(4,fs*0.15);
+    var top=-fs*(n-1)-fs*0.85-pad, bottom=fs*0.3+pad, left=-pad, right=maxW+pad;
+    if(lx>=left&&lx<=right&&ly>=top&&ly<=bottom){
+      var area=(right-left)*(bottom-top);
+      if(area<bestArea){bestArea=area;best=e;}
+    }
+  }
+  if(!best){showGuide('文字が見つかりませんでした。もう一度タップしてください',2200);return;}
+  var target=_textPickTarget;
+  var text=best.text.replace(/\n/g,' ').trim();
+  _setTextPickMode(null);
+  if(target==='screen'){
+    document.getElementById('searchInput').value=text;
+    doSearch();
+  } else if(target==='all'){
+    document.getElementById('allSearchInput').value=text;
+    doAllSearch();
+  }
+  showGuide('「'+text+'」を検索欄に入力しました',2200);
+}
+document.getElementById('screenTextPickBtn').addEventListener('click',function(){
+  _setTextPickMode(_textPickTarget==='screen'?null:'screen');
+});
+document.getElementById('allTextPickBtn').addEventListener('click',function(){
+  _setTextPickMode(_textPickTarget==='all'?null:'all');
+});
 function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック処理を関数化）
   // DXFが開かれていたら再インデックス（念のため）
   if(doc&&doc.moji) buildSearchIndex();
@@ -3919,7 +4015,7 @@ function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック�
   if(inp.value.trim()) doSearch();
   setTimeout(function(){inp.focus();},120);
 }
-function closeSearch(){document.getElementById('searchOverlay').classList.remove('open');_searchHighlight=null;scheduleOverlay();}
+function closeSearch(){document.getElementById('searchOverlay').classList.remove('open');_searchHighlight=null;scheduleOverlay();if(_textPickTarget==='screen')_setTextPickMode(null);} // V1_27: パネルを閉じたらテキスト読込ピックモードも解除
 document.getElementById('searchClose').addEventListener('click',closeSearch);
 document.getElementById('searchBg').addEventListener('click',closeSearch);
 document.getElementById('searchInput').addEventListener('input',doSearch);
@@ -4278,7 +4374,7 @@ document.getElementById('openFileIndexClearBtn').addEventListener('click',functi
     if(popup.classList.contains('open')&&!popup.contains(e.target)&&e.target!==menuBtn) closeMenu();
   });
 })();
-function closeAllSearch(){document.getElementById('allSearchOverlay').classList.remove('open');}
+function closeAllSearch(){document.getElementById('allSearchOverlay').classList.remove('open');if(_textPickTarget==='all')_setTextPickMode(null);} // V1_27: パネルを閉じたらテキスト読込ピックモードも解除
 document.getElementById('allSearchClose').addEventListener('click',closeAllSearch);
 document.getElementById('allSearchBg').addEventListener('click',closeAllSearch);
 document.getElementById('allSearchInput').addEventListener('input',doAllSearch);

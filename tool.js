@@ -400,12 +400,19 @@ ov.addEventListener('touchend',e=>{
       var _tapDt=Date.now()-_tapStartTime;
       var _tapDd=Math.hypot(lastMX-_tapStartX,lastMY-_tapStartY);
       if(_tapDt<300&&_tapDd<12){ // 短時間・小移動＝ドラッグではなくタップ
-        var _tapNow=Date.now();
-        if(_tapNow-_lastTapTime<400&&Math.hypot(lastMX-_lastTapX,lastMY-_lastTapY)<40){
-          fit();scheduleDraw();scheduleSave(); // V0_74のfitBtnと同じ処理
-          _lastTapTime=0; // 3連続タップ等での誤爆防止
+        // V1_27: 「テキスト読込」ピックモード中は、ダブルタップ全体表示より優先して
+        // タップ位置の文字要素を拾い、画面検索/全図面検索の入力欄へ自動入力する
+        if(typeof _textPickTarget!=='undefined'&&_textPickTarget){
+          if(typeof _tapPickText==='function') _tapPickText(lastMX,lastMY);
+          _lastTapTime=0;
         } else {
-          _lastTapTime=_tapNow;_lastTapX=lastMX;_lastTapY=lastMY;
+          var _tapNow=Date.now();
+          if(_tapNow-_lastTapTime<400&&Math.hypot(lastMX-_lastTapX,lastMY-_lastTapY)<40){
+            fit();scheduleDraw();scheduleSave(); // V0_74のfitBtnと同じ処理
+            _lastTapTime=0; // 3連続タップ等での誤爆防止
+          } else {
+            _lastTapTime=_tapNow;_lastTapX=lastMX;_lastTapY=lastMY;
+          }
         }
       }
     }
