@@ -477,7 +477,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_56</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_57</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -783,21 +783,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=156"></script>
-<script src="viewer.js?v=156"></script>
-<script src="utils.js?v=156"></script>
-<script src="ui.js?v=156"></script>
-<script src="dialog.js?v=156"></script>
-<script src="storage.js?v=156"></script>
-<script src="fonts/NotoSansJP.js?v=156"></script>
-<script src="export.js?v=156"></script>
-<script src="tool.js?v=156"></script>
-<script src="verify.js?v=156"></script>
+<script src="layer.js?v=157"></script>
+<script src="viewer.js?v=157"></script>
+<script src="utils.js?v=157"></script>
+<script src="ui.js?v=157"></script>
+<script src="dialog.js?v=157"></script>
+<script src="storage.js?v=157"></script>
+<script src="fonts/NotoSansJP.js?v=157"></script>
+<script src="export.js?v=157"></script>
+<script src="tool.js?v=157"></script>
+<script src="verify.js?v=157"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=156"></script>
+<script src="supabase-sync.js?v=157"></script>
 <script>
-const APP_VERSION = 'V1_56';
+const APP_VERSION = 'V1_57';
 
 // =========================================================
 // グローバル状態
@@ -1234,6 +1234,14 @@ fileInput.addEventListener('change',async e=>{
   doc=null;pdfDoc=null;pdfImage=null;pdfMoji=[]; // V1_51
   document.getElementById('pdfPageCtrl').style.display='none';
   if(f.name.toLowerCase().endsWith('.pdf')){
+    // V1_57: PDF分岐だけ、前のタブのhiddenLayers/strokes/dims/imagesを一度も
+    // クリアしていなかった（DXF分岐にはV0_160のクリア処理があるが、PDF分岐には
+    // 無かった）。このため、直前に開いていた別ファイルの手書き線・寸法・画像が
+    // 新しく開いたPDFにそのまま残って表示され続け、さらに残った画像(images)の
+    // 座標がcomputeBBox()に含まれることで「全体表示」が本来のPDFページ範囲より
+    // はるかに広い範囲に合わせられ、ページが画面の隅に小さく表示される
+    // （四方の余白が異常に広い）不具合の原因になっていた
+    hiddenLayers.clear();strokes=[];dims=[];images=[];[0,1,2,3,4].forEach(i=>updateViewmemoState(i));
     // V0_131/V1_51: ファイル切替時にマーク自動クリア（従来DXF側にしか無かった処理をPDFにも適用）
     _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
     await loadPDF(buf);{const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
@@ -1244,6 +1252,25 @@ fileInput.addEventListener('change',async e=>{
     // 使われるため、ズレるとPDFの復元（アプリを閉じて再度開いた時の復元）が
     // 常に失敗する原因になっていた
     currentFileSize=f.size;
+    // V1_57: PDF自身のfileKeyに紐づく書込みデータ(dxfViewerDxfviewDB)があれば復元する
+    // （従来DXF分岐にはあったが、PDF分岐には無く、同じPDFを開き直しても書込みが
+    // 復元されなかった）
+    {var _fkP57=_fileKey(f.name,f.size);
+    var _dvP57=await new Promise(function(resolve){
+      try{
+        var _rP57=indexedDB.open('dxfViewerDxfviewDB',1);
+        _rP57.onupgradeneeded=function(e){e.target.result.createObjectStore('dv',{keyPath:'fk'});};
+        _rP57.onsuccess=function(e){try{var _txP57=e.target.result.transaction('dv','readonly');var _grP57=_txP57.objectStore('dv').get(_fkP57);_grP57.onsuccess=function(){resolve(_grP57.result||null);};_grP57.onerror=function(){resolve(null);};}catch(e2){resolve(null);}};
+        _rP57.onerror=function(){resolve(null);};
+      }catch(e3){resolve(null);}
+    });
+    if(_dvP57){if(_dvP57.dims&&_dvP57.dims.length>0)dims=_dvP57.dims;if(_dvP57.strokes&&_dvP57.strokes.length>0)strokes=_dvP57.strokes;}}
+    if(strokes.length===0&&dims.length===0&&typeof _sbPullAnnotations==='function'){
+      try{
+        var _sbP57=await _sbPullAnnotations(_fkP57);
+        if(_sbP57){if(_sbP57.strokes&&_sbP57.strokes.length>0)strokes=_sbP57.strokes;if(_sbP57.dims&&_sbP57.dims.length>0)dims=_sbP57.dims;}
+      }catch(e){}
+    }
     // V1_51: 単独で開いたPDFも、DXFと同様に自動でインデックスへ追加する（全ページの文字を抽出）
     try{
       var _pdfTexts151=await extractAllPdfTexts(pdfDoc);
