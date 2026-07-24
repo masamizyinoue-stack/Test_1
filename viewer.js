@@ -706,7 +706,12 @@ function showInfo(){
 // =========================================================
 async function loadPDF(buf){
   if(typeof pdfjsLib==='undefined'){alert('PDF.jsが読み込まれていません');return;}
-  pdfDoc=await pdfjsLib.getDocument({data:buf}).promise;
+  // V1_52: pdf.jsはWorkerへdata(ArrayBuffer)をTransferable(ゼロコピー転送)で渡すため、
+  // getDocument()呼び出し後は呼び出し元が保持している元のbuf(ArrayBuffer)が
+  // detach（byteLength=0）される。呼び出し元(fileInput/openDxfFromDb/tryRestore等)は
+  // loadPDF(buf)実行後もbuf.byteLengthの参照やIndexedDBへの保存にbufを使い続けて
+  // いるため、コピー(slice(0))を渡してdetachの影響が元のbufに及ばないようにする
+  pdfDoc=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
   document.getElementById('pdfPageCtrl').style.display='';
   document.getElementById('pageInfo').textContent=`1/${pdfDoc.numPages}`;
   pdfPageNum=1;
