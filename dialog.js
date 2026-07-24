@@ -190,3 +190,64 @@ function _showIndexProfileListMenu(anchorEl){
     if(!menu.contains(ev.target)&&ev.target!==anchorEl){closeMenu();document.removeEventListener('click',_dc);}
   });},10);
 }
+
+// =========================================================
+// V1_70: 開いているファイル一覧（タブが多い時に見失わないための一覧パネル）
+// 依存グローバル: openFiles, currentFileIdx (index.html)
+// 依存関数: switchToFile (index.html)
+// =========================================================
+function _showOpenFilesListMenu(anchorEl){
+  var existing=document.getElementById('_tabListMenu');
+  if(existing){existing.remove();return;}
+  var menu=document.createElement('div');
+  menu.id='_tabListMenu';
+  menu.style.cssText='position:fixed;z-index:9999;background:#1e3a5f;border:2px solid #4a9eff;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:240px;max-width:340px;max-height:70vh;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,.7);';
+  var r=anchorEl.getBoundingClientRect();
+  menu.style.top=(r.bottom+6)+'px';
+  menu.style.right=(window.innerWidth-r.right)+'px';
+  function closeMenu(){if(document.getElementById('_tabListMenu'))menu.remove();}
+
+  var title=document.createElement('div');
+  title.style.cssText='color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;';
+  title.textContent='開いているファイル（'+openFiles.length+'件）';
+  menu.appendChild(title);
+
+  if(openFiles.length===0){
+    var e=document.createElement('div');
+    e.style.cssText='color:#889;font-size:13px;text-align:center;padding:8px 0;';
+    e.textContent='開いているファイルはありません';
+    menu.appendChild(e);
+  } else {
+    // 最後に表示していた順（新しいものが上）に並べる。同値(未表示のまま復元された
+    // タブ等)はopenFiles配列の順番を保つ
+    var idxs=openFiles.map(function(f,i){return i;});
+    idxs.sort(function(a,b){return (openFiles[b]._lastActiveTs||0)-(openFiles[a]._lastActiveTs||0);});
+    idxs.forEach(function(idx){
+      var f=openFiles[idx];
+      var row=document.createElement('div');
+      var isActive=(idx===currentFileIdx);
+      row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:8px;border-bottom:1px solid #2a3d55;cursor:pointer;'+(isActive?'background:rgba(255,85,85,.15);':'');
+      var isPdf=(f.currentFileName||f.name||'').toLowerCase().endsWith('.pdf');
+      var badge=document.createElement('span');
+      badge.textContent=isPdf?'PDF':'DXF';
+      badge.style.cssText='font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;background:'+(isPdf?'#8e44ad':'#1a7a3a')+';color:#fff;';
+      var info=document.createElement('div');
+      info.style.cssText='flex:1;min-width:0;';
+      var timeStr=f._lastActiveTs?'表示済み':'未表示';
+      var sub=[f.folder||'',timeStr].filter(Boolean).join('・');
+      info.innerHTML='<div style="color:'+(isActive?'#ff8888':'#eee')+';font-size:13px;font-weight:'+(isActive?'700':'400')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(f.currentFileName||f.name||'---')+'</div>'
+        +'<div style="color:#889;font-size:11px;">'+sub+'</div>';
+      row.appendChild(badge);row.appendChild(info);
+      row.addEventListener('click',function(){
+        closeMenu();
+        if(idx!==currentFileIdx&&typeof switchToFile==='function') switchToFile(idx);
+      });
+      menu.appendChild(row);
+    });
+  }
+
+  document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('click',function _dc(ev){
+    if(!menu.contains(ev.target)&&ev.target!==anchorEl){closeMenu();document.removeEventListener('click',_dc);}
+  });},10);
+}

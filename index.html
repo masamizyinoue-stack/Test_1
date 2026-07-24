@@ -307,12 +307,23 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .idx-profile-btn{flex:1;padding:9px 0;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer}
 .idx-profile-btn:active{background:rgba(255,255,255,.08)}
 /* V0_107: タブバー */
-#tabBar{display:flex;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;background:#0d1117;border-bottom:1px solid #2a3040;min-height:0;max-height:40px;flex-shrink:0}
+/* V1_70: 単独divから「スクロールするタブ一覧」＋「開いているファイル一覧ボタン」の
+   横並びに変更（タブが多い時に見失わないための対策の一つ）。ボタンはtabBarRowの
+   外側に固定表示するため、タブと一緒に横スクロールして見えなくなることがない */
+#tabBarRow{display:flex;align-items:stretch;flex-shrink:0}
+#tabBar{display:flex;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;background:#0d1117;border-bottom:1px solid #2a3040;min-height:0;max-height:40px;flex-shrink:0;flex:1;min-width:0}
 #tabBar:empty{max-height:0;border-bottom:none}
+#tabListBtn{display:none;width:36px;min-width:36px;height:40px;align-items:center;justify-content:center;background:#0d1117;border:none;border-bottom:1px solid #2a3040;border-left:1px solid #2a3040;color:#b0bec5;font-size:16px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+#tabListBtn:active{background:rgba(255,255,255,.12)}
 .tab-item{display:flex;align-items:center;padding:0 6px 0 12px;min-width:80px;max-width:180px;height:40px;background:#0d1117;border-right:1px solid #2a3040;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;gap:4px;box-sizing:border-box}
-.tab-item.active{background:#1a2535;border-bottom:2px solid var(--accent,#00d4ff)}
+/* V1_70: アクティブタブの強調を強化（背景をより明るく・下線を太く）、ファイル名は赤太字に。
+   直前まで表示していたタブは黄色、その1つ前は青色にして、タブが多くても直近の
+   行き来を目で追えるようにする */
+.tab-item.active{background:#223451;border-bottom:3px solid var(--accent,#00d4ff)}
 .tab-name{font-size:12px;color:#b0bec5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
-.tab-item.active .tab-name{color:#fff}
+.tab-item.active .tab-name{color:#ff5555;font-weight:700}
+.tab-name.tab-recent-1{color:#ffd60a}
+.tab-name.tab-recent-2{color:#4da6ff}
 .tab-close{font-size:13px;color:#6b7f99;min-width:24px;min-height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:none;background:transparent;cursor:pointer;padding:0;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .tab-close:active{background:rgba(255,255,255,.15)}
 
@@ -455,7 +466,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
 </div>
-<div id="tabBar"></div>
+<div id="tabBarRow">
+  <div id="tabBar"></div>
+  <button id="tabListBtn" title="開いているファイル一覧">☰</button>
+</div>
 <div class="stage" id="stage">
   <canvas id="cv"></canvas>
   <canvas id="ac"></canvas>
@@ -503,7 +517,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_69</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_70</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -541,6 +555,22 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <span>作成時サイズ固定</span>
       </label>
       <!-- V0_154: 「サイズ指定」モードを削除 -->
+    </div>
+  </div>
+  <!-- V1_70: タブの並び順（名前順/開いた順）を選べるようにする。名前順のままだと
+       検索して新しいファイルを開いた時、タブがどこに挿入されるか予測できず
+       見失いやすいとの指摘への対応の一つ -->
+  <div class="sp-section">
+    <div class="sp-label">タブの並び順</div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="tabSortMode" id="tabSortName" value="name" checked style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>ファイル名順<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">従来通り。名前の五十音・数字順で並ぶ</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="tabSortMode" id="tabSortOpened" value="opened" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>開いた順<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">新しく開いたファイルが末尾に追加される</small></span>
+      </label>
     </div>
   </div>
 
@@ -801,21 +831,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=169"></script>
-<script src="viewer.js?v=169"></script>
-<script src="utils.js?v=169"></script>
-<script src="ui.js?v=169"></script>
-<script src="dialog.js?v=169"></script>
-<script src="storage.js?v=169"></script>
-<script src="fonts/NotoSansJP.js?v=169"></script>
-<script src="export.js?v=169"></script>
-<script src="tool.js?v=169"></script>
-<script src="verify.js?v=169"></script>
+<script src="layer.js?v=170"></script>
+<script src="viewer.js?v=170"></script>
+<script src="utils.js?v=170"></script>
+<script src="ui.js?v=170"></script>
+<script src="dialog.js?v=170"></script>
+<script src="storage.js?v=170"></script>
+<script src="fonts/NotoSansJP.js?v=170"></script>
+<script src="export.js?v=170"></script>
+<script src="tool.js?v=170"></script>
+<script src="verify.js?v=170"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=169"></script>
+<script src="supabase-sync.js?v=170"></script>
 <script>
-const APP_VERSION = 'V1_69';
+const APP_VERSION = 'V1_70';
 
 // =========================================================
 // グローバル状態
@@ -1354,9 +1384,16 @@ fileInput.addEventListener('change',async e=>{
 });
 
 // V0_93: マルチファイル管理 ─────────────────────────────────────
-var openFiles=[];   // [{name,doc,pdfDoc,pdfImage,pdfPageNum,strokes,dims,images,savedViews,hiddenLayersArr,currentFileName,tx,ty,scale,fitScale,fileSize}]
+var openFiles=[];   // [{name,doc,pdfDoc,pdfImage,pdfPageNum,strokes,dims,images,savedViews,hiddenLayersArr,currentFileName,tx,ty,scale,fitScale,fileSize,folder,_lastActiveTs}]
 var currentFileIdx=-1;
 var openFilesBufs=[];  // V0_112: ファイルバイナリキャッシュ（マルチ復元用）
+// V1_70: タブが増えた時に「前に開いていたファイルが分からなくなる」対策。
+// updateFileNavUI()が呼ばれるたびcurrentFileIdxのタブへ_tabActivitySeq(単調増加する
+// 通し番号)を記録することで、「直前まで表示していたタブ」「その1つ前」を常に
+// 正しく判定できるようにする（タブを閉じても他タブのこの値には影響しない）
+var _tabActivitySeq=0;
+// V1_70: タブの並び順（名前順/開いた順）。ユーザーが設定パネルから切り替え可能
+var _tabSortMode=(function(){try{return localStorage.getItem('_tabSortMode')||'name';}catch(e){return 'name';}})();
 
 // V0_139: DXF切替時に計測ツール状態を安全にリセットする共通関数
 // 将来ツールが増えた場合はここに追加するだけでよい
@@ -1455,21 +1492,44 @@ function switchToFile(idx){
 function updateFileNavUI(){
   var bar=document.getElementById('tabBar');
   if(!bar) return;
+  // V1_70: currentFileIdxのタブに「最後に表示していた通し番号」を記録する。
+  // updateFileNavUI()は切替・新規オープン・タブを閉じた際など、タブの状態が
+  // 変わり得るタイミングで必ず呼ばれるため、ここに集約するだけで済む
+  // （currentFileIdx=...の代入箇所すべてに手を入れる必要が無い）。
+  // 単に呼ばれただけ（タブ切替を伴わない再描画）でも値を更新するが、
+  // それはアクティブタブ自身の値が更新されるだけで他タブの順位には影響しない
+  if(currentFileIdx>=0&&openFiles[currentFileIdx]){
+    openFiles[currentFileIdx]._lastActiveTs=++_tabActivitySeq;
+  }
+  var tlb=document.getElementById('tabListBtn');
+  if(tlb) tlb.style.display=openFiles.length>0?'flex':'none';
   bar.innerHTML='';
   // V0_157: タブは開いた順ではなく、ファイル名順（自然順=数字を数値として比較）で
   // 左から並べる。openFiles[]の実体・currentFileIdxなど内部インデックスは変更せず、
   // 表示のための並び順(order[])だけを別途ソートする。
+  // V1_70: 設定で「開いた順」が選ばれている場合はソートせず、openFiles[]の登録順
+  // （＝新しく開いたファイルほど末尾）のまま表示する
   var order=openFiles.map(function(f,i){return i;});
-  order.sort(function(a,b){
-    var na=openFiles[a].currentFileName||'', nb=openFiles[b].currentFileName||'';
-    return na.localeCompare(nb,undefined,{numeric:true,sensitivity:'base'});
-  });
+  if(_tabSortMode!=='opened'){
+    order.sort(function(a,b){
+      var na=openFiles[a].currentFileName||'', nb=openFiles[b].currentFileName||'';
+      return na.localeCompare(nb,undefined,{numeric:true,sensitivity:'base'});
+    });
+  }
+  // V1_70: 「直前まで表示していたタブ」「その1つ前」を_lastActiveTsの大きい順で判定
+  // （currentFileIdx自身は上で最大値に更新済みのため、除外して考える）
+  var _recentIdxs=openFiles.map(function(f,i){return i;})
+    .filter(function(i){return i!==currentFileIdx&&openFiles[i]._lastActiveTs;})
+    .sort(function(a,b){return (openFiles[b]._lastActiveTs||0)-(openFiles[a]._lastActiveTs||0);});
+  var _recent1=_recentIdxs.length>0?_recentIdxs[0]:-1;
+  var _recent2=_recentIdxs.length>1?_recentIdxs[1]:-1;
+  var _activeItemEl=null;
   for(var k=0;k<order.length;k++){
     (function(idx){
       var item=document.createElement('div');
       item.className='tab-item'+(idx===currentFileIdx?' active':'');
       var name=document.createElement('span');
-      name.className='tab-name';
+      name.className='tab-name'+(idx===_recent1?' tab-recent-1':idx===_recent2?' tab-recent-2':'');
       name.textContent=openFiles[idx].currentFileName||'---';
       name.title=openFiles[idx].currentFileName||'';
       var close=document.createElement('button');
@@ -1480,7 +1540,13 @@ function updateFileNavUI(){
       item.appendChild(close);
       item.addEventListener('click',function(){if(_isOpeningFileBusy)return;if(idx!==currentFileIdx) switchToFile(idx);}); // V1_40: 読込中は操作不可
       bar.appendChild(item);
+      if(idx===currentFileIdx) _activeItemEl=item;
     })(order[k]);
+  }
+  // V1_70: アクティブタブへ自動スクロール。名前順・開いた順いずれの並びでも、
+  // 新しく開いた/切り替えた先のタブが横スクロールの外に隠れて見失われないようにする
+  if(_activeItemEl&&typeof _activeItemEl.scrollIntoView==='function'){
+    try{_activeItemEl.scrollIntoView({inline:'nearest',block:'nearest'});}catch(e){}
   }
 }
 
@@ -1699,6 +1765,27 @@ function updateInputModeUI(){
   if(fr)fr.checked=(inputMode==='freehand');
 }
 updateInputModeUI();
+// V1_70: タブの並び順設定（名前順/開いた順）
+document.querySelectorAll('input[name="tabSortMode"]').forEach(function(r){
+  r.addEventListener('change',function(){
+    if(this.checked){
+      _tabSortMode=this.value;
+      try{localStorage.setItem('_tabSortMode',_tabSortMode);}catch(e){}
+      if(typeof updateFileNavUI==='function')updateFileNavUI();
+    }
+  });
+});
+function updateTabSortModeUI(){
+  var rn=document.getElementById('tabSortName'),ro=document.getElementById('tabSortOpened');
+  if(rn)rn.checked=(_tabSortMode==='name');
+  if(ro)ro.checked=(_tabSortMode==='opened');
+}
+updateTabSortModeUI();
+// V1_70: 開いているファイル一覧ボタン
+document.getElementById('tabListBtn').addEventListener('click',function(e){
+  e.stopPropagation();
+  if(typeof _showOpenFilesListMenu==='function') _showOpenFilesListMenu(this);
+});
 document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 // PDFページ
 document.getElementById('prevPage').addEventListener('click',async()=>{
@@ -4695,7 +4782,7 @@ function doAllSearch(){
     var hits=[];
     records.forEach(function(rec){
       var matched=(rec.texts||[]).filter(function(t){return t.toLowerCase().indexOf(kw)>=0;});
-      if(matched.length>0) hits.push({name:rec.name,buf:rec.buf,matched:matched});
+      if(matched.length>0) hits.push({name:rec.name,buf:rec.buf,matched:matched,folder:rec.folder}); // V1_70: folder追加（開いているファイル一覧の表示用）
     });
     cnt.textContent=hits.length+'件（全'+records.length+'図面）';
     if(hits.length===0){
@@ -4711,7 +4798,7 @@ function doAllSearch(){
       var ht=document.createElement('div');ht.className='asr-hit';
       ht.textContent=h.matched.slice(0,4).join(' / ')+(h.matched.length>4?' …':'');
       el.appendChild(fn);el.appendChild(ht);
-      el.addEventListener('click',function(){openDxfFromDb(h.name,h.buf,kw);}); // V0_104
+      el.addEventListener('click',function(){openDxfFromDb(h.name,h.buf,kw,h.folder);}); // V0_104 / V1_70: folder伝達
       list.appendChild(el);
     });
   });
@@ -4720,7 +4807,7 @@ function doAllSearch(){
 // ・F-1: 新規タブ時にIDB(dxfViewerDxfviewDB)からstrokes/dimsを復元
 // ・F-2: 既存タブ時はstrokes/dims/images/savedViewsを上書きせず保持
 // ・F-3: findIndexをfileKeyベースに変更（同名異サイズ問題を修正）
-async function openDxfFromDb(name,buf,keyword){
+async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追加（開いているファイル一覧での表示用、任意）
   // V1_40: fileInput側と同じ「ファイルを開いている最中はタブ切替・新規オープンを
   // ブロックする」フラグ。検索結果を連続タップした場合や、読込中にタブを
   // 切替えた場合に、非同期処理完了時に別タブのdoc/strokes/dimsを誤って
@@ -4778,6 +4865,7 @@ async function openDxfFromDb(name,buf,keyword){
       openFiles[_xi].doc=doc; // パース結果のみ更新
       // V1_51: PDF再読込時のpdfDoc/pdfImage/pdfPageNumも反映
       openFiles[_xi].pdfDoc=pdfDoc;openFiles[_xi].pdfImage=pdfImage;openFiles[_xi].pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);
+      if(folder) openFiles[_xi].folder=folder; // V1_70: 分かっている時だけ上書き（既存値を空で消さない）
       currentFileIdx=_xi;
       var _ef=openFiles[_xi];
       // V0_140: deep copy廃止 → 参照エイリアス（openFiles[]を唯一の本体とする）
@@ -4819,7 +4907,7 @@ async function openDxfFromDb(name,buf,keyword){
         }catch(e){}
       }
       // ⑧ openFilesへ登録
-      openFiles.push({name:name,fileKey:_fk});
+      openFiles.push({name:name,fileKey:_fk,folder:folder||''}); // V1_70: folderは開いているファイル一覧の表示用
       currentFileIdx=openFiles.length-1;
       // V0_140: 新タブ登録時にstrokes/dims/images/savedViewsの参照を設定
       {var _nf140b=openFiles[currentFileIdx];_nf140b.strokes=strokes;_nf140b.dims=dims;_nf140b.images=typeof images!=='undefined'?images:[];_nf140b.savedViews=savedViews;_nf140b.doc=doc;_nf140b.hiddenLayersArr=Array.from(hiddenLayers);_nf140b.pdfDoc=pdfDoc;_nf140b.pdfImage=pdfImage;_nf140b.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);} // V1_51: PDFタブ情報も登録
@@ -4929,7 +5017,7 @@ function doOpenFileSearch(){
           _openFileOpening=false;
           if(!rec){showGuide('「'+item.name+'」を読み込めませんでした',2500);fn.textContent=item.name;return;}
           closeOpenFilePanel();
-          openDxfFromDb(rec.name,rec.buf,kw||null); // V1_25: キーワードがあれば図面内マークも表示
+          openDxfFromDb(rec.name,rec.buf,kw||null,rec.folder); // V1_25: キーワードがあれば図面内マークも表示 / V1_70: folder伝達
         });
       });
       list.appendChild(el);
