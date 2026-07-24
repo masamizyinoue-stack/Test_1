@@ -477,7 +477,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_54</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_56</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -783,21 +783,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=154"></script>
-<script src="viewer.js?v=154"></script>
-<script src="utils.js?v=154"></script>
-<script src="ui.js?v=154"></script>
-<script src="dialog.js?v=154"></script>
-<script src="storage.js?v=154"></script>
-<script src="fonts/NotoSansJP.js?v=154"></script>
-<script src="export.js?v=154"></script>
-<script src="tool.js?v=154"></script>
-<script src="verify.js?v=154"></script>
+<script src="layer.js?v=156"></script>
+<script src="viewer.js?v=156"></script>
+<script src="utils.js?v=156"></script>
+<script src="ui.js?v=156"></script>
+<script src="dialog.js?v=156"></script>
+<script src="storage.js?v=156"></script>
+<script src="fonts/NotoSansJP.js?v=156"></script>
+<script src="export.js?v=156"></script>
+<script src="tool.js?v=156"></script>
+<script src="verify.js?v=156"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=154"></script>
+<script src="supabase-sync.js?v=156"></script>
 <script>
-const APP_VERSION = 'V1_54';
+const APP_VERSION = 'V1_56';
 
 // =========================================================
 // グローバル状態
@@ -1237,6 +1237,13 @@ fileInput.addEventListener('change',async e=>{
     // V0_131/V1_51: ファイル切替時にマーク自動クリア（従来DXF側にしか無かった処理をPDFにも適用）
     _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
     await loadPDF(buf);{const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
+    // V1_55: PDF分岐だけcurrentFileSizeが一度も設定されておらず、前に開いていた
+    // 別ファイルのサイズが残ったままになる不具合があった（DXF分岐にはV0_103で
+    // currentFileSize=f.sizeがあるが、PDF分岐には無かった）。この値は
+    // doSave()/_dvAutoSave()のfileKey計算・セッション復元時のfileSize照合に
+    // 使われるため、ズレるとPDFの復元（アプリを閉じて再度開いた時の復元）が
+    // 常に失敗する原因になっていた
+    currentFileSize=f.size;
     // V1_51: 単独で開いたPDFも、DXFと同様に自動でインデックスへ追加する（全ページの文字を抽出）
     try{
       var _pdfTexts151=await extractAllPdfTexts(pdfDoc);
@@ -1426,30 +1433,8 @@ function closeTab(idx){
       if(ok!==false) doCloseTab(idx);
     });
   });
-  makeBtn('そのまま閉じる','#c0392b','#fff',function(){ // V0_111: 二段確認
-    var dlg2=document.createElement('div');
-    dlg2.style.cssText='position:fixed;inset:0;z-index:9100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72)';
-    var box2=document.createElement('div');
-    box2.style.cssText='background:#131921;border:1px solid #c0392b;border-radius:14px;padding:22px 18px;min-width:260px;max-width:90vw;display:flex;flex-direction:column;gap:10px';
-    var msg2=document.createElement('div');
-    msg2.style.cssText='font-size:13px;color:#fff;font-weight:600;text-align:center;margin-bottom:2px';
-    msg2.textContent='本当に閉じても宜しいですか？';
-    var sub2=document.createElement('div');
-    sub2.style.cssText='font-size:12px;color:#e74c3c;text-align:center';
-    sub2.textContent='書込みバックアップは作成されません。'; // V0_145: 文言をバックアップに変更
-    box2.appendChild(msg2);box2.appendChild(sub2);
-    function makeBtn2(label,bg,fg,cb){
-      var b=document.createElement('button');
-      b.textContent=label;
-      b.style.cssText='width:100%;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:'+bg+';color:'+fg+';border:1px solid '+(bg==='transparent'?'#3a4050':'transparent');
-      b.addEventListener('click',function(){document.body.removeChild(dlg2);cb();});
-      box2.appendChild(b);
-    }
-    makeBtn2('閉じる','#c0392b','#fff',function(){doCloseTab(idx);});
-    makeBtn2('戻る','transparent','#6b7f99',function(){});
-    dlg2.appendChild(box2);
-    dlg2.addEventListener('click',function(e){if(e.target===dlg2){document.body.removeChild(dlg2);}});
-    document.body.appendChild(dlg2);
+  makeBtn('そのまま閉じる','#c0392b','#fff',function(){ // V1_56: 二段確認("本当に閉じても宜しいですか？")を廃止し即閉じるように変更
+    doCloseTab(idx);
   });
   makeBtn('キャンセル','transparent','#6b7f99',function(){});
   dlg.appendChild(box);
