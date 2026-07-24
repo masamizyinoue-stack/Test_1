@@ -113,6 +113,18 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   color:var(--accent);cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   -webkit-tap-highlight-color:transparent;white-space:nowrap}
 #ipxBtn:active{background:rgba(255,255,255,.12)}
+/* V1_61: PDFページ送り。設定パネル内(.sp-section)からメイン画面右上のフローティング
+   パネルへ移動した（旧位置がハンバーガーメニューの中で見つけにくいとの指摘のため）。
+   #ipxBtn(左上)と対称の右上に配置し、.viewmemo(top:100px)より上に置くことで重ならない */
+#pdfPageCtrl{position:absolute;top:10px;right:10px;z-index:100;
+  display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:10px;
+  background:rgba(10,14,20,.88);border:1.5px solid var(--accent);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#pdfPageCtrl .sp-page-btn{width:36px;height:36px;border-radius:8px;font-size:16px;
+  border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+#pdfPageCtrl .sp-page-btn:active{background:rgba(255,255,255,.12)}
+#pdfPageCtrl .sp-page-info{color:var(--text);font-size:14px;min-width:40px;text-align:center}
 #snap-hint{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.82);color:var(--accent);font-size:12px;
   padding:6px 14px;border-radius:8px;pointer-events:none;display:none}
@@ -269,6 +281,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .text-pick-btn{width:100%;padding:10px 0;border-radius:9px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent}
 .text-pick-btn:active{background:rgba(255,255,255,.07)}
 .text-pick-btn.picking{border-color:#ffd700;background:rgba(255,215,0,.12);color:#ffd700}
+/* V1_62: 画面検索・検索開くはパネルを開くと自動でテキスト読込ピックモードになる
+   (V1_58)ため、テキスト読込ボタンを廃止し、代わりにこの注記を表示する */
+.text-pick-note{font-size:12px;color:var(--text-dim);text-align:center;padding:2px 4px;line-height:1.4}
 #folderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center;white-space:pre-line} /* V1_43: フォルダ別内訳を複数行表示するため改行を有効化 */
 /* V1_22: 「ファイルを開く」フォルダインデックス検索パネル（全図面検索と同じdxfIndexを共有） */
 #openFileOverlay{display:none;position:fixed;inset:0;z-index:300}
@@ -455,6 +470,14 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     </svg>
     <span class="nd-text">NO DRAWING LOADED</span>
   </div>
+  <!-- V1_61: PDFページ送りを設定パネルからメイン画面右上へ移動（見つけにくいとの
+       指摘を受けたため）。id="pdfPageCtrl"/"prevPage"/"pageInfo"/"nextPage"は
+       既存JSがそのまま参照するため、要素を移設しCSSのみ全体表示用に変更 -->
+  <div id="pdfPageCtrl" style="display:none">
+    <button id="prevPage" class="sp-page-btn">◀</button>
+    <span id="pageInfo" class="sp-page-info">1/1</span>
+    <button id="nextPage" class="sp-page-btn">▶</button>
+  </div>
   <div class="viewmemo" id="viewmemo">
     <div id="markFitRow">
       <div id="markPopup"><span style="font-size:15px">●</span>マーク ✕</div>
@@ -477,7 +500,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_58</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_62</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -522,14 +545,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">縮尺分母</div>
     <input type="number" id="scaleDenom" value="1" min="1" class="sp-input">
   </div>
-  <div class="sp-section" id="pdfPageCtrl" style="display:none">
-    <div class="sp-label">ページ</div>
-    <div class="sp-row">
-      <button id="prevPage" class="sp-page-btn">◀</button>
-      <span id="pageInfo" class="sp-page-info">1/1</span>
-      <button id="nextPage" class="sp-page-btn">▶</button>
-    </div>
-  </div>
+  <!-- V1_61: PDFページ送り(#pdfPageCtrl)はメイン画面右上へ移動したため、ここには無い -->
   <div class="sp-section">
     <button id="layerBtn" class="sp-action-btn">レイヤ設定</button>
   </div>
@@ -695,12 +711,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <input type="search" id="searchInput" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;width:auto;min-width:0">
         <button id="searchClearBtn" style="background:none;border:none;color:var(--text-dim,#6b7f99);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button>
       </div>
-      <!-- V1_27: テキスト読込ボタン。押すと図面上の文字をタップして検索欄へ自動入力できる。
-           V1_28: 視認性・操作性を考慮し検索欄の直下に移動（入力操作の並びとして自然な位置） -->
-      <button id="screenTextPickBtn" class="text-pick-btn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/></svg>
-        テキスト読込
-      </button>
+      <!-- V1_58: パネルを開くと自動でテキスト読込ピックモードになるため、
+           V1_62でボタンを廃止し注記のみ表示するようにした -->
+      <div class="text-pick-note">図面上の文字をタップすれば、テキスト読込可能です</div>
       <div id="searchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
     </div>
     <div id="searchResultList" style="flex:1;overflow-y:auto"></div>
@@ -752,12 +765,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       </button>
       <div id="openFolderProgress"></div>
       <div style="display:flex;gap:4px;align-items:center"><input type="search" id="openFileSearchInput" placeholder="ファイル名・図面内の文字で検索…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="openFileSearchClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button></div>
-      <!-- V1_29: テキスト読込ボタン。押すと図面上の文字をタップして検索欄へ自動入力できる
-           （画面検索/全図面検索と同じ機能。検索欄の直下に配置） -->
-      <button id="openFileTextPickBtn" class="text-pick-btn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/></svg>
-        テキスト読込
-      </button>
+      <!-- V1_58: パネルを開くと自動でテキスト読込ピックモードになるため、
+           V1_62でボタンを廃止し注記のみ表示するようにした -->
+      <div class="text-pick-note">図面上の文字をタップすれば、テキスト読込可能です</div>
       <div id="openFileSearchCount" style="font-size:13px;color:var(--text-dim);min-height:18px"></div>
       <!-- V1_24: ネイティブ選択は設定パネルの「ファイルを開く」ボタンに役割分離したため、
            このパネル内の重複したフォールバックボタンは削除した -->
@@ -783,21 +793,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=158"></script>
-<script src="viewer.js?v=158"></script>
-<script src="utils.js?v=158"></script>
-<script src="ui.js?v=158"></script>
-<script src="dialog.js?v=158"></script>
-<script src="storage.js?v=158"></script>
-<script src="fonts/NotoSansJP.js?v=158"></script>
-<script src="export.js?v=158"></script>
-<script src="tool.js?v=158"></script>
-<script src="verify.js?v=158"></script>
+<script src="layer.js?v=162"></script>
+<script src="viewer.js?v=162"></script>
+<script src="utils.js?v=162"></script>
+<script src="ui.js?v=162"></script>
+<script src="dialog.js?v=162"></script>
+<script src="storage.js?v=162"></script>
+<script src="fonts/NotoSansJP.js?v=162"></script>
+<script src="export.js?v=162"></script>
+<script src="tool.js?v=162"></script>
+<script src="verify.js?v=162"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=158"></script>
+<script src="supabase-sync.js?v=162"></script>
 <script>
-const APP_VERSION = 'V1_58';
+const APP_VERSION = 'V1_62';
 
 // =========================================================
 // グローバル状態
@@ -3395,8 +3405,10 @@ window.resetSW=resetSW;
 function _swUpdateBtnUI(on){
   var b=document.getElementById('subWinBtn');
   if(!b)return;
+  // V1_59: 選択解除時にborderColorを空にすると、V1_54で付けた枠色（緑）まで
+  // 消えてしまっていたため、解除時は元の枠色に戻すよう修正
   if(on){b.style.background='rgba(0,212,255,.22)';b.style.borderColor='#00d4ff';b.style.color='#00d4ff';}
-  else{b.style.background='';b.style.borderColor='';b.style.color='';}
+  else{b.style.background='';b.style.borderColor='#2ecc71';b.style.color='';}
 }
 document.getElementById('subWinBtn').addEventListener('click',function(){
   if(SW.active){ // 選択中に再度押した場合はキャンセル
@@ -3481,7 +3493,8 @@ function createSubWindow(rectWorld){
     '<button class="sw-close" style="background:none;border:none;color:#c86;font-size:16px;cursor:pointer;padding:2px 8px;line-height:1;">×</button>';
 
   var body=document.createElement('div');
-  body.style.cssText='position:relative;flex:1;overflow:hidden;background:'+(bwMode?'#ffffff':'#1e2430')+';';
+  // V1_60: メイン画面同様、PDF表示中は白/黒背景切替(bwMode)の影響を受けず常に濃色背景にする
+  body.style.cssText='position:relative;flex:1;overflow:hidden;background:'+((bwMode&&!pdfImage)?'#ffffff':'#1e2430')+';';
 
   var cvEl=document.createElement('canvas');
   var acEl=document.createElement('canvas');
@@ -3996,7 +4009,8 @@ function _hist(expr,result){
 
 document.getElementById('cclose').addEventListener('click',function(){
   _calcEl.classList.remove('on');
-  var b=document.getElementById('calcBtn');if(b){b.style.background='';b.style.borderColor='';b.style.color='';}
+  // V1_59: ここでもborderColorを空にすると枠色（茶色）が消えてしまうため元の枠色に戻す
+  var b=document.getElementById('calcBtn');if(b){b.style.background='';b.style.borderColor='#8b5a2b';b.style.color='';}
 });
 
 function _toggleCalcHist(show){
@@ -4170,8 +4184,10 @@ ctbEl.addEventListener('pointerdown',function(e){
 var _calcBtnEl=document.getElementById('calcBtn');
 function _calcBtnUI(on){
   if(!_calcBtnEl)return;
+  // V1_59: 選択解除時にborderColorを空にすると、V1_54で付けた枠色（茶色）まで
+  // 消えてしまっていたため、解除時は元の枠色に戻すよう修正
   if(on){_calcBtnEl.style.background='rgba(0,212,255,.22)';_calcBtnEl.style.borderColor='#00d4ff';_calcBtnEl.style.color='#00d4ff';}
-  else{_calcBtnEl.style.background='';_calcBtnEl.style.borderColor='';_calcBtnEl.style.color='';}
+  else{_calcBtnEl.style.background='';_calcBtnEl.style.borderColor='#8b5a2b';_calcBtnEl.style.color='';}
 }
 if(_calcBtnEl){
   _calcBtnEl.addEventListener('click',function(){
@@ -4322,14 +4338,10 @@ function _tapPickText(sx0,sy0){
   }
   showGuide('「'+text+'」を検索欄に入力しました',2200);
 }
-document.getElementById('screenTextPickBtn').addEventListener('click',function(){
-  _setTextPickMode(_textPickTarget==='screen'?null:'screen');
-});
+// V1_62: 画面検索・検索開くはパネルを開くと自動でピックモードになる(V1_58)ため
+// テキスト読込ボタン自体を廃止した。全図面検索は従来通りボタンで手動切替する
 document.getElementById('allTextPickBtn').addEventListener('click',function(){
   _setTextPickMode(_textPickTarget==='all'?null:'all');
-});
-document.getElementById('openFileTextPickBtn').addEventListener('click',function(){ // V1_29
-  _setTextPickMode(_textPickTarget==='openFile'?null:'openFile');
 });
 function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック処理を関数化）
   // DXF/PDFが開かれていたら再インデックス（念のため）V1_51: PDF(pdfMoji)にも対応

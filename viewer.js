@@ -575,7 +575,10 @@ function draw(){
   ctx.scale(dpr,dpr);
   const W=cv.width/dpr, H=cv.height/dpr;
   const darkBg=!bwMode;
-  ctx.fillStyle=bwMode?'#ffffff':'#1e2430';
+  // V1_60: PDF表示時は白/黒背景切替(bwMode)の影響を受けず常に濃色背景にする。
+  // PDF自体が白いページとして描画されるため、白背景モードのままだとページの
+  // 余白と背景が同化して「余白が無限」に見えてしまっていた
+  ctx.fillStyle=(bwMode&&!pdfImage)?'#ffffff':'#1e2430';
   ctx.fillRect(0,0,W,H);
   if(!doc&&!pdfImage){ctx.restore();return;}
   if(pdfImage){
