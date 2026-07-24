@@ -48,6 +48,41 @@ function _fingerMeasureUp(sx,sy){
   else handlePointerUp(sx,sy,true);
 }
 
+// V1_48: 水平/鉛直・斜め(dimState方式)の点確定処理を一本化。
+// handlePointerDown(指:即確定)・handlePointerUp(ペン:離して確定)の両方、および
+// 「2線間の交点」ボタン(IPX)からの点供給からも共通で呼べるようにする。
+// saveImmediately: 3点そろって寸法を確定した際に即時保存(doSave)するかどうか
+// （従来、指操作時は呼ばれておらず、ペン操作時のみ呼ばれていた挙動をそのまま踏襲）
+function _dimStateCommitPoint(pt,saveImmediately){
+  dimState.pts.push(pt);
+  // ガイドメッセージ更新
+  if(currentTool==='dxdy'||currentTool==='diag'){
+    if(dimState.pts.length===1) showGuide('2点目を選択してください');
+    else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
+  }
+  const need=3; // diag も dxdy も 3ステップ（P1→P2→位置）
+  if(dimState.pts.length>=need){
+    const[p1,p2,p3]=dimState.pts;
+    snapshot();
+    let dimType=currentTool;
+    if(currentTool==='dxdy'&&dimState.pts.length>=2){
+      const p1_=dimState.pts[0], p2_=dimState.pts[1];
+      const p3_=dimState.pts[2]||p2_;
+      const midX=(p1_.x+p2_.x)/2, midY=(p1_.y+p2_.y)/2;
+      const horizOfs=Math.abs(p3_.x-midX);
+      const vertOfs=Math.abs(p3_.y-midY);
+      dimType = vertOfs >= horizOfs ? 'dx' : 'dy';
+    }
+    dims.push(buildDim(p1,p2,p3||p2,dimType));
+    if(typeof verify==='function')verify('寸法追加',{len:dims.length});
+    dimState={pts:[]};
+    if(saveImmediately) doSave(); // V0_103: 即時保存
+    hideGuide();
+    showGuide('寸法を追加しました ↩ で取消', 2000);
+  }
+  scheduleOverlay();
+}
+
 // =========================================================
 // ポインタ座標取得
 // =========================================================
@@ -57,6 +92,8 @@ function getPos(e){const r=ov.getBoundingClientRect();return {x:e.clientX-r.left
 // ポインタダウン処理
 // =========================================================
 function handlePointerDown(sx,sy,isPenInput){
+  // V1_48: 「2線間の交点」ピック中は、通常のツール処理より優先してIPXへ渡す
+  if(window.IPX&&window.IPX.active){window.IPX.handleDown(sx,sy);return;}
   // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
   if(window.LP&&window.LP.active)return;
@@ -72,32 +109,8 @@ function handlePointerDown(sx,sy,isPenInput){
       dimPendingDown=true;return;
     }
     const snap=snapAt(wx,wy);const pt=snap||{x:wx,y:wy};
-    dimState.pts.push(pt);
-    // ガイドメッセージ更新
-    if(currentTool==='dxdy'||currentTool==='diag'){
-      if(dimState.pts.length===1) showGuide('2点目を選択してください');
-      else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
-    }
-    const need=3; // diag も dxdy も 3ステップ（P1→P2→位置）
-    if(dimState.pts.length>=need){
-      const[p1,p2,p3]=dimState.pts;
-      snapshot();
-      let dimType=currentTool;
-      if(currentTool==='dxdy'&&dimState.pts.length>=2){
-        const p1_=dimState.pts[0], p2_=dimState.pts[1];
-        const p3_=dimState.pts[2]||p2_;
-        const midX=(p1_.x+p2_.x)/2, midY=(p1_.y+p2_.y)/2;
-        const horizOfs=Math.abs(p3_.x-midX);
-        const vertOfs=Math.abs(p3_.y-midY);
-        dimType = vertOfs >= horizOfs ? 'dx' : 'dy';
-      }
-      dims.push(buildDim(p1,p2,p3||p2,dimType));
-      if(typeof verify==='function')verify('寸法追加',{len:dims.length});
-      dimState={pts:[]};
-      hideGuide();
-      showGuide('寸法を追加しました ↩ で取消', 2000);
-    }
-    scheduleOverlay();return;
+    _dimStateCommitPoint(pt,false);
+    return;
   }
   // 消しゴム
   if(currentTool==='eraser'){
@@ -125,6 +138,8 @@ function handlePointerDown(sx,sy,isPenInput){
 // ポインタムーブ処理
 // =========================================================
 function handlePointerMove(sx,sy,isPenInput){
+  // V1_48: 「2線間の交点」ピック中は、通常のツール処理より優先してIPXへ渡す
+  if(window.IPX&&window.IPX.active){window.IPX.handleMove(sx,sy);return;}
   if(typeof _dimTextDrag!=='undefined'&&_dimTextDrag&&typeof _dimTextDragMove==='function'&&_dimTextDragMove(sx,sy)) return; // V0_102
   // DIMシステムがアクティブな場合は DIM の pointermove ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
@@ -159,6 +174,8 @@ function handlePointerMove(sx,sy,isPenInput){
 // ポインタアップ処理
 // =========================================================
 function handlePointerUp(sx,sy,isPenInput){
+  // V1_48: 「2線間の交点」ピック中は、通常のツール処理より優先してIPXへ渡す
+  if(window.IPX&&window.IPX.active){window.IPX.handleUp(sx,sy);return;}
   if(typeof _dimTextDragUp==='function'&&_dimTextDragUp()) return; // V0_102
   // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
   if(window.DIM&&window.DIM.active)return;
@@ -170,33 +187,8 @@ function handlePointerUp(sx,sy,isPenInput){
     if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
       const[wx2,wy2]=s2w(sx,sy);
       const pt=snapPt||{x:wx2,y:wy2};
-      dimState.pts.push(pt);
-      // ガイドメッセージ更新
-      if(currentTool==='dxdy'||currentTool==='diag'){
-        if(dimState.pts.length===1) showGuide('2点目を選択してください');
-        else if(dimState.pts.length===2) showGuide('寸法線の位置を指定してください');
-      }
-      const need=3; // diag も dxdy も 3ステップ（P1→P2→位置）
-      if(dimState.pts.length>=need){
-        const[p1,p2,p3]=dimState.pts;
-        snapshot();
-        let dimType=currentTool;
-        if(currentTool==='dxdy'&&dimState.pts.length>=2){
-          const p1_=dimState.pts[0], p2_=dimState.pts[1];
-          const p3_=dimState.pts[2]||p2_;
-          const midX=(p1_.x+p2_.x)/2, midY=(p1_.y+p2_.y)/2;
-          const horizOfs=Math.abs(p3_.x-midX);
-          const vertOfs=Math.abs(p3_.y-midY);
-          dimType = vertOfs >= horizOfs ? 'dx' : 'dy';
-        }
-        dims.push(buildDim(p1,p2,p3||p2,dimType));
-        if(typeof verify==='function')verify('寸法追加',{len:dims.length});
-        dimState={pts:[]};
-        doSave(); // V0_103: 即時保存
-        hideGuide();
-        showGuide('寸法を追加しました ↩ で取消', 2000);
-      }
-      scheduleOverlay();return;
+      _dimStateCommitPoint(pt,true);
+      return;
     }
   }
   if(currentTool==='eraser'){eraserPos=null;scheduleOverlay();scheduleSave();return;}
@@ -524,6 +516,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     }
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
+    if(window.IPX&&window.IPX.active&&typeof ipxCancel==='function')ipxCancel(); // V1_48: ツール切替時は交点ピックを中止
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
 
