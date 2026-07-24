@@ -28,6 +28,7 @@ var inputMode='pen'; // 'pen' | 'freehand'  入力モード
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
 var pdfImage=null;
+var pdfMoji=[]; // V1_51: 現在表示中のPDFページから抽出した文字（画面検索・テキスト読込用）
 var rafId=null;
 var needDraw=false,needOverlay=false,needAnnotation=false;
 // ─ パフォーマンス最適化 ─
@@ -720,7 +721,44 @@ async function renderPdfPage(n){
   offscreen.width=vp.width;offscreen.height=vp.height;
   await page.render({canvasContext:offscreen.getContext('2d'),viewport:vp}).promise;
   pdfImage={img:offscreen,wx:0,wy:vp.height/3,ww:vp.width/3,wh:vp.height/3};
+  // V1_51: 画面検索・テキスト読込用に、このページのテキストをワールド座標付きで抽出する。
+  // PDFのテキスト位置(getTextContent)はPDFページのデフォルトのポイント単位(scale=1相当)で
+  // 得られ、pdfImageのワールド座標(wx=0,wy=vp.height/3=ページ高さ)と同じ単位・原点
+  // （左下原点・Y上向き）のため、追加の座標変換なしでそのままワールド座標として使える
+  pdfMoji=await _pdfPageTextItems(page);
   fit();scheduleDraw();
+  if(typeof buildSearchIndex==='function') buildSearchIndex();
+  if(typeof scheduleOverlay==='function') scheduleOverlay();
+}
+
+// V1_51: PDF 1ページ分のテキストを、doc.moji相当の形状 {text,x,y,h,angle,widthFactor} の
+// 配列に変換する。取得に失敗した場合は空配列を返す（画像のみのスキャンPDF等）
+async function _pdfPageTextItems(page){
+  try{
+    var tc=await page.getTextContent();
+    var arr=[];
+    tc.items.forEach(function(it){
+      var t=(it.str||'').trim();
+      if(!t) return;
+      var tr=it.transform; // [a,b,c,d,e,f]: e,f がテキスト原点のx,y(PDFポイント単位)
+      var h=Math.hypot(tr[2],tr[3])||Math.hypot(tr[0],tr[1])||10; // フォント高さの目安
+      arr.push({text:t,x:tr[4],y:tr[5],h:h,angle:0,widthFactor:1});
+    });
+    return arr;
+  }catch(e){ console.warn('[PDF文字抽出]',e); return []; }
+}
+
+// V1_51: フォルダインデックス用途。PDF全ページの文字列一覧（位置情報は不要）を返す
+async function extractAllPdfTexts(pdfDocObj){
+  var texts=[];
+  try{
+    for(var i=1;i<=pdfDocObj.numPages;i++){
+      var page=await pdfDocObj.getPage(i);
+      var items=await _pdfPageTextItems(page);
+      items.forEach(function(m){texts.push(m.text);});
+    }
+  }catch(e){ console.warn('[PDF全ページ文字抽出]',e); }
+  return texts;
 }
 
 function buildPDF(jpegB64,pw,ph){

@@ -471,7 +471,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_50</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_51</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -780,21 +780,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=150"></script>
-<script src="viewer.js?v=150"></script>
-<script src="utils.js?v=150"></script>
-<script src="ui.js?v=150"></script>
-<script src="dialog.js?v=150"></script>
-<script src="storage.js?v=150"></script>
-<script src="fonts/NotoSansJP.js?v=150"></script>
-<script src="export.js?v=150"></script>
-<script src="tool.js?v=150"></script>
-<script src="verify.js?v=150"></script>
+<script src="layer.js?v=151"></script>
+<script src="viewer.js?v=151"></script>
+<script src="utils.js?v=151"></script>
+<script src="ui.js?v=151"></script>
+<script src="dialog.js?v=151"></script>
+<script src="storage.js?v=151"></script>
+<script src="fonts/NotoSansJP.js?v=151"></script>
+<script src="export.js?v=151"></script>
+<script src="tool.js?v=151"></script>
+<script src="verify.js?v=151"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=150"></script>
+<script src="supabase-sync.js?v=151"></script>
 <script>
-const APP_VERSION = 'V1_50';
+const APP_VERSION = 'V1_51';
 
 // =========================================================
 // グローバル状態
@@ -1227,10 +1227,17 @@ fileInput.addEventListener('change',async e=>{
   if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140fi=openFiles[currentFileIdx];_pf140fi.tx=tx;_pf140fi.ty=ty;_pf140fi.scale=scale;_pf140fi.fitScale=fitScale;_pf140fi.hiddenLayersArr=Array.from(hiddenLayers);_pf140fi.pdfDoc=pdfDoc;_pf140fi.pdfImage=pdfImage;_pf140fi.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
   currentFileName=f.name;
   const buf=await f.arrayBuffer();
-  doc=null;pdfDoc=null;pdfImage=null;
+  doc=null;pdfDoc=null;pdfImage=null;pdfMoji=[]; // V1_51
   document.getElementById('pdfPageCtrl').style.display='none';
   if(f.name.toLowerCase().endsWith('.pdf')){
+    // V0_131/V1_51: ファイル切替時にマーク自動クリア（従来DXF側にしか無かった処理をPDFにも適用）
+    _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
     await loadPDF(buf);{const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
+    // V1_51: 単独で開いたPDFも、DXFと同様に自動でインデックスへ追加する（全ページの文字を抽出）
+    try{
+      var _pdfTexts151=await extractAllPdfTexts(pdfDoc);
+      _idbSave(f.name,buf,_pdfTexts151);
+    }catch(e151){console.warn('[PDF自動インデックス]',e151);}
     saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();
     document.body.classList.remove('settings-open');
   } else {
@@ -1315,6 +1322,17 @@ function switchToFile(idx){
   var f=openFiles[idx];
   doc=f.doc; pdfDoc=f.pdfDoc; pdfImage=f.pdfImage;
   try{ if(typeof pdfPageNum!=='undefined') pdfPageNum=f.pdfPageNum||1; }catch(e){}
+  // V1_51: pdfMojiはタブ毎に保持していないため、PDFタブに切り替えた際は
+  // 表示中ページの文字を非同期で再抽出する（doc同様の即時反映はできないが、
+  // 完了後にbuildSearchIndex()を呼び直して画面検索・テキスト読込を使えるようにする）
+  if(pdfDoc){
+    var _swPdfDoc151=pdfDoc,_swPn151=pdfPageNum;
+    pdfDoc.getPage(_swPn151).then(function(page){return _pdfPageTextItems(page);}).then(function(items){
+      if(pdfDoc===_swPdfDoc151&&pdfPageNum===_swPn151){pdfMoji=items;if(typeof buildSearchIndex==='function')buildSearchIndex();}
+    }).catch(function(e){console.warn('[pdfMoji再取得]',e);});
+  } else if(!doc){
+    pdfMoji=[];
+  }
   // V0_140: 参照エイリアス（deep copyしない）― push/splice/assign はそのままopenFiles[]に反映
   strokes=f.strokes||[];
   dims=f.dims||[];
@@ -1460,7 +1478,7 @@ function doCloseTab(idx){
   }
   if(openFiles.length===0){
     currentFileIdx=-1;
-    doc=null;pdfDoc=null;pdfImage=null;
+    doc=null;pdfDoc=null;pdfImage=null;pdfMoji=[]; // V1_51
     doSave(); // V0_128: 即時保存（scheduleSaveは800ms非同期のため不可）
     strokes=[];dims=[];
     if(typeof images!=='undefined') images=[];
@@ -4156,8 +4174,10 @@ var _searchHighlight=null;
 
 function buildSearchIndex(){
   _searchIdx=[];
-  for(var i=0;i<doc.moji.length;i++){
-    var m=doc.moji[i];
+  // V1_51: DXFのdoc.mojiが無い場合はPDFから抽出したpdfMojiを使う
+  var mojiArr=(doc&&doc.moji)?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
+  for(var i=0;i<mojiArr.length;i++){
+    var m=mojiArr[i];
     var t=(m.text||'').trim();
     if(t) _searchIdx.push({text:t,x:m.x,y:m.y,h:m.h||1});
   }
@@ -4241,11 +4261,13 @@ function _setTextPickMode(target){
   if(b3) b3.classList.toggle('picking', target==='openFile');
 }
 function _tapPickText(sx0,sy0){
-  if(!doc||!doc.moji||doc.moji.length===0){showGuide('図面に文字がありません',2000);return;}
+  // V1_51: DXFのdoc.mojiが無い場合はPDFから抽出したpdfMojiを使う
+  var _mojiArr151=(doc&&doc.moji)?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
+  if(!_mojiArr151||_mojiArr151.length===0){showGuide('図面に文字がありません',2000);return;}
   var mctx=document.getElementById('ov').getContext('2d');
   var best=null,bestArea=Infinity;
-  for(var i=0;i<doc.moji.length;i++){
-    var e=doc.moji[i];
+  for(var i=0;i<_mojiArr151.length;i++){
+    var e=_mojiArr151[i];
     if(!e.text||!e.text.trim()) continue;
     var pos=w2s(e.x,e.y);
     var dx=sx0-pos[0], dy=sy0-pos[1];
@@ -4294,8 +4316,8 @@ document.getElementById('openFileTextPickBtn').addEventListener('click',function
   _setTextPickMode(_textPickTarget==='openFile'?null:'openFile');
 });
 function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック処理を関数化）
-  // DXFが開かれていたら再インデックス（念のため）
-  if(doc&&doc.moji) buildSearchIndex();
+  // DXF/PDFが開かれていたら再インデックス（念のため）V1_51: PDF(pdfMoji)にも対応
+  if((doc&&doc.moji)||(typeof pdfMoji!=='undefined'&&pdfMoji&&pdfMoji.length>0)) buildSearchIndex();
   document.getElementById('searchOverlay').classList.add('open');
   // インデックス件数をプレースホルダーに表示
   var inp=document.getElementById('searchInput');
@@ -4556,16 +4578,29 @@ async function openDxfFromDb(name,buf,keyword){
     // ① resetToolStates（計測ツール状態をリセット）
     resetToolStates();
     // ② V0_140: saveCurrentFileState廃止 → 前ファイルのビュー状態のみinline同期
-    if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140=openFiles[currentFileIdx];_pf140.tx=tx;_pf140.ty=ty;_pf140.scale=scale;_pf140.fitScale=fitScale;_pf140.hiddenLayersArr=Array.from(hiddenLayers);}
+    // V1_51: PDFタブのpdfDoc/pdfImage/pdfPageNumも退避（V1_40でfileInput側に追加した処理と同様）
+    if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140=openFiles[currentFileIdx];_pf140.tx=tx;_pf140.ty=ty;_pf140.scale=scale;_pf140.fitScale=fitScale;_pf140.hiddenLayersArr=Array.from(hiddenLayers);_pf140.pdfDoc=pdfDoc;_pf140.pdfImage=pdfImage;_pf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
 
-    // ③ DXF読込
-    doc=parseDXF(buf);
+    // ③ DXF/PDF読込 V1_51: 拡張子で分岐し、PDFはloadPDF()で読み込む（doc=nullのまま、
+    // pdfDoc/pdfImage/pdfMojiがrenderPdfPage内で設定される）
+    var _isPdf151=name.toLowerCase().endsWith('.pdf');
+    if(_isPdf151){
+      doc=null; pdfDoc=null; pdfImage=null; pdfMoji=[];
+      await loadPDF(buf);
+    } else {
+      doc=parseDXF(buf);
+      pdfDoc=null; pdfImage=null; pdfMoji=[]; // V1_51: 前のPDF状態が残らないようクリア
+    }
     currentFileSize=buf.byteLength;
 
-    // 検索キーワードマーク設定（V0_104）
+    // 検索キーワードマーク設定（V0_104、V1_51: PDF(pdfMoji)にも対応）
     _searchHighlight=null;
     _searchMarks=[];_markKeyword=keyword||null;
-    if(keyword&&doc&&doc.moji){var _kl=keyword.toLowerCase();doc.moji.forEach(function(m){if(m.text&&m.text.toLowerCase().indexOf(_kl)>=0)_searchMarks.push(m);});}
+    if(keyword){
+      var _kl=keyword.toLowerCase();
+      var _mojiSrc151=(doc&&doc.moji)?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
+      _mojiSrc151.forEach(function(m){if(m.text&&m.text.toLowerCase().indexOf(_kl)>=0)_searchMarks.push(m);});
+    }
 
     // ④ fileKey生成
     var _fk=_fileKey(name,buf.byteLength);
@@ -4577,6 +4612,8 @@ async function openDxfFromDb(name,buf,keyword){
     if(!_isNew){
       // ⑥ 既存タブ: strokes/dims/images/savedViews/hiddenLayersを保持して復元（F-2）
       openFiles[_xi].doc=doc; // パース結果のみ更新
+      // V1_51: PDF再読込時のpdfDoc/pdfImage/pdfPageNumも反映
+      openFiles[_xi].pdfDoc=pdfDoc;openFiles[_xi].pdfImage=pdfImage;openFiles[_xi].pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);
       currentFileIdx=_xi;
       var _ef=openFiles[_xi];
       // V0_140: deep copy廃止 → 参照エイリアス（openFiles[]を唯一の本体とする）
@@ -4621,7 +4658,7 @@ async function openDxfFromDb(name,buf,keyword){
       openFiles.push({name:name,fileKey:_fk});
       currentFileIdx=openFiles.length-1;
       // V0_140: 新タブ登録時にstrokes/dims/images/savedViewsの参照を設定
-      {var _nf140b=openFiles[currentFileIdx];_nf140b.strokes=strokes;_nf140b.dims=dims;_nf140b.images=typeof images!=='undefined'?images:[];_nf140b.savedViews=savedViews;_nf140b.doc=doc;_nf140b.hiddenLayersArr=Array.from(hiddenLayers);}
+      {var _nf140b=openFiles[currentFileIdx];_nf140b.strokes=strokes;_nf140b.dims=dims;_nf140b.images=typeof images!=='undefined'?images:[];_nf140b.savedViews=savedViews;_nf140b.doc=doc;_nf140b.hiddenLayersArr=Array.from(hiddenLayers);_nf140b.pdfDoc=pdfDoc;_nf140b.pdfImage=pdfImage;_nf140b.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);} // V1_51: PDFタブ情報も登録
     }
 
     currentFileName=name;
@@ -4638,9 +4675,14 @@ async function openDxfFromDb(name,buf,keyword){
     updateFileNavUI();scheduleSave();
     verify('openDxfFromDb:after');
 
+    // V1_51: PDFページ操作UIの表示切替（switchToFile()と同じパターン）
+    var _ppc151=document.getElementById('pdfPageCtrl');
+    if(_ppc151) _ppc151.style.display=pdfDoc?'':'none';
+    if(pdfDoc){var _pi151=document.getElementById('pageInfo');if(_pi151)_pi151.textContent=(pdfPageNum||1)+'/'+pdfDoc.numPages;}
+
     document.getElementById('allSearchOverlay').classList.remove('open');
     document.body.classList.remove('settings-open');
-    var _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';
+    var _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display=(doc||pdfImage)?'none':'';
     // マークポップアップ（V0_104）
     var _mp=document.getElementById('markPopup');if(_mp){if(_searchMarks.length>0)_mp.classList.add('visible');else _mp.classList.remove('visible');}
   }catch(err){alert('図面を開けません: '+err.message);}finally{_isOpeningFileBusy=false;} // V1_40
@@ -4811,11 +4853,13 @@ document.getElementById('openFolderIndexBtn').addEventListener('click', function
 document.getElementById('folderInput').addEventListener('change', function(e){
   var progEl = document.getElementById(_folderIndexSource==='openFile'?'openFolderProgress':'folderProgress');
   var allFiles = Array.from(e.target.files);
+  // V1_51: PDFも対象に追加し、文字を抽出してインデックスできるようにする
   var files = allFiles.filter(function(f){
-    return f.name.toLowerCase().endsWith('.dxf');
+    var n=f.name.toLowerCase();
+    return n.endsWith('.dxf')||n.endsWith('.pdf');
   });
   if(files.length === 0){
-    progEl.textContent = 'DXFファイルが見つかりません';
+    progEl.textContent = 'DXF・PDFファイルが見つかりません';
     return;
   }
   // V1_33: webkitRelativePathの先頭セグメント＝選択したフォルダ名を取得
@@ -4860,16 +4904,24 @@ function processFolderFiles(files, progEl, folderName){
     var f = files[idx];
     prog.textContent = (fn?fn+'を':'')+'処理中… ' + (idx + 1) + ' / ' + total + '件: ' + f.name;
     var reader = new FileReader();
-    reader.onload = function(ev){
+    // V1_51: PDFはpdf.jsで全ページの文字を抽出してtextsに使う（DXFはparseDXFのdoc.mojiのまま）。
+    // PDF抽出は非同期(await)のため、onload自体をasync関数にした
+    reader.onload = async function(ev){
       try{
         var buf = ev.target.result;
-        var d = parseDXF(buf);
         var texts = [];
-        if(d && d.moji){
-          d.moji.forEach(function(m){
-            var t = (m.text || '').trim();
-            if(t) texts.push(t);
-          });
+        if(f.name.toLowerCase().endsWith('.pdf')){
+          if(typeof pdfjsLib==='undefined') throw new Error('PDF.jsが読み込まれていません');
+          var _pdoc151=await pdfjsLib.getDocument({data:buf}).promise;
+          texts=await extractAllPdfTexts(_pdoc151);
+        } else {
+          var d = parseDXF(buf);
+          if(d && d.moji){
+            d.moji.forEach(function(m){
+              var t = (m.text || '').trim();
+              if(t) texts.push(t);
+            });
+          }
         }
         _idbSave(f.name, buf, texts, folderName); // V1_43: フォルダ別内訳表示のためフォルダ名も保存
         done++;
