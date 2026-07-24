@@ -22,6 +22,32 @@ var ERASER_RADIUS_PX=20;
 // V1_46: 手書きモードで指計測時、指に隠れないようカーソルを上にずらすオフセット量(px)
 var FINGER_CURSOR_OFFSET_Y=60;
 
+// V1_47: 手書きモードでの指計測 対象判定・呼び分け（DIM=直径/半径、LP=線と点、LL=2線間、
+// それ以外の水平/鉛直(dxdy)・斜め(diag)はDIM.active等の状態フラグを持たずcurrentToolで
+// 判定するhandlePointerDown/Move/Up内蔵の仕組みのため、ここで一本化して呼び分ける）
+function _fingerMeasureActive(){
+  return (window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active)
+      ||currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag';
+}
+function _fingerMeasureDown(sx,sy){
+  if(window.DIM&&window.DIM.active) window.DIM.handleDown(sx,sy);
+  else if(window.LP&&window.LP.active) window.LP.handleDown(sx,sy);
+  else if(window.LL&&window.LL.active) window.LL.handleDown(sx,sy);
+  else handlePointerDown(sx,sy,true); // dx/dy/dxdy/diag: ペン相当のダウン→ムーブ→アップで確定
+}
+function _fingerMeasureMove(sx,sy){
+  if(window.DIM&&window.DIM.active) window.DIM.handleMove(sx,sy);
+  else if(window.LP&&window.LP.active) window.LP.handleMove(sx,sy);
+  else if(window.LL&&window.LL.active) window.LL.handleMove(sx,sy);
+  else handlePointerMove(sx,sy,true);
+}
+function _fingerMeasureUp(sx,sy){
+  if(window.DIM&&window.DIM.active) window.DIM.handleUp(sx,sy);
+  else if(window.LP&&window.LP.active) window.LP.handleUp(sx,sy);
+  else if(window.LL&&window.LL.active) window.LL.handleUp(sx,sy);
+  else handlePointerUp(sx,sy,true);
+}
+
 // =========================================================
 // ポインタ座標取得
 // =========================================================
@@ -285,19 +311,13 @@ ov.addEventListener('touchstart',e=>{
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     isPen=false;mouseDown=true;lastMX=sx;lastMY=sy;
-    // V1_46: 手書きモード + 計測ツール(DIM/LP/LL)選択中 → 指でも計測できるようにする。
-    // 指先で候補点が隠れないよう、実際の指位置より少し上をカーソル位置として扱う。
-    if(inputMode==='freehand'
-        &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+    // V1_46/V1_47: 手書きモード + 計測ツール（DIM/LP/LL・水平鉛直・斜め）選択中 →
+    // 指でも計測できるようにする。指先で候補点が隠れないよう、実際の指位置より
+    // 少し上をカーソル位置として扱う。
+    if(inputMode==='freehand'&&_fingerMeasureActive()){
       panning=false;
       const fy=sy-FINGER_CURSOR_OFFSET_Y;
-      if(window.DIM&&window.DIM.active){
-        window.DIM.handleDown(sx,fy);
-      } else if(window.LP&&window.LP.active){
-        window.LP.handleDown(sx,fy);
-      } else if(window.LL&&window.LL.active){
-        window.LL.handleDown(sx,fy);
-      }
+      _fingerMeasureDown(sx,fy);
       lastMX=sx;lastMY=fy;
     } else if(inputMode==='freehand'
         &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||(window.SW&&window.SW.active))){
@@ -347,18 +367,12 @@ ov.addEventListener('touchmove',e=>{
     }
     tx=mid.x-wx*scale;ty=mid.y+wy*scale;
     pinchDist=dist;pinchMid=mid;scheduleDraw();
-  } else if(fingers.length===1&&mouseDown&&!panning&&inputMode==='freehand'
-      &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
-    // V1_46: 手書きモード 指1本での計測継続（DIM/LP/LL）。指位置より少し上をカーソルとして扱う
+  } else if(fingers.length===1&&mouseDown&&!panning&&inputMode==='freehand'&&_fingerMeasureActive()){
+    // V1_46/V1_47: 手書きモード 指1本での計測継続（DIM/LP/LL・水平鉛直・斜め）。
+    // 指位置より少し上をカーソルとして扱う
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top-FINGER_CURSOR_OFFSET_Y;
-    if(window.DIM&&window.DIM.active){
-      window.DIM.handleMove(sx,sy);
-    } else if(window.LP&&window.LP.active){
-      window.LP.handleMove(sx,sy);
-    } else if(window.LL&&window.LL.active){
-      window.LL.handleMove(sx,sy);
-    }
+    _fingerMeasureMove(sx,sy);
     lastMX=sx;lastMY=sy;
   } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
     // V0_79: 手書きモード 指1本描画中 / V0_152.2: サブ窓作成の対角ドラッグ中も含む
@@ -412,16 +426,10 @@ ov.addEventListener('touchend',e=>{
   }
   // 全タッチ終了
   if(remaining.length===0){
-    // V1_46: 手書きモードで指計測中(DIM/LP/LL)だった場合は指を離した位置で確定
-    if(!isPen&&inputMode==='freehand'
-        &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
-      if(window.DIM&&window.DIM.active){
-        window.DIM.handleUp(lastMX,lastMY);
-      } else if(window.LP&&window.LP.active){
-        window.LP.handleUp(lastMX,lastMY);
-      } else if(window.LL&&window.LL.active){
-        window.LL.handleUp(lastMX,lastMY);
-      }
+    // V1_46/V1_47: 手書きモードで指計測中（DIM/LP/LL・水平鉛直・斜め）だった場合は
+    // 指を離した位置で確定
+    if(!isPen&&inputMode==='freehand'&&_fingerMeasureActive()){
+      _fingerMeasureUp(lastMX,lastMY);
     }
     // V0_79: 手書きモードで指描画中だった場合はストロークを確定
     // V0_152.2: サブ窓作成の対角ドラッグ中(指を離して矩形確定)も含む
@@ -472,18 +480,12 @@ ov.addEventListener('touchend',e=>{
     const t=remFing[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     mouseDown=true;lastMX=sx;lastMY=sy;
-    // V1_46: 手書きモード+計測ツール(DIM/LP/LL)なら指計測を再開（カーソルは指の少し上）
-    if(inputMode==='freehand'
-        &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+    // V1_46/V1_47: 手書きモード+計測ツール（DIM/LP/LL・水平鉛直・斜め）なら指計測を
+    // 再開（カーソルは指の少し上）
+    if(inputMode==='freehand'&&_fingerMeasureActive()){
       panning=false;
       const fy=sy-FINGER_CURSOR_OFFSET_Y;
-      if(window.DIM&&window.DIM.active){
-        window.DIM.handleDown(sx,fy);
-      } else if(window.LP&&window.LP.active){
-        window.LP.handleDown(sx,fy);
-      } else if(window.LL&&window.LL.active){
-        window.LL.handleDown(sx,fy);
-      }
+      _fingerMeasureDown(sx,fy);
       lastMX=sx;lastMY=fy;
     } else if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||(window.SW&&window.SW.active))){
       // V0_79: 手書きモード+描画ツールなら描画再開
