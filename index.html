@@ -500,7 +500,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_65</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_66</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -793,21 +793,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=165"></script>
-<script src="viewer.js?v=165"></script>
-<script src="utils.js?v=165"></script>
-<script src="ui.js?v=165"></script>
-<script src="dialog.js?v=165"></script>
-<script src="storage.js?v=165"></script>
-<script src="fonts/NotoSansJP.js?v=165"></script>
-<script src="export.js?v=165"></script>
-<script src="tool.js?v=165"></script>
-<script src="verify.js?v=165"></script>
+<script src="layer.js?v=166"></script>
+<script src="viewer.js?v=166"></script>
+<script src="utils.js?v=166"></script>
+<script src="ui.js?v=166"></script>
+<script src="dialog.js?v=166"></script>
+<script src="storage.js?v=166"></script>
+<script src="fonts/NotoSansJP.js?v=166"></script>
+<script src="export.js?v=166"></script>
+<script src="tool.js?v=166"></script>
+<script src="verify.js?v=166"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=165"></script>
+<script src="supabase-sync.js?v=166"></script>
 <script>
-const APP_VERSION = 'V1_65';
+const APP_VERSION = 'V1_66';
 
 // =========================================================
 // グローバル状態
@@ -1349,6 +1349,17 @@ function resetToolStates(){
   if(window.LP  && typeof resetLP ==='function') resetLP();
   if(window.LL  && typeof resetLL ==='function') resetLL(); // V0_153.1: 2線間
   if(window.SW  && typeof resetSW ==='function'){ resetSW(); if(typeof _swUpdateBtnUI==='function')_swUpdateBtnUI(false); }
+  // V1_66: 上記はDIM/LP/LL/SWの内部active状態を解除するだけで、currentTool変数と
+  // ツールボタンの見た目(activeクラス)はそのまま残っていた。そのため「2線間」等の
+  // 計測ツール選択中にタブ切替・別ファイルを開く操作を行うと、ボタンは選択中の
+  // 見た目のまま・currentToolも'll'等のままなのにLL.active等はfalseになり、以後
+  // Apple Pencilでタップ/ドラッグしても計測ツールの分岐に入らずペン書き込み(sketch)
+  // になってしまう不具合があった。ここでcurrentToolをデフォルトの'sketch'へ戻し、
+  // ツールボタンの選択表示も「ペン」ボタンに揃えることで、内部状態と見た目を一致させる
+  currentTool='sketch';
+  document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
+  var _sketchBtn66=document.querySelector('.tool-btn[data-tool="sketch"]');
+  if(_sketchBtn66) _sketchBtn66.classList.add('active');
 }
 
 // V0_140: saveCurrentFileState廃止（全呼び出しをinline viewport syncに置換済み）
