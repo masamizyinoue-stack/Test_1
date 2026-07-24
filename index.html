@@ -324,6 +324,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .tab-item.active .tab-name{color:#ff5555;font-weight:700}
 .tab-name.tab-recent-1{color:#ffd60a}
 .tab-name.tab-recent-2{color:#4da6ff}
+/* V1_71: 「任意」モードでタブを長押ししてつかんだ時／ドロップ先候補タブの表示 */
+.tab-item.tab-drag-source{opacity:0.4}
+.tab-item.tab-drop-target{background:#2f4a70;box-shadow:inset 0 0 0 2px var(--accent,#00d4ff)}
 .tab-close{font-size:13px;color:#6b7f99;min-width:24px;min-height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:none;background:transparent;cursor:pointer;padding:0;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 .tab-close:active{background:rgba(255,255,255,.15)}
 
@@ -517,7 +520,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_70</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_71</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -570,6 +573,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
         <input type="radio" name="tabSortMode" id="tabSortOpened" value="opened" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
         <span>開いた順<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">新しく開いたファイルが末尾に追加される</small></span>
+      </label>
+      <!-- V1_71: アクセス順・任意（ドラッグ並び替え）を追加 -->
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="tabSortMode" id="tabSortAccess" value="access" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>アクセス順<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">最後に表示したファイルほど左側に来る</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="tabSortMode" id="tabSortManual" value="manual" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>任意（ドラッグで並び替え）<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">タブを長押ししてつかむと、動かして好きな順番に並び替えられる</small></span>
       </label>
     </div>
   </div>
@@ -831,21 +843,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=170"></script>
-<script src="viewer.js?v=170"></script>
-<script src="utils.js?v=170"></script>
-<script src="ui.js?v=170"></script>
-<script src="dialog.js?v=170"></script>
-<script src="storage.js?v=170"></script>
-<script src="fonts/NotoSansJP.js?v=170"></script>
-<script src="export.js?v=170"></script>
-<script src="tool.js?v=170"></script>
-<script src="verify.js?v=170"></script>
+<script src="layer.js?v=171"></script>
+<script src="viewer.js?v=171"></script>
+<script src="utils.js?v=171"></script>
+<script src="ui.js?v=171"></script>
+<script src="dialog.js?v=171"></script>
+<script src="storage.js?v=171"></script>
+<script src="fonts/NotoSansJP.js?v=171"></script>
+<script src="export.js?v=171"></script>
+<script src="tool.js?v=171"></script>
+<script src="verify.js?v=171"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=170"></script>
+<script src="supabase-sync.js?v=171"></script>
 <script>
-const APP_VERSION = 'V1_70';
+const APP_VERSION = 'V1_71';
 
 // =========================================================
 // グローバル状態
@@ -1392,8 +1404,12 @@ var openFilesBufs=[];  // V0_112: ファイルバイナリキャッシュ（マ�
 // 通し番号)を記録することで、「直前まで表示していたタブ」「その1つ前」を常に
 // 正しく判定できるようにする（タブを閉じても他タブのこの値には影響しない）
 var _tabActivitySeq=0;
-// V1_70: タブの並び順（名前順/開いた順）。ユーザーが設定パネルから切り替え可能
+// V1_70: タブの並び順（名前順/開いた順/アクセス順/任意）。ユーザーが設定パネルから切り替え可能
 var _tabSortMode=(function(){try{return localStorage.getItem('_tabSortMode')||'name';}catch(e){return 'name';}})();
+// V1_71: 「任意」モードでの手動並び替え結果（fileKeyの配列、左から並ぶ順）を保存する
+var _manualTabOrder=(function(){try{return JSON.parse(localStorage.getItem('_manualTabOrder')||'[]');}catch(e){return [];}})();
+// V1_71: タブの長押しドラッグ並び替え中の状態（1つのドラッグ操作の間だけ使う一時変数）
+var _tabDragTimer=null, _tabDragActive=false, _tabDragJustHappened=false;
 
 // V0_139: DXF切替時に計測ツール状態を安全にリセットする共通関数
 // 将来ツールが増えた場合はここに追加するだけでよい
@@ -1489,6 +1505,91 @@ function switchToFile(idx){
   verify('switchToFile:after');
 }
 
+// V1_71: 「直前まで表示していたタブ」「その1つ前」を_lastActiveTsの大きい順で判定する。
+// updateFileNavUI()（タブバー）とdialog.jsの_showOpenFilesListMenu()（一覧パネル）の
+// 両方で同じ色分け（赤=アクティブ/黄=recent1/青=recent2）を使うため共通関数に切り出す。
+function _getTabRecencyRanks(){
+  var _recentIdxs=openFiles.map(function(f,i){return i;})
+    .filter(function(i){return i!==currentFileIdx&&openFiles[i]._lastActiveTs;})
+    .sort(function(a,b){return (openFiles[b]._lastActiveTs||0)-(openFiles[a]._lastActiveTs||0);});
+  return {recent1:_recentIdxs.length>0?_recentIdxs[0]:-1, recent2:_recentIdxs.length>1?_recentIdxs[1]:-1};
+}
+
+// V1_71: 「任意」並び替えモード用に、保存済みの並び順(_manualTabOrder=fileKeyの配列)と
+// 現在開いているopenFiles[]を突き合わせ、表示用インデックス順を作る。
+// ・保存順にあるfileKeyはその順で並べる（既に閉じられ存在しないキーは無視）
+// ・保存順に無い（まだ並び替えていない新規タブ）ファイルは末尾に追加する
+function _buildManualOrder(){
+  var idxByKey={};
+  openFiles.forEach(function(f,i){if(f.fileKey) idxByKey[f.fileKey]=i;});
+  var used={}, order=[];
+  _manualTabOrder.forEach(function(k){
+    if(idxByKey.hasOwnProperty(k)&&!used[idxByKey[k]]){order.push(idxByKey[k]);used[idxByKey[k]]=true;}
+  });
+  openFiles.forEach(function(f,i){if(!used[i]){order.push(i);used[i]=true;}});
+  return order;
+}
+
+// V1_71: 「任意」モードでタブをドラッグして並び替えた結果を計算する純粋関数。
+// currentOrderKeys: 現在の並び順（fileKeyの配列）, draggedKey: つかんだタブ,
+// dropTargetKey: その上に離したタブ。draggedKeyをdropTargetKeyの直前に移動した新しい配列を返す。
+// dropTargetKeyがdraggedKey自身、または存在しない場合は元の並びをそのまま返す。
+function _reorderManualTabs(currentOrderKeys,draggedKey,dropTargetKey){
+  var keys=currentOrderKeys.slice();
+  var fromIdx=keys.indexOf(draggedKey);
+  if(fromIdx<0||draggedKey===dropTargetKey) return keys;
+  keys.splice(fromIdx,1);
+  var toIdx=keys.indexOf(dropTargetKey);
+  if(toIdx<0){keys.push(draggedKey);}else{keys.splice(toIdx,0,draggedKey);}
+  return keys;
+}
+
+// V1_71: タブの長押し(400ms)→ドラッグ→離す、での並び替え操作。
+// 実機のポインター/タッチ操作はサンドボックス内では検証できないため、
+// 並び替えの計算自体は_reorderManualTabs()という独立関数に切り出し、そちらはテスト済み。
+function _tabItemPointerDown(ev,itemEl,fileKey){
+  if(_tabSortMode!=='manual') return;
+  var sx=ev.clientX, sy=ev.clientY, moved=false;
+  _tabDragActive=false;
+  clearTimeout(_tabDragTimer);
+  var bar=document.getElementById('tabBar');
+  function onMove(e){
+    if(Math.abs(e.clientX-sx)>10||Math.abs(e.clientY-sy)>10) moved=true;
+    if(!_tabDragActive) return;
+    document.querySelectorAll('.tab-item.tab-drop-target').forEach(function(el){el.classList.remove('tab-drop-target');});
+    var el=document.elementFromPoint(e.clientX,e.clientY);
+    var tab=el?el.closest('.tab-item'):null;
+    if(tab&&tab!==itemEl) tab.classList.add('tab-drop-target');
+  }
+  function onUp(e){
+    document.removeEventListener('pointermove',onMove);
+    document.removeEventListener('pointerup',onUp);
+    clearTimeout(_tabDragTimer);
+    if(_tabDragActive){
+      itemEl.classList.remove('tab-drag-source');
+      var tgt=document.querySelector('.tab-item.tab-drop-target');
+      document.querySelectorAll('.tab-item.tab-drop-target').forEach(function(el){el.classList.remove('tab-drop-target');});
+      var dropKey=tgt?tgt.dataset.filekey:null;
+      if(dropKey&&dropKey!==fileKey){
+        var curKeys=Array.prototype.slice.call(bar.children).map(function(el){return el.dataset.filekey;});
+        _manualTabOrder=_reorderManualTabs(curKeys,fileKey,dropKey);
+        try{localStorage.setItem('_manualTabOrder',JSON.stringify(_manualTabOrder));}catch(e){}
+      }
+      _tabDragActive=false;
+      _tabDragJustHappened=true;
+      setTimeout(function(){_tabDragJustHappened=false;},50);
+      updateFileNavUI();
+    }
+  }
+  document.addEventListener('pointermove',onMove);
+  document.addEventListener('pointerup',onUp);
+  _tabDragTimer=setTimeout(function(){
+    if(moved) return;
+    _tabDragActive=true;
+    itemEl.classList.add('tab-drag-source');
+  },400);
+}
+
 function updateFileNavUI(){
   var bar=document.getElementById('tabBar');
   if(!bar) return;
@@ -1509,25 +1610,29 @@ function updateFileNavUI(){
   // 表示のための並び順(order[])だけを別途ソートする。
   // V1_70: 設定で「開いた順」が選ばれている場合はソートせず、openFiles[]の登録順
   // （＝新しく開いたファイルほど末尾）のまま表示する
+  // V1_71: 「アクセス順」「任意」の並びにも対応
   var order=openFiles.map(function(f,i){return i;});
-  if(_tabSortMode!=='opened'){
+  if(_tabSortMode==='access'){
+    order.sort(function(a,b){
+      if(a===currentFileIdx) return -1;
+      if(b===currentFileIdx) return 1;
+      return (openFiles[b]._lastActiveTs||0)-(openFiles[a]._lastActiveTs||0);
+    });
+  }else if(_tabSortMode==='manual'){
+    order=_buildManualOrder();
+  }else if(_tabSortMode!=='opened'){
     order.sort(function(a,b){
       var na=openFiles[a].currentFileName||'', nb=openFiles[b].currentFileName||'';
       return na.localeCompare(nb,undefined,{numeric:true,sensitivity:'base'});
     });
   }
-  // V1_70: 「直前まで表示していたタブ」「その1つ前」を_lastActiveTsの大きい順で判定
-  // （currentFileIdx自身は上で最大値に更新済みのため、除外して考える）
-  var _recentIdxs=openFiles.map(function(f,i){return i;})
-    .filter(function(i){return i!==currentFileIdx&&openFiles[i]._lastActiveTs;})
-    .sort(function(a,b){return (openFiles[b]._lastActiveTs||0)-(openFiles[a]._lastActiveTs||0);});
-  var _recent1=_recentIdxs.length>0?_recentIdxs[0]:-1;
-  var _recent2=_recentIdxs.length>1?_recentIdxs[1]:-1;
+  var _ranks71=_getTabRecencyRanks(), _recent1=_ranks71.recent1, _recent2=_ranks71.recent2;
   var _activeItemEl=null;
   for(var k=0;k<order.length;k++){
     (function(idx){
       var item=document.createElement('div');
       item.className='tab-item'+(idx===currentFileIdx?' active':'');
+      item.dataset.filekey=openFiles[idx].fileKey||('idx'+idx); // V1_71: ドラッグ並び替え識別用
       var name=document.createElement('span');
       name.className='tab-name'+(idx===_recent1?' tab-recent-1':idx===_recent2?' tab-recent-2':'');
       name.textContent=openFiles[idx].currentFileName||'---';
@@ -1538,7 +1643,8 @@ function updateFileNavUI(){
       close.addEventListener('click',function(e){e.stopPropagation();if(_isOpeningFileBusy)return;closeTab(idx);}); // V1_40: 読込中は操作不可
       item.appendChild(name);
       item.appendChild(close);
-      item.addEventListener('click',function(){if(_isOpeningFileBusy)return;if(idx!==currentFileIdx) switchToFile(idx);}); // V1_40: 読込中は操作不可
+      item.addEventListener('pointerdown',function(e){_tabItemPointerDown(e,item,item.dataset.filekey);}); // V1_71: 長押しドラッグ並び替え
+      item.addEventListener('click',function(){if(_isOpeningFileBusy)return;if(_tabDragJustHappened)return;if(idx!==currentFileIdx) switchToFile(idx);}); // V1_40: 読込中は操作不可 / V1_71: ドラッグ直後のクリックは無視
       bar.appendChild(item);
       if(idx===currentFileIdx) _activeItemEl=item;
     })(order[k]);
@@ -1777,8 +1883,11 @@ document.querySelectorAll('input[name="tabSortMode"]').forEach(function(r){
 });
 function updateTabSortModeUI(){
   var rn=document.getElementById('tabSortName'),ro=document.getElementById('tabSortOpened');
+  var ra=document.getElementById('tabSortAccess'),rm=document.getElementById('tabSortManual'); // V1_71
   if(rn)rn.checked=(_tabSortMode==='name');
   if(ro)ro.checked=(_tabSortMode==='opened');
+  if(ra)ra.checked=(_tabSortMode==='access');
+  if(rm)rm.checked=(_tabSortMode==='manual');
 }
 updateTabSortModeUI();
 // V1_70: 開いているファイル一覧ボタン

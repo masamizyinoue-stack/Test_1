@@ -222,10 +222,13 @@ function _showOpenFilesListMenu(anchorEl){
     // タブ等)はopenFiles配列の順番を保つ
     var idxs=openFiles.map(function(f,i){return i;});
     idxs.sort(function(a,b){return (openFiles[b]._lastActiveTs||0)-(openFiles[a]._lastActiveTs||0);});
+    // V1_71: タブバーと同じ配色（赤=アクティブ/黄=前回/青=前々回）を共通関数で判定し統一する
+    var _ranks71=(typeof _getTabRecencyRanks==='function')?_getTabRecencyRanks():{recent1:-1,recent2:-1};
     idxs.forEach(function(idx){
       var f=openFiles[idx];
       var row=document.createElement('div');
       var isActive=(idx===currentFileIdx);
+      var isRecent1=(idx===_ranks71.recent1), isRecent2=(idx===_ranks71.recent2);
       row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:8px;border-bottom:1px solid #2a3d55;cursor:pointer;'+(isActive?'background:rgba(255,85,85,.15);':'');
       var isPdf=(f.currentFileName||f.name||'').toLowerCase().endsWith('.pdf');
       var badge=document.createElement('span');
@@ -235,7 +238,8 @@ function _showOpenFilesListMenu(anchorEl){
       info.style.cssText='flex:1;min-width:0;';
       var timeStr=f._lastActiveTs?'表示済み':'未表示';
       var sub=[f.folder||'',timeStr].filter(Boolean).join('・');
-      info.innerHTML='<div style="color:'+(isActive?'#ff8888':'#eee')+';font-size:13px;font-weight:'+(isActive?'700':'400')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(f.currentFileName||f.name||'---')+'</div>'
+      var nameColor=isActive?'#ff5555':isRecent1?'#ffd60a':isRecent2?'#4da6ff':'#eee';
+      info.innerHTML='<div style="color:'+nameColor+';font-size:13px;font-weight:'+(isActive?'700':'400')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(f.currentFileName||f.name||'---')+'</div>'
         +'<div style="color:#889;font-size:11px;">'+sub+'</div>';
       row.appendChild(badge);row.appendChild(info);
       row.addEventListener('click',function(){
