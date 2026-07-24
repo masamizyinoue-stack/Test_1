@@ -303,6 +303,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #openFolderIndexBtn:active{opacity:.8}
 #openFolderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center;white-space:pre-line} /* V1_43: フォルダ別内訳を複数行表示するため改行を有効化 */
 #openFileIndexClearBtn{align-self:flex-end;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--text-dim,#6b7f99);background:transparent;color:var(--text-dim,#6b7f99);cursor:pointer}
+/* V1_69: インデックスパターン登録・切替ボタン */
+.idx-profile-btn{flex:1;padding:9px 0;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;cursor:pointer}
+.idx-profile-btn:active{background:rgba(255,255,255,.08)}
 /* V0_107: タブバー */
 #tabBar{display:flex;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;background:#0d1117;border-bottom:1px solid #2a3040;min-height:0;max-height:40px;flex-shrink:0}
 #tabBar:empty{max-height:0;border-bottom:none}
@@ -500,7 +503,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_66</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_69</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -763,6 +766,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
         フォルダを選択してインデックス作成
       </button>
+      <!-- V1_69: インデックスパターン（複数登録・切替）機能 -->
+      <div style="display:flex;gap:6px">
+        <button id="saveIndexProfileBtn" class="idx-profile-btn">現在のインデックスを登録</button>
+        <button id="loadIndexProfileBtn" class="idx-profile-btn">登録インデックス</button>
+      </div>
       <div id="openFolderProgress"></div>
       <div style="display:flex;gap:4px;align-items:center"><input type="search" id="openFileSearchInput" placeholder="ファイル名・図面内の文字で検索…" autocomplete="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:0"><button id="openFileSearchClearBtn" style="background:none;border:none;color:var(--text-dim,#888);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;flex-shrink:0">✕</button></div>
       <!-- V1_58: パネルを開くと自動でテキスト読込ピックモードになるため、
@@ -793,21 +801,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=166"></script>
-<script src="viewer.js?v=166"></script>
-<script src="utils.js?v=166"></script>
-<script src="ui.js?v=166"></script>
-<script src="dialog.js?v=166"></script>
-<script src="storage.js?v=166"></script>
-<script src="fonts/NotoSansJP.js?v=166"></script>
-<script src="export.js?v=166"></script>
-<script src="tool.js?v=166"></script>
-<script src="verify.js?v=166"></script>
+<script src="layer.js?v=169"></script>
+<script src="viewer.js?v=169"></script>
+<script src="utils.js?v=169"></script>
+<script src="ui.js?v=169"></script>
+<script src="dialog.js?v=169"></script>
+<script src="storage.js?v=169"></script>
+<script src="fonts/NotoSansJP.js?v=169"></script>
+<script src="export.js?v=169"></script>
+<script src="tool.js?v=169"></script>
+<script src="verify.js?v=169"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=166"></script>
+<script src="supabase-sync.js?v=169"></script>
 <script>
-const APP_VERSION = 'V1_66';
+const APP_VERSION = 'V1_69';
 
 // =========================================================
 // グローバル状態
@@ -1285,6 +1293,14 @@ fileInput.addEventListener('change',async e=>{
         if(_sbP57){if(_sbP57.strokes&&_sbP57.strokes.length>0)strokes=_sbP57.strokes;if(_sbP57.dims&&_sbP57.dims.length>0)dims=_sbP57.dims;}
       }catch(e){}
     }
+    // V1_68: 上記のstrokes/dims復元（IndexedDB・Supabaseいずれも非同期）は、直前の
+    // loadPDF()内renderPdfPage()によるscheduleDraw()実行（1261行目付近、strokesが
+    // まだ空の時点）より後に完了するため、復元後に再度scheduleDraw()を呼ばないと
+    // 復元したstrokes/dimsがrequestAnimationFrame描画ループに反映されず、パン/ズーム等の
+    // 別操作でscheduleDraw系が呼ばれるまで画面に書き込みが表示されない不具合があった。
+    // DXF分岐(1322行目付近)・openDxfFromDb()には元々あった仕上げのscheduleDraw()が
+    // PDF分岐だけ欠けていたため、ここで追加する
+    scheduleDraw();
     // V1_51: 単独で開いたPDFも、DXFと同様に自動でインデックスへ追加する（全ページの文字を抽出）
     try{
       var _pdfTexts151=await extractAllPdfTexts(pdfDoc);
@@ -1354,12 +1370,20 @@ function resetToolStates(){
   // 計測ツール選択中にタブ切替・別ファイルを開く操作を行うと、ボタンは選択中の
   // 見た目のまま・currentToolも'll'等のままなのにLL.active等はfalseになり、以後
   // Apple Pencilでタップ/ドラッグしても計測ツールの分岐に入らずペン書き込み(sketch)
-  // になってしまう不具合があった。ここでcurrentToolをデフォルトの'sketch'へ戻し、
-  // ツールボタンの選択表示も「ペン」ボタンに揃えることで、内部状態と見た目を一致させる
-  currentTool='sketch';
-  document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
-  var _sketchBtn66=document.querySelector('.tool-btn[data-tool="sketch"]');
-  if(_sketchBtn66) _sketchBtn66.classList.add('active');
+  // になってしまう不具合があった。
+  // V1_67: V1_66では常にcurrentToolを'sketch'へ戻していたが、これだと消しゴム(eraser)・
+  // 蛍光ペン(hl)選択中にファイルを切り替えただけでもペンへ戻ってしまう回帰があった
+  // （eraser/hlはDIM/LP/LLのような専用状態機械を持たず、今回の不具合の対象外だったため、
+  // 従来はタブ切替をまたいで選択状態が保たれていた）。DIM/LP/LLのいずれかを使う
+  // 計測ツール（水平鉛直・斜め・2線間・線と点・直径・半径）が選択中だった場合に限り、
+  // currentToolとツールボタンの見た目を「ペン」に戻すよう修正した
+  var _measureTools67=['dxdy','diag','ll','lp','circDim','radDim'];
+  if(_measureTools67.indexOf(currentTool)!==-1){
+    currentTool='sketch';
+    document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
+    var _sketchBtn66=document.querySelector('.tool-btn[data-tool="sketch"]');
+    if(_sketchBtn66) _sketchBtn66.classList.add('active');
+  }
 }
 
 // V0_140: saveCurrentFileState廃止（全呼び出しをinline viewport syncに置換済み）
@@ -4391,7 +4415,11 @@ document.getElementById('searchBg').addEventListener('click',closeSearch);
 document.getElementById('searchInput').addEventListener('input',doSearch);
 
 // V0_100: IndexedDB 全図面検索 ───────────────────────────────────────
-var _IDB_NAME='dxfViewerDB', _IDB_VER=1, _IDB_STORE='dxfIndex';
+// V1_69: インデックスパターン（登録インデックス）保存用に_IDB_PROFILE_STOREを追加し、
+// DBバージョンを1→2へ引き上げた。既存ユーザーのDB(バージョン1・dxfIndexストアのみ)を
+// 開いた際もonupgradeneededが働き、dxfIndexストアはそのまま・新規に
+// dxfIndexProfilesストアだけが追加される（既存データの移行・削除は発生しない）
+var _IDB_NAME='dxfViewerDB', _IDB_VER=2, _IDB_STORE='dxfIndex', _IDB_PROFILE_STORE='dxfIndexProfiles';
 // V1_24: 「フォルダを選択してインデックス作成」実行中に落ちる不具合の修正。
 // 従来は_idbSave()を呼ぶたび（＝フォルダ内のファイル1件ごと）にindexedDB.open()で
 // 新しい接続を作っており、一度も閉じていなかった。数十〜数百件のフォルダを
@@ -4405,6 +4433,8 @@ function _openIdb(cb){
     var db=e.target.result;
     if(!db.objectStoreNames.contains(_IDB_STORE))
       db.createObjectStore(_IDB_STORE,{keyPath:'name'});
+    if(!db.objectStoreNames.contains(_IDB_PROFILE_STORE)) // V1_69: インデックスパターン保存用
+      db.createObjectStore(_IDB_PROFILE_STORE,{keyPath:'name'});
   };
   req.onsuccess=function(e){
     _idbConn=e.target.result;
@@ -4514,6 +4544,81 @@ function _idbClear(){
   _idbTx('readwrite',function(err,tx){
     if(err)return;
     tx.objectStore(_IDB_STORE).clear();
+  });
+}
+// V1_69: インデックスパターン（登録インデックス）機能 ─────────────────────
+// 現在dxfIndexストアに蓄積されている全レコード(name,buf,texts,ts,folder)を、
+// ユーザーが指定した任意の名前でdxfIndexProfilesストアへ丸ごと複製保存する。
+// 実フォルダへの再アクセスは不要（既にDBにあるバイナリ・テキストをそのまま使う）
+function _idbSaveProfile(name,cb){
+  _idbGetAll(function(records){
+    _openIdb(function(err,db){
+      if(err){cb&&cb(err);return;}
+      try{
+        var tx=db.transaction(_IDB_PROFILE_STORE,'readwrite');
+        tx.objectStore(_IDB_PROFILE_STORE).put({name:name,records:records,savedAt:Date.now()});
+        tx.oncomplete=function(){cb&&cb(null);};
+        tx.onerror=function(e){cb&&cb(e.target.error);};
+      }catch(e){cb&&cb(e);}
+    });
+  });
+}
+// 登録済みインデックスパターンの一覧を、名前・件数・保存日時のみの軽量な形で返す
+// （records本体は一覧表示に不要なため、コールバックへ渡す前に捨てる）
+function _idbListProfiles(cb){
+  _openIdb(function(err,db){
+    if(err){cb([]);return;}
+    try{
+      var tx=db.transaction(_IDB_PROFILE_STORE,'readonly');
+      var list=[];
+      var req=tx.objectStore(_IDB_PROFILE_STORE).openCursor();
+      req.onsuccess=function(e){
+        var cursor=e.target.result;
+        if(cursor){
+          list.push({name:cursor.value.name,count:(cursor.value.records||[]).length,savedAt:cursor.value.savedAt});
+          cursor.continue();
+        } else {
+          list.sort(function(a,b){return (b.savedAt||0)-(a.savedAt||0);}); // 新しい登録ほど上に
+          cb(list);
+        }
+      };
+      req.onerror=function(){cb([]);};
+    }catch(e){cb([]);}
+  });
+}
+// 指定名のインデックスパターンで、現在のdxfIndexストアを置き換える
+// （検索対象を登録内容だけに絞り込むため、clear→putを同一トランザクションで行う）
+function _idbLoadProfile(name,cb){
+  _openIdb(function(err,db){
+    if(err){cb&&cb(err);return;}
+    try{
+      var txR=db.transaction(_IDB_PROFILE_STORE,'readonly');
+      var getReq=txR.objectStore(_IDB_PROFILE_STORE).get(name);
+      getReq.onsuccess=function(e){
+        var prof=e.target.result;
+        if(!prof){cb&&cb(new Error('見つかりません'));return;}
+        try{
+          var tx=db.transaction(_IDB_STORE,'readwrite');
+          var store=tx.objectStore(_IDB_STORE);
+          store.clear();
+          (prof.records||[]).forEach(function(r){store.put(r);});
+          tx.oncomplete=function(){cb&&cb(null);};
+          tx.onerror=function(e3){cb&&cb(e3.target.error);};
+        }catch(e4){cb&&cb(e4);}
+      };
+      getReq.onerror=function(e){cb&&cb(e.target.error);};
+    }catch(e){cb&&cb(e);}
+  });
+}
+function _idbDeleteProfile(name,cb){
+  _openIdb(function(err,db){
+    if(err){cb&&cb(err);return;}
+    try{
+      var tx=db.transaction(_IDB_PROFILE_STORE,'readwrite');
+      tx.objectStore(_IDB_PROFILE_STORE).delete(name);
+      tx.oncomplete=function(){cb&&cb(null);};
+      tx.onerror=function(e){cb&&cb(e.target.error);};
+    }catch(e){cb&&cb(e);}
   });
 }
 // V1_23: 「ファイルを開く」パネルの不安定・重い・落ちる不具合の修正で追加した
@@ -4912,6 +5017,21 @@ document.getElementById('folderIndexBtn').addEventListener('click', function(){
 document.getElementById('openFolderIndexBtn').addEventListener('click', function(){
   _folderIndexSource='openFile';
   document.getElementById('folderInput').click();
+});
+// V1_69: 現在のインデックス(dxfIndexストア全件)を任意の名前で登録する
+document.getElementById('saveIndexProfileBtn').addEventListener('click', function(){
+  var btn=this;
+  if(typeof _showIndexProfileNameDialog!=='function') return;
+  _showIndexProfileNameDialog(btn, function(name){
+    _idbSaveProfile(name, function(err){
+      if(err){showGuide('登録に失敗しました',2000);return;}
+      showGuide('「'+name+'」として登録しました',2000);
+    });
+  });
+});
+// V1_69: 登録済みインデックスパターンの一覧から選んで切替・削除する
+document.getElementById('loadIndexProfileBtn').addEventListener('click', function(){
+  if(typeof _showIndexProfileListMenu==='function') _showIndexProfileListMenu(this);
 });
 document.getElementById('folderInput').addEventListener('change', function(e){
   var progEl = document.getElementById(_folderIndexSource==='openFile'?'openFolderProgress':'folderProgress');
