@@ -261,7 +261,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .text-pick-btn{width:100%;padding:10px 0;border-radius:9px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent}
 .text-pick-btn:active{background:rgba(255,255,255,.07)}
 .text-pick-btn.picking{border-color:#ffd700;background:rgba(255,215,0,.12);color:#ffd700}
-#folderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center}
+#folderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center;white-space:pre-line} /* V1_43: フォルダ別内訳を複数行表示するため改行を有効化 */
 /* V1_22: 「ファイルを開く」フォルダインデックス検索パネル（全図面検索と同じdxfIndexを共有） */
 #openFileOverlay{display:none;position:fixed;inset:0;z-index:300}
 #openFileOverlay.open{display:block}
@@ -278,7 +278,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #openFileSearchInput:focus{border-color:var(--accent)}
 #openFolderIndexBtn{width:100%;padding:10px 0;border-radius:9px;border:none;background:var(--accent,#00d4ff);color:#000;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
 #openFolderIndexBtn:active{opacity:.8}
-#openFolderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center}
+#openFolderProgress{font-size:13px;color:var(--accent,#00d4ff);min-height:18px;text-align:center;white-space:pre-line} /* V1_43: フォルダ別内訳を複数行表示するため改行を有効化 */
 #openFileIndexClearBtn{align-self:flex-end;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--text-dim,#6b7f99);background:transparent;color:var(--text-dim,#6b7f99);cursor:pointer}
 /* V0_107: タブバー */
 #tabBar{display:flex;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;background:#0d1117;border-bottom:1px solid #2a3040;min-height:0;max-height:40px;flex-shrink:0}
@@ -452,7 +452,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_42</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_43</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -761,21 +761,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=142"></script>
-<script src="viewer.js?v=142"></script>
-<script src="utils.js?v=142"></script>
-<script src="ui.js?v=142"></script>
-<script src="dialog.js?v=142"></script>
-<script src="storage.js?v=142"></script>
-<script src="fonts/NotoSansJP.js?v=142"></script>
-<script src="export.js?v=142"></script>
-<script src="tool.js?v=142"></script>
-<script src="verify.js?v=142"></script>
+<script src="layer.js?v=143"></script>
+<script src="viewer.js?v=143"></script>
+<script src="utils.js?v=143"></script>
+<script src="ui.js?v=143"></script>
+<script src="dialog.js?v=143"></script>
+<script src="storage.js?v=143"></script>
+<script src="fonts/NotoSansJP.js?v=143"></script>
+<script src="export.js?v=143"></script>
+<script src="tool.js?v=143"></script>
+<script src="verify.js?v=143"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=142"></script>
+<script src="supabase-sync.js?v=143"></script>
 <script>
-const APP_VERSION = 'V1_42';
+const APP_VERSION = 'V1_43';
 
 // =========================================================
 // グローバル状態
@@ -4126,10 +4126,13 @@ function _idbTx(mode,cb){
     }
   });
 }
-function _idbSave(name,buf,texts){
+// V1_43: フォルダ別の内訳表示のため、どのフォルダをインデックスした際に保存
+// されたファイルかをレコードに持たせる（folder引数省略時は個別に開いたファイル
+// 扱いとして''を入れる）
+function _idbSave(name,buf,texts,folder){
   _idbTx('readwrite',function(err,tx){
     if(err)return;
-    var req=tx.objectStore(_IDB_STORE).put({name:name,buf:buf,texts:texts,ts:Date.now()});
+    var req=tx.objectStore(_IDB_STORE).put({name:name,buf:buf,texts:texts,ts:Date.now(),folder:folder||''});
     // V1_37: put()自体が失敗した場合（データ破損・容量超過等）に気づけるよう
     // コンソールへ記録する。processFolderFiles()の成功/失敗カウントには
     // 影響させない（従来通り解析成功時点でdone扱いとする）
@@ -4146,6 +4149,43 @@ function _idbCount(cb){
     req.onsuccess=function(e){cb(e.target.result||0);};
     req.onerror=function(){cb(0);};
   });
+}
+// V1_43: 複数フォルダのインデックスが「クリア」を押すまで蓄積される仕様のため、
+// 「前回インデックスしたフォルダ名」1件だけを表示するとその他に蓄積されている
+// フォルダの存在が分からず紛らわしいとの指摘を受けて追加。フォルダ名ごとの
+// 件数をカーソルで集計する（folder未設定＝旧データ・個別に開いたファイルは
+// ''キーにまとめる）
+function _idbCountByFolder(cb){
+  _idbTx('readonly',function(err,tx){
+    if(err){cb({});return;}
+    var counts={};
+    var req=tx.objectStore(_IDB_STORE).openCursor();
+    req.onsuccess=function(e){
+      var cursor=e.target.result;
+      if(cursor){
+        var f=cursor.value.folder||'';
+        counts[f]=(counts[f]||0)+1;
+        cursor.continue();
+      } else {
+        cb(counts);
+      }
+    };
+    req.onerror=function(){cb(counts);};
+  });
+}
+// V1_43: _idbCountByFolder()の結果から表示用テキストを組み立てる。
+// 保存されているファイルが1件も無ければ「インデックス作成：無し」、
+// あればフォルダごとに1行ずつ件数を列挙する（フォルダ名は自然順ソート）。
+// folder=''（個別に開いたファイル・旧データ）は最後に別枠でまとめる
+function _buildIndexSummaryText(counts){
+  var keys=Object.keys(counts).filter(function(k){return k&&counts[k]>0;});
+  var otherCount=counts['']||0;
+  if(keys.length===0&&otherCount===0) return 'インデックス作成：無し';
+  keys.sort(function(a,b){return a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});});
+  var lines=['インデックス完了'];
+  keys.forEach(function(k){lines.push('「'+k+'」：'+counts[k]+'件');});
+  if(otherCount>0) lines.push('「個別に開いたファイル」：'+otherCount+'件');
+  return lines.join('\n');
 }
 function _idbGetAll(cb){
   _idbTx('readonly',function(err,tx){
@@ -4208,14 +4248,13 @@ function openAllSearchPanel(){
   // V1_37: 「前回のインデックス対象フォルダ」という表示だと、実際に保存済みなのか
   // 単に前回試みたフォルダ名を覚えているだけなのか分かりにくいとの指摘のため、
   // 実際にIndexedDBへ保存されている件数を調べて表示するよう変更した
+  // V1_43: 「クリア」を押すまで複数フォルダ分が蓄積される仕様のため、最後の1件だけ
+  // でなく保存済み全フォルダの内訳を表示するよう変更した
   var prog=document.getElementById('folderProgress');
-  if(prog&&!prog.textContent&&_dxfIndexFolderName){
-    var _fn=_dxfIndexFolderName;
-    _idbCount(function(n){
+  if(prog&&!prog.textContent){
+    _idbCountByFolder(function(counts){
       if(prog.textContent) return; // 表示中に他の処理が進捗を書き換えていたら上書きしない
-      prog.textContent = n>0
-        ? 'インデックス済み: 「'+_fn+'」（'+n+'件 保存済み）'
-        : '「'+_fn+'」のインデックスは保存されていません。再度インデックス作成してください';
+      prog.textContent=_buildIndexSummaryText(counts);
     });
   }
   var inp=document.getElementById('allSearchInput');
@@ -4378,14 +4417,12 @@ function openOpenFilePanel(){
   document.getElementById('openFileOverlay').classList.add('open');
   // V1_33: 進捗表示が空の場合は直近にインデックスしたフォルダ名を表示する
   // V1_37: 実際の保存件数を調べて表示するよう変更（詳細はopenAllSearchPanel参照）
+  // V1_43: 保存済み全フォルダの内訳を表示するよう変更（詳細はopenAllSearchPanel参照）
   var oprog=document.getElementById('openFolderProgress');
-  if(oprog&&!oprog.textContent&&_dxfIndexFolderName){
-    var _fn2=_dxfIndexFolderName;
-    _idbCount(function(n){
+  if(oprog&&!oprog.textContent){
+    _idbCountByFolder(function(counts){
       if(oprog.textContent) return;
-      oprog.textContent = n>0
-        ? 'インデックス済み: 「'+_fn2+'」（'+n+'件 保存済み）'
-        : '「'+_fn2+'」のインデックスは保存されていません。再度インデックス作成してください';
+      oprog.textContent=_buildIndexSummaryText(counts);
     });
   }
   doOpenFileSearch();
@@ -4473,8 +4510,8 @@ document.getElementById('openFileIndexClearBtn').addEventListener('click',functi
     // V1_33: フォルダ名表示もあわせてクリア
     _dxfIndexFolderName='';
     try{localStorage.removeItem('_dxfIndexFolderName');}catch(e){}
-    document.getElementById('folderProgress').textContent='';
-    document.getElementById('openFolderProgress').textContent='';
+    document.getElementById('folderProgress').textContent='インデックス作成：無し'; // V1_43
+    document.getElementById('openFolderProgress').textContent='インデックス作成：無し'; // V1_43
     doOpenFileSearch();
     document.getElementById('allSearchResultList').innerHTML='';
     document.getElementById('allSearchCount').textContent='インデックスをクリアしました';
@@ -4500,8 +4537,8 @@ document.getElementById('allSearchClearBtn').addEventListener('click',function()
     // V1_33: フォルダ名表示もあわせてクリア
     _dxfIndexFolderName='';
     try{localStorage.removeItem('_dxfIndexFolderName');}catch(e){}
-    document.getElementById('folderProgress').textContent='';
-    document.getElementById('openFolderProgress').textContent='';
+    document.getElementById('folderProgress').textContent='インデックス作成：無し'; // V1_43
+    document.getElementById('openFolderProgress').textContent='インデックス作成：無し'; // V1_43
     document.getElementById('allSearchResultList').innerHTML='';
     document.getElementById('allSearchCount').textContent='インデックスをクリアしました';
   }
@@ -4566,13 +4603,20 @@ function processFolderFiles(files, progEl, folderName){
   function next(idx){
     if(idx >= total){
       // V1_35: エラーがあった場合、原因がすぐ分かるよう代表的なエラー内容を併記する
-      // （従来はconsole.warnのみでユーザーからは原因が見えなかった）
-      var errMsg = errorSamples.length ? '（'+errors+'件エラー: '+errorSamples.join(' / ')+'）' : (errors>0?'（'+errors+'件エラー）':'');
-      prog.textContent = (fn?fn+'の':'')+'インデックスが完了しました: ' + (total - errors) + '件' + errMsg;
+      // （従来はconsole.warnのみでユーザーからは原因が見えなかった）。
+      // V1_43: 複数フォルダのインデックスが「クリア」を押すまで蓄積される仕様のため、
+      // 完了時の表示を「今回処理したフォルダの件数」単体ではなく、保存済み全フォルダの
+      // 内訳（_buildIndexSummaryText）に変更した。エラー内容は別途ガイド表示（トースト）
+      // で一時的に知らせる
+      if(errors>0){
+        var errMsg = errorSamples.length ? '（'+errorSamples.join(' / ')+'）' : '';
+        showGuide((fn?fn+'の':'')+'処理中に'+errors+'件のエラーがありました'+errMsg, 4000);
+      }
       if(folderName){ // V1_33: 次回パネルを開いた時のためにフォルダ名を保存
         _dxfIndexFolderName=folderName;
         try{localStorage.setItem('_dxfIndexFolderName',folderName);}catch(e){}
       }
+      _idbCountByFolder(function(counts){ prog.textContent=_buildIndexSummaryText(counts); });
       // 検索入力に値があれば再検索（全図面検索・ファイルを開くの両パネル）
       var inp = document.getElementById('allSearchInput');
       if(inp.value.trim()) doAllSearch();
@@ -4593,7 +4637,7 @@ function processFolderFiles(files, progEl, folderName){
             if(t) texts.push(t);
           });
         }
-        _idbSave(f.name, buf, texts);
+        _idbSave(f.name, buf, texts, folderName); // V1_43: フォルダ別内訳表示のためフォルダ名も保存
         done++;
       }catch(err){
         errors++;
