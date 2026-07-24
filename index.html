@@ -477,7 +477,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_57</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_58</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -783,21 +783,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=157"></script>
-<script src="viewer.js?v=157"></script>
-<script src="utils.js?v=157"></script>
-<script src="ui.js?v=157"></script>
-<script src="dialog.js?v=157"></script>
-<script src="storage.js?v=157"></script>
-<script src="fonts/NotoSansJP.js?v=157"></script>
-<script src="export.js?v=157"></script>
-<script src="tool.js?v=157"></script>
-<script src="verify.js?v=157"></script>
+<script src="layer.js?v=158"></script>
+<script src="viewer.js?v=158"></script>
+<script src="utils.js?v=158"></script>
+<script src="ui.js?v=158"></script>
+<script src="dialog.js?v=158"></script>
+<script src="storage.js?v=158"></script>
+<script src="fonts/NotoSansJP.js?v=158"></script>
+<script src="export.js?v=158"></script>
+<script src="tool.js?v=158"></script>
+<script src="verify.js?v=158"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=157"></script>
+<script src="supabase-sync.js?v=158"></script>
 <script>
-const APP_VERSION = 'V1_57';
+const APP_VERSION = 'V1_58';
 
 // =========================================================
 // グローバル状態
@@ -4341,6 +4341,11 @@ function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック�
   // 既存のキーワードがあれば再検索
   if(inp.value.trim()) doSearch();
   setTimeout(function(){inp.focus();},120);
+  // V1_58: 画面検索を開いたら、テキスト読込ボタンを押さなくても最初から
+  // 図面タップでの文字読込ピックモードに入るようにする（キーボード入力も
+  // 従来通り有効。ピックモードはcanvasタップの挙動のみに影響するため、
+  // 検索欄へのキーボード入力とは無関係で両立する）
+  _setTextPickMode('screen');
 }
 function closeSearch(){document.getElementById('searchOverlay').classList.remove('open');_searchHighlight=null;scheduleOverlay();if(_textPickTarget==='screen')_setTextPickMode(null);} // V1_27: パネルを閉じたらテキスト読込ピックモードも解除
 document.getElementById('searchClose').addEventListener('click',closeSearch);
@@ -4718,6 +4723,10 @@ function openOpenFilePanel(){
     });
   }
   doOpenFileSearch();
+  // V1_58: 検索開くを開いたら、テキスト読込ボタンを押さなくても最初から
+  // 図面タップでの文字読込ピックモードに入るようにする（キーボード入力も
+  // 従来通り有効）
+  _setTextPickMode('openFile');
 }
 function closeOpenFilePanel(){document.getElementById('openFileOverlay').classList.remove('open');if(_textPickTarget==='openFile')_setTextPickMode(null);} // V1_29: パネルを閉じたらテキスト読込ピックモードも解除
 var _openFileSearchGen=0;
