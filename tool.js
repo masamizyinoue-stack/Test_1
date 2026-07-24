@@ -130,33 +130,31 @@ function _fingerCursorInfo(){
   return null;
 }
 
+// V1_50: 見た目をシンプルな十字印に変更。白背景(bwMode)・黒背景のどちらでも
+// 見えるよう、背景と反対系統の色のハロー（縁取り）を下地に描き、その上に
+// 視認性の高い赤系の線を重ねる（ハロー色だけを背景で切り替える方式）
 function _drawFingerCursor(){
   var info=_fingerCursorInfo();
   if(!info) return;
   var sc=w2s(info.wx,info.wy);
   var sx=sc[0],sy=sc[1];
   var dpr=window.devicePixelRatio||1;
+  var r=11;
+  var haloColor=(typeof bwMode!=='undefined'&&bwMode)?'rgba(255,255,255,0.95)':'rgba(0,0,0,0.6)';
   octx.save();
   octx.scale(dpr,dpr);
-  octx.globalAlpha=0.92;
-  // 実際の指位置（この仮カーソルの真下）へのガイド線
-  octx.strokeStyle='rgba(255,255,255,0.55)';
-  octx.lineWidth=1.5; octx.setLineDash([3,3]);
+  octx.lineCap='round';
+  // ハロー（背景色に応じた太めの縁取り）
+  octx.strokeStyle=haloColor; octx.lineWidth=5;
   octx.beginPath();
-  octx.moveTo(sx,sy+16); octx.lineTo(sx,sy+FINGER_CURSOR_OFFSET_Y-6);
+  octx.moveTo(sx-r,sy); octx.lineTo(sx+r,sy);
+  octx.moveTo(sx,sy-r); octx.lineTo(sx,sy+r);
   octx.stroke();
-  octx.setLineDash([]);
-  // 指先パッド（半透明の楕円＝「指の形」）
-  octx.fillStyle='rgba(255,255,255,0.16)';
-  octx.strokeStyle='rgba(255,255,255,0.95)';
-  octx.lineWidth=2;
+  // 十字本体
+  octx.strokeStyle='#ff3b30'; octx.lineWidth=2.5;
   octx.beginPath();
-  octx.ellipse(sx,sy,12,15,0,0,Math.PI*2);
-  octx.fill(); octx.stroke();
-  // 中心の十字（現在サーチ中の正確な座標）
-  octx.beginPath();
-  octx.moveTo(sx-6,sy); octx.lineTo(sx+6,sy);
-  octx.moveTo(sx,sy-6); octx.lineTo(sx,sy+6);
+  octx.moveTo(sx-r,sy); octx.lineTo(sx+r,sy);
+  octx.moveTo(sx,sy-r); octx.lineTo(sx,sy+r);
   octx.stroke();
   octx.restore();
 }
