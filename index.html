@@ -500,7 +500,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_64</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_65</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -793,21 +793,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=164"></script>
-<script src="viewer.js?v=164"></script>
-<script src="utils.js?v=164"></script>
-<script src="ui.js?v=164"></script>
-<script src="dialog.js?v=164"></script>
-<script src="storage.js?v=164"></script>
-<script src="fonts/NotoSansJP.js?v=164"></script>
-<script src="export.js?v=164"></script>
-<script src="tool.js?v=164"></script>
-<script src="verify.js?v=164"></script>
+<script src="layer.js?v=165"></script>
+<script src="viewer.js?v=165"></script>
+<script src="utils.js?v=165"></script>
+<script src="ui.js?v=165"></script>
+<script src="dialog.js?v=165"></script>
+<script src="storage.js?v=165"></script>
+<script src="fonts/NotoSansJP.js?v=165"></script>
+<script src="export.js?v=165"></script>
+<script src="tool.js?v=165"></script>
+<script src="verify.js?v=165"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=164"></script>
+<script src="supabase-sync.js?v=165"></script>
 <script>
-const APP_VERSION = 'V1_64';
+const APP_VERSION = 'V1_65';
 
 // =========================================================
 // グローバル状態
@@ -874,9 +874,11 @@ function drawAnnotation(targetCtx) {
   // V0_119: ビューポートカリング（物理ピクセル空間で判定）
   const _mgPx=(atc.canvas.width>0?60*(window.devicePixelRatio||1):0);
   const _cwPx=atc.canvas.width, _chPx=atc.canvas.height;
+  var _curPg65=_curPage(); // V1_65: PDFページごとに書き込みを分離するため、現在ページ以外は描画しない
   for(var si=0; si<strokes.length; si++){
     var s = strokes[si];
     if(!s.pts || s.pts.length < 2) continue;
+    if((s.page||1)!==_curPg65) continue;
     var _sxMn=Infinity,_sxMx=-Infinity,_syMn=Infinity,_syMx=-Infinity;
     for(var _pi=0;_pi<s.pts.length;_pi++){var _ppx=physX(s.pts[_pi].x),_ppy=physY(s.pts[_pi].y);if(_ppx<_sxMn)_sxMn=_ppx;if(_ppx>_sxMx)_sxMx=_ppx;if(_ppy<_syMn)_syMn=_ppy;if(_ppy>_syMx)_syMx=_ppy;}
     if(_sxMx<-_mgPx||_sxMn>_cwPx+_mgPx||_syMx<-_mgPx||_syMn>_chPx+_mgPx) continue;
@@ -975,7 +977,9 @@ function drawOverlay(){
     }
   }
   // Dims（V0_119: ビューポートカリング追加）
-  {const _mgD=60;for(const d of dims){
+  // V1_65: PDFページごとに書き込みを分離するため、現在ページ以外のdimは描画しない
+  {const _mgD=60;const _curPgD65=_curPage();for(const d of dims){
+    if((d.page||1)!==_curPgD65) continue;
     if(!d.lines||d.lines.length===0){drawDimEntity(octx,d);continue;}
     let _wxMn=Infinity,_wyMn=Infinity,_wxMx=-Infinity,_wyMx=-Infinity;
     for(const _l of d.lines){if(_l.x1<_wxMn)_wxMn=_l.x1;if(_l.x1>_wxMx)_wxMx=_l.x1;if(_l.y1<_wyMn)_wyMn=_l.y1;if(_l.y1>_wyMx)_wyMx=_l.y1;if(_l.x2<_wxMn)_wxMn=_l.x2;if(_l.x2>_wxMx)_wxMx=_l.x2;if(_l.y2<_wyMn)_wyMn=_l.y2;if(_l.y2>_wyMx)_wyMx=_l.y2;}
@@ -2089,7 +2093,8 @@ function buildDim(p1,p2,pArrow,type){
     else if(tRef2>len+1/scale) lines.push({x1:ep2x,y1:ep2y,x2:pRef.x,y2:pRef.y});
     arrows.push({x:ep1x,y:ep1y,angle:a1});arrows.push({x:ep2x,y:ep2y,angle:a2});
   }
-  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12',worldFontH:17/(scale||1),fixedTextPx:17}; // V0_78: テキストサイズモード用
+  // V1_65: PDFの場合、現在ページ番号をpageとして付与（ページごとに書き込みを分離するため）
+  return {lines,arrows,text,tx:tx2,ty:ty2,tangle,color:currentDimColor||'#f39c12',worldFontH:17/(scale||1),fixedTextPx:17,page:_curPage()}; // V0_78: テキストサイズモード用
 }
 
 function formatDim(d){
@@ -2409,7 +2414,7 @@ function buildCircDimPhi(ent,p3){
     arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
     text:'φ'+formatDim(r*2/sd),
     tx:p3.x,ty:p3.y,tangle:tangle,type:'phi',worldFontH:17/(scale||1),color:currentDimColor||'#f39c12',
-    centerMark:{cx:cx,cy:cy}
+    centerMark:{cx:cx,cy:cy},page:_curPage() // V1_65: ページごとに書き込みを分離するため
   };
 }
 
@@ -2485,7 +2490,7 @@ function buildRadDim(ent,p3){
     arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
     text:'R'+formatDim(r/sd),
     tx:p3.x,ty:p3.y,tangle:tangle,type:'rad',worldFontH:17/(scale||1),color:currentDimColor||'#f39c12',
-    centerMark:{cx:cx,cy:cy}
+    centerMark:{cx:cx,cy:cy},page:_curPage() // V1_65: ページごとに書き込みを分離するため
   };
 }
 
@@ -2725,7 +2730,7 @@ function buildLinePtDim(line,pt,pArrow){
   }
   return {lines,arrows,
     text:formatDim(dist/sd),
-    tx:tx2,ty:ty2,tangle,worldFontH:17/(scale||1),color:currentDimColor||'#f39c12'};
+    tx:tx2,ty:ty2,tangle,worldFontH:17/(scale||1),color:currentDimColor||'#f39c12',page:_curPage()}; // V1_65: ページごとに書き込みを分離するため
 }
 
 // ─ プレビュー描画(点線) ───────────────────────────────
@@ -5007,9 +5012,11 @@ document.getElementById('searchClearBtn').addEventListener('click',function(){
 var _dimTextDrag=null;
 function _dimTextHit(sx,sy){
   var r=26;
+  var _curPgH65=_curPage(); // V1_65: 現在表示中のページの寸法値のみドラッグ対象にする
   for(var _dti=dims.length-1;_dti>=0;_dti--){
     var _dtd=dims[_dti];
     if(_dtd.tx===undefined||_dtd.ty===undefined) continue;
+    if((_dtd.page||1)!==_curPgH65) continue;
     var _dts=w2s(_dtd.tx,_dtd.ty);
     if(Math.hypot(sx-_dts[0],sy-_dts[1])<r) return _dti;
   }

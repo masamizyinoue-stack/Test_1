@@ -28,6 +28,10 @@ var inputMode='pen'; // 'pen' | 'freehand'  入力モード
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
 var pdfImage=null;
+// V1_65: PDFの各ページに書いたstrokes/dimsが全ページに同じ様に表示されてしまう不具合の修正用。
+// stroke/dim作成時にこの値をpageプロパティとして付与し、描画・消しゴム等でこの値と一致するものだけを対象にする。
+// PDF未表示時（DXF表示中含む）は常に1を返し、既存データ（pageプロパティ無し=1扱い）と互換を保つ
+function _curPage(){return (typeof pdfDoc!=='undefined'&&pdfDoc)?pdfPageNum:1;}
 var pdfMoji=[]; // V1_51: 現在表示中のPDFページから抽出した文字（画面検索・テキスト読込用）
 var rafId=null;
 var needDraw=false,needOverlay=false,needAnnotation=false;
