@@ -199,9 +199,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 @supports (padding-bottom:env(safe-area-inset-bottom)){
   .btbar{bottom:calc(22px + env(safe-area-inset-bottom))}}
 .tb-btn svg, .tb-tool-btn svg { width: 20px; height: 20px; display: block; flex-shrink: 0; }
-/* V0_71: コンテキスト感知色丸ボタン */
-.tool-color-dot{width:24px;height:24px;border-radius:50%;border:2.5px solid rgba(255,255,255,0.5);cursor:pointer;padding:0;flex-shrink:0;-webkit-tap-highlight-color:transparent;margin-left:4px}
-.tool-color-dot:active{border-color:#fff}
+/* V1_45: 色丸ボタン(.tool-color-dot)は、選択中の色をツールアイコン自体に表示する
+   方式に統合したため廃止した（色・太さの選択は、選択中のツールアイコンをもう一度
+   押すことで開くように変更） */
 /* colorOverlay モード別セクション表示制御 */
 #colorOverlay .co-sketch-section,#colorOverlay .co-hl-section,#colorOverlay .co-dim-section{display:none}
 #colorOverlay[data-mode="sketch"] .co-sketch-section{display:block}
@@ -365,23 +365,31 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     </div>
   </div>
   <div class="tb-sep"></div>
-  <button class="tool-color-dot" id="sketchColorDot" title="スケッチ色" style="display:none;background:rgb(255,0,0)"></button>
-  <button class="tool-color-dot" id="hlColorDot" title="蛍光色" style="display:none;background:rgb(255,255,0);margin-right:8px"></button>
-  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="hl" title="蛍光ペン"><span class="tb-tool-label">蛍光</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3l6 6-11 11H4v-6L15 3z" fill="rgba(255,255,0,0.25)"/><line x1="11" y1="7" x2="17" y2="13"/></svg></button>
+  <!-- V1_44: アイコン自体に選択中の色を反映させるため、svgにid(sketchToolIcon)を付与。
+       stroke="currentColor"なのでsvg要素自身のstyle.colorを変えるとペン先の線色が変わる
+       V1_45: 色丸ボタン(sketchColorDot)は廃止。選択中に同じアイコンをもう一度押すと
+       色・太さの選択ポップアップが開く -->
+  <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg id="sketchToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></button>
+  <!-- V1_44: 蛍光ペン先(line)はcurrentColorで追従するが、塗りつぶし部分(path)は
+       fill属性が固定値のため、id(hlToolIconFill)を付与してJSから直接色を書き換える
+       V1_45: 色丸ボタン(hlColorDot)は廃止。選択中に同じアイコンをもう一度押すと
+       色・太さの選択ポップアップが開く -->
+  <button class="tb-tool-btn tool-btn" data-tool="hl" title="蛍光ペン"><span class="tb-tool-label">蛍光</span><svg id="hlToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path id="hlToolIconFill" d="M15 3l6 6-11 11H4v-6L15 3z" fill="rgba(255,255,0,0.25)"/><line x1="11" y1="7" x2="17" y2="13"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
   <!-- V0_74: 計測グループ（ラベル付き） -->
   <div class="dim-group">
     <div class="dim-group-btns">
-      <button class="tool-color-dot" id="dimColorDot" title="寸法色" style="display:none;background:#f39c12;margin-right:8px"></button>
-      <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="ll" title="2線間距離（平行な線を2本選択）"><span class="tb-tool-label">2線間</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="12" y1="7" x2="12" y2="17"/><polyline points="9 10 12 7 15 10"/><polyline points="9 14 12 17 15 14"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
+      <!-- V1_45: 色丸ボタン(dimColorDot)は廃止。寸法系アイコン(svg)にはdimToolIconクラスを
+           付与し、選択中の寸法色(currentDimColor)を反映する。選択中に同じアイコンを
+           もう一度押すと色・太さの選択ポップアップが開く -->
+      <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="ll" title="2線間距離（平行な線を2本選択）"><span class="tb-tool-label">2線間</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="12" y1="7" x2="12" y2="17"/><polyline points="9 10 12 7 15 10"/><polyline points="9 14 12 17 15 14"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
 
     </div>
   </div>
@@ -452,7 +460,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_43</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_46</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -761,21 +769,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=143"></script>
-<script src="viewer.js?v=143"></script>
-<script src="utils.js?v=143"></script>
-<script src="ui.js?v=143"></script>
-<script src="dialog.js?v=143"></script>
-<script src="storage.js?v=143"></script>
-<script src="fonts/NotoSansJP.js?v=143"></script>
-<script src="export.js?v=143"></script>
-<script src="tool.js?v=143"></script>
-<script src="verify.js?v=143"></script>
+<script src="layer.js?v=146"></script>
+<script src="viewer.js?v=146"></script>
+<script src="utils.js?v=146"></script>
+<script src="ui.js?v=146"></script>
+<script src="dialog.js?v=146"></script>
+<script src="storage.js?v=146"></script>
+<script src="fonts/NotoSansJP.js?v=146"></script>
+<script src="export.js?v=146"></script>
+<script src="tool.js?v=146"></script>
+<script src="verify.js?v=146"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=143"></script>
+<script src="supabase-sync.js?v=146"></script>
 <script>
-const APP_VERSION = 'V1_43';
+const APP_VERSION = 'V1_46';
 
 // =========================================================
 // グローバル状態
@@ -1743,25 +1751,27 @@ document.querySelectorAll('.show-btn').forEach(btn=>{
 });
 
 
-// V0_71: コンテキスト感知色丸ボタン制御
+// V0_71: コンテキスト感知色丸ボタン制御（V1_45で色丸自体は廃止。関数名・DIM_TOOLS定数は
+// 他ファイル(tool.js/storage.js)から参照されているためそのまま維持している）
 // V1_30: 「2線間」(ll)がこの一覧に含まれておらず、2線間コマンド中に寸法色選択ボタン
 // (dimColorDot)が表示されない不具合を修正。他の寸法系ツール(dxdy/diag/lp/circDim/
 // radDim)と同様、llもDIM_TOOLSに含めることでボタンが表示されるようにした
 const DIM_TOOLS=['dxdy','diag','lp','ll','circDim','radDim'];
+// V1_44/V1_45: 「ペン」「蛍光」「寸法系」ツールボタンのアイコン自体に選択中の色を
+// 反映する。svg要素自身のstyle.colorを変えることで、そのsvg内のstroke="currentColor"
+// な要素（線）だけが変わり、ボタン本体のactive状態の色(border/background)には
+// 影響しない。V1_45で色丸ボタン(sketchColorDot/hlColorDot/dimColorDot)は、色が
+// アイコンで分かるようになったため廃止した
 function updateToolColorDots(){
-  const isSk=currentTool==='sketch';
-  const isHl=currentTool==='hl';
-  const isDim=DIM_TOOLS.includes(currentTool);
-  const sd=document.getElementById('sketchColorDot');
-  const hd=document.getElementById('hlColorDot');
-  const dd=document.getElementById('dimColorDot');
-  if(sd){sd.style.display=isSk?'block':'none';}
-  if(hd){hd.style.display=isHl?'block':'none';}
-  if(dd){dd.style.display=isDim?'block':'none';}
-  // 色丸の色を現在値に合わせて更新
-  if(sd&&currentColor)sd.style.background=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
-  if(hd&&currentHL_Color)hd.style.background=`rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
-  if(dd&&currentDimColor)dd.style.background=currentDimColor;
+  const si=document.getElementById('sketchToolIcon');
+  const hi=document.getElementById('hlToolIcon');
+  const hif=document.getElementById('hlToolIconFill');
+  if(si&&currentColor)si.style.color=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
+  if(hi&&currentHL_Color)hi.style.color=`rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
+  if(hif&&currentHL_Color)hif.setAttribute('fill',`rgba(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b},0.25)`);
+  if(currentDimColor){
+    document.querySelectorAll('.dimToolIcon').forEach(function(svg){svg.style.color=currentDimColor;});
+  }
 }
 function openContextPopup(mode,anchorEl){
   const co=document.getElementById('colorOverlay');
@@ -1777,19 +1787,13 @@ function openContextPopup(mode,anchorEl){
   co.style.top=top+'px';co.style.left=left+'px';
   co.classList.add('open');
 }
-// 色丸ボタンのクリックハンドラ
-(function(){
-  const sd=document.getElementById('sketchColorDot');
-  const hd=document.getElementById('hlColorDot');
-  const dd=document.getElementById('dimColorDot');
-  if(sd)sd.addEventListener('click',function(e){e.stopPropagation();openContextPopup('sketch',this);});
-  if(hd)hd.addEventListener('click',function(e){e.stopPropagation();openContextPopup('hl',this);});
-  if(dd)dd.addEventListener('click',function(e){e.stopPropagation();openContextPopup('dim',this);});
-})();
+// V1_45: 色丸ボタン(sketchColorDot/hlColorDot/dimColorDot)は廃止。色・太さの選択
+// ポップアップは、選択中のツールアイコンをもう一度押すことで開く(tool.js側で
+// stopImmediatePropagation()して開くため、このdocumentクリックリスナーには
+// 到達しない。他の場所をタップした場合のみここで閉じる)
 document.addEventListener('click',function(e){
   const co=document.getElementById('colorOverlay');
-  const ids=['sketchColorDot','hlColorDot','dimColorDot'];
-  if(co.classList.contains('open')&&!co.contains(e.target)&&!ids.includes(e.target.id)){
+  if(co.classList.contains('open')&&!co.contains(e.target)){
     co.classList.remove('open');
   }
 });
@@ -3503,8 +3507,18 @@ function _swAttachInput(sw){
       var tf=fingers[0];
       var sxf=tf.clientX-r.left,syf=tf.clientY-r.top;
       isPen=false;mouseDown=true;lastMX=sxf;lastMY=syf;
-      if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')
-          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)&&!(window.LL&&window.LL.active)){
+      // V1_46: 手書きモード+計測ツール(DIM/LP/LL)選択中は指でも計測できるようにする。
+      // 指に隠れないよう指位置より少し上をカーソル位置として扱う
+      if(inputMode==='freehand'&&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+        panning=false;
+        var fyf=syf-FINGER_CURSOR_OFFSET_Y;
+        withCtx(function(){
+          if(window.DIM&&window.DIM.active) window.DIM.handleDown(sxf,fyf);
+          else if(window.LP&&window.LP.active) window.LP.handleDown(sxf,fyf);
+          else if(window.LL&&window.LL.active) window.LL.handleDown(sxf,fyf);
+        });
+        lastMX=sxf;lastMY=fyf;
+      } else if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')){
         panning=false;
         withCtx(function(){ handlePointerDown(sxf,syf,false); });
       } else {
@@ -3550,6 +3564,17 @@ function _swAttachInput(sw){
       pinchDist=dist;pinchMid=mid;
       sw._userNavigated=true;
       scheduleDraw();
+    } else if(fingers.length===1&&mouseDown&&!panning&&inputMode==='freehand'
+        &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+      // V1_46: 手書きモード 指1本での計測継続（DIM/LP/LL）。指位置より少し上をカーソルとして扱う
+      var tf=fingers[0];
+      var sxf=tf.clientX-r.left,syf=tf.clientY-r.top-FINGER_CURSOR_OFFSET_Y;
+      withCtx(function(){
+        if(window.DIM&&window.DIM.active) window.DIM.handleMove(sxf,syf);
+        else if(window.LP&&window.LP.active) window.LP.handleMove(sxf,syf);
+        else if(window.LL&&window.LL.active) window.LL.handleMove(sxf,syf);
+      });
+      lastMX=sxf;lastMY=syf;
     } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
       var tf=fingers[0];
       var sxf=tf.clientX-r.left,syf=tf.clientY-r.top;
@@ -3599,6 +3624,15 @@ function _swAttachInput(sw){
       return;
     }
     if(remaining.length===0){
+      // V1_46: 手書きモードで指計測中(DIM/LP/LL)だった場合は指を離した位置で確定
+      if(!isPen&&inputMode==='freehand'
+          &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+        withCtx(function(){
+          if(window.DIM&&window.DIM.active) window.DIM.handleUp(lastMX,lastMY);
+          else if(window.LP&&window.LP.active) window.LP.handleUp(lastMX,lastMY);
+          else if(window.LL&&window.LL.active) window.LL.handleUp(lastMX,lastMY);
+        });
+      }
       if(!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
         withCtx(function(){ handlePointerUp(lastMX,lastMY,false); });
       }
@@ -3621,8 +3655,17 @@ function _swAttachInput(sw){
       var t=remFing[0];
       var sx=t.clientX-r.left,sy=t.clientY-r.top;
       mouseDown=true;lastMX=sx;lastMY=sy;
-      if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl')
-          &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)&&!(window.LL&&window.LL.active)){
+      // V1_46: 手書きモード+計測ツール(DIM/LP/LL)なら指計測を再開（カーソルは指の少し上）
+      if(inputMode==='freehand'&&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+        panning=false;
+        var fy=sy-FINGER_CURSOR_OFFSET_Y;
+        withCtx(function(){
+          if(window.DIM&&window.DIM.active) window.DIM.handleDown(sx,fy);
+          else if(window.LP&&window.LP.active) window.LP.handleDown(sx,fy);
+          else if(window.LL&&window.LL.active) window.LL.handleDown(sx,fy);
+        });
+        lastMX=sx;lastMY=fy;
+      } else if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl')){
         panning=false;
         withCtx(function(){ handlePointerDown(sx,sy,false); });
       } else {

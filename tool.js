@@ -19,6 +19,8 @@
 
 // ERASER_RADIUS_PX: var宣言でグローバル公開（drawOverlayがHTMLから参照するため）
 var ERASER_RADIUS_PX=20;
+// V1_46: 手書きモードで指計測時、指に隠れないようカーソルを上にずらすオフセット量(px)
+var FINGER_CURSOR_OFFSET_Y=60;
 
 // =========================================================
 // ポインタ座標取得
@@ -283,12 +285,24 @@ ov.addEventListener('touchstart',e=>{
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     isPen=false;mouseDown=true;lastMX=sx;lastMY=sy;
-    // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
-    // V0_152.2: 手書きモード + サブ窓作成中(SW.active) → 指1本で対角ドラッグできるように追加
+    // V1_46: 手書きモード + 計測ツール(DIM/LP/LL)選択中 → 指でも計測できるようにする。
+    // 指先で候補点が隠れないよう、実際の指位置より少し上をカーソル位置として扱う。
     if(inputMode==='freehand'
-        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||(window.SW&&window.SW.active))
-        &&!(window.DIM&&window.DIM.active)
-        &&!(window.LP&&window.LP.active)){
+        &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+      panning=false;
+      const fy=sy-FINGER_CURSOR_OFFSET_Y;
+      if(window.DIM&&window.DIM.active){
+        window.DIM.handleDown(sx,fy);
+      } else if(window.LP&&window.LP.active){
+        window.LP.handleDown(sx,fy);
+      } else if(window.LL&&window.LL.active){
+        window.LL.handleDown(sx,fy);
+      }
+      lastMX=sx;lastMY=fy;
+    } else if(inputMode==='freehand'
+        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||(window.SW&&window.SW.active))){
+      // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
+      // V0_152.2: 手書きモード + サブ窓作成中(SW.active) → 指1本で対角ドラッグできるように追加
       panning=false;
       handlePointerDown(sx,sy,false); // currentTool===sketch/hl/サブ窓作成中 なので描画(操作)開始
     } else {
@@ -333,6 +347,19 @@ ov.addEventListener('touchmove',e=>{
     }
     tx=mid.x-wx*scale;ty=mid.y+wy*scale;
     pinchDist=dist;pinchMid=mid;scheduleDraw();
+  } else if(fingers.length===1&&mouseDown&&!panning&&inputMode==='freehand'
+      &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+    // V1_46: 手書きモード 指1本での計測継続（DIM/LP/LL）。指位置より少し上をカーソルとして扱う
+    const t=fingers[0];
+    const sx=t.clientX-r.left,sy=t.clientY-r.top-FINGER_CURSOR_OFFSET_Y;
+    if(window.DIM&&window.DIM.active){
+      window.DIM.handleMove(sx,sy);
+    } else if(window.LP&&window.LP.active){
+      window.LP.handleMove(sx,sy);
+    } else if(window.LL&&window.LL.active){
+      window.LL.handleMove(sx,sy);
+    }
+    lastMX=sx;lastMY=sy;
   } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
     // V0_79: 手書きモード 指1本描画中 / V0_152.2: サブ窓作成の対角ドラッグ中も含む
     const t=fingers[0];
@@ -385,6 +412,17 @@ ov.addEventListener('touchend',e=>{
   }
   // 全タッチ終了
   if(remaining.length===0){
+    // V1_46: 手書きモードで指計測中(DIM/LP/LL)だった場合は指を離した位置で確定
+    if(!isPen&&inputMode==='freehand'
+        &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+      if(window.DIM&&window.DIM.active){
+        window.DIM.handleUp(lastMX,lastMY);
+      } else if(window.LP&&window.LP.active){
+        window.LP.handleUp(lastMX,lastMY);
+      } else if(window.LL&&window.LL.active){
+        window.LL.handleUp(lastMX,lastMY);
+      }
+    }
     // V0_79: 手書きモードで指描画中だった場合はストロークを確定
     // V0_152.2: サブ窓作成の対角ドラッグ中(指を離して矩形確定)も含む
     if(!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
@@ -434,10 +472,22 @@ ov.addEventListener('touchend',e=>{
     const t=remFing[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     mouseDown=true;lastMX=sx;lastMY=sy;
-    // V0_79: 手書きモード+描画ツールなら描画再開、そうでなければパン
-    // V0_152.2: サブ窓作成中(SW.active)も対象に追加
-    if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||(window.SW&&window.SW.active))
-        &&!(window.DIM&&window.DIM.active)&&!(window.LP&&window.LP.active)){
+    // V1_46: 手書きモード+計測ツール(DIM/LP/LL)なら指計測を再開（カーソルは指の少し上）
+    if(inputMode==='freehand'
+        &&((window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active))){
+      panning=false;
+      const fy=sy-FINGER_CURSOR_OFFSET_Y;
+      if(window.DIM&&window.DIM.active){
+        window.DIM.handleDown(sx,fy);
+      } else if(window.LP&&window.LP.active){
+        window.LP.handleDown(sx,fy);
+      } else if(window.LL&&window.LL.active){
+        window.LL.handleDown(sx,fy);
+      }
+      lastMX=sx;lastMY=fy;
+    } else if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||(window.SW&&window.SW.active))){
+      // V0_79: 手書きモード+描画ツールなら描画再開
+      // V0_152.2: サブ窓作成中(SW.active)も対象に追加
       panning=false;
       handlePointerDown(sx,sy,false); // 新しい指で描画(操作)再開
     } else {
@@ -453,8 +503,23 @@ ov.addEventListener('touchend',e=>{
 // =========================================================
 // ツール切替ボタン
 // =========================================================
+// V1_45: 色丸ボタン廃止に伴い、「選択中のツールアイコンをもう一度押すと
+// 色・太さの選択ポップアップが開く」という操作に統合した。対象はペン・蛍光・
+// 寸法系ツール（色/太さ設定を持つもの）のみで、それ以外（消しゴム等）は
+// 従来通り再選択の動作のみとなる。
+const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim'};
 document.querySelectorAll('.tool-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
+  btn.addEventListener('click',(e)=>{
+    const _mode=_TOOL_COLOR_MODE[btn.dataset.tool];
+    if(btn.classList.contains('active')&&_mode){
+      // 既に選択中のアイコンの再タップ：ツールの再選択・状態リセットは行わず、
+      // 色・太さの選択ポップアップだけを開く。DIM/LP/LL等、同じボタンに登録された
+      // 他のフックリスナー（計測状態のリセットを行う）が発火して計測途中の状態を
+      // 壊してしまわないよう、stopImmediatePropagation()で止める
+      if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();
+      if(typeof openContextPopup==='function')openContextPopup(_mode,btn);
+      return;
+    }
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
