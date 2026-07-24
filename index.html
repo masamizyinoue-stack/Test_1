@@ -471,7 +471,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_48</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_49</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -780,21 +780,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=148"></script>
-<script src="viewer.js?v=148"></script>
-<script src="utils.js?v=148"></script>
-<script src="ui.js?v=148"></script>
-<script src="dialog.js?v=148"></script>
-<script src="storage.js?v=148"></script>
-<script src="fonts/NotoSansJP.js?v=148"></script>
-<script src="export.js?v=148"></script>
-<script src="tool.js?v=148"></script>
-<script src="verify.js?v=148"></script>
+<script src="layer.js?v=149"></script>
+<script src="viewer.js?v=149"></script>
+<script src="utils.js?v=149"></script>
+<script src="ui.js?v=149"></script>
+<script src="dialog.js?v=149"></script>
+<script src="storage.js?v=149"></script>
+<script src="fonts/NotoSansJP.js?v=149"></script>
+<script src="export.js?v=149"></script>
+<script src="tool.js?v=149"></script>
+<script src="verify.js?v=149"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=148"></script>
+<script src="supabase-sync.js?v=149"></script>
 <script>
-const APP_VERSION = 'V1_48';
+const APP_VERSION = 'V1_49';
 
 // =========================================================
 // グローバル状態
@@ -2522,6 +2522,7 @@ DIM.handleUp = function(sx, sy) {
 
 window.DIM = DIM;
 window.resetDIM = resetDIM; // V0_144: resetToolStates()から呼べるようグローバル公開（IIFE内に閉じていてV0_139のリセットが機能していなかったバグ修正）
+window.findNearestCircleEdge = findNearestCircleEdge; // V1_49: 指カーソル表示(tool.js)から呼べるよう公開
 
 })(); // end C
 
@@ -2736,22 +2737,11 @@ function drawLPOverlay(){
   }
 
   // Phase1: スナップ候補マーカー (LP.cur!=null の時のみ表示)
+  // V1_47で追加した「候補が無い時の暫定マーカー」は、V1_49で全ツール共通の
+  // 「指カーソル」表示(_drawFingerCursor、tool.js)に統合したためここでは削除した
   if(LP.phase===1&&LP.cur){
     var sc=w2s(LP.cur.x,LP.cur.y);
     drawLPSnapMarker(ctx2,sc[0],sc[1],LP.cur.type||'default');
-  } else if(LP.phase===1&&LP._hoverPos){
-    // V1_47: スナップ候補が無い時も、現在どこを探索しているかを示すカーソルを表示する
-    // （手書きモードの指入力では、候補が見つかるまで何も表示されず位置が分かりにくいため）
-    var shp=w2s(LP._hoverPos.x,LP._hoverPos.y);
-    ctx2.save();
-    ctx2.strokeStyle='rgba(255,255,255,0.85)'; ctx2.lineWidth=1.5; ctx2.setLineDash([3,3]);
-    ctx2.beginPath(); ctx2.arc(shp[0],shp[1],9,0,Math.PI*2); ctx2.stroke();
-    ctx2.setLineDash([]);
-    ctx2.beginPath();
-    ctx2.moveTo(shp[0]-12,shp[1]); ctx2.lineTo(shp[0]+12,shp[1]);
-    ctx2.moveTo(shp[0],shp[1]-12); ctx2.lineTo(shp[0],shp[1]+12);
-    ctx2.stroke();
-    ctx2.restore();
   }
 
   // Phase2: 選択済み点+垂点マーカー
@@ -3094,6 +3084,7 @@ var IPX={
   line1:null,
   penDown:false,
   _hoverLine:null,
+  _hoverPos:null,   // V1_49: 指カーソル表示用の最新カーソル位置
   onDone:null       // 交点確定時に呼ばれるコールバック（未使用・_ipxFeedPointへ一本化）
 };
 window.IPX=IPX;
@@ -3115,13 +3106,13 @@ function _ipxLineIntersectInf(l1,l2){
 }
 
 function ipxStart(){
-  IPX.active=true; IPX.step=0; IPX.line1=null; IPX._hoverLine=null; IPX.penDown=false;
+  IPX.active=true; IPX.step=0; IPX.line1=null; IPX._hoverLine=null; IPX.penDown=false; IPX._hoverPos=null;
   showGuide(IPX_GUIDES.LINE1,0);
   scheduleOverlay();
   _ipxUpdateButtonUI();
 }
 function ipxCancel(){
-  IPX.active=false; IPX.step=0; IPX.line1=null; IPX._hoverLine=null; IPX.penDown=false;
+  IPX.active=false; IPX.step=0; IPX.line1=null; IPX._hoverLine=null; IPX.penDown=false; IPX._hoverPos=null;
   scheduleOverlay();
   _ipxUpdateButtonUI();
 }
@@ -3129,13 +3120,15 @@ window.ipxCancel=ipxCancel;
 
 IPX.handleDown=function(sx,sy){
   var wp=s2w(sx,sy);
+  IPX._hoverPos={x:wp[0],y:wp[1]}; // V1_49: 指カーソル表示用
   IPX.penDown=true;
   IPX._hoverLine=findNearestSen(wp[0],wp[1]);
   scheduleOverlay();
 };
 IPX.handleMove=function(sx,sy){
-  if(!IPX.penDown){scheduleOverlay();return;}
   var wp=s2w(sx,sy);
+  IPX._hoverPos={x:wp[0],y:wp[1]}; // V1_49: 指カーソル表示用
+  if(!IPX.penDown){scheduleOverlay();return;}
   IPX._hoverLine=findNearestSen(wp[0],wp[1]);
   scheduleOverlay();
 };
@@ -3173,6 +3166,9 @@ window.drawOverlay=function(){
   _ipxOrigDO();
   _ipxUpdateButtonUI();
   if(IPX.active) drawIPXOverlay();
+  // V1_49: 指カーソルは全ツールのマーカーより最前面に出したいため、
+  // drawOverlayチェーンの一番最後（ここ）で連結する
+  if(typeof _drawFingerCursor==='function') _drawFingerCursor();
 };
 
 function drawIPXOverlay(){

@@ -83,6 +83,88 @@ function _dimStateCommitPoint(pt,saveImmediately){
   scheduleOverlay();
 }
 
+// V1_49: 手書きモードで指計測中、候補（線・円・スナップ点・交点）がまだ見つかって
+// いない間、実際の指位置より少し上（V1_46のオフセット位置）に「指の形」の仮カーソルを
+// 表示する。候補が見つかったら、各ツールが元々描画している専用のマーカー（スナップ
+// マーカーやハイライト等）に表示を譲り、この仮カーソルは消す。
+// ペン入力時はペン先そのものが正確なカーソルとして見えるため対象外（従来通り）。
+function _fingerCursorInfo(){
+  if(!(typeof inputMode!=='undefined'&&inputMode==='freehand'&&mouseDown&&!isPen)) return null;
+  if(window.DIM&&window.DIM.active){
+    var D=window.DIM;
+    if(D.phase===0){
+      if(!D._hoverPos) return null;
+      var nearEnk=(typeof findNearestCircleEdge==='function')?findNearestCircleEdge(D._hoverPos.x,D._hoverPos.y):null;
+      return nearEnk?null:{wx:D._hoverPos.x,wy:D._hoverPos.y};
+    }
+    if(D.phase===2){
+      var c=D.cur;
+      if(c&&c.type&&c.type!=='default') return null; // 何らかのスナップ済み
+      var hp=D._hoverPos||c;
+      return hp?{wx:hp.x,wy:hp.y}:null;
+    }
+    return null;
+  }
+  if(window.LP&&window.LP.active){
+    var P=window.LP;
+    if(P.phase===0) return P._hoverLine?null:(P._hoverPos?{wx:P._hoverPos.x,wy:P._hoverPos.y}:null);
+    if(P.phase===1) return P.cur?null:(P._hoverPos?{wx:P._hoverPos.x,wy:P._hoverPos.y}:null);
+    if(P.phase===2) return P._hoverPos?{wx:P._hoverPos.x,wy:P._hoverPos.y}:null;
+    return null;
+  }
+  if(window.LL&&window.LL.active){
+    var Q=window.LL;
+    if(Q.phase===0||Q.phase===1) return Q._hoverLine?null:(Q._hoverPos?{wx:Q._hoverPos.x,wy:Q._hoverPos.y}:null);
+    if(Q.phase===2) return Q._hoverPos?{wx:Q._hoverPos.x,wy:Q._hoverPos.y}:null;
+    return null;
+  }
+  if(window.IPX&&window.IPX.active){
+    var X=window.IPX;
+    return X._hoverLine?null:(X._hoverPos?{wx:X._hoverPos.x,wy:X._hoverPos.y}:null);
+  }
+  if(currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag'){
+    if(typeof snapPt!=='undefined'&&snapPt) return null;
+    if(typeof currentCursorWorld!=='undefined'&&currentCursorWorld) return {wx:currentCursorWorld.x,wy:currentCursorWorld.y};
+    return null;
+  }
+  return null;
+}
+
+function _drawFingerCursor(){
+  var info=_fingerCursorInfo();
+  if(!info) return;
+  var sc=w2s(info.wx,info.wy);
+  var sx=sc[0],sy=sc[1];
+  var dpr=window.devicePixelRatio||1;
+  octx.save();
+  octx.scale(dpr,dpr);
+  octx.globalAlpha=0.92;
+  // 実際の指位置（この仮カーソルの真下）へのガイド線
+  octx.strokeStyle='rgba(255,255,255,0.55)';
+  octx.lineWidth=1.5; octx.setLineDash([3,3]);
+  octx.beginPath();
+  octx.moveTo(sx,sy+16); octx.lineTo(sx,sy+FINGER_CURSOR_OFFSET_Y-6);
+  octx.stroke();
+  octx.setLineDash([]);
+  // 指先パッド（半透明の楕円＝「指の形」）
+  octx.fillStyle='rgba(255,255,255,0.16)';
+  octx.strokeStyle='rgba(255,255,255,0.95)';
+  octx.lineWidth=2;
+  octx.beginPath();
+  octx.ellipse(sx,sy,12,15,0,0,Math.PI*2);
+  octx.fill(); octx.stroke();
+  // 中心の十字（現在サーチ中の正確な座標）
+  octx.beginPath();
+  octx.moveTo(sx-6,sy); octx.lineTo(sx+6,sy);
+  octx.moveTo(sx,sy-6); octx.lineTo(sx,sy+6);
+  octx.stroke();
+  octx.restore();
+}
+// V1_49: drawOverlayへの連結はindex.html側（DIM/LP/LL/IPXの後、最後尾）で行う。
+// 理由: tool.jsはDIM/LP/LL/IPXより先に読み込まれるため、ここでwindow.drawOverlayを
+// ラップすると各ツールの上書き(overlay)より先に描画されてしまい、指カーソルが
+// 各ツールのマーカーの下に隠れてしまう。最前面に出すため一番最後に連結する。
+
 // =========================================================
 // ポインタ座標取得
 // =========================================================
