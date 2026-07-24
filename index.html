@@ -500,7 +500,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_62</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_63</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -793,21 +793,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=162"></script>
-<script src="viewer.js?v=162"></script>
-<script src="utils.js?v=162"></script>
-<script src="ui.js?v=162"></script>
-<script src="dialog.js?v=162"></script>
-<script src="storage.js?v=162"></script>
-<script src="fonts/NotoSansJP.js?v=162"></script>
-<script src="export.js?v=162"></script>
-<script src="tool.js?v=162"></script>
-<script src="verify.js?v=162"></script>
+<script src="layer.js?v=163"></script>
+<script src="viewer.js?v=163"></script>
+<script src="utils.js?v=163"></script>
+<script src="ui.js?v=163"></script>
+<script src="dialog.js?v=163"></script>
+<script src="storage.js?v=163"></script>
+<script src="fonts/NotoSansJP.js?v=163"></script>
+<script src="export.js?v=163"></script>
+<script src="tool.js?v=163"></script>
+<script src="verify.js?v=163"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=162"></script>
+<script src="supabase-sync.js?v=163"></script>
 <script>
-const APP_VERSION = 'V1_62';
+const APP_VERSION = 'V1_63';
 
 // =========================================================
 // グローバル状態
@@ -4325,7 +4325,9 @@ function _tapPickText(sx0,sy0){
   if(!best){showGuide('文字が見つかりませんでした。もう一度タップしてください',2200);return;}
   var target=_textPickTarget;
   var text=best.text.replace(/\n/g,' ').trim();
-  _setTextPickMode(null);
+  // V1_63: 1回読み込むごとにピックモードを解除していたが、連続して複数の文字を
+  // 読み込めるよう、ここではピックモードを解除せず維持する。確認メッセージを
+  // 一定時間表示した後、ピックモードが同じ対象のまま継続していればタップ案内に戻す
   if(target==='screen'){
     document.getElementById('searchInput').value=text;
     doSearch();
@@ -4337,6 +4339,9 @@ function _tapPickText(sx0,sy0){
     doOpenFileSearch();
   }
   showGuide('「'+text+'」を検索欄に入力しました',2200);
+  setTimeout(function(){
+    if(_textPickTarget===target) showGuide('図面上の文字をタップしてください（もう一度ボタンを押すと中止）',0);
+  },2200);
 }
 // V1_62: 画面検索・検索開くはパネルを開くと自動でピックモードになる(V1_58)ため
 // テキスト読込ボタン自体を廃止した。全図面検索は従来通りボタンで手動切替する
