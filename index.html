@@ -19,7 +19,36 @@
 <link rel="apple-touch-icon" sizes="120x120" href="apple-touch-icon-120.png">
 <link rel="icon" sizes="192x192" href="icon-192.png"> <!-- V1_06 -->
 <link rel="icon" sizes="512x512" href="icon-512.png"> <!-- V1_06 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
+<!-- V1_72: pdf.jsを3.11.174(2023年9月版、classic script対応の最終シリーズ)から
+     6.1.200(現行安定版)へ更新。埋め込みフォントのCMap解釈・CJK文字の文字化けが
+     多く改善されている。ただしpdf.js 4.0以降はESモジュール配布のみとなり、
+     classic <script src=...> では読み込めなくなったため、type="module"で読み込む。
+     モジュールは常に「遅延実行」扱いのため、本体の巨大なscript要素(非module)より
+     後に実行される可能性がある。そのため即座にwindow.pdfjsLibへ代入せず、
+     読み込み完了を表す_pdfjsReadyPromiseを介して他のコードから安全に待てるようにした
+     （_pdfjsReadyPromise自体はこの直後の非moduleスクリプトで即座に生成するため、
+     参照する側がいつ実行されても必ず存在する） -->
+<script>
+window._pdfjsReadyPromise=new Promise(function(resolve){window._resolvePdfjsReady=resolve;});
+// V1_72: pdfjsLibを使う全ての箇所は、実際にAPIを呼ぶ直前でこれをawaitしてから
+// typeof pdfjsLibのチェックを行うこと（モジュール読み込み完了前に到達してもここで待てる）。
+// 万一CDN障害等でモジュールの読み込み自体が失敗した場合に無限に待ち続けないよう、
+// 10秒でタイムアウトして先へ進める（その場合はpdfjsLibが未定義のままなので、
+// 各呼び出し箇所の既存のtypeof pdfjsLib==='undefined'チェックが従来通りエラー処理する）
+window._waitPdfjsReady=async function(){
+  try{
+    await Promise.race([
+      window._pdfjsReadyPromise,
+      new Promise(function(r){setTimeout(r,10000);})
+    ]);
+  }catch(e){}
+};
+</script>
+<script type="module">
+import * as _pdfjsLib72 from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.min.mjs";
+window.pdfjsLib=_pdfjsLib72;
+_pdfjsLib72.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.worker.min.mjs';
+window._resolvePdfjsReady();
 </script>
 <!-- V0_147: html2canvas削除（スクショ機能廃止に伴い不要） -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -520,7 +549,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_71</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_72</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -843,21 +872,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=171"></script>
-<script src="viewer.js?v=171"></script>
-<script src="utils.js?v=171"></script>
-<script src="ui.js?v=171"></script>
-<script src="dialog.js?v=171"></script>
-<script src="storage.js?v=171"></script>
-<script src="fonts/NotoSansJP.js?v=171"></script>
-<script src="export.js?v=171"></script>
-<script src="tool.js?v=171"></script>
-<script src="verify.js?v=171"></script>
+<script src="layer.js?v=172"></script>
+<script src="viewer.js?v=172"></script>
+<script src="utils.js?v=172"></script>
+<script src="ui.js?v=172"></script>
+<script src="dialog.js?v=172"></script>
+<script src="storage.js?v=172"></script>
+<script src="fonts/NotoSansJP.js?v=172"></script>
+<script src="export.js?v=172"></script>
+<script src="tool.js?v=172"></script>
+<script src="verify.js?v=172"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=171"></script>
+<script src="supabase-sync.js?v=172"></script>
 <script>
-const APP_VERSION = 'V1_71';
+const APP_VERSION = 'V1_72';
 
 // =========================================================
 // グローバル状態
@@ -5291,12 +5320,16 @@ function processFolderFiles(files, progEl, folderName){
         var buf = ev.target.result;
         var texts = [];
         if(f.name.toLowerCase().endsWith('.pdf')){
+          if(typeof window._waitPdfjsReady==='function') await window._waitPdfjsReady(); // V1_72: ESモジュール読み込み完了を待つ
           if(typeof pdfjsLib==='undefined') throw new Error('PDF.jsが読み込まれていません');
           // V1_52: getDocument()はdata(ArrayBuffer)をWorkerへTransferable転送するため、
           // 元のbufをそのまま渡すとこの後のbuf(byteLength)が0になり、直後の
           // _idbSave(f.name, buf, ...)で0バイトの壊れたデータを保存してしまう。
           // コピー(slice(0))を渡してbufを無傷のまま保持する
-          var _pdoc151=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
+          // V1_72: cMapUrl/standardFontDataUrlでCJK文字化け対策
+          var _pdoc151=await pdfjsLib.getDocument({data:buf.slice(0),
+            cMapUrl:'https://unpkg.com/pdfjs-dist@6.1.200/cmaps/',cMapPacked:true,
+            standardFontDataUrl:'https://unpkg.com/pdfjs-dist@6.1.200/standard_fonts/'}).promise;
           texts=await extractAllPdfTexts(_pdoc151);
         } else {
           var d = parseDXF(buf);

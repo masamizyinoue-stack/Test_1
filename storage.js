@@ -186,9 +186,12 @@ async function tryRestore(){
           // 保存されていたページを再描画してpdfImageも復元するようにした
           if(_mf.isPDF){
             try{
+              if(typeof window._waitPdfjsReady==='function') await window._waitPdfjsReady(); // V1_72: ESモジュール読み込み完了を待つ
               if(typeof pdfjsLib==='undefined') continue;
               var _pnR=_mf.pdfPageNum||1;
-              var _pdocR=await pdfjsLib.getDocument({data:_buf2.slice(0)}).promise; // V1_52同様、bufをdetachさせないようコピーを渡す
+              var _pdocR=await pdfjsLib.getDocument({data:_buf2.slice(0), // V1_52同様、bufをdetachさせないようコピーを渡す
+                cMapUrl:'https://unpkg.com/pdfjs-dist@6.1.200/cmaps/',cMapPacked:true, // V1_72: CJK文字化け対策
+                standardFontDataUrl:'https://unpkg.com/pdfjs-dist@6.1.200/standard_fonts/'}).promise;
               var _pageR=await _pdocR.getPage(_pnR);
               var _vpR=_pageR.getViewport({scale:3});
               var _offR=document.createElement('canvas');
