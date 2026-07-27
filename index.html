@@ -82,6 +82,8 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 #excelTable{border-collapse:collapse;font-size:13px;color:#111}
 #excelTable td{border:1px solid #ccc;padding:4px 8px;white-space:nowrap;cursor:pointer}
 #excelTable td:active{background:#ffe9a8}
+/* V1_88: 「検索してファイルを開く」で一致したセルをDXF/PDFの黄色マークと同様に強調表示 */
+#excelTable td.cell-highlight{background:#fff3b0;box-shadow:inset 0 0 0 2px #e6b800}
 #cv,#ov{position:absolute;top:0;left:0;width:100%;height:100%}
 #ac{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none} /* V0_82: Annotation専用Canvas */
 #ov{pointer-events:all;cursor:crosshair;touch-action:none}
@@ -553,7 +555,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_87</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_88</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -895,24 +897,24 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=187"></script>
-<script src="viewer.js?v=187"></script>
-<script src="utils.js?v=187"></script>
-<script src="ui.js?v=187"></script>
-<script src="dialog.js?v=187"></script>
-<script src="storage.js?v=187"></script>
-<script src="fonts/NotoSansJP.js?v=187"></script>
-<script src="export.js?v=187"></script>
-<script src="tool.js?v=187"></script>
-<script src="verify.js?v=187"></script>
+<script src="layer.js?v=188"></script>
+<script src="viewer.js?v=188"></script>
+<script src="utils.js?v=188"></script>
+<script src="ui.js?v=188"></script>
+<script src="dialog.js?v=188"></script>
+<script src="storage.js?v=188"></script>
+<script src="fonts/NotoSansJP.js?v=188"></script>
+<script src="export.js?v=188"></script>
+<script src="tool.js?v=188"></script>
+<script src="verify.js?v=188"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=187"></script>
+<script src="pc.js?v=188"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=187"></script>
+<script src="supabase-sync.js?v=188"></script>
 <script>
-const APP_VERSION = 'V1_87';
+const APP_VERSION = 'V1_88';
 
 // =========================================================
 // グローバル状態
@@ -4561,6 +4563,13 @@ function _normalizeForSearch(s){
   try{ return (s||'').normalize('NFKC').toLowerCase(); }catch(e){ return (s||'').toLowerCase(); }
 }
 
+// V1_88: フォルダインデックスのtexts[]は、DXFは従来通り文字列のまま、PDF/Excelは
+// どのページ/シートに一致したかへジャンプできるよう{text,page}/{text,sheet}形式に
+// なった。両方の形をまとめて文字列として扱うためのヘルパー
+function _idxTextOf(t){
+  return (t&&typeof t==='object')?(t.text||''):(t||'');
+}
+
 function buildSearchIndex(){
   _searchIdx=[];
   // V1_51: DXFのdoc.mojiが無い場合はPDFから抽出したpdfMojiを使う
@@ -5159,8 +5168,15 @@ function doAllSearch(){
     list.innerHTML=''; // 最新世代のみリスト再構築
     var hits=[];
     records.forEach(function(rec){
-      var matched=(rec.texts||[]).filter(function(t){return _normalizeForSearch(t).indexOf(kw)>=0;});
-      if(matched.length>0) hits.push({name:rec.name,matched:matched,folder:rec.folder});
+      var matched=(rec.texts||[]).filter(function(t){return _normalizeForSearch(_idxTextOf(t)).indexOf(kw)>=0;});
+      if(matched.length>0){
+        // V1_88: 最初に一致した要素からページ(PDF)・シート(Excel)番号を取り出し、
+        // ファイルを開く際にその場所へジャンプできるようにする
+        var _first=matched[0];
+        var _pg=(_first&&typeof _first==='object'&&_first.page)?_first.page:undefined;
+        var _sh=(_first&&typeof _first==='object'&&_first.sheet!==undefined)?_first.sheet:undefined;
+        hits.push({name:rec.name,matched:matched,folder:rec.folder,page:_pg,sheet:_sh});
+      }
     });
     cnt.textContent=hits.length+'件（全'+records.length+'図面）';
     if(hits.length===0){
@@ -5174,12 +5190,12 @@ function doAllSearch(){
       var el=document.createElement('div');el.className='asr-item';
       var fn=document.createElement('div');fn.className='asr-fname';fn.textContent=h.name;
       var ht=document.createElement('div');ht.className='asr-hit';
-      ht.textContent=h.matched.slice(0,4).join(' / ')+(h.matched.length>4?' …':'');
+      ht.textContent=h.matched.slice(0,4).map(_idxTextOf).join(' / ')+(h.matched.length>4?' …':'');
       el.appendChild(fn);el.appendChild(ht);
       el.addEventListener('click',function(){ // V1_75: タップ時にその1件分だけbufを取得
         _idbGetOne(h.name,function(full){
           if(!full){showGuide('読み込みに失敗しました',2000);return;}
-          openDxfFromDb(h.name,full.buf,kw,h.folder); // V0_104 / V1_70: folder伝達
+          openDxfFromDb(h.name,full.buf,kw,h.folder,h.page,h.sheet); // V0_104 / V1_70: folder伝達 / V1_88: page・sheet伝達
         });
       });
       list.appendChild(el);
@@ -5190,7 +5206,7 @@ function doAllSearch(){
 // ・F-1: 新規タブ時にIDB(dxfViewerDxfviewDB)からstrokes/dimsを復元
 // ・F-2: 既存タブ時はstrokes/dims/images/savedViewsを上書きせず保持
 // ・F-3: findIndexをfileKeyベースに変更（同名異サイズ問題を修正）
-async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追加（開いているファイル一覧での表示用、任意）
+async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: folder引数追加（開いているファイル一覧での表示用、任意） / V1_88: page(PDF)・sheet(Excel)引数追加（検索一致箇所への直接ジャンプ用、任意）
   // V1_40: fileInput側と同じ「ファイルを開いている最中はタブ切替・新規オープンを
   // ブロックする」フラグ。検索結果を連続タップした場合や、読込中にタブを
   // 切替えた場合に、非同期処理完了時に別タブのdoc/strokes/dimsを誤って
@@ -5221,9 +5237,11 @@ async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追
     var _isExcel176=_isExcelName(name); // V1_76
     doc=null; pdfDoc=null; pdfImage=null; pdfMoji=[]; excelWb=null; // V1_51/V1_76: 前の状態が残らないようクリア
     if(_isPdf151){
-      await loadPDF(buf);
+      await loadPDF(buf,page); // V1_88: 検索で一致したページがあればそのページを開く
     } else if(_isExcel176){
-      loadExcel(buf);
+      loadExcel(buf); // 内部でexcelSheetIdx=0にリセットされ1回描画される
+      // V1_88: 検索で一致したシートがあれば切り替える（この後のrenderExcelView()で反映）
+      if(sheet!=null&&sheet>=0&&excelWb&&sheet<excelWb.SheetNames.length) excelSheetIdx=sheet;
     } else {
       doc=parseDXF(buf);
     }
@@ -5238,6 +5256,9 @@ async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追
       var _mojiSrc151=(doc&&doc.moji)?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
       _mojiSrc151.forEach(function(m){if(m.text&&_normalizeForSearch(m.text).indexOf(_kl)>=0)_searchMarks.push(m);});
     }
+    // V1_88: Excelは座標系を持たないためcanvas上のマークではなく、一致セルをハイライトし
+    // 最初の一致箇所までスクロールする（キーワード無しの場合は内部で解除のみ行われる）
+    if(_isExcel176&&typeof _applyExcelSearchHighlight==='function') _applyExcelSearchHighlight(true);
 
     // ④ fileKey生成
     var _fk=_fileKey(name,buf.byteLength);
@@ -5375,8 +5396,15 @@ function doOpenFileSearch(){
     records.forEach(function(r){
       if(!kw){filtered.push({name:r.name,matched:[]});return;}
       var nameHit=_normalizeForSearch(r.name).indexOf(kw)>=0;
-      var textHits=(r.texts||[]).filter(function(t){return _normalizeForSearch(t).indexOf(kw)>=0;});
-      if(nameHit||textHits.length>0) filtered.push({name:r.name,matched:textHits});
+      var textHits=(r.texts||[]).filter(function(t){return _normalizeForSearch(_idxTextOf(t)).indexOf(kw)>=0;});
+      if(nameHit||textHits.length>0){
+        // V1_88: 最初に一致した要素からページ(PDF)・シート(Excel)番号を取り出し、
+        // ファイルを開く際にその場所へジャンプできるようにする
+        var _first=textHits[0];
+        var _pg=(_first&&typeof _first==='object'&&_first.page)?_first.page:undefined;
+        var _sh=(_first&&typeof _first==='object'&&_first.sheet!==undefined)?_first.sheet:undefined;
+        filtered.push({name:r.name,matched:textHits,page:_pg,sheet:_sh});
+      }
     });
     filtered.sort(function(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'});}); // V0_157と同じ自然順
     cnt.textContent=filtered.length+'件（全'+records.length+'件）';
@@ -5393,7 +5421,7 @@ function doOpenFileSearch(){
       el.appendChild(fn);
       if(item.matched&&item.matched.length>0){
         var ht=document.createElement('div');ht.className='asr-hit';
-        ht.textContent=item.matched.slice(0,4).join(' / ')+(item.matched.length>4?' …':'');
+        ht.textContent=item.matched.slice(0,4).map(_idxTextOf).join(' / ')+(item.matched.length>4?' …':'');
         el.appendChild(ht);
       }
       el.addEventListener('click',function(){
@@ -5404,7 +5432,7 @@ function doOpenFileSearch(){
           _openFileOpening=false;
           if(!rec){showGuide('「'+item.name+'」を読み込めませんでした',2500);fn.textContent=item.name;return;}
           closeOpenFilePanel();
-          openDxfFromDb(rec.name,rec.buf,kw||null,rec.folder); // V1_25: キーワードがあれば図面内マークも表示 / V1_70: folder伝達
+          openDxfFromDb(rec.name,rec.buf,kw||null,rec.folder,item.page,item.sheet); // V1_25: キーワードがあれば図面内マークも表示 / V1_70: folder伝達 / V1_88: page・sheet伝達
         });
       });
       list.appendChild(el);

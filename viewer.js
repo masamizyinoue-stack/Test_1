@@ -729,7 +729,10 @@ function showInfo(){
 // =========================================================
 // PDF表示
 // =========================================================
-async function loadPDF(buf){
+// V1_88: 第2引数startPageに1以上のページ番号を渡すと、そのページを開いた状態にする。
+// 「検索してファイルを開く」で図面内の文字が見つかったページへ直接ジャンプするために追加。
+// 省略時・範囲外の値の場合は従来通り1ページ目を開く（fileInput等の通常オープンは無指定のまま）
+async function loadPDF(buf,startPage){
   if(typeof pdfjsLib==='undefined'){alert('PDF.jsが読み込まれていません');return;}
   // V1_52: pdf.jsはWorkerへdata(ArrayBuffer)をTransferable(ゼロコピー転送)で渡すため、
   // getDocument()呼び出し後は呼び出し元が保持している元のbuf(ArrayBuffer)が
@@ -738,9 +741,9 @@ async function loadPDF(buf){
   // いるため、コピー(slice(0))を渡してdetachの影響が元のbufに及ばないようにする
   pdfDoc=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
   document.getElementById('pdfPageCtrl').style.display='';
-  document.getElementById('pageInfo').textContent=`1/${pdfDoc.numPages}`;
-  pdfPageNum=1;
-  await renderPdfPage(1);
+  pdfPageNum=(startPage&&startPage>=1&&startPage<=pdfDoc.numPages)?Math.floor(startPage):1;
+  document.getElementById('pageInfo').textContent=`${pdfPageNum}/${pdfDoc.numPages}`;
+  await renderPdfPage(pdfPageNum);
 }
 
 async function renderPdfPage(n){
@@ -947,14 +950,17 @@ function _pdfScheduleResRefresh(){
   },PDF_RERENDER_DEBOUNCE_MS);
 }
 
-// V1_51: フォルダインデックス用途。PDF全ページの文字列一覧（位置情報は不要）を返す
+// V1_51: フォルダインデックス用途。PDF全ページの文字列一覧を返す
+// V1_88: 「検索してファイルを開く」で一致した文字がどのページにあるかへジャンプできるよう、
+// 各文字列にページ番号(page)も付与した{text,page}形式で返すようにした（従来はtextのみの配列）。
+// 呼び出し側(doAllSearch/doOpenFileSearch)は_idxTextOf()でtext部分だけ取り出して比較する
 async function extractAllPdfTexts(pdfDocObj){
   var texts=[];
   try{
     for(var i=1;i<=pdfDocObj.numPages;i++){
       var page=await pdfDocObj.getPage(i);
       var items=await _pdfPageTextItems(page);
-      items.forEach(function(m){texts.push(m.text);});
+      items.forEach(function(m){texts.push({text:m.text,page:i});});
     }
   }catch(e){ console.warn('[PDF全ページ文字抽出]',e); }
   return texts;
@@ -980,17 +986,19 @@ function loadExcel(buf){
 }
 
 // フォルダインデックス・全図面検索用途。全シートのセル文字列一覧（重複含む）を返す
+// V1_88: 「検索してファイルを開く」で一致した文字がどのシートにあるかへ切り替えられるよう、
+// 各文字列にシート番号(sheet)も付与した{text,sheet}形式で返すようにした（従来はtextのみの配列）
 function extractAllExcelTexts(wb){
   var texts=[];
   try{
-    wb.SheetNames.forEach(function(name){
+    wb.SheetNames.forEach(function(name,si){
       var ws=wb.Sheets[name];
       if(!ws) return;
       var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
       rows.forEach(function(row){
         row.forEach(function(cell){
           var t=(cell===null||cell===undefined)?'':String(cell).trim();
-          if(t) texts.push(t);
+          if(t) texts.push({text:t,sheet:si});
         });
       });
     });
@@ -1046,6 +1054,36 @@ function renderExcelView(){
     });
     table.appendChild(tr);
   });
+  // V1_88: DXF/PDFの黄色マークと同様に、検索キーワード(_markKeyword)に一致するセルを
+  // ハイライトする。シートタブ切替のたびにここが再実行されるため、切り替えた先の
+  // シートに一致セルがあれば自動的に反映される（スクロールは行わない。初回オープン時の
+  // スクロールはopenDxfFromDb側から_applyExcelSearchHighlight(true)を明示的に呼ぶ）
+  if(typeof _applyExcelSearchHighlight==='function') _applyExcelSearchHighlight(false);
+}
+
+// V1_88: 検索してファイルを開く/全図面検索で開いたExcelの、キーワード(_markKeyword)に
+// 一致するセルをDXF/PDFの黄色マークと同様にハイライト表示する。呼ばれるたびに、まず
+// 既存のハイライトをすべて解除してから、_markKeywordが設定されていれば再度付与し直す
+// （キーワードが無ければ解除だけで終わる＝ファイルを直接開いた時は自動的にクリアされる）
+function _applyExcelSearchHighlight(scrollToFirst){
+  var table=document.getElementById('excelTable');
+  if(!table) return;
+  var prev=table.querySelectorAll('td.cell-highlight');
+  prev.forEach(function(td){td.classList.remove('cell-highlight');});
+  if(typeof _markKeyword==='undefined'||!_markKeyword) return;
+  var kw=(typeof _normalizeForSearch==='function')?_normalizeForSearch(_markKeyword):_markKeyword;
+  if(!kw) return;
+  var first=null;
+  table.querySelectorAll('td').forEach(function(td){
+    var t=(typeof _normalizeForSearch==='function')?_normalizeForSearch(td.textContent):td.textContent;
+    if(t.indexOf(kw)>=0){
+      td.classList.add('cell-highlight');
+      if(!first) first=td;
+    }
+  });
+  if(scrollToFirst&&first&&typeof first.scrollIntoView==='function'){
+    first.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});
+  }
 }
 
 // Excelセルタップ時の処理。テキスト読込ピックモード中は共通ヘルパー(_commitPickedText)へ渡す。
