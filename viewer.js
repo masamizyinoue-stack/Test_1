@@ -5,10 +5,10 @@
 
 // =========================================================
 // PDF.js worker
-// V1_72: pdf.jsがESモジュール配布(v4以降)になったため、workerSrcの設定は
-// index.htmlのtype="module"スクリプト側で行うよう変更。ここでは何もしない
-// （pdfjsLibを実際に使う箇所は_waitPdfjsReady()で読み込み完了を待つ）
 // =========================================================
+if(typeof pdfjsLib!=='undefined'){
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 var cv=document.getElementById('cv');
 var ov=document.getElementById('ov');
 var ac=document.getElementById('ac'); // V0_82: Annotation専用Canvas
@@ -712,18 +712,13 @@ function showInfo(){
 // PDF表示
 // =========================================================
 async function loadPDF(buf){
-  if(typeof window._waitPdfjsReady==='function') await window._waitPdfjsReady(); // V1_72: ESモジュール読み込み完了を待つ
   if(typeof pdfjsLib==='undefined'){alert('PDF.jsが読み込まれていません');return;}
   // V1_52: pdf.jsはWorkerへdata(ArrayBuffer)をTransferable(ゼロコピー転送)で渡すため、
   // getDocument()呼び出し後は呼び出し元が保持している元のbuf(ArrayBuffer)が
   // detach（byteLength=0）される。呼び出し元(fileInput/openDxfFromDb/tryRestore等)は
   // loadPDF(buf)実行後もbuf.byteLengthの参照やIndexedDBへの保存にbufを使い続けて
   // いるため、コピー(slice(0))を渡してdetachの影響が元のbufに及ばないようにする
-  // V1_72: cMapUrl/standardFontDataUrlを指定し、埋め込みでない標準的なCJKエンコーディング・
-  // 標準14フォントも正しく解釈できるようにした（文字化けの主因の一つ）
-  pdfDoc=await pdfjsLib.getDocument({data:buf.slice(0),
-    cMapUrl:'https://unpkg.com/pdfjs-dist@6.1.200/cmaps/',cMapPacked:true,
-    standardFontDataUrl:'https://unpkg.com/pdfjs-dist@6.1.200/standard_fonts/'}).promise;
+  pdfDoc=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
   document.getElementById('pdfPageCtrl').style.display='';
   document.getElementById('pageInfo').textContent=`1/${pdfDoc.numPages}`;
   pdfPageNum=1;
