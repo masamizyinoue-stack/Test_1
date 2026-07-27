@@ -27,6 +27,11 @@
 </script>
 <!-- V0_147: html2canvas削除（スクショ機能廃止に伴い不要） -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- V1_76: Excel(.xlsx/.xls/.csv)表示・テキスト読込用。SheetJSはcdnjs/unpkgでは
+     旧版(0.18.5)しか配布されておらず、公式CDN(cdn.sheetjs.com)のみ最新版を
+     classic scriptタグ(window.XLSXグローバル)で配布しているため、pdf.jsのような
+     ESモジュール移行の問題は発生しない -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -68,6 +73,15 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 
 .color-dot{width:22px;height:22px;border-radius:50%;display:block;border:2.5px solid rgba(255,255,255,.45)}
 .stage{flex:1;position:relative;overflow:hidden;background:#000;min-height:0}
+/* V1_76: Excel表示オーバーレイ（シンプルな表形式のみ、セル色・結合・罫線は再現しない） */
+#excelView{display:none;position:absolute;inset:0;flex-direction:column;background:#fff;z-index:5}
+#excelSheetTabs{display:flex;gap:4px;padding:6px 8px;background:#e8e8e8;border-bottom:1px solid #bbb;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
+.excel-sheet-tab{padding:6px 12px;border-radius:6px;border:1px solid #bbb;background:#fff;color:#333;font-size:13px;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.excel-sheet-tab.active{background:#217346;color:#fff;border-color:#217346}
+#excelTableWrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+#excelTable{border-collapse:collapse;font-size:13px;color:#111}
+#excelTable td{border:1px solid #ccc;padding:4px 8px;white-space:nowrap;cursor:pointer}
+#excelTable td:active{background:#ffe9a8}
 #cv,#ov{position:absolute;top:0;left:0;width:100%;height:100%}
 #ac{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none} /* V0_82: Annotation専用Canvas */
 #ov{pointer-events:all;cursor:crosshair;touch-action:none}
@@ -502,6 +516,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <span id="pageInfo" class="sp-page-info">1/1</span>
     <button id="nextPage" class="sp-page-btn">▶</button>
   </div>
+  <!-- V1_76: Excel(.xlsx/.xls/.csv)表示用オーバーレイ。表示中はcv/ac/ov(canvas)を隠し、
+       renderExcelView()(viewer.js)がタブ・テーブルを構築する -->
+  <div id="excelView">
+    <div id="excelSheetTabs"></div>
+    <div id="excelTableWrap"><table id="excelTable"></table></div>
+  </div>
   <div class="viewmemo" id="viewmemo">
     <div id="markFitRow">
       <div id="markPopup"><span style="font-size:15px">●</span>マーク ✕</div>
@@ -524,7 +544,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_75</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_77</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -866,21 +886,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=175"></script>
-<script src="viewer.js?v=175"></script>
-<script src="utils.js?v=175"></script>
-<script src="ui.js?v=175"></script>
-<script src="dialog.js?v=175"></script>
-<script src="storage.js?v=175"></script>
-<script src="fonts/NotoSansJP.js?v=175"></script>
-<script src="export.js?v=175"></script>
-<script src="tool.js?v=175"></script>
-<script src="verify.js?v=175"></script>
+<script src="layer.js?v=177"></script>
+<script src="viewer.js?v=177"></script>
+<script src="utils.js?v=177"></script>
+<script src="ui.js?v=177"></script>
+<script src="dialog.js?v=177"></script>
+<script src="storage.js?v=177"></script>
+<script src="fonts/NotoSansJP.js?v=177"></script>
+<script src="export.js?v=177"></script>
+<script src="tool.js?v=177"></script>
+<script src="verify.js?v=177"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=175"></script>
+<script src="supabase-sync.js?v=177"></script>
 <script>
-const APP_VERSION = 'V1_75';
+const APP_VERSION = 'V1_77';
 
 // =========================================================
 // グローバル状態
@@ -1257,6 +1277,12 @@ function drawOverlay(){
 
 // V0_119: ファイル一意キー（name+size）。同名異サイズを別ファイルとして扱う
 function _fileKey(name,size){return name+'\x00'+size;}
+// V1_76: Excel(.xlsx/.xls/.csv)判定。fileInput分岐・フォルダインデックス・
+// セッション復元・タブバッジ(dialog.js)で共通利用する
+function _isExcelName(name){
+  var n=(name||'').toLowerCase();
+  return n.endsWith('.xlsx')||n.endsWith('.xls')||n.endsWith('.csv');
+}
 
 // ファイル
 const fileInput=document.getElementById('file');
@@ -1319,6 +1345,7 @@ fileInput.addEventListener('change',async e=>{
   currentFileName=f.name;
   const buf=await f.arrayBuffer();
   doc=null;pdfDoc=null;pdfImage=null;pdfMoji=[]; // V1_51
+  excelWb=null;renderExcelView(); // V1_76: 前のタブがExcelだった場合の表示を先に隠す
   document.getElementById('pdfPageCtrl').style.display='none';
   if(f.name.toLowerCase().endsWith('.pdf')){
     // V1_57: PDF分岐だけ、前のタブのhiddenLayers/strokes/dims/imagesを一度も
@@ -1373,6 +1400,23 @@ fileInput.addEventListener('change',async e=>{
     }catch(e151){console.warn('[PDF自動インデックス]',e151);}
     saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();
     document.body.classList.remove('settings-open');
+  } else if(_isExcelName(f.name)){
+    // V1_76: Excel(.xlsx/.xls/.csv)はシンプルな表形式表示＋テキスト読込のみ対応。
+    // 座標系を持たないため、DXF/PDFと異なり手書き・寸法計測(strokes/dims)は対象外とする
+    hiddenLayers.clear();strokes=[];dims=[];images=[];[0,1,2,3,4].forEach(i=>updateViewmemoState(i));
+    _searchMarks=[];_markKeyword=null;_searchHighlight=null;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');})();
+    currentFileSize=f.size;
+    var _excelOk176=loadExcel(buf);
+    if(_excelOk176){
+      {const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
+      // V1_76: DXF/PDFと同様、開いたファイルは自動でインデックスへ追加する（全シート文字を抽出）
+      try{
+        var _excelTexts176=extractAllExcelTexts(excelWb);
+        _idbSave(f.name,buf,_excelTexts176);
+      }catch(e176){console.warn('[Excel自動インデックス]',e176);}
+      saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();
+      document.body.classList.remove('settings-open');
+    }
   } else {
     try{
       doc=parseDXF(buf);
@@ -1412,7 +1456,7 @@ fileInput.addEventListener('change',async e=>{
   // V1_40: PDFを開いた場合、pdfDoc/pdfImage/pdfPageNumがopenFiles[]に一度も
   // 保存されていなかったため、このタブから他タブへ移動して戻ると必ずPDFが
   // 消えてしまう不具合があった。ここで初回登録時に保存するようにした
-  {var _nf140=openFiles[currentFileIdx];_nf140.strokes=strokes;_nf140.dims=dims;_nf140.images=typeof images!=='undefined'?images:[];_nf140.savedViews=savedViews;_nf140.doc=doc;_nf140.hiddenLayersArr=Array.from(hiddenLayers);_nf140.tx=tx;_nf140.ty=ty;_nf140.scale=scale;_nf140.fitScale=fitScale;_nf140.currentFileName=currentFileName;_nf140.fileSize=currentFileSize;_nf140.pdfDoc=pdfDoc;_nf140.pdfImage=pdfImage;_nf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
+  {var _nf140=openFiles[currentFileIdx];_nf140.strokes=strokes;_nf140.dims=dims;_nf140.images=typeof images!=='undefined'?images:[];_nf140.savedViews=savedViews;_nf140.doc=doc;_nf140.hiddenLayersArr=Array.from(hiddenLayers);_nf140.tx=tx;_nf140.ty=ty;_nf140.scale=scale;_nf140.fitScale=fitScale;_nf140.currentFileName=currentFileName;_nf140.fileSize=currentFileSize;_nf140.pdfDoc=pdfDoc;_nf140.pdfImage=pdfImage;_nf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);_nf140.excelWb=(typeof excelWb!=='undefined'?excelWb:null);_nf140.excelSheetIdx=(typeof excelSheetIdx!=='undefined'?excelSheetIdx:0);}
   updateFileNavUI();// V0_112
   verify('fileInput.change:done');
   }finally{_isOpeningFileBusy=false;e.target.value='';} // V1_40
@@ -1479,11 +1523,14 @@ function switchToFile(idx){
     var _pn2=1;try{if(typeof pdfPageNum!=='undefined')_pn2=pdfPageNum;}catch(e){}
     _prevF.pdfPageNum=_pn2;
     _prevF.pdfDoc=pdfDoc;_prevF.pdfImage=pdfImage; // V1_40: PDF内容も退避
+    _prevF.excelWb=(typeof excelWb!=='undefined'?excelWb:null);_prevF.excelSheetIdx=(typeof excelSheetIdx!=='undefined'?excelSheetIdx:0); // V1_76
     _prevF.hiddenLayersArr=Array.from(hiddenLayers);
   }
   currentFileIdx=idx;
   var f=openFiles[idx];
   doc=f.doc; pdfDoc=f.pdfDoc; pdfImage=f.pdfImage;
+  excelWb=f.excelWb||null; excelSheetIdx=f.excelSheetIdx||0; // V1_76
+  if(typeof renderExcelView==='function') renderExcelView();
   try{ if(typeof pdfPageNum!=='undefined') pdfPageNum=f.pdfPageNum||1; }catch(e){}
   // V1_51: pdfMojiはタブ毎に保持していないため、PDFタブに切り替えた際は
   // 表示中ページの文字を非同期で再抽出する（doc同様の即時反映はできないが、
@@ -1522,7 +1569,7 @@ function switchToFile(idx){
   if(ppc) ppc.style.display=pdfDoc?'':'none';
   if(pdfDoc){var pi=document.getElementById('pageInfo');if(pi)pi.textContent=(f.pdfPageNum||1)+'/'+pdfDoc.numPages;}
   var nd=document.getElementById('noDrawingMsg');
-  if(nd) nd.style.display=(doc||pdfImage)?'none':'';
+  if(nd) nd.style.display=(doc||pdfImage||excelWb)?'none':'';
   [0,1,2,3,4].forEach(function(i){if(typeof updateViewmemoState==='function')updateViewmemoState(i);});
   if(typeof updateFileNavUI==='function') updateFileNavUI(); // V0_107: タブ強調表示を同期
   verify('switchToFile:after');
@@ -4589,8 +4636,15 @@ function _tapPickText(sx0,sy0){
     }
   }
   if(!best){showGuide('文字が見つかりませんでした。もう一度タップしてください',2200);return;}
+  _commitPickedText(best.text.replace(/\n/g,' ').trim());
+}
+
+// V1_76: 検索欄へのテキスト読込確定処理。従来_tapPickText内にあった処理を切り出し、
+// Excelセルタップ(_excelCellTapped, viewer.js)からも共通で呼べるようにした（挙動は変更なし）
+function _commitPickedText(text){
   var target=_textPickTarget;
-  var text=best.text.replace(/\n/g,' ').trim();
+  text=(text||'').trim();
+  if(!text) return;
   // V1_63: 1回読み込むごとにピックモードを解除していたが、連続して複数の文字を
   // 読み込めるよう、ここではピックモードを解除せず維持する。確認メッセージを
   // 一定時間表示した後、ピックモードが同じ対象のまま継続していればタップ案内に戻す
@@ -4905,6 +4959,66 @@ function _idbLoadProfile(name,cb){
     }catch(e){cb&&cb(e);}
   });
 }
+// V1_77: 複数の登録名をまとめて（結合して）現在のdxfIndexへ反映する。
+// _idbLoadProfile(単数)は1件で置き換えるのに対し、本関数はclear()を最初に1回だけ行い、
+// 選択された全プロファイルのレコードを順に積み上げる。同名ファイルが複数プロファイルに
+// 含まれる場合は、後から処理したプロファイルの内容で上書きされる（keyPath:'name'のため）
+function _idbLoadProfiles(names,cb){
+  if(!names||names.length===0){cb&&cb(new Error('選択されていません'));return;}
+  _openIdb(function(err,db){
+    if(err){cb&&cb(err);return;}
+    try{
+      var txR=db.transaction(_IDB_PROFILE_STORE,'readonly');
+      var profStore=txR.objectStore(_IDB_PROFILE_STORE);
+      var profs=[];
+      var pending=names.length;
+      names.forEach(function(name){
+        var getReq=profStore.get(name);
+        getReq.onsuccess=function(e){
+          if(e.target.result) profs.push(e.target.result);
+          pending--;
+          if(pending===0) proceed();
+        };
+        getReq.onerror=function(){ pending--; if(pending===0) proceed(); };
+      });
+      function proceed(){
+        if(profs.length===0){cb&&cb(new Error('見つかりません'));return;}
+        try{
+          var tx=db.transaction([_IDB_STORE,_IDB_PROFILE_RECORDS_STORE],'readwrite');
+          var dstStore=tx.objectStore(_IDB_STORE);
+          dstStore.clear();
+          var idx=0;
+          function loadNext(){
+            if(idx>=profs.length) return; // 完了検知はtx.oncompleteで行う
+            var prof=profs[idx];idx++;
+            if(prof.records){
+              // 旧形式(後方互換): records配列からそのまま積む
+              (prof.records||[]).forEach(function(r){dstStore.put(r);});
+              loadNext();
+            } else {
+              // 新形式: dxfIndexProfileRecordsからカーソルで1件ずつ読み出し積む
+              var curReq=tx.objectStore(_IDB_PROFILE_RECORDS_STORE).index('byProfile').openCursor(IDBKeyRange.only(prof.name));
+              curReq.onsuccess=function(e2){
+                var cur=e2.target.result;
+                if(cur){
+                  var v=cur.value;
+                  dstStore.put({name:v.name,buf:v.buf,texts:v.texts,ts:v.ts,folder:v.folder});
+                  cur.continue();
+                } else {
+                  loadNext();
+                }
+              };
+              curReq.onerror=function(){ loadNext(); };
+            }
+          }
+          loadNext();
+          tx.oncomplete=function(){cb&&cb(null);};
+          tx.onerror=function(e3){cb&&cb(e3.target.error);};
+        }catch(e4){cb&&cb(e4);}
+      }
+    }catch(e){cb&&cb(e);}
+  });
+}
 function _idbDeleteProfile(name,cb){
   _openIdb(function(err,db){
     if(err){cb&&cb(err);return;}
@@ -5060,13 +5174,16 @@ async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追
     // ③ DXF/PDF読込 V1_51: 拡張子で分岐し、PDFはloadPDF()で読み込む（doc=nullのまま、
     // pdfDoc/pdfImage/pdfMojiがrenderPdfPage内で設定される）
     var _isPdf151=name.toLowerCase().endsWith('.pdf');
+    var _isExcel176=_isExcelName(name); // V1_76
+    doc=null; pdfDoc=null; pdfImage=null; pdfMoji=[]; excelWb=null; // V1_51/V1_76: 前の状態が残らないようクリア
     if(_isPdf151){
-      doc=null; pdfDoc=null; pdfImage=null; pdfMoji=[];
       await loadPDF(buf);
+    } else if(_isExcel176){
+      loadExcel(buf);
     } else {
       doc=parseDXF(buf);
-      pdfDoc=null; pdfImage=null; pdfMoji=[]; // V1_51: 前のPDF状態が残らないようクリア
     }
+    if(typeof renderExcelView==='function') renderExcelView(); // V1_76: excelWbの有無に応じて表示を同期
     currentFileSize=buf.byteLength;
 
     // 検索キーワードマーク設定（V0_104、V1_51: PDF(pdfMoji)にも対応）
@@ -5090,6 +5207,7 @@ async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追
       openFiles[_xi].doc=doc; // パース結果のみ更新
       // V1_51: PDF再読込時のpdfDoc/pdfImage/pdfPageNumも反映
       openFiles[_xi].pdfDoc=pdfDoc;openFiles[_xi].pdfImage=pdfImage;openFiles[_xi].pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);
+      openFiles[_xi].excelWb=excelWb;openFiles[_xi].excelSheetIdx=(typeof excelSheetIdx!=='undefined'?excelSheetIdx:0); // V1_76
       if(folder) openFiles[_xi].folder=folder; // V1_70: 分かっている時だけ上書き（既存値を空で消さない）
       currentFileIdx=_xi;
       var _ef=openFiles[_xi];
@@ -5135,7 +5253,7 @@ async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追
       openFiles.push({name:name,fileKey:_fk,folder:folder||''}); // V1_70: folderは開いているファイル一覧の表示用
       currentFileIdx=openFiles.length-1;
       // V0_140: 新タブ登録時にstrokes/dims/images/savedViewsの参照を設定
-      {var _nf140b=openFiles[currentFileIdx];_nf140b.strokes=strokes;_nf140b.dims=dims;_nf140b.images=typeof images!=='undefined'?images:[];_nf140b.savedViews=savedViews;_nf140b.doc=doc;_nf140b.hiddenLayersArr=Array.from(hiddenLayers);_nf140b.pdfDoc=pdfDoc;_nf140b.pdfImage=pdfImage;_nf140b.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);} // V1_51: PDFタブ情報も登録
+      {var _nf140b=openFiles[currentFileIdx];_nf140b.strokes=strokes;_nf140b.dims=dims;_nf140b.images=typeof images!=='undefined'?images:[];_nf140b.savedViews=savedViews;_nf140b.doc=doc;_nf140b.hiddenLayersArr=Array.from(hiddenLayers);_nf140b.pdfDoc=pdfDoc;_nf140b.pdfImage=pdfImage;_nf140b.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);_nf140b.excelWb=excelWb;_nf140b.excelSheetIdx=(typeof excelSheetIdx!=='undefined'?excelSheetIdx:0);} // V1_51/V1_76: PDF/Excelタブ情報も登録
     }
 
     currentFileName=name;
@@ -5159,7 +5277,7 @@ async function openDxfFromDb(name,buf,keyword,folder){ // V1_70: folder引数追
 
     document.getElementById('allSearchOverlay').classList.remove('open');
     document.body.classList.remove('settings-open');
-    var _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display=(doc||pdfImage)?'none':'';
+    var _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display=(doc||pdfImage||excelWb)?'none':'';
     // マークポップアップ（V0_104）
     var _mp=document.getElementById('markPopup');if(_mp){if(_searchMarks.length>0)_mp.classList.add('visible');else _mp.classList.remove('visible');}
   }catch(err){alert('図面を開けません: '+err.message);}finally{_isOpeningFileBusy=false;} // V1_40
@@ -5350,12 +5468,13 @@ document.getElementById('folderInput').addEventListener('change', function(e){
   var progEl = document.getElementById(_folderIndexSource==='openFile'?'openFolderProgress':'folderProgress');
   var allFiles = Array.from(e.target.files);
   // V1_51: PDFも対象に追加し、文字を抽出してインデックスできるようにする
+  // V1_76: Excel(.xlsx/.xls/.csv)も対象に追加
   var files = allFiles.filter(function(f){
     var n=f.name.toLowerCase();
-    return n.endsWith('.dxf')||n.endsWith('.pdf');
+    return n.endsWith('.dxf')||n.endsWith('.pdf')||_isExcelName(n);
   });
   if(files.length === 0){
-    progEl.textContent = 'DXF・PDFファイルが見つかりません';
+    progEl.textContent = 'DXF・PDF・Excelファイルが見つかりません';
     return;
   }
   // V1_33: webkitRelativePathの先頭セグメント＝選択したフォルダ名を取得
@@ -5414,6 +5533,11 @@ function processFolderFiles(files, progEl, folderName){
           // コピー(slice(0))を渡してbufを無傷のまま保持する
           var _pdoc151=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
           texts=await extractAllPdfTexts(_pdoc151);
+        } else if(_isExcelName(f.name)){
+          // V1_76: Excelは全シートのセル文字列をtextsに追加するだけでよい（座標情報は不要）
+          if(typeof XLSX==='undefined') throw new Error('Excel読み込み機能が読み込まれていません');
+          var _wb176=XLSX.read(buf,{type:'array'});
+          texts=extractAllExcelTexts(_wb176);
         } else {
           var d = parseDXF(buf);
           if(d && d.moji){
