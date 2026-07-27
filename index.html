@@ -185,7 +185,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   padding:14px 16px;min-width:252px;max-height:80vh;overflow-y:auto;
   box-shadow:0 8px 32px rgba(0,0,0,.65);flex-direction:column;gap:14px}
 #colorOverlay.open{display:flex}
-.co-hl-colors{display:flex;gap:8px}
+.co-hl-colors{display:flex;gap:8px;flex-wrap:wrap} /* V1_74: 10色化で折り返しが必要なため追加 */
 .hl-color-btn{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .hl-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
 .co-hl-lw{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
@@ -198,7 +198,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .dim-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
 .co-label{font-size:11px;color:var(--text-dim);margin-bottom:8px;
   text-transform:uppercase;letter-spacing:.5px;font-weight:500}
-.co-colors{display:flex;gap:8px}
+.co-colors{display:flex;gap:8px;flex-wrap:wrap} /* V1_74: 10色化で折り返しが必要なため追加 */
 .color-btn{width:38px;height:38px;border-radius:50%;border:3px solid transparent;cursor:pointer;
   -webkit-tap-highlight-color:transparent}
 .color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
@@ -524,7 +524,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_73</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_75</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -667,12 +667,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <div id="colorOverlay">
   <div class="co-sketch-section">
     <div class="co-label">スケッチ色</div>
+    <!-- V1_74: 10色に拡張。白・黒は背景色（白背景/濃紺背景・図面の黒線）と重なり見えなくなるため除外 -->
     <div class="co-colors">
       <button class="color-btn active" data-color="255,0,0" style="background:#f00" title="赤"></button>
       <button class="color-btn" data-color="255,140,0" style="background:#f80" title="橙"></button>
+      <button class="color-btn" data-color="255,215,0" style="background:#ffd700" title="黄"></button>
+      <button class="color-btn" data-color="130,220,0" style="background:#82dc00" title="黄緑"></button>
       <button class="color-btn" data-color="0,200,0" style="background:#0c8" title="緑"></button>
+      <button class="color-btn" data-color="0,200,220" style="background:#00c8dc" title="水色"></button>
       <button class="color-btn" data-color="0,120,255" style="background:#08f" title="青"></button>
+      <button class="color-btn" data-color="140,60,230" style="background:#8c3ce6" title="紫"></button>
       <button class="color-btn" data-color="255,0,180" style="background:#f0b" title="ピンク"></button>
+      <button class="color-btn" data-color="150,90,40" style="background:#965a28" title="茶"></button>
     </div>
   </div>
   <div class="co-sketch-section">
@@ -693,11 +699,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div class="co-hl-section">
     <div class="co-label">蛍光色</div>
+    <!-- V1_74: 10色に拡張。白・黒は背景色と重なり見えなくなるため除外 -->
     <div class="co-hl-colors">
       <button class="hl-color-btn active" data-color="255,255,0" style="background:#ff0" title="黄"></button>
-      <button class="hl-color-btn" data-color="255,80,160" style="background:#f050a0" title="ピンク"></button>
+      <button class="hl-color-btn" data-color="255,180,60" style="background:#ffb43c" title="橙"></button>
+      <button class="hl-color-btn" data-color="200,255,80" style="background:#c8ff50" title="黄緑"></button>
       <button class="hl-color-btn" data-color="80,255,80" style="background:#50ff50" title="緑"></button>
       <button class="hl-color-btn" data-color="80,210,255" style="background:#50d2ff" title="水色"></button>
+      <button class="hl-color-btn" data-color="110,160,255" style="background:#6ea0ff" title="青"></button>
+      <button class="hl-color-btn" data-color="190,140,255" style="background:#be8cff" title="紫"></button>
+      <button class="hl-color-btn" data-color="255,80,160" style="background:#f050a0" title="ピンク"></button>
+      <button class="hl-color-btn" data-color="255,110,110" style="background:#ff6e6e" title="赤"></button>
+      <button class="hl-color-btn" data-color="220,180,120" style="background:#dcb478" title="茶"></button>
     </div>
   </div>
   <div class="co-hl-section">
@@ -717,13 +730,19 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div class="co-dim-section">
     <div class="co-label">寸法色</div>
+    <!-- V1_74: 10色に拡張。白(#ffffff)は白背景・図面の黒線側どちらでも見づらくなるため除外し、
+         代わりに黄・黄緑・青・紫・茶を追加した -->
     <div class="co-dim-colors">
       <button class="dim-color-btn active" data-color="#f39c12" style="background:#f39c12" title="橙（既定）"></button>
-      <button class="dim-color-btn" data-color="#00d4ff" style="background:#00d4ff" title="水色"></button>
-      <button class="dim-color-btn" data-color="#ff4444" style="background:#f44" title="赤"></button>
-      <button class="dim-color-btn" data-color="#ffffff" style="background:#fff" title="白"></button>
+      <button class="dim-color-btn" data-color="#ffd700" style="background:#ffd700" title="黄"></button>
+      <button class="dim-color-btn" data-color="#8bc400" style="background:#8bc400" title="黄緑"></button>
       <button class="dim-color-btn" data-color="#2ecc71" style="background:#2ecc71" title="緑"></button>
-      <button class="dim-color-btn" data-color="#ff88ff" style="background:#f8f" title="紫"></button>
+      <button class="dim-color-btn" data-color="#00d4ff" style="background:#00d4ff" title="水色"></button>
+      <button class="dim-color-btn" data-color="#3399ff" style="background:#3399ff" title="青"></button>
+      <button class="dim-color-btn" data-color="#9b59b6" style="background:#9b59b6" title="紫"></button>
+      <button class="dim-color-btn" data-color="#ff88ff" style="background:#f8f" title="ピンク"></button>
+      <button class="dim-color-btn" data-color="#ff4444" style="background:#f44" title="赤"></button>
+      <button class="dim-color-btn" data-color="#a0623c" style="background:#a0623c" title="茶"></button>
     </div>
   </div>
 </div>
@@ -847,21 +866,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=173"></script>
-<script src="viewer.js?v=173"></script>
-<script src="utils.js?v=173"></script>
-<script src="ui.js?v=173"></script>
-<script src="dialog.js?v=173"></script>
-<script src="storage.js?v=173"></script>
-<script src="fonts/NotoSansJP.js?v=173"></script>
-<script src="export.js?v=173"></script>
-<script src="tool.js?v=173"></script>
-<script src="verify.js?v=173"></script>
+<script src="layer.js?v=175"></script>
+<script src="viewer.js?v=175"></script>
+<script src="utils.js?v=175"></script>
+<script src="ui.js?v=175"></script>
+<script src="dialog.js?v=175"></script>
+<script src="storage.js?v=175"></script>
+<script src="fonts/NotoSansJP.js?v=175"></script>
+<script src="export.js?v=175"></script>
+<script src="tool.js?v=175"></script>
+<script src="verify.js?v=175"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=173"></script>
+<script src="supabase-sync.js?v=175"></script>
 <script>
-const APP_VERSION = 'V1_73';
+const APP_VERSION = 'V1_75';
 
 // =========================================================
 // グローバル状態
@@ -2076,15 +2095,17 @@ function openContextPopup(mode,anchorEl){
   const co=document.getElementById('colorOverlay');
   if(co.classList.contains('open')&&co.dataset.mode===mode){co.classList.remove('open');return;}
   co.dataset.mode=mode;
+  // V1_74: 色数(10色化)でポップアップの実際の高さがモードごとに変わるため、
+  // 固定値(旧popW=252,popH=180)ではなく先に表示してoffsetWidth/Heightで実測する
+  co.classList.add('open');
   const rect=anchorEl.getBoundingClientRect();
-  const popW=252,popH=180;
+  const popW=co.offsetWidth||252,popH=co.offsetHeight||180;
   let left=rect.left;
   let top=rect.bottom+6;
   if(left+popW>window.innerWidth) left=window.innerWidth-popW-8;
   if(left<4) left=4;
   if(top+popH>window.innerHeight) top=rect.top-popH-4;
   co.style.top=top+'px';co.style.left=left+'px';
-  co.classList.add('open');
 }
 // V1_45: 色丸ボタン(sketchColorDot/hlColorDot/dimColorDot)は廃止。色・太さの選択
 // ポップアップは、選択中のツールアイコンをもう一度押すことで開く(tool.js側で
@@ -4619,7 +4640,13 @@ document.getElementById('searchInput').addEventListener('input',doSearch);
 // DBバージョンを1→2へ引き上げた。既存ユーザーのDB(バージョン1・dxfIndexストアのみ)を
 // 開いた際もonupgradeneededが働き、dxfIndexストアはそのまま・新規に
 // dxfIndexProfilesストアだけが追加される（既存データの移行・削除は発生しない）
-var _IDB_NAME='dxfViewerDB', _IDB_VER=2, _IDB_STORE='dxfIndex', _IDB_PROFILE_STORE='dxfIndexProfiles';
+// V1_75: 「現在のインデックスを登録」でファイル数が多いと失敗する不具合を修正するため、
+// dxfIndexProfileRecordsストアを追加しDBバージョンを2→3へ引き上げた。従来は
+// dxfIndexProfilesストアの1レコードに全ファイル分のbuf(生バイナリ)を配列でまとめて
+// 保存していたため、ファイル数・サイズが増えるほど1回のput()が巨大になり失敗しやすい
+// 構造だった。新方式ではファイル1件＝1レコードとしてdxfIndexProfileRecordsへ分散保存し、
+// dxfIndexProfilesにはname/count/savedAtだけの軽量なメタ情報のみを持たせる
+var _IDB_NAME='dxfViewerDB', _IDB_VER=3, _IDB_STORE='dxfIndex', _IDB_PROFILE_STORE='dxfIndexProfiles', _IDB_PROFILE_RECORDS_STORE='dxfIndexProfileRecords';
 // V1_24: 「フォルダを選択してインデックス作成」実行中に落ちる不具合の修正。
 // 従来は_idbSave()を呼ぶたび（＝フォルダ内のファイル1件ごと）にindexedDB.open()で
 // 新しい接続を作っており、一度も閉じていなかった。数十〜数百件のフォルダを
@@ -4635,6 +4662,10 @@ function _openIdb(cb){
       db.createObjectStore(_IDB_STORE,{keyPath:'name'});
     if(!db.objectStoreNames.contains(_IDB_PROFILE_STORE)) // V1_69: インデックスパターン保存用
       db.createObjectStore(_IDB_PROFILE_STORE,{keyPath:'name'});
+    if(!db.objectStoreNames.contains(_IDB_PROFILE_RECORDS_STORE)){ // V1_75: 登録パターンのファイル1件ごとの分散保存用
+      var _prs=db.createObjectStore(_IDB_PROFILE_RECORDS_STORE,{keyPath:'pk'});
+      _prs.createIndex('byProfile','profile',{unique:false});
+    }
   };
   req.onsuccess=function(e){
     _idbConn=e.target.result;
@@ -4748,23 +4779,61 @@ function _idbClear(){
 }
 // V1_69: インデックスパターン（登録インデックス）機能 ─────────────────────
 // 現在dxfIndexストアに蓄積されている全レコード(name,buf,texts,ts,folder)を、
-// ユーザーが指定した任意の名前でdxfIndexProfilesストアへ丸ごと複製保存する。
+// ユーザーが指定した任意の名前でdxfIndexProfile系ストアへ複製保存する。
 // 実フォルダへの再アクセスは不要（既にDBにあるバイナリ・テキストをそのまま使う）
+// V1_75: 「ファイル数が多いと登録に失敗する」不具合を修正。従来はgetAll()で全ファイルの
+// buf(生バイナリ)を一度にJSメモリへ展開した上で、それを1レコードとしてまとめて
+// put()していたため、ファイル数・サイズが増えるほど1回の書き込みが巨大になり
+// 失敗しやすかった（iOS Safari(WKWebView)のメモリ制限・IndexedDBの単一値サイズに
+// 抵触しやすい）。新方式ではdxfIndexストアをカーソルで1件ずつ読みながら、
+// ファイル1件＝dxfIndexProfileRecordsストアの1レコードとして都度put()し、
+// 巨大な単一オブジェクトを作らないようにした。同名で再登録した場合に古い
+// レコードが残らないよう、書き込み前に同名分をカーソルで削除してから書き直す
 function _idbSaveProfile(name,cb){
-  _idbGetAll(function(records){
-    _openIdb(function(err,db){
-      if(err){cb&&cb(err);return;}
-      try{
-        var tx=db.transaction(_IDB_PROFILE_STORE,'readwrite');
-        tx.objectStore(_IDB_PROFILE_STORE).put({name:name,records:records,savedAt:Date.now()});
-        tx.oncomplete=function(){cb&&cb(null);};
-        tx.onerror=function(e){cb&&cb(e.target.error);};
-      }catch(e){cb&&cb(e);}
-    });
+  _openIdb(function(err,db){
+    if(err){cb&&cb(err);return;}
+    try{
+      var tx=db.transaction([_IDB_STORE,_IDB_PROFILE_STORE,_IDB_PROFILE_RECORDS_STORE],'readwrite');
+      var recStore=tx.objectStore(_IDB_PROFILE_RECORDS_STORE);
+      var metaStore=tx.objectStore(_IDB_PROFILE_STORE);
+      var srcStore=tx.objectStore(_IDB_STORE);
+      var count=0;
+      // ① 同名の登録パターンが既に存在する場合、古い個別レコードを先に削除する
+      //   （今回のフォルダに含まれなくなったファイルが残留するのを防ぐ）
+      var delReq=recStore.index('byProfile').openCursor(IDBKeyRange.only(name));
+      delReq.onsuccess=function(e){
+        var cur=e.target.result;
+        if(cur){cur.delete();cur.continue();}
+        else{ copyRecords(); }
+      };
+      delReq.onerror=function(){ copyRecords(); }; // 削除失敗しても後続の書き込みは試みる
+      // ② dxfIndexストアをカーソルで1件ずつ読み、profile専用の複合キー(pk)を付けて
+      //    dxfIndexProfileRecordsへ都度put()する（全件を配列にまとめない）
+      function copyRecords(){
+        var srcReq=srcStore.openCursor();
+        srcReq.onsuccess=function(e){
+          var cur=e.target.result;
+          if(cur){
+            var r=cur.value;
+            recStore.put({pk:name+' '+r.name,profile:name,name:r.name,buf:r.buf,texts:r.texts,ts:r.ts,folder:r.folder});
+            count++;
+            cur.continue();
+          } else {
+            // ③ 件数・保存日時だけの軽量なメタ情報をdxfIndexProfilesへ保存
+            //    （旧形式でrecords配列を持つ同名レコードがあってもこのputで上書きされ、
+            //    自動的に新形式(軽量)へ移行する）
+            metaStore.put({name:name,count:count,savedAt:Date.now()});
+          }
+        };
+      }
+      tx.oncomplete=function(){cb&&cb(null);};
+      tx.onerror=function(e){cb&&cb(e.target.error);};
+    }catch(e){cb&&cb(e);}
   });
 }
-// 登録済みインデックスパターンの一覧を、名前・件数・保存日時のみの軽量な形で返す
-// （records本体は一覧表示に不要なため、コールバックへ渡す前に捨てる）
+// 登録済みインデックスパターンの一覧を、名前・件数・保存日時のみの軽量な形で返す。
+// V1_75: 新形式(count保持)・旧形式(records配列保持)のどちらのレコードが残っていても
+// 件数を正しく算出できるようにした（旧形式のまま一度も再登録していないデータの後方互換）
 function _idbListProfiles(cb){
   _openIdb(function(err,db){
     if(err){cb([]);return;}
@@ -4775,7 +4844,9 @@ function _idbListProfiles(cb){
       req.onsuccess=function(e){
         var cursor=e.target.result;
         if(cursor){
-          list.push({name:cursor.value.name,count:(cursor.value.records||[]).length,savedAt:cursor.value.savedAt});
+          var v=cursor.value;
+          var cnt=(v.count!=null)?v.count:(v.records||[]).length; // V1_75: 新形式/旧形式どちらにも対応
+          list.push({name:v.name,count:cnt,savedAt:v.savedAt});
           cursor.continue();
         } else {
           list.sort(function(a,b){return (b.savedAt||0)-(a.savedAt||0);}); // 新しい登録ほど上に
@@ -4788,6 +4859,10 @@ function _idbListProfiles(cb){
 }
 // 指定名のインデックスパターンで、現在のdxfIndexストアを置き換える
 // （検索対象を登録内容だけに絞り込むため、clear→putを同一トランザクションで行う）
+// V1_75: 新形式（dxfIndexProfileRecordsにファイル毎の個別レコードがある場合）は
+// カーソルで1件ずつ読みながらdxfIndexへput()し、全件を配列に載せない。
+// 旧形式（dxfIndexProfilesのレコード自体がrecords配列を持つ場合）は後方互換のため
+// 従来通りrecords配列からそのまま復元する
 function _idbLoadProfile(name,cb){
   _openIdb(function(err,db){
     if(err){cb&&cb(err);return;}
@@ -4798,12 +4873,32 @@ function _idbLoadProfile(name,cb){
         var prof=e.target.result;
         if(!prof){cb&&cb(new Error('見つかりません'));return;}
         try{
-          var tx=db.transaction(_IDB_STORE,'readwrite');
-          var store=tx.objectStore(_IDB_STORE);
-          store.clear();
-          (prof.records||[]).forEach(function(r){store.put(r);});
-          tx.oncomplete=function(){cb&&cb(null);};
-          tx.onerror=function(e3){cb&&cb(e3.target.error);};
+          if(prof.records){
+            // 旧形式(後方互換): 一度も再登録されていない古いデータ
+            var tx=db.transaction(_IDB_STORE,'readwrite');
+            var store=tx.objectStore(_IDB_STORE);
+            store.clear();
+            (prof.records||[]).forEach(function(r){store.put(r);});
+            tx.oncomplete=function(){cb&&cb(null);};
+            tx.onerror=function(e3){cb&&cb(e3.target.error);};
+          } else {
+            // V1_75: 新形式。dxfIndexProfileRecordsからカーソルで1件ずつ読み出し、
+            // dxfIndexへ都度put()する（全件を配列にまとめない）
+            var tx2=db.transaction([_IDB_STORE,_IDB_PROFILE_RECORDS_STORE],'readwrite');
+            var dstStore=tx2.objectStore(_IDB_STORE);
+            dstStore.clear();
+            var curReq=tx2.objectStore(_IDB_PROFILE_RECORDS_STORE).index('byProfile').openCursor(IDBKeyRange.only(name));
+            curReq.onsuccess=function(e2){
+              var cur=e2.target.result;
+              if(cur){
+                var v=cur.value;
+                dstStore.put({name:v.name,buf:v.buf,texts:v.texts,ts:v.ts,folder:v.folder});
+                cur.continue();
+              }
+            };
+            tx2.oncomplete=function(){cb&&cb(null);};
+            tx2.onerror=function(e4){cb&&cb(e4.target.error);};
+          }
         }catch(e4){cb&&cb(e4);}
       };
       getReq.onerror=function(e){cb&&cb(e.target.error);};
@@ -4814,8 +4909,14 @@ function _idbDeleteProfile(name,cb){
   _openIdb(function(err,db){
     if(err){cb&&cb(err);return;}
     try{
-      var tx=db.transaction(_IDB_PROFILE_STORE,'readwrite');
+      var tx=db.transaction([_IDB_PROFILE_STORE,_IDB_PROFILE_RECORDS_STORE],'readwrite');
       tx.objectStore(_IDB_PROFILE_STORE).delete(name);
+      // V1_75: 新形式の個別レコードも併せて削除する（旧形式のみの場合はヒットせず無害）
+      var delReq=tx.objectStore(_IDB_PROFILE_RECORDS_STORE).index('byProfile').openCursor(IDBKeyRange.only(name));
+      delReq.onsuccess=function(e){
+        var cur=e.target.result;
+        if(cur){cur.delete();cur.continue();}
+      };
       tx.oncomplete=function(){cb&&cb(null);};
       tx.onerror=function(e){cb&&cb(e.target.error);};
     }catch(e){cb&&cb(e);}
@@ -4851,7 +4952,7 @@ function _idbGetAllNameTexts(cb){
       var cursor=e.target.result;
       if(cursor){
         var v=cursor.value;
-        out.push({name:v.name,texts:v.texts||[],ts:v.ts||0});
+        out.push({name:v.name,texts:v.texts||[],ts:v.ts||0,folder:v.folder||''}); // V1_75: doAllSearch()をgetAll()から移行するためfolderも追加
         cursor.continue();
       } else {
         cb(out);
@@ -4889,13 +4990,19 @@ function doAllSearch(){
   var cnt=document.getElementById('allSearchCount');
   list.innerHTML='';
   if(!kw){cnt.textContent='';return;}
-  _idbGetAll(function(records){
+  // V1_75: 従来は_idbGetAll()で全ファイルのbuf(生バイナリ)を検索のたびに一括で
+  // メモリへ読み込んでいたが、検索でヒット判定に使うのはname/texts/folderだけで、
+  // bufが実際に必要なのは結果をタップして開く時点のみ。ファイル数が多いフォルダで
+  // 検索するたびに重くなる/失敗しやすくなるのを避けるため、一覧取得は軽量な
+  // _idbGetAllNameTexts()（bufを含まない）に変え、bufはタップ時に_idbGetOne()で
+  // その1件分だけ取得するようにした
+  _idbGetAllNameTexts(function(records){
     if(gen!==_allSearchGen) return; // V0_103: 旧世代コールバックは破棄
     list.innerHTML=''; // 最新世代のみリスト再構築
     var hits=[];
     records.forEach(function(rec){
       var matched=(rec.texts||[]).filter(function(t){return t.toLowerCase().indexOf(kw)>=0;});
-      if(matched.length>0) hits.push({name:rec.name,buf:rec.buf,matched:matched,folder:rec.folder}); // V1_70: folder追加（開いているファイル一覧の表示用）
+      if(matched.length>0) hits.push({name:rec.name,matched:matched,folder:rec.folder});
     });
     cnt.textContent=hits.length+'件（全'+records.length+'図面）';
     if(hits.length===0){
@@ -4911,7 +5018,12 @@ function doAllSearch(){
       var ht=document.createElement('div');ht.className='asr-hit';
       ht.textContent=h.matched.slice(0,4).join(' / ')+(h.matched.length>4?' …':'');
       el.appendChild(fn);el.appendChild(ht);
-      el.addEventListener('click',function(){openDxfFromDb(h.name,h.buf,kw,h.folder);}); // V0_104 / V1_70: folder伝達
+      el.addEventListener('click',function(){ // V1_75: タップ時にその1件分だけbufを取得
+        _idbGetOne(h.name,function(full){
+          if(!full){showGuide('読み込みに失敗しました',2000);return;}
+          openDxfFromDb(h.name,full.buf,kw,h.folder); // V0_104 / V1_70: folder伝達
+        });
+      });
       list.appendChild(el);
     });
   });
