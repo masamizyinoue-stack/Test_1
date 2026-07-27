@@ -311,8 +311,20 @@ function eraseAt(wx,wy){
 // =========================================================
 // マウスイベントリスナー
 // =========================================================
+var _mouseTextPickPending=false,_mouseTapStartTime=0,_mouseTapStartX=0,_mouseTapStartY=0; // V1_86
 ov.addEventListener('mousedown',e=>{
   if(e.button!==0)return;
+  // V1_86: 画面検索/検索して開くパネルが開いている間(_textPickTarget有効時)は、
+  // マウスクリックでの書込み・消しゴム・計測操作を行わず、図面上の文字クリックでの
+  // テキスト読込を最優先する（V1_83のタッチ操作(_textPickTarget)と同じ考え方をマウスにも適用）。
+  // DIM/LP/LL.handleDown・handlePointerDownを一切呼ばないため、ドラッグ中もそれらの
+  // hoverプレビュー更新以外の実際のデータ変更(点確定・描画・消しゴム)は発生しない
+  if(typeof _textPickTarget!=='undefined'&&_textPickTarget){
+    mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
+    _mouseTextPickPending=true;
+    _mouseTapStartTime=Date.now();_mouseTapStartX=p.x;_mouseTapStartY=p.y;
+    return;
+  }
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
   if(window.DIM&&window.DIM.active){
     window.DIM.handleDown(p.x,p.y);
@@ -336,6 +348,22 @@ window.addEventListener('mousemove',e=>{
 window.addEventListener('mouseup',e=>{
   if(!mouseDown)return;mouseDown=false;
   const p=getPos(e);
+  // V1_86: mousedown時にテキスト読込ピック待機中だった場合は、DIM/LP/LL/handlePointerUpを
+  // 呼ばず、クリック相当(短時間・小移動)なら文字読込を試みる。ドラッグ的な動きだった場合や
+  // 待機中に_textPickTargetが解除された場合は何もしない（元々handleDownを呼んでいないため
+  // 安全に無視できる）
+  if(_mouseTextPickPending){
+    _mouseTextPickPending=false;
+    if(typeof _textPickTarget!=='undefined'&&_textPickTarget&&_mouseTapStartTime){
+      var _mDt=Date.now()-_mouseTapStartTime;
+      var _mDd=Math.hypot(p.x-_mouseTapStartX,p.y-_mouseTapStartY);
+      if(_mDt<600&&_mDd<6){ // マウスは指ほど誤差が無いため許容範囲は小さめ
+        if(typeof _tapPickText==='function') _tapPickText(p.x,p.y);
+      }
+    }
+    _mouseTapStartTime=0;
+    return;
+  }
   if(window.DIM&&window.DIM.active){
     window.DIM.handleUp(p.x,p.y);
   } else if(window.LP&&window.LP.active){
@@ -346,7 +374,20 @@ window.addEventListener('mouseup',e=>{
 });
 ov.addEventListener('wheel',e=>{
   e.preventDefault();
-  const p=getPos(e);zoomAt(p.x,p.y,e.deltaY<0?1.15:1/1.15);scheduleDraw();
+  const p=getPos(e);
+  // V1_86: ホイール/トラックパッドを回す・動かす勢い(deltaYの大きさ)に応じて滑らかに
+  // 拡大縮小の変化量を変える。従来は符号のみを見て常に固定倍率(15%)だったため、座標の
+  // 大きい図面(建物全体等)では全体表示から詳細表示まで辿り着くのに必要なホイール回数が
+  // 多く感じられていた（データの絶対座標によって倍率自体が変わっていたわけではない）。
+  // deltaModeの違い(line/page単位)をpixel相当に正規化した上で、一般的なマウスホイール
+  // 1ノッチ(deltaY=100前後)では従来と同じ約15%になるよう係数を合わせつつ、
+  // 強く/速く回すほど大きく、そっと回すほど小さく変化するようにする
+  var _wd=e.deltaY;
+  if(e.deltaMode===1) _wd*=16; // DOM_DELTA_LINE→pixel相当
+  else if(e.deltaMode===2) _wd*=800; // DOM_DELTA_PAGE→pixel相当(概算)
+  _wd=Math.max(-800,Math.min(800,_wd)); // 極端な単発ジャンプの安全策
+  const _wf=Math.pow(1.15,-_wd/100);
+  zoomAt(p.x,p.y,_wf);scheduleDraw();
 },{passive:false});
 
 // =========================================================

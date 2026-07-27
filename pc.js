@@ -11,8 +11,13 @@
 //     2本指タップ(iPadOSの右クリック相当ジェスチャー)で発火しうるが、これは新規追加の
 //     挙動であり、既存のタッチ/Apple Pencilのdraw/pan/pinchロジック(tool.js)には
 //     一切影響しない。
+//   ・mousedown/mousemove/mouseup（中央ボタン、V1_86追加）: マウスの中央ボタン
+//     (e.button===1、ホイール押し込み)はiPadのタッチ/Apple Pencilでは発生し得ない。
+//     tool.js側の既存mousedownはe.button!==0で左クリック以外を即returnしており、
+//     ここで追加するリスナーはtool.js側の処理と競合しない（tool.js側は素通りするだけ）。
 // 依存関数・変数: undo, redo, fit, scheduleDraw, history, redoStack (index.html)
 //               showGuide (ui.js)
+//               getPos, tx, ty (tool.js/viewer.js)
 (function(){
   'use strict';
 
@@ -101,5 +106,42 @@
       });
     },10);
   }
+
+  // =========================================================
+  // V1_86: マウスの中央ボタン(ホイール押し込み)を押しながらドラッグでスクロール(パン)。
+  // 慣性(勢いで動き続ける効果)は付けない — ボタンを離した位置でぴたっと止まる。
+  // 描画キャンバス(#ov)上のみで有効。左クリック(既存のtool.js側mousedown/mousemove/
+  // mouseup)や右クリックメニューとは独立した、新規追加のイベントリスナーのみで完結する。
+  // =========================================================
+  var _pcMidPanning = false, _pcMidLastX = 0, _pcMidLastY = 0;
+
+  document.addEventListener('mousedown', function(e){
+    if(e.button !== 1) return;
+    var ov = document.getElementById('ov');
+    if(!ov || !ov.contains(e.target)) return;
+    e.preventDefault(); // ブラウザ既定の中央ボタン自動スクロールアイコンを抑止
+    if(typeof getPos !== 'function') return;
+    var p = getPos(e);
+    _pcMidPanning = true;
+    _pcMidLastX = p.x; _pcMidLastY = p.y;
+  });
+
+  document.addEventListener('mousemove', function(e){
+    if(!_pcMidPanning) return;
+    if(typeof getPos !== 'function') return;
+    var p = getPos(e);
+    // V0_79等の既存パン処理(tool.js)と同じ「移動量をそのまま加算するだけ」の式。
+    // 減速・継続処理を一切行わないため、慣性は付かない
+    tx += p.x - _pcMidLastX;
+    ty += p.y - _pcMidLastY;
+    _pcMidLastX = p.x; _pcMidLastY = p.y;
+    if(typeof scheduleDraw === 'function') scheduleDraw();
+  });
+
+  document.addEventListener('mouseup', function(e){
+    if(e.button === 1) _pcMidPanning = false;
+  });
+  // ウィンドウ外でボタンを離した場合や、フォーカスが外れた場合もパン状態を残さない
+  window.addEventListener('blur', function(){ _pcMidPanning = false; });
 
 })();
