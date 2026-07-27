@@ -779,23 +779,60 @@ async function renderPdfPage(n){
 // V1_85: 固定のscale:3で割っていた箇所を、実際に使われたviewport自身のscale(vp.scale)で
 // 割るように修正。ズーム倍率に応じた解像度可変レンダリング(_pdfRenderVisibleTile)により、
 // 渡されるviewportのscaleがPDF_BASE_SCALE以外の値になる場合があるため
+// V1_87: PDFによっては、1文字ずつ個別のTj命令で描画されている（Excel等からのPDF出力で
+// 太字セルなどによく見られる）ため、pdf.js自身が同じ単語として結合してくれず、
+// 「C1」が「C」と「1」の2つの要素に分かれてしまい、テキスト読込で1回のタップで
+// 「C1」とまとめて読み込めない不具合があった。取得した文字要素を並び順に走査し、
+// 高さ(フォントサイズ)がほぼ同じ・同じ行（垂直方向のずれが小さい）・すき間がほぼ無い
+// （前の文字の右端と次の文字の左端がほぼ接している）場合にひとつの単語として結合する。
+// 間に空白のみの要素(スペース)があれば単語の区切りとして結合しない（従来通り除去）
 async function _pdfPageTextItems(page,viewport){
   try{
     var tc=await page.getTextContent();
     var vp=viewport||page.getViewport({scale:PDF_BASE_SCALE});
     var s=vp.scale||PDF_BASE_SCALE;
-    var arr=[];
+    var raw=[];
     tc.items.forEach(function(it){
-      var t=(it.str||'').trim();
-      if(!t) return;
+      var rawText=it.str||'';
+      var t=rawText.trim();
       // V1_81: viewport.transform(回転込み)とitem.transform(回転前の生座標)を
       // 合成し、実際にcanvasへ描画された位置（vpと同じピクセル空間）を求める。
       // その後 /s でviewportのscaleを打ち消し、Y軸をワールド座標(左下原点・Y上向き)に合わせて反転する
       var tr=pdfjsLib.Util.transform(vp.transform,it.transform);
       var hRawDevice=Math.hypot(tr[2],tr[3])||Math.hypot(tr[0],tr[1]);
       var h=hRawDevice?hRawDevice/s:10; // フォールバックは元々のワールド単位換算値(10)のまま
-      arr.push({text:t,x:tr[4]/s,y:(vp.height-tr[5])/s,h:h,angle:0,widthFactor:1});
+      // V1_87: 文字の幅(it.width)も高さと同じ比率でデバイス座標系に変換し、
+      // 前の文字の右端と次の文字の左端のすき間(gap)を判定できるようにする
+      var rawFontSize=Math.hypot(it.transform[2],it.transform[3])||Math.hypot(it.transform[0],it.transform[1])||h||1;
+      var w=(it.width||0)*(h/rawFontSize);
+      if(!t){ raw.push(null); return; } // 空白のみの要素は単語の区切りを示す目印として残す
+      raw.push({text:t,x:tr[4]/s,y:(vp.height-tr[5])/s,h:h,w:w});
     });
+    var arr=[];
+    var cur=null;
+    function flush(){
+      if(cur) arr.push({text:cur.text,x:cur.x,y:cur.y,h:cur.h,angle:0,widthFactor:1});
+      cur=null;
+    }
+    raw.forEach(function(it){
+      if(!it){ flush(); return; } // 空白要素＝単語の区切り。現在の単語を確定して次へ
+      if(cur){
+        var maxH=Math.max(cur.h,it.h), minH=Math.min(cur.h,it.h);
+        var sameH=minH>0&&(maxH/minH)<1.2; // フォントサイズがほぼ同じ(20%以内の差)
+        var sameRow=Math.abs(it.y-cur.y)<maxH*0.35; // 縦方向のずれが小さい＝同じ行
+        var gap=it.x-cur.endX; // 前の文字の右端から次の文字の左端までのすき間
+        var closeGap=gap>-maxH*0.6&&gap<maxH*0.6; // すき間がほぼ無い(重なりも軽微な隙間も許容)
+        if(sameH&&sameRow&&closeGap){
+          cur.text+=it.text;
+          cur.endX=it.x+it.w;
+          if(it.h>cur.h) cur.h=it.h;
+          return;
+        }
+        flush();
+      }
+      cur={text:it.text,x:it.x,y:it.y,h:it.h,endX:it.x+it.w};
+    });
+    flush();
     return arr;
   }catch(e){ console.warn('[PDF文字抽出]',e); return []; }
 }
