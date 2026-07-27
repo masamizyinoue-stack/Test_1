@@ -561,7 +561,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_91</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_92</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -903,24 +903,24 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=191"></script>
-<script src="viewer.js?v=191"></script>
-<script src="utils.js?v=191"></script>
-<script src="ui.js?v=191"></script>
-<script src="dialog.js?v=191"></script>
-<script src="storage.js?v=191"></script>
-<script src="fonts/NotoSansJP.js?v=191"></script>
-<script src="export.js?v=191"></script>
-<script src="tool.js?v=191"></script>
-<script src="verify.js?v=191"></script>
+<script src="layer.js?v=192"></script>
+<script src="viewer.js?v=192"></script>
+<script src="utils.js?v=192"></script>
+<script src="ui.js?v=192"></script>
+<script src="dialog.js?v=192"></script>
+<script src="storage.js?v=192"></script>
+<script src="fonts/NotoSansJP.js?v=192"></script>
+<script src="export.js?v=192"></script>
+<script src="tool.js?v=192"></script>
+<script src="verify.js?v=192"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=191"></script>
+<script src="pc.js?v=192"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=191"></script>
+<script src="supabase-sync.js?v=192"></script>
 <script>
-const APP_VERSION = 'V1_91';
+const APP_VERSION = 'V1_92';
 
 // =========================================================
 // グローバル状態
@@ -5481,8 +5481,11 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
     document.getElementById('allSearchOverlay').classList.remove('open');
     document.body.classList.remove('settings-open');
     var _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display=(doc||pdfImage||excelWb)?'none':'';
-    // マークポップアップ（V0_104）
-    var _mp=document.getElementById('markPopup');if(_mp){if(_searchMarks.length>0)_mp.classList.add('visible');else _mp.classList.remove('visible');}
+    // マークポップアップ（V0_104 / V1_92: Excelは_searchMarksを使わないため、
+    // PDF全ページ・Excel全シート分を含む_totalForLabelで判定するよう修正。
+    // 修正前はExcelの場合_searchMarks.length===0のままとなり、セルはハイライトされ
+    // 件数も計算済みなのにポップアップ本体(.visible)が表示されない不具合があった）
+    var _mp=document.getElementById('markPopup');if(_mp){if(_totalForLabel>0)_mp.classList.add('visible');else _mp.classList.remove('visible');}
   }catch(err){alert('図面を開けません: '+err.message);}finally{_isOpeningFileBusy=false;} // V1_40
 }
 // V1_22: 「ファイルを開く」フォルダインデックス検索パネル（全図面検索(V0_100〜)と同じ
