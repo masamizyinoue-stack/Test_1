@@ -387,10 +387,17 @@ ov.addEventListener('touchstart',e=>{
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     isPen=false;mouseDown=true;lastMX=sx;lastMY=sy;
-    // V1_46/V1_47: 手書きモード + 計測ツール（DIM/LP/LL・水平鉛直・斜め）選択中 →
-    // 指でも計測できるようにする。指先で候補点が隠れないよう、実際の指位置より
-    // 少し上をカーソル位置として扱う。
-    if(inputMode==='freehand'&&_fingerMeasureActive()){
+    // V1_83: 画面検索/検索して開くパネルが開いている間(_textPickTarget有効時)は、
+    // 手書きモードでの描画・消しゴム・指計測より、文字タップでのテキスト読込ピックを
+    // 優先する。パン扱いにしてtouchend側の既存のテキスト読込ピック判定(_textPickTarget)
+    // に委ねる。サブ窓作成のドラッグ操作(SW.active)は対象外とし従来通り動作する
+    if(typeof _textPickTarget!=='undefined'&&_textPickTarget
+        &&inputMode==='freehand'&&!(window.SW&&window.SW.active)
+        &&(_fingerMeasureActive()||currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')){
+      if(sketching){sketching=false;sketchPts=[];}
+      panning=true;
+      _tapStartTime=Date.now();_tapStartX=sx;_tapStartY=sy;
+    } else if(inputMode==='freehand'&&_fingerMeasureActive()){
       panning=false;
       const fy=sy-FINGER_CURSOR_OFFSET_Y;
       _fingerMeasureDown(sx,fy);
