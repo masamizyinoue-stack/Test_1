@@ -15,12 +15,12 @@
 //     (e.button===1、ホイール押し込み)はiPadのタッチ/Apple Pencilでは発生し得ない。
 //     tool.js側の既存mousedownはe.button!==0で左クリック以外を即returnしており、
 //     ここで追加するリスナーはtool.js側の処理と競合しない（tool.js側は素通りするだけ）。
-//   ・#fileのaccept属性削除（V1_89）: イベントリスナーではなくDOM属性の変更だが、
-//     判定にwindow.matchMedia('(hover:hover) and (pointer:fine)')というPC専用の
-//     判定条件（V1_78のホバーCSSと同じ判定式）を使うため、iPad(タッチのみ)では
-//     条件を満たさず一切実行されない。iPad側のaccept属性(.dxf,application/octet-stream。
-//     iOSのFilesアプリで正しくDXFを選択できるようV1_08/V1_09で調整した経緯があるため
-//     変更しない)には一切手を加えない。
+//   ・#file/#folderInputのaccept属性削除（V1_89/V1_90）: イベントリスナーではなく
+//     DOM属性の変更だが、判定にwindow.matchMedia('(hover:hover) and (pointer:fine)')
+//     というPC専用の判定条件（V1_78のホバーCSSと同じ判定式）を使うため、
+//     iPad(タッチのみ)では条件を満たさず一切実行されない。iPad側のaccept属性
+//     (.dxf,application/octet-stream。iOSのFilesアプリで正しくDXFを選択できるよう
+//     V1_08/V1_09で調整した経緯があるため変更しない)には一切手を加えない。
 // 依存関数・変数: undo, redo, fit, scheduleDraw, history, redoStack (index.html)
 //               showGuide (ui.js)
 //               getPos, tx, ty (tool.js/viewer.js)
@@ -31,16 +31,24 @@
   // V1_89: 「ファイルを開く」のOSファイル選択ダイアログが、既定で「カスタムファイル」
   // フィルタ(拡張子が.dxfのみ)になり、PDF/Excelを選ぶ際に手動でフィルタを
   // 「すべてのファイル」へ切り替える一手間が必要という指摘への対応。
-  // PC(マウス操作可能な環境、(hover:hover)and(pointer:fine))でのみ#fileのaccept属性を
-  // 外し、ダイアログの既定フィルタが最初から「すべてのファイル」になるようにする。
-  // iPadのFilesアプリ/写真アプリの選択シートは、accept属性の値によって表示内容や
-  // 挙動が変わる既知の制約(V1_08/V1_09のコメント参照)があるため、この変更はiPadには
-  // 一切適用しない
+  // V1_90: 「フォルダを選択してインデックス作成」でも同様にPDF/Excelが見えにくい・
+  // わかりにくいとの指摘があったため、folderInputにも同じ対応を追加した。
+  // PC(マウス操作可能な環境、(hover:hover)and(pointer:fine))でのみ#file/#folderInputの
+  // accept属性を外し、ダイアログの既定フィルタが最初から「すべてのファイル」になる
+  // ようにする。iPadのFilesアプリ/写真アプリの選択シートは、accept属性の値によって
+  // 表示内容や挙動が変わる既知の制約(V1_08/V1_09のコメント参照)があるため、
+  // この変更はiPadには一切適用しない
   // =========================================================
   try{
     if(window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches){
       var _fileInputV189=document.getElementById('file');
       if(_fileInputV189) _fileInputV189.removeAttribute('accept');
+      // V1_90: 「フォルダを選択してインデックス作成」(folderInput)も同様に、PDF/Excelが
+      // 見えにくい・選びにくいとの指摘のためaccept属性(.dxf)を外す。folderInput自体は
+      // 実際のファイル絞り込みをJS側(change イベント内、拡張子で.dxf/.pdf/Excelを判定)で
+      // 行っており、accept属性の有無はここでの処理結果には影響しない
+      var _folderInputV190=document.getElementById('folderInput');
+      if(_folderInputV190) _folderInputV190.removeAttribute('accept');
     }
   }catch(e){}
 
