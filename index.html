@@ -561,7 +561,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_100</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_101</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -903,24 +903,24 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=1100"></script>
-<script src="viewer.js?v=1100"></script>
-<script src="utils.js?v=1100"></script>
-<script src="ui.js?v=1100"></script>
-<script src="dialog.js?v=1100"></script>
-<script src="storage.js?v=1100"></script>
-<script src="fonts/NotoSansJP.js?v=1100"></script>
-<script src="export.js?v=1100"></script>
-<script src="tool.js?v=1100"></script>
-<script src="verify.js?v=1100"></script>
+<script src="layer.js?v=1101"></script>
+<script src="viewer.js?v=1101"></script>
+<script src="utils.js?v=1101"></script>
+<script src="ui.js?v=1101"></script>
+<script src="dialog.js?v=1101"></script>
+<script src="storage.js?v=1101"></script>
+<script src="fonts/NotoSansJP.js?v=1101"></script>
+<script src="export.js?v=1101"></script>
+<script src="tool.js?v=1101"></script>
+<script src="verify.js?v=1101"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=1100"></script>
+<script src="pc.js?v=1101"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=1100"></script>
+<script src="supabase-sync.js?v=1101"></script>
 <script>
-const APP_VERSION = 'V1_100';
+const APP_VERSION = 'V1_101';
 
 // =========================================================
 // グローバル状態
@@ -968,14 +968,24 @@ var mouseDown=false,lastMX=0,lastMY=0,panning=false;
 var pinchDist=null,pinchMid=null;
 // V1_18: ダブルタップ全体表示用（パン中の単純タップのみ対象。詳細はtool.js touchend参照）
 var _tapStartTime=0,_tapStartX=0,_tapStartY=0,_lastTapTime=0,_lastTapX=0,_lastTapY=0;
-// V1_99: ピンチズーム後の誤操作対策。2本指→1本指へ移行した瞬間の時刻を記録し、
-// その後すぐ（既定0.8秒以内）に全指が離れて「全タッチ終了」に至った場合は、
-// まだピンチ操作・移動の余韻の途中とみなし、書き込み(ペン/蛍光)・計測(DIM/LP/LL)
-// の確定を行わない。0の間は「直近にピンチが終了していない」ことを示す
-// （詳細はtool.js touchend・index.html _swAttachInput内touchend参照）
-// V1_100: 実機でなお誤操作が続くとの報告により、猶予時間を0.3秒→0.8秒に延長した
-var _pinchEndedAt=0;
-var PINCH_RESIDUAL_MS=800;
+// V1_99/V1_100: ピンチズーム後の誤操作対策として、2本指→1本指へ移行してから
+// 既定時間(0.3秒→0.8秒に延長)以内に全指が離れた場合は確定しない、という
+// 時間ベースの猶予を導入したが、実機でなお誤操作の報告が続いた。
+// V1_101: 時間で区切る方式をやめ、以下2つの判定を組み合わせたセッション全体
+// フラグ方式に置き換えた。
+// (1) 本数ベース: このタッチセッション中に一度でも2本指以上になったら
+//     _gestureSessionActive=trueにし、猶予時間に関係なく、全指が画面から
+//     完全に離れて新しいタッチセッションが始まるまで、書き込み・計測の確定を
+//     一切行わない（時間切れによる誤確定を根本的に防ぐ）。
+// (2) 移動距離ベース: 1本指パン中の指がタッチ開始位置から一定距離
+//     (GESTURE_MOVE_THRESHOLD_PX)以上動いた場合も_gestureSessionActiveを
+//     trueにする。実機では2本指ジェスチャーの本数変化イベントの発火順序が
+//     ずれることがあり、(1)の本数判定だけでは検知しきれない場合の保険となる
+// （詳細はtool.js touchmove/touchend・index.html _swAttachInput内touchmove/
+// touchend参照）
+var _gestureSessionActive=false;
+var GESTURE_MOVE_THRESHOLD_PX=18;
+var _panAnchorX=null,_panAnchorY=null;
 // ERASER_RADIUS_PX → tool.js
 
 // showGuide / hideGuide → ui.js
@@ -4135,6 +4145,10 @@ function _swAttachInput(sw){
       if(window.LP) window.LP.penDown=false;
       if(window.LL) window.LL.penDown=false;
       mouseDown=false;panning=false;
+      // V1_101: メイン画面(tool.js)と同じく、2本指が揃った時点でセッション全体
+      // フラグを立てる。全指が完全に離れて新しいタッチセッションが始まるまで
+      // 書き込み・計測の確定を一切行わない（詳細はtouchendのremaining.length===0側参照）
+      _gestureSessionActive=true;
       var t0=fingers[0],t1=fingers[1];
       var x0=t0.clientX-r.left,y0=t0.clientY-r.top,x1=t1.clientX-r.left,y1=t1.clientY-r.top;
       pinchDist=Math.hypot(x1-x0,y1-y0);
@@ -4151,6 +4165,7 @@ function _swAttachInput(sw){
           &&(_fingerMeasureActive()||currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')){
         if(sketching){sketching=false;sketchPts=[];}
         panning=true;
+        _panAnchorX=null;_panAnchorY=null; // V1_101: 移動距離判定の起点をパン開始のたびにリセット
         _tapStartTime=Date.now();_tapStartX=sxf;_tapStartY=syf;
       } else if(inputMode==='freehand'&&_fingerMeasureActive()){
         panning=false;
@@ -4163,6 +4178,7 @@ function _swAttachInput(sw){
       } else {
         if(sketching){sketching=false;sketchPts=[];}
         panning=true;
+        _panAnchorX=null;_panAnchorY=null; // V1_101: 移動距離判定の起点をパン開始のたびにリセット
         // V1_42: 「テキスト読込」ピック中にサブ窓内で単純タップした場合を
         // 検出できるよう、メイン画面(tool.js)と同様にタップ起点を記録する
         _tapStartTime=Date.now();_tapStartX=sxf;_tapStartY=syf;
@@ -4224,6 +4240,13 @@ function _swAttachInput(sw){
       var tf2=fingers[0];
       var sxf2=tf2.clientX-r.left,syf2=tf2.clientY-r.top;
       withCtx(function(){ tx+=sxf2-lastMX; ty+=syf2-lastMY; });
+      // V1_101: メイン画面(tool.js)と同じ移動距離判定。パン中の指がパン開始位置
+      // から一定距離(GESTURE_MOVE_THRESHOLD_PX)以上動いたら_gestureSessionActive
+      // を立てる（本数ベースの判定だけでは検知できない場合の保険）
+      if(_panAnchorX===null){_panAnchorX=sxf2;_panAnchorY=syf2;}
+      else if(Math.hypot(sxf2-_panAnchorX,syf2-_panAnchorY)>GESTURE_MOVE_THRESHOLD_PX){
+        _gestureSessionActive=true;
+      }
       lastMX=sxf2;lastMY=syf2;
       sw._userNavigated=true;
       scheduleDraw();
@@ -4261,15 +4284,13 @@ function _swAttachInput(sw){
     if(remaining.length===0){
       // V1_46/V1_47: 手書きモードで指計測中（DIM/LP/LL・水平鉛直・斜め）だった場合は
       // 指を離した位置で確定
-      // V1_99: メイン画面(tool.js)と同じ修正をサブ窓にも適用。2本指→1本指へ
-      // 移行してから既定0.8秒(PINCH_RESIDUAL_MS)以内に全指が離れた場合は、
-      // まだピンチ・移動操作の余韻の途中とみなし、書き込み・計測の確定処理を
-      // 一切行わない（V1_100で猶予時間を0.3秒→0.8秒に延長）
-      var _swRecentPinch99=_pinchEndedAt&&(Date.now()-_pinchEndedAt<PINCH_RESIDUAL_MS);
-      if(!_swRecentPinch99&&!isPen&&inputMode==='freehand'&&_fingerMeasureActive()){
+      // V1_101: メイン画面(tool.js)と同じく、時間ベースの猶予(V1_99/V1_100)を
+      // やめ、_gestureSessionActive(このタッチセッション中に一度でも2本指以上・
+      // または一定距離以上のパン移動があったか)で判定するようにした
+      if(!_gestureSessionActive&&!isPen&&inputMode==='freehand'&&_fingerMeasureActive()){
         withCtx(function(){ _fingerMeasureUp(lastMX,lastMY); });
       }
-      if(!_swRecentPinch99&&!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
+      if(!_gestureSessionActive&&!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser'))){
         withCtx(function(){ handlePointerUp(lastMX,lastMY,false); });
       }
       // V1_42: 「テキスト読込」ピック中は、サブ窓内での単純タップ（ドラッグ量が
@@ -4283,7 +4304,8 @@ function _swAttachInput(sw){
         }
       }
       _tapStartTime=0;
-      _pinchEndedAt=0; // V1_99: このタッチセッションの判定はここで使い切り、次回に持ち越さない
+      _gestureSessionActive=false; // V1_101: このタッチセッションの判定はここで使い切り、次回に持ち越さない
+      _panAnchorX=null;_panAnchorY=null;
       if(!isPen){panning=false;mouseDown=false;}
       pinchDist=null;pinchMid=null;return;
     }
@@ -4300,10 +4322,11 @@ function _swAttachInput(sw){
       // 終了時の誤操作の原因になっていたため、この自動再開を廃止し、ピンチ終了直後は
       // 常にパン継続として扱うよう変更した
       panning=true;
-      // V1_99: tool.js側と同じく、2本指→1本指へ移行した時刻を記録しておき、
-      // この後すぐ全指が離れた場合（下のremaining.length===0側）に「まだピンチの
-      // 余韻の途中」と判定できるようにする
-      _pinchEndedAt=Date.now();
+      // V1_101: tool.js側と同じく、2本指を経由した時点でtouchstart側の
+      // _gestureSessionActive=trueが既に立っているため、時間経過に関わらず
+      // 全タッチ終了まで確定は抑止される。ここでは移動距離判定
+      // (GESTURE_MOVE_THRESHOLD_PX)の起点をリセットするのみでよい
+      _panAnchorX=null;_panAnchorY=null;
     }
   },{passive:false});
 }
