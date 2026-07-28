@@ -336,6 +336,12 @@ ov.addEventListener('mousedown',e=>{
 });
 window.addEventListener('mousemove',e=>{
   const p=getPos(e);
+  // V1_95: テキスト読込ピックモード中(_textPickTarget有効時)は、mousedown/mouseup
+  // 側と同様にDIM/LP/LLのホバープレビュー更新・ペン/消しゴムのポインタ処理も
+  // 一切行わない。従来はmousemoveだけこのチェックが漏れており、検索して開く等を
+  // 開いた後も計測ツールのホバー候補が更新され続け、「操作がキャンセルされて
+  // いない」ように見える一因になっていた
+  if(typeof _textPickTarget!=='undefined'&&_textPickTarget){ lastMX=p.x;lastMY=p.y; return; }
   if(window.DIM&&window.DIM.active){
     window.DIM.handleMove(p.x,p.y); // mouseDown不要: ホバー中も_hoverPos更新
   } else if(window.LP&&window.LP.active){
