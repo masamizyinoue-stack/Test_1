@@ -424,6 +424,22 @@ ov.addEventListener('touchstart',e=>{
   } else if(fingers.length>=2){
     // 2本指: ピンチズーム+パン
     if(sketching){sketching=false;sketchPts=[];}
+    // V1_97: 2本指ピンチは、指Aが単独で触れた直後(fingers.length===1の
+    // touchstartが1回発火した後)に指Bが加わって初めて成立することが多い。
+    // このわずかな間に、手書きモード+計測ツール(DIM/LP/LL)選択中だと
+    // 指Aの単独touchstartだけで既にhandleDown()が呼ばれ、penDown=trueの
+    // まま「候補位置(cur/_hoverLine)が確定待ち」の状態になっていた。
+    // ピンチ中は_fingerMeasureMove()が一切呼ばれないためこの候補位置は
+    // 更新されずピンチ開始前の古い位置のまま残り、ピンチ終了後に指を
+    // 離すと(penDownがtrueのままのため)その古い候補位置で計測点が
+    // 確定してしまう不具合があった（「離れた2点を測定する場合、2点目を
+    // 選ぶ前に手でズームすると点が打たれてしまう」）。sketchingと同様に、
+    // 2本指が揃った時点でDIM/LP/LLのpenDownを強制的に解除し、指Aの
+    // 単独touchstartが与えた影響を無効化する（各ツールのhandleUpは
+    // penDown===falseなら何もしないため、これだけで安全にキャンセルできる）
+    if(window.DIM) window.DIM.penDown=false;
+    if(window.LP) window.LP.penDown=false;
+    if(window.LL) window.LL.penDown=false;
     mouseDown=false;panning=false;
     const t0=fingers[0],t1=fingers[1];
     const x0=t0.clientX-r.left,y0=t0.clientY-r.top;
