@@ -613,21 +613,17 @@ ov.addEventListener('touchend',e=>{
     const t=remFing[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
     mouseDown=true;lastMX=sx;lastMY=sy;
-    // V1_46/V1_47: 手書きモード+計測ツール（DIM/LP/LL・水平鉛直・斜め）なら指計測を
-    // 再開（カーソルは指の少し上）
-    if(inputMode==='freehand'&&_fingerMeasureActive()){
-      panning=false;
-      const fy=sy-FINGER_CURSOR_OFFSET_Y;
-      _fingerMeasureDown(sx,fy);
-      lastMX=sx;lastMY=fy;
-    } else if(inputMode==='freehand'&&(currentTool==='sketch'||currentTool==='hl'||(window.SW&&window.SW.active))){
-      // V0_79: 手書きモード+描画ツールなら描画再開
-      // V0_152.2: サブ窓作成中(SW.active)も対象に追加
-      panning=false;
-      handlePointerDown(sx,sy,false); // 新しい指で描画(操作)再開
-    } else {
-      panning=true;
-    }
+    // V1_96: ピンチズーム終了時、2本の指がぴったり同時に離れることは少なく、
+    // 片方がわずかに早く離れて一瞬「2本指→1本指」の状態を経由することがよくある。
+    // 従来はこの瞬間を「指を持ち替えて手書き描画・計測を続けたい」意図とみなし、
+    // 残った指の位置でスケッチ再開(V0_79)・計測ツールの指計測再開(V1_46/V1_47)を
+    // 自動的に行っていた。しかし実際には「ズームイン・ズームアウトすると誤操作で
+    // ペンの線が残る」「離れた2点を測る際、2点目を選ぶ前にズームすると意図しない
+    // 位置に点が打たれる」不具合の原因になっていたため、この自動再開を廃止し、
+    // ピンチ終了直後は常にパン継続として扱うよう変更した。描画・計測を続けたい
+    // 場合は、指を完全に離してから改めてタップ/ドラッグする（通常のtouchstartの
+    // 1本指分岐を経由するため、意図した位置で正しく再開できる）
+    panning=true;
   }
 },{passive:false});
 
