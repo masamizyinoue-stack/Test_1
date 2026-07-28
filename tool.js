@@ -569,12 +569,13 @@ ov.addEventListener('touchend',e=>{
     // 全体表示できなくなってしまっていた。実際に誤操作防止が必要なのは「計測が
     // 進行中（1本目の線や1点目を選択済み＝phase>0）」の場合のみのため、
     // phase>0の時だけダブルタップ全体表示を禁止するよう条件を絞り込んだ
-    if(!isPen&&panning
-        &&!sketching&&!(window.SW&&window.SW.active)
-        &&!(window.DIM&&window.DIM.active&&window.DIM.phase>0)
-        &&!(window.LP&&window.LP.active&&window.LP.phase>0)
-        &&!(window.LL&&window.LL.active&&window.LL.phase>0)
-        &&_tapStartTime){
+    // V1_93: 「テキスト読込」ピックモード中(_textPickTarget有効時)にDIM/LP/LLが
+    // 計測途中(phase>0)だと、このif自体がまるごと成立せず_tapPickText呼び出しにすら
+    // 到達できず、手書きモード+検索して開く/画面検索でテキスト読込が反応しない不具合が
+    // あった。V1_27のコメント通り本来テキスト読込はダブルタップ全体表示より優先される
+    // 設計のため、phase>0ガードはダブルタップ全体表示の判定にのみ適用し、テキスト読込
+    // 側は独立してphase>0でも実行されるよう分離した
+    if(!isPen&&panning&&!sketching&&!(window.SW&&window.SW.active)&&_tapStartTime){
       var _tapDt=Date.now()-_tapStartTime;
       var _tapDd=Math.hypot(lastMX-_tapStartX,lastMY-_tapStartY);
       if(_tapDt<300&&_tapDd<12){ // 短時間・小移動＝ドラッグではなくタップ
@@ -583,7 +584,9 @@ ov.addEventListener('touchend',e=>{
         if(typeof _textPickTarget!=='undefined'&&_textPickTarget){
           if(typeof _tapPickText==='function') _tapPickText(lastMX,lastMY);
           _lastTapTime=0;
-        } else {
+        } else if(!(window.DIM&&window.DIM.active&&window.DIM.phase>0)
+            &&!(window.LP&&window.LP.active&&window.LP.phase>0)
+            &&!(window.LL&&window.LL.active&&window.LL.phase>0)){
           var _tapNow=Date.now();
           if(_tapNow-_lastTapTime<400&&Math.hypot(lastMX-_lastTapX,lastMY-_lastTapY)<40){
             fit();scheduleDraw();scheduleSave(); // V0_74のfitBtnと同じ処理
