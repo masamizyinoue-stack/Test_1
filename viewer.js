@@ -114,12 +114,19 @@ function hsvToRgb(h,s,v){
 // =========================================================
 // DXF パーサ
 // =========================================================
+// V1_106: 文字コード自動判定（UTF-8として妥当ならUTF-8、そうでなければShift-JISとみなす）。
+// 元々DXF読込専用だったdecodeDXF()内のロジックを切り出し、CSV読込(loadExcel)からも
+// 共通で使えるようにした。日本語Windows環境で作成されたCSVはShift-JIS(CP932)であることが
+// 多く、UTF-8前提で読むと文字化けするため、DXFと同じ判定方式をCSVにも適用する
+function _decodeTextAuto(buf){
+  try{return new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(e){}
+  return new TextDecoder('shift_jis').decode(buf);
+}
 function decodeDXF(buf){
   const head=new Uint8Array(buf,0,Math.min(20,buf.byteLength));
   if(head[0]===65&&head[1]===117&&head[2]===116)
     throw new Error('バイナリDXF形式は非対応です。ASCII DXFで保存してください。');
-  try{return new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(e){}
-  return new TextDecoder('shift_jis').decode(buf);
+  return _decodeTextAuto(buf);
 }
 
 function parseDXF(buf){
@@ -1000,10 +1007,18 @@ async function extractAllPdfTexts(pdfDocObj){
 // シンプルな表形式のみ対応（セル色・結合・罫線・書式は再現しない）。
 // PDF/DXFと同様、canvas(cv/ac/ov)は非表示にしてHTMLテーブルへ切り替える。
 // =========================================================
-function loadExcel(buf){
+// V1_106: isCsv=trueの場合、buf(生バイト)をXLSXへそのまま渡さず、先に文字コードを
+// 自動判定(_decodeTextAuto)してから文字列として渡す。.xlsx/.xlsはバイナリ形式で
+// エンコーディングの概念が無いため従来通りtype:'array'のまま扱う（CSVのみプレーン
+// テキストで文字コードを持つため、Shift-JIS等のCSVがUTF-8前提で文字化けする不具合への対応）
+function loadExcel(buf,isCsv){
   if(typeof XLSX==='undefined'){alert('Excel読み込み機能が読み込まれていません');return false;}
   try{
-    excelWb=XLSX.read(buf,{type:'array'});
+    if(isCsv){
+      excelWb=XLSX.read(_decodeTextAuto(buf),{type:'string'});
+    } else {
+      excelWb=XLSX.read(buf,{type:'array'});
+    }
   }catch(e){
     alert('Excelファイルの読み込みに失敗しました: '+(e&&e.message||e));
     excelWb=null;renderExcelView();
