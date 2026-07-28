@@ -572,14 +572,20 @@ ov.addEventListener('touchend',e=>{
   }
   // 全タッチ終了
   if(remaining.length===0){
+    // V1_99: 2本指→1本指へ移行してから既定0.3秒(PINCH_RESIDUAL_MS)以内に
+    // 全指が離れた場合は、まだピンチ・移動操作の余韻の途中とみなし、
+    // 書き込み(ペン/蛍光/消しゴム/サブ窓作成)・計測(DIM/LP/LL)の確定処理を
+    // 一切行わない（V1_96〜V1_98の対策だけでは実機でなお誤操作が発生していたため、
+    // より確実な時間ベースの判定を追加した）
+    var _recentPinch99=_pinchEndedAt&&(Date.now()-_pinchEndedAt<PINCH_RESIDUAL_MS);
     // V1_46/V1_47: 手書きモードで指計測中（DIM/LP/LL・水平鉛直・斜め）だった場合は
     // 指を離した位置で確定
-    if(!isPen&&inputMode==='freehand'&&_fingerMeasureActive()){
+    if(!_recentPinch99&&!isPen&&inputMode==='freehand'&&_fingerMeasureActive()){
       _fingerMeasureUp(lastMX,lastMY);
     }
     // V0_79: 手書きモードで指描画中だった場合はストロークを確定
     // V0_152.2: サブ窓作成の対角ドラッグ中(指を離して矩形確定)も含む
-    if(!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
+    if(!_recentPinch99&&!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
       handlePointerUp(lastMX,lastMY,false);
     }
     // V1_18: ダブルタップ全体表示（V0_80で誤操作防止のため一旦廃止したが再要望により復活）。
@@ -620,6 +626,7 @@ ov.addEventListener('touchend',e=>{
       }
     }
     _tapStartTime=0;
+    _pinchEndedAt=0; // V1_99: このタッチセッションの判定はここで使い切り、次回に持ち越さない
     if(!isPen){panning=false;mouseDown=false;}
     pinchDist=null;pinchMid=null;return;
   }
@@ -640,6 +647,15 @@ ov.addEventListener('touchend',e=>{
     // 場合は、指を完全に離してから改めてタップ/ドラッグする（通常のtouchstartの
     // 1本指分岐を経由するため、意図した位置で正しく再開できる）
     panning=true;
+    // V1_99: V1_96〜V1_98の対策後も「ピンチ後に誤操作が多発する」との報告が続いた。
+    // 実機では2本指→1本指→全指解放が非常に短い間隔(コンマ数秒)で連続することが多く、
+    // その一瞬の「1本指」区間だけを見て安全側に倒しても、直後の全タッチ終了処理
+    // (下記remaining.length===0)側でなお何らかの確定処理が起きる余地が残っていた。
+    // より確実にするため、2本指→1本指へ移行した時刻を記録しておき、そこから
+    // 既定0.3秒(PINCH_RESIDUAL_MS)以内に全指が離れた場合は「まだピンチ・移動の
+    // 余韻の途中」とみなして、全タッチ終了時の書き込み・計測確定そのものを
+    // スキップするようにした（詳細は下のremaining.length===0側を参照）
+    _pinchEndedAt=Date.now();
   }
 },{passive:false});
 
