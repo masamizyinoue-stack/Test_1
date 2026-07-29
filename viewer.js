@@ -1902,18 +1902,24 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
   // なければ上向き(bottom基準)に開くようにする
   var _spaceBelow117=window.innerHeight-r.bottom;
   var _spaceAbove117=r.top;
+  // V1_126: メニューの最大高さ(maxHeight)を、開く方向にかかわらず「画面の高さ-16px」
+  // という一律の値にしていたバグを修正。メニューは画面の途中(アイコンの位置)から
+  // 開くため、実際に使える残り高さは方向によって異なる(下向きなら画面下端まで、
+  // 上向きなら画面上端まで)。この食い違いにより、アイコンが画面の下寄りにある場合、
+  // メニューの見た目上の開始位置より下にmaxHeightぶんの高さが確保されてしまい、
+  // 実際の画面には収まりきらずOK/キャンセルボタンが画面外に押し出されてしまっていた
+  // （V1_125で追加したフッター常時表示化だけでは、そもそもメニュー自体が画面の外に
+  // 出てしまっているケースまでは救えていなかった）。開く方向ごとに、その方向に
+  // 実際に残っている余白を上限として使うよう修正する
+  var _margin126=8; // 画面端からの最小余白
   if(_spaceBelow117<220&&_spaceAbove117>_spaceBelow117){
     menu.style.bottom=(window.innerHeight-r.top+4)+'px';
+    menu.style.maxHeight=Math.max(120,r.top-4-_margin126)+'px'; // 上向き: アイコンより上に使える高さまで
   } else {
     menu.style.top=(r.bottom+4)+'px';
+    menu.style.maxHeight=Math.max(120,window.innerHeight-(r.bottom+4)-_margin126)+'px'; // 下向き: アイコンより下に使える高さまで
   }
   menu.style.left=Math.max(4,Math.min(r.left,window.innerWidth-296))+'px';
-  // V1_122: 画面が縦に狭い場合、上下どちらに開いてもメニュー自体が画面をはみ出す
-  // ことがあるため、メニュー全体の最大高さを画面の高さ以内に制限する。
-  // V1_125: OK/キャンセルは下記の通り常時表示のフッターに分離したため、この
-  // maxHeightを超える分は「値のチェックリスト部分(scrollArea)」側で吸収される
-  var _menuMaxH122=Math.max(120,window.innerHeight-16);
-  menu.style.maxHeight=_menuMaxH122+'px';
   function closeMenu(){ if(document.getElementById('_excelColMenu113')) menu.remove(); }
 
   // V1_125: 昇順/降順ボタン〜値の一覧までをまとめる、内部だけがスクロールする領域。
