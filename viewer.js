@@ -45,8 +45,11 @@ var _excelFreezeRowIdx=-1,_excelFreezeColIdx=-1;
 // V1_115: ソート/固定行列ボタン押下による「タップ待ち」状態。null|'sort'|'freeze'。
 // 行番号セル・列アルファベットセルのクリックハンドラはこの値を見て挙動を切り替える
 var _excelPickMode=null;
-// V1_115: 列ストライプ(列単位の縞模様)表示のON/OFF。ONの間は列インデックスの偶奇で
-// 背景色を変え、既存の行ストライプ(V1_111)の代わりに使う
+// V1_117: 行ストライプ(行単位の縞模様、V1_111由来)・列ストライプ(列単位の縞模様、V1_115)
+// のON/OFFをそれぞれ独立したボタンで切り替えられるようにした。両方ONの場合は
+// 行×列の偶奇を組み合わせたチェッカーボード状の縞になる（renderExcelView参照）。
+// 行ストライプは従来の既定表示に合わせ既定でON、列ストライプは既定でOFF
+var _excelRowStripe=true;
 var _excelColStripe=false;
 // V1_113: 列ごとの値フィルタ（Excelのオートフィルタ相当）。{colIdx: Set(許可する値の文字列)}。
 // キーが無い列は絞り込みなし。V1_111の「行を絞り込み（自由文字列）」機能を置き換えた
@@ -62,11 +65,13 @@ var _excelColWidths=null;
 // カスタム状態をまとめてリセットする（列の意味がファイル/シートごとに異なるため）
 // V1_113: 見出し行指定・列値フィルタ・検索状態のリセットも追加
 // V1_115: ソート位置・固定行/列・ピックモード・列ストライプのリセットも追加
+// V1_117: 行ストライプのリセットも追加（既定値=true）
 function _excelResetViewState(){
   _excelSortCol=-1;_excelSortDir=0;
   _excelSortRowIdx=-1;
   _excelFreezeRowIdx=-1;_excelFreezeColIdx=-1;
   _excelPickMode=null;
+  _excelRowStripe=true;
   _excelColStripe=false;
   _excelColFilters=null;
   _excelSearchText='';
@@ -1149,15 +1154,27 @@ function _updateTopbarForExcel(isExcel){
   if(dxfGroup) dxfGroup.style.display=isExcel?'none':'contents';
   if(excelGroup) excelGroup.style.display=isExcel?'contents':'none';
 }
+// V1_116: PDF表示中は計測グループ(.dim-group、水・鉛/斜め/2線間/線と点/直径/半径)と
+// 画面(白黒切替、#bwToggleBtn)ボタンを非表示にする。ペン・蛍光ペン・消しゴム・戻る/進む・
+// サブ窓・計算機等その他のボタンは現状の位置のまま表示を維持するため、dxfToolGroup全体を
+// 隠す_updateTopbarForExcelとは別に、この2要素だけを個別にdisplay切替する
+function _updateTopbarForPdf(isPdf){
+  var dimGroup=document.querySelector('.dim-group');
+  var bwBtn=document.getElementById('bwToggleBtn');
+  if(dimGroup) dimGroup.style.display=isPdf?'none':'';
+  if(bwBtn) bwBtn.style.display=isPdf?'none':'';
+}
 // V1_115: ソート/固定行列ボタンの押下状態(active表示)・タップ待ちガイド文言・
 // タップ対象セルの強調(.excel-pick-armed)をまとめて同期する
 function _updateExcelToolbarUI(){
   var sortBtn=document.getElementById('excelSortBtn');
   var freezeBtn=document.getElementById('excelFreezeBtn');
-  var stripeBtn=document.getElementById('excelColStripeBtn');
+  var rowStripeBtn=document.getElementById('excelRowStripeBtn');
+  var colStripeBtn=document.getElementById('excelColStripeBtn');
   if(sortBtn) sortBtn.classList.toggle('active',_excelPickMode==='sort');
   if(freezeBtn) freezeBtn.classList.toggle('active',_excelPickMode==='freeze');
-  if(stripeBtn) stripeBtn.classList.toggle('active',!!_excelColStripe);
+  if(rowStripeBtn) rowStripeBtn.classList.toggle('active',!!_excelRowStripe);
+  if(colStripeBtn) colStripeBtn.classList.toggle('active',!!_excelColStripe);
   var wrap=document.getElementById('excelTableWrap');
   if(wrap) wrap.classList.toggle('excel-pick-armed',!!_excelPickMode);
   if(_excelPickMode==='sort'){
@@ -1254,57 +1271,45 @@ function _excelBuildResizeHandle(absColIdx,localIdx,tableIdA,tableIdB){
   });
   return handle;
 }
-// V1_115: 列幅を計測する。#excelMeasureTable(画面には表示しない隠しテーブル)に
-// 列アルファベット行+全データ行を素のテキストのみでtable-layout:auto配置し、
-// ブラウザが自然に計算した列幅(getBoundingClientRect)を測定してから内容を破棄する。
-// ソート位置が指定されている間はソートアイコン＋リサイズハンドル分の余白を全データ列に加算する。
-// 手動でドラッグ調整済みの列(_excelColWidths、index0=行番号列)があればそちらを優先する
-function _excelMeasureColWidths(entries,colCount,hasSortRow){
-  var mTable=document.getElementById('excelMeasureTable');
-  var totalCols=colCount+1;
-  var widths=new Array(totalCols).fill(0);
-  if(mTable){
-    mTable.innerHTML='';
-    var lr=document.createElement('tr');
-    lr.appendChild(document.createElement('td'));
-    for(var i=0;i<colCount;i++){
-      var lt=document.createElement('td');
-      lt.textContent=_excelColLetter(i);
-      lr.appendChild(lt);
+// V1_117: 列幅を計測する。V1_115では画面に表示しない隠しテーブル(#excelMeasureTable)へ
+// 全行を素のテキストで複製してから計測していたが、これは(1)行数×列数ぶんの
+// getBoundingClientRect呼び出しが発生し大きな表で顕著に重くなる、(2)隠しテーブルは
+// 実際に表示される4つのテーブルとは別のレイアウト文脈のため、ソートアイコン等の
+// 装飾込みの実寸と食い違い、行列ラベルと実セルの位置がずれる、という2つの不具合が
+// あった。table-layout:autoの表は「同じ列の全セルが同じ幅になる」ようブラウザが
+// 自動調整するため、実際に表示している各テーブルの代表行(最終行で十分)を直接
+// 測定すれば、隠しテーブルを使わずに正確な値が得られる。左右パネルそれぞれ、
+// 上下2テーブルのうち大きい方を採用する（V1_114の2テーブル計測方式を4テーブルへ拡張）
+function _excelMeasurePaneWidths(t1,t2,count){
+  var widths=new Array(count).fill(0);
+  [t1,t2].forEach(function(t){
+    if(!t||!t.rows||t.rows.length===0) return;
+    var tr=t.rows[t.rows.length-1];
+    var tds=tr.querySelectorAll('td');
+    for(var i=0;i<tds.length&&i<count;i++){
+      var w=tds[i].getBoundingClientRect().width;
+      if(w>widths[i]) widths[i]=w;
     }
-    mTable.appendChild(lr);
-    entries.forEach(function(e){
-      var tr=document.createElement('tr');
-      var rn=document.createElement('td');
-      rn.textContent=String(e.label);
-      tr.appendChild(rn);
-      for(var ci=0;ci<colCount;ci++){
-        var td=document.createElement('td');
-        var v=e.cells[ci];
-        td.textContent=(v===undefined||v===null)?'':String(v);
-        tr.appendChild(td);
-      }
-      mTable.appendChild(tr);
-    });
-    for(var r=0;r<mTable.rows.length;r++){
-      var tds=mTable.rows[r].querySelectorAll('td');
-      for(var c=0;c<tds.length&&c<totalCols;c++){
-        var w=tds[c].getBoundingClientRect().width;
-        if(w>widths[c]) widths[c]=w;
-      }
-    }
-    mTable.innerHTML='';
-  }
-  for(var k=0;k<totalCols;k++){
-    if(!(widths[k]>0)) widths[k]=(k===0)?40:80;
-    if(hasSortRow&&k>0) widths[k]+=26; // ソートアイコン+リサイズハンドル分の余白
-  }
-  if(_excelColWidths){
-    for(var j=0;j<totalCols;j++){
-      if(_excelColWidths[j]!=null) widths[j]=_excelColWidths[j];
-    }
-  }
+  });
   return widths;
+}
+// V1_117: 左右パネルの列幅をそれぞれ計測し、手動ドラッグ調整済みの列
+// (_excelColWidths、index0=行番号列を含む絶対インデックス)があればそちらを優先したうえで、
+// 4テーブルへcolgroupとして適用する
+function _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bottomRightTable,leftCount,totalCols){
+  var rightCount=totalCols-leftCount;
+  var leftWidths=_excelMeasurePaneWidths(topLeftTable,bottomLeftTable,leftCount);
+  var rightWidths=_excelMeasurePaneWidths(topRightTable,bottomRightTable,rightCount);
+  for(var i=0;i<leftCount;i++){ if(!(leftWidths[i]>0)) leftWidths[i]=(i===0)?40:80; }
+  for(var j=0;j<rightCount;j++){ if(!(rightWidths[j]>0)) rightWidths[j]=80; }
+  if(_excelColWidths){
+    for(var a=0;a<leftCount;a++){ if(_excelColWidths[a]!=null) leftWidths[a]=_excelColWidths[a]; }
+    for(var b=0;b<rightCount;b++){ if(_excelColWidths[leftCount+b]!=null) rightWidths[b]=_excelColWidths[leftCount+b]; }
+  }
+  _excelApplyColgroup(topLeftTable,leftWidths);
+  _excelApplyColgroup(bottomLeftTable,leftWidths);
+  _excelApplyColgroup(topRightTable,rightWidths);
+  _excelApplyColgroup(bottomRightTable,rightWidths);
 }
 function _excelApplyColgroup(table,widths){
   if(!table) return;
@@ -1327,12 +1332,14 @@ function renderExcelView(){
     if(cv)cv.style.display='';if(ac)ac.style.display='';if(ov)ov.style.display='';
     _updateViewmemoForExcel(false);
     _updateTopbarForExcel(false);
+    _updateTopbarForPdf(!!pdfDoc); // V1_116: PDF表示中は計測グループ・画面ボタンを隠す
     return;
   }
   view.style.display='flex';
   if(cv)cv.style.display='none';if(ac)ac.style.display='none';if(ov)ov.style.display='none';
   _updateViewmemoForExcel(true);
   _updateTopbarForExcel(true);
+  _updateTopbarForPdf(false); // V1_116: Excel/CSV表示中はdxfToolGroup自体を隠すため対象外
   _updateExcelToolbarUI();
   var tabsEl=document.getElementById('excelSheetTabs');
   var topLeftTable=document.getElementById('excelTopLeftTable');
@@ -1449,9 +1456,19 @@ function renderExcelView(){
           var sortIcon=document.createElement('span');
           var _active110=(_excelSortCol===colIdx&&_excelSortDir!==0);
           var _hasFilter113=!!(_excelColFilters&&_excelColFilters[colIdx]);
-          sortIcon.textContent=_active110?(_excelSortDir===1?' ▲':' ▼'):' ▾';
-          sortIcon.style.cssText='margin-left:4px;color:'+((_active110||_hasFilter113)?'#1565c0':'#999')+';cursor:pointer;font-size:11px;';
-          sortIcon.title='並べ替え・絞り込み';
+          var _iconColor118=(_active110||_hasFilter113)?'#1565c0':'#999';
+          // V1_118: フィルター適用中は色変化だけでは視認しにくいとの指摘のため、
+          // Excelの列フィルターに倣い三角矢印から漏斗(じょうご)アイコンに形状ごと変更する。
+          // ソートも併用中は漏斗の右上に小さな矢印を重ねて両方の状態を示す。
+          if(_hasFilter113){
+            var _arrowOverlay118=_active110?('<span style="position:absolute;top:-4px;right:-6px;font-size:8px;line-height:1;color:'+_iconColor118+'">'+(_excelSortDir===1?'▲':'▼')+'</span>'):'';
+            sortIcon.innerHTML='<span style="position:relative;display:inline-block;vertical-align:middle;width:11px;height:11px">'+
+              '<svg width="11" height="11" viewBox="0 0 16 16" style="display:block"><path d="M1 2h14l-5.5 6.5V13l-3 2V8.5z" fill="'+_iconColor118+'"/></svg>'+_arrowOverlay118+'</span>';
+          } else {
+            sortIcon.textContent=_active110?(_excelSortDir===1?' ▲':' ▼'):' ▾';
+          }
+          sortIcon.style.cssText='margin-left:4px;color:'+_iconColor118+';cursor:pointer;font-size:11px;';
+          sortIcon.title=_hasFilter113?'絞り込み中（タップで変更）':'並べ替え・絞り込み';
           sortIcon.addEventListener('click',function(ev){
             ev.stopPropagation();
             _showExcelColumnMenu(sortIcon,colIdx,sortableSuffix.map(function(e){return e.cells;}));
@@ -1465,10 +1482,13 @@ function renderExcelView(){
         })(ci,td);
       } else if(isPrefixRow){
         td.style.background='#f7f8fa';
-      } else if(_excelColStripe){
-        td.style.background=(ci%2===0)?'#fff':'#f5f7fa';
       } else {
-        td.style.background=((entry.renderedPos-dataStartIdx)%2===0)?'#fff':'#f5f7fa';
+        // V1_117: 行ストライプ・列ストライプを独立したON/OFFにし、両方ONの場合は
+        // 行×列の偶奇を組み合わせたチェッカーボード状の縞にする。両方OFFなら縞なし(白)
+        var _rowParity117=_excelRowStripe?((entry.renderedPos-dataStartIdx)%2):0;
+        var _colParity117=_excelColStripe?(ci%2):0;
+        var _stripeOn117=_excelRowStripe||_excelColStripe?((_rowParity117+_colParity117)%2):0;
+        td.style.background=_stripeOn117?'#f5f7fa':'#fff';
       }
       (isColFrozen2?trLeft:trRight).appendChild(td);
     }
@@ -1476,14 +1496,8 @@ function renderExcelView(){
     else { bottomLeftTable.appendChild(trLeft); bottomRightTable.appendChild(trRight); }
   });
 
-  // V1_115: 列幅を計測し、左右パネルへ分配して適用する
-  var widths=_excelMeasureColWidths(finalEntries,colCount111,hasSortRow);
-  var leftWidths=widths.slice(0,leftCount);
-  var rightWidths=widths.slice(leftCount);
-  _excelApplyColgroup(topLeftTable,leftWidths);
-  _excelApplyColgroup(bottomLeftTable,leftWidths);
-  _excelApplyColgroup(topRightTable,rightWidths);
-  _excelApplyColgroup(bottomRightTable,rightWidths);
+  // V1_117: 実テーブルを直接測定して列幅を左右パネルへ分配・適用する（隠しテーブルは廃止）
+  _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bottomRightTable,leftCount,colCount111+1);
 
   // V1_88: DXF/PDFの黄色マークと同様に、検索キーワード(_markKeyword)に一致するセルを
   // ハイライトする。シートタブ切替のたびにここが再実行されるため、切り替えた先の
@@ -1509,12 +1523,14 @@ function renderExcelView(){
     if(tr) tr.scrollLeft=br.scrollLeft;
   });
 })();
-// V1_115: ヘッダーツールバーのソート/固定行列/列ストライプボタンの配線。
+// V1_115: ヘッダーツールバーのソート/固定行列ボタンの配線。
+// V1_117: 列ストライプボタンを行縞/列縞の2ボタンに分離した。
 // いずれも常設の静的要素なので、リスナーはここで1度だけ登録する
 (function(){
   var sortBtn=document.getElementById('excelSortBtn');
   var freezeBtn=document.getElementById('excelFreezeBtn');
-  var stripeBtn=document.getElementById('excelColStripeBtn');
+  var rowStripeBtn=document.getElementById('excelRowStripeBtn');
+  var colStripeBtn=document.getElementById('excelColStripeBtn');
   if(sortBtn) sortBtn.addEventListener('click',function(){
     _excelPickMode=(_excelPickMode==='sort')?null:'sort';
     _updateExcelToolbarUI();
@@ -1523,7 +1539,11 @@ function renderExcelView(){
     _excelPickMode=(_excelPickMode==='freeze')?null:'freeze';
     _updateExcelToolbarUI();
   });
-  if(stripeBtn) stripeBtn.addEventListener('click',function(){
+  if(rowStripeBtn) rowStripeBtn.addEventListener('click',function(){
+    _excelRowStripe=!_excelRowStripe;
+    renderExcelView();
+  });
+  if(colStripeBtn) colStripeBtn.addEventListener('click',function(){
     _excelColStripe=!_excelColStripe;
     renderExcelView();
   });
@@ -1608,7 +1628,16 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
   menu.id='_excelColMenu113';
   menu.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #999;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:200px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.35);color:#222;';
   var r=anchorEl.getBoundingClientRect();
-  menu.style.top=(r.bottom+4)+'px';
+  // V1_117: 固定行が多い場合など、アイコンが画面下端に近い位置にあると常に下向きに
+  // 開くのでは視認性が悪かった（メニューが画面外にはみ出す）。下に十分な余白が
+  // なければ上向き(bottom基準)に開くようにする
+  var _spaceBelow117=window.innerHeight-r.bottom;
+  var _spaceAbove117=r.top;
+  if(_spaceBelow117<220&&_spaceAbove117>_spaceBelow117){
+    menu.style.bottom=(window.innerHeight-r.top+4)+'px';
+  } else {
+    menu.style.top=(r.bottom+4)+'px';
+  }
   menu.style.left=Math.max(4,Math.min(r.left,window.innerWidth-296))+'px';
   function closeMenu(){ if(document.getElementById('_excelColMenu113')) menu.remove(); }
 

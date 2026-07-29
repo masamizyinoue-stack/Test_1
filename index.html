@@ -565,6 +565,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">固定行列</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
 </button>
+  <!-- V1_117: 列ストライプボタンから分離。行単位の縞模様表示をトグルする -->
+  <button class="tb-btn" id="excelRowStripeBtn" title="行ストライプ表示" style="border:2px solid #d35400">
+  <span class="tb-tool-label">行縞</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="4" fill="currentColor" fill-opacity="0.25"/><rect x="4" y="10" width="16" height="4"/><rect x="4" y="17" width="16" height="4" fill="currentColor" fill-opacity="0.25"/></svg>
+</button>
   <button class="tb-btn" id="excelColStripeBtn" title="列ストライプ表示" style="border:2px solid #d35400">
   <span class="tb-tool-label">列縞</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="4" height="16" fill="currentColor" fill-opacity="0.25"/><rect x="10" y="4" width="4" height="16"/><rect x="17" y="4" width="4" height="16" fill="currentColor" fill-opacity="0.25"/></svg>
@@ -640,8 +645,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <!-- V1_115: 行の固定に加えて列の固定にも対応するため、4分割(上左/上右/下左/下右)の
          テーブル構成に変更した。#excelBottomRightWrapのみユーザー操作でスクロールし、
          そのscrollTop/scrollLeftを他の3パネルへJSで同期する(viewer.js)。
-         #excelMeasureWrapは画面には表示しない列幅計測専用の隠しテーブル
-         (4パネルの列幅を完全一致させるため、分割前の内容で一度計測してから分配する) -->
+         V1_117: 列幅計測用の隠しテーブル(#excelMeasureWrap)は、大きな表で顕著に重くなる
+         うえ実セルとの表示ずれの原因にもなっていたため廃止した。実際に表示している
+         4テーブル自身を直接計測する方式に変更した(_excelSyncPaneColWidths、viewer.js) -->
     <div id="excelTableWrap">
       <div id="excelTopWrap">
         <div id="excelTopLeftWrap"><table id="excelTopLeftTable"></table></div>
@@ -652,7 +658,6 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <div id="excelBottomRightWrap"><table id="excelBottomRightTable"></table></div>
       </div>
     </div>
-    <div id="excelMeasureWrap" style="position:absolute;visibility:hidden;height:0;overflow:hidden;top:0;left:0"><table id="excelMeasureTable"></table></div>
   </div>
   <div class="viewmemo" id="viewmemo">
     <div id="markFitRow">
@@ -676,7 +681,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_115</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_118</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1042,7 +1047,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_115';
+const APP_VERSION = 'V1_118';
 
 // =========================================================
 // グローバル状態
@@ -1547,6 +1552,7 @@ fileInput.addEventListener('change',async e=>{
     // V0_131/V1_51: ファイル切替時にマーク自動クリア（従来DXF側にしか無かった処理をPDFにも適用）
     _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
     await loadPDF(buf);{const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
+    if(typeof _updateTopbarForPdf==='function') _updateTopbarForPdf(true); // V1_116: 直前のrenderExcelView()呼び出し時点ではpdfDoc未設定だったため、loadPDF完了後に改めて反映する
     // V1_55: PDF分岐だけcurrentFileSizeが一度も設定されておらず、前に開いていた
     // 別ファイルのサイズが残ったままになる不具合があった（DXF分岐にはV0_103で
     // currentFileSize=f.sizeがあるが、PDF分岐には無かった）。この値は
@@ -2033,6 +2039,7 @@ function doCloseTab(idx){
   if(openFiles.length===0){
     currentFileIdx=-1;
     doc=null;pdfDoc=null;pdfImage=null;pdfMoji=[]; // V1_51
+    if(typeof _updateTopbarForPdf==='function') _updateTopbarForPdf(false); // V1_116
     doSave(); // V0_128: 即時保存（scheduleSaveは800ms非同期のため不可）
     strokes=[];dims=[];
     if(typeof images!=='undefined') images=[];
