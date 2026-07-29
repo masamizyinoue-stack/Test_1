@@ -99,6 +99,11 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
    (上1行)は固定表示専用領域(上左)に含まれ、ユーザーが「固定行・列」ボタンで指定した行/列は
    さらにその固定領域へ追加される */
 #excelTableWrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+/* V1_125: 検索パネル(画面検索/検索して開く/全図面検索)がExcel/CSV表示中に開いている間、
+   テーブル領域をパネル幅ぶん右から縮める。allSearchPanel/openFilePanelの340px/88vwを
+   基準にする(searchPanelは320px/85vwとやや狭いが、大きい方に合わせても縮め過ぎで
+   実害はなく、逆に不足して隠れるよりは安全なため統一した) */
+#excelTableWrap.excel-search-shrink{margin-right:min(340px,88vw)}
 #excelTopWrap{flex-shrink:0;display:flex;overflow:hidden}
 #excelTopLeftWrap{flex-shrink:0;overflow:hidden}
 #excelTopRightWrap{flex:1;overflow:hidden;min-width:0}
@@ -109,10 +114,16 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 /* V1_122: 行番号セル(font-size:11px)とデータセル(13px継承)は文字サイズが異なるため、
    line-heightを明示しない場合はブラウザの既定値(フォントサイズに比例)により行の高さが
    微妙に食い違い、行番号・列アルファベットと実セルがズレて見える不具合の根本原因になって
-   いた。line-heightをpx固定で共通指定することで、フォントサイズによらず全ての行の高さを
-   そろえる（ソート行のアイコンもこの高さに収まるサイズのため、個別のJS実測同期
-   (_excelSyncRowHeights)に頼らずCSSだけで大半のケースが解決する） */
-#excelTopLeftTable td,#excelTopRightTable td,#excelBottomLeftTable td,#excelBottomRightTable td{border:1px solid #ccc;padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;position:relative;box-sizing:border-box;line-height:18px}
+   いた。line-heightのpx固定指定だけでは、ソートアイコン(svg)・列幅ドラッグハンドル・
+   ソート行の太罫線(2px)など、行によって微妙に異なる内容量の影響を排除しきれず、
+   固定行(フリーズ)使用時に再発する事例が繰り返された。
+   V1_124: そこで「実測して後から高さを合わせる」JS方式(_excelSyncRowHeights)を廃止し、
+   全パネル共通の td に明示的な固定height(box-sizing:border-boxとoverflow:hiddenの
+   組み合わせで、内容がどうであれこの高さに強制的に収まる)を指定する方式に変更した。
+   行番号側・データ側は別テーブルの別要素だが、height指定が完全に同一である以上、
+   ブラウザが計算する行の高さは常に一致する（Excelのように行番号とセルが機械的に
+   「くっついた」状態になり、内容量による食い違いが原理的に発生しなくなる） */
+#excelTopLeftTable td,#excelTopRightTable td,#excelBottomLeftTable td,#excelBottomRightTable td{border:1px solid #ccc;padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;position:relative;box-sizing:border-box;line-height:18px;height:32px}
 #excelBottomLeftTable td:active,#excelBottomRightTable td:active{background:#ffe9a8}
 /* V1_111: 見出しセル右端の列幅ドラッグ用ハンドル */
 .excel-col-resize-handle{position:absolute;top:0;right:-4px;width:9px;height:100%;cursor:col-resize;z-index:3;-webkit-tap-highlight-color:transparent}
@@ -206,6 +217,18 @@ tr.excel-sort-row td{font-weight:700;background:#cfe2ff;border-top:2px solid #15
 #snap-hint{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.82);color:var(--accent);font-size:12px;
   padding:6px 14px;border-radius:8px;pointer-events:none;display:none}
+/* V1_125: 非表示/合計ピックモードの確定ボタン。ヘッダーのボタン群から離れた、
+   画面下中央のよく見える位置に大きく表示する（#snap-hintより上に出し、
+   pointer-events:noneのガイドと重なっても確実にタップできるようにする） */
+#excelConfirmBar{position:fixed;bottom:150px;left:50%;transform:translateX(-50%);
+  z-index:60;display:flex;align-items:center;gap:10px;
+  background:rgba(20,20,20,.92);padding:8px 10px 8px 16px;border-radius:30px;
+  box-shadow:0 4px 16px rgba(0,0,0,.4)}
+#excelConfirmCount{color:#fff;font-size:13px;white-space:nowrap}
+#excelConfirmBtn{font-size:15px;font-weight:700;padding:10px 22px;border:none;
+  border-radius:22px;background:#27ae60;color:#fff;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;white-space:nowrap}
+#excelConfirmBtn:active{background:#1e8449}
 #settingsOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:299}
 body.settings-open #settingsOverlay{display:block}
 #settingsPanel{position:fixed;left:0;top:0;bottom:0;width:300px;max-width:80vw;
@@ -718,6 +741,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button class="mem-btn" data-vi="4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>記憶</button><button class="show-btn" data-vs="4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>表示</button><div class="vm-file" data-vf="4"></div>
   </div>
   <div id="snap-hint"></div>
+  <!-- V1_125: 非表示/合計ピックモード用の確定ボタン。従来はヘッダーの「非表示」
+       「合計」ボタンをもう一度押すことで確定していたが、ヘッダーの小さなボタンを
+       もう一度押す操作だとわかりにくいとの指摘のため、選択中だけ画面下に大きく
+       表示される専用の確定ボタンに変更した(ヘッダーボタン自体は入る/やめるの
+       トグルのみに変更、確定操作はこのボタンに一本化する) -->
+  <div id="excelConfirmBar" style="display:none">
+    <span id="excelConfirmCount"></span>
+    <button type="button" id="excelConfirmBtn"></button>
+  </div>
   <!-- V1_48: 水平/鉛直・斜めのP1/P2、線と点の点選択中のみ表示するボタン。
        押すと線を2本選び、その交点(延長含む)を確定点として使う -->
   <button id="ipxBtn" style="display:none">2線の交点取得</button>
@@ -728,7 +760,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_122</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_125</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1094,7 +1126,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_122';
+const APP_VERSION = 'V1_125';
 
 // =========================================================
 // グローバル状態
@@ -1775,11 +1807,21 @@ function switchToFile(idx){
     _prevF.pdfDoc=pdfDoc;_prevF.pdfImage=pdfImage; // V1_40: PDF内容も退避
     _prevF.excelWb=(typeof excelWb!=='undefined'?excelWb:null);_prevF.excelSheetIdx=(typeof excelSheetIdx!=='undefined'?excelSheetIdx:0); // V1_76
     _prevF.hiddenLayersArr=Array.from(hiddenLayers);
+    // V1_125: 離れるタブのExcel/CSV表示設定(ソート/固定行列/縞/非表示/列幅/列フィルタ等)を
+    // そのファイル専用のスナップショットとして保存する。従来はグローバル変数のまま
+    // 残っていたため、切替先の別ファイルにも前のファイルの設定が反映されてしまっていた
+    if(typeof _excelCaptureViewState==='function') _prevF.excelViewState=_excelCaptureViewState();
   }
   currentFileIdx=idx;
   var f=openFiles[idx];
   doc=f.doc; pdfDoc=f.pdfDoc; pdfImage=f.pdfImage;
   excelWb=f.excelWb||null; excelSheetIdx=f.excelSheetIdx||0; // V1_76
+  // V1_125: 切替先ファイルに保存済みのExcel/CSV表示設定があれば復元し、無ければ
+  // (まだExcel/CSVとして開いたことがない、または前回保存前のファイル)初期状態にする
+  if(typeof _excelApplyViewState==='function'){
+    if(f.excelViewState) _excelApplyViewState(f.excelViewState);
+    else if(typeof _excelResetViewState==='function') _excelResetViewState();
+  }
   if(typeof renderExcelView==='function') renderExcelView();
   try{ if(typeof pdfPageNum!=='undefined') pdfPageNum=f.pdfPageNum||1; }catch(e){}
   // V1_51: pdfMojiはタブ毎に保持していないため、PDFタブに切り替えた際は
@@ -5099,12 +5141,19 @@ function _setTextPickMode(target){
   // その下に隠れた列のセルをタップできない不具合があった。ピックモード中は、開いている
   // パネルの実際の幅ぶんだけExcelテーブル領域を右から縮め、隠れていた列も
   // タップできるようにする（'excelLocal'はシート下の検索欄自体でパネルを covers しないため対象外）
+  // V1_125: 従来はgetBoundingClientRect()でパネルの実測幅を都度measureしてから
+  // marginRightへ書き込んでいたが、パネルの開閉(display切替)とこの測定のタイミングが
+  // 前後する経路があり、稀に0pxのまま(縮まない)ことがあった＝依然としてテキスト読込
+  // したい列がパネルの下に隠れて操作できない、との報告が繰り返された。
+  // パネル幅(searchPanel:320px/85vw、allSearchPanel・openFilePanel:340px/88vw)は
+  // CSSside既に固定値として定義済みのため、JSでの実測はやめ、対象パネルが開いている
+  // 間だけCSSクラスを付け外しする方式に変更した。実際の縮小幅もCSS側の固定値
+  // (双方をまかなえるよう大きい方の340px/88vwを採用)で決まるため、測定タイミングに
+  // 左右されず常に確実に縮む
   var _tableWrap122=document.getElementById('excelTableWrap');
   if(_tableWrap122){
-    var _panelId122=target==='screen'?'searchPanel':(target==='all'?'allSearchPanel':(target==='openFile'?'openFilePanel':null));
-    var _panelEl122=_panelId122?document.getElementById(_panelId122):null;
-    var _pw122=(_panelEl122&&typeof excelWb!=='undefined'&&excelWb)?_panelEl122.getBoundingClientRect().width:0;
-    _tableWrap122.style.marginRight=_pw122>0?(_pw122+'px'):'';
+    var _shrink125=(target==='screen'||target==='all'||target==='openFile')&&(typeof excelWb!=='undefined'&&excelWb);
+    _tableWrap122.classList.toggle('excel-search-shrink',_shrink125);
   }
 }
 function _tapPickText(sx0,sy0){
@@ -5184,6 +5233,15 @@ document.getElementById('allTextPickBtn').addEventListener('click',function(){
 var _excelFilterTextPickBtnEl122=document.getElementById('excelFilterTextPickBtn');
 if(_excelFilterTextPickBtnEl122) _excelFilterTextPickBtnEl122.addEventListener('click',function(){
   _setTextPickMode(_textPickTarget==='excelLocal'?null:'excelLocal');
+});
+// V1_125: 「読込ボタンを押さなくても、検索欄に入力しようとした時点でテキスト読込
+// 状態にしてほしい」との指摘への対応。画面検索・検索して開くは既にパネルを開いた
+// 時点で自動的にピックモードへ入る(V1_58/V1_62)ため、この検索欄も同様に「タップして
+// フォーカスした時点」で自動的に'excelLocal'ピックモードへ入るようにする。
+// 読込ボタン自体は手動での解除・状態表示用としてそのまま残す
+var _excelFilterInputEl125=document.getElementById('excelFilterInput');
+if(_excelFilterInputEl125) _excelFilterInputEl125.addEventListener('focus',function(){
+  if(_textPickTarget!=='excelLocal') _setTextPickMode('excelLocal');
 });
 function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック処理を関数化）
   // DXF/PDFが開かれていたら再インデックス（念のため）V1_51: PDF(pdfMoji)にも対応
@@ -5707,7 +5765,7 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
     resetToolStates();
     // ② V0_140: saveCurrentFileState廃止 → 前ファイルのビュー状態のみinline同期
     // V1_51: PDFタブのpdfDoc/pdfImage/pdfPageNumも退避（V1_40でfileInput側に追加した処理と同様）
-    if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140=openFiles[currentFileIdx];_pf140.tx=tx;_pf140.ty=ty;_pf140.scale=scale;_pf140.fitScale=fitScale;_pf140.hiddenLayersArr=Array.from(hiddenLayers);_pf140.pdfDoc=pdfDoc;_pf140.pdfImage=pdfImage;_pf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
+    if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140=openFiles[currentFileIdx];_pf140.tx=tx;_pf140.ty=ty;_pf140.scale=scale;_pf140.fitScale=fitScale;_pf140.hiddenLayersArr=Array.from(hiddenLayers);_pf140.pdfDoc=pdfDoc;_pf140.pdfImage=pdfImage;_pf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);if(typeof _excelCaptureViewState==='function')_pf140.excelViewState=_excelCaptureViewState();} // V1_125: 離れるタブのExcel表示設定を保存
 
     // ③ DXF/PDF読込 V1_51: 拡張子で分岐し、PDFはloadPDF()で読み込む（doc=nullのまま、
     // pdfDoc/pdfImage/pdfMojiがrenderPdfPage内で設定される）
@@ -5772,6 +5830,12 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
       hiddenLayers=new Set(_ef.hiddenLayersArr||[]);
       tx=_ef.tx||0; ty=_ef.ty||0; scale=_ef.scale||1;
       if(_ef.fitScale) fitScale=_ef.fitScale;
+      // V1_125: loadExcel()内で既にビュー設定がリセットされているため、この既存タブに
+      // 保存済みのExcel表示設定(ソート/固定行列/縞/非表示等)があればここで再適用する
+      if(_isExcel176&&_ef.excelViewState&&typeof _excelApplyViewState==='function'){
+        _excelApplyViewState(_ef.excelViewState);
+        if(typeof renderExcelView==='function') renderExcelView();
+      }
     } else {
       // ⑦ 新規タブ: まず空初期化、次にIDB復元を試みる（F-1）
       hiddenLayers.clear(); strokes=[]; dims=[]; images=[]; // V0_160: savedViewsはグローバルのためリセットしない

@@ -111,6 +111,43 @@ function _excelResetViewState(){
   if(fi) fi.value='';
   if(typeof _updateExcelToolbarUI==='function') _updateExcelToolbarUI();
 }
+// V1_125: 「複数のExcel/CSVファイルを開いてソート・固定行列・縞・非表示等を設定すると、
+// 全てのファイルに反映されてしまう」との指摘への対応。従来、ソート/固定行列/縞/非表示/
+// 列幅/列フィルタ等の状態はグローバル変数のみで持ち、ファイル(タブ)を切り替えても
+// リセットされるのは「新規ファイルを開いた時」「シートを切り替えた時」だけだった
+// （_excelResetViewState参照）。既に開いている別のファイルのタブへ切り替える経路
+// (switchToFile等)ではこれらの変数がそのまま残ってしまい、切替先のファイルにも
+// 前のファイルの設定が適用されて見えてしまっていた。
+// この2関数は、タブ切替の際に現在のグローバル状態を「そのファイル専用のスナップ
+// ショット」として保存(_excelCaptureViewState)・復元(_excelApplyViewState)するための
+// もの。ピックモード・非表示/合計の仮選択などタップ操作の途中経過(transient)は
+// ファイルをまたいで持ち越す意味がないため対象に含めない（常にクリアする）
+function _excelCaptureViewState(){
+  return {
+    sortCol:_excelSortCol,sortDir:_excelSortDir,sortRowIdx:_excelSortRowIdx,
+    freezeRowIdx:_excelFreezeRowIdx,freezeColIdx:_excelFreezeColIdx,
+    rowStripe:_excelRowStripe,colStripe:_excelColStripe,
+    colFilters:_excelColFilters,searchText:_excelSearchText,searchMatchIdx:_excelSearchMatchIdx,
+    colWidths:_excelColWidths,hiddenRows:_excelHiddenRows,hiddenCols:_excelHiddenCols
+  };
+}
+function _excelApplyViewState(state){
+  _excelSortCol=state.sortCol;_excelSortDir=state.sortDir;
+  _excelSortRowIdx=state.sortRowIdx;
+  _excelFreezeRowIdx=state.freezeRowIdx;_excelFreezeColIdx=state.freezeColIdx;
+  _excelRowStripe=state.rowStripe;_excelColStripe=state.colStripe;
+  _excelColFilters=state.colFilters;
+  _excelSearchText=state.searchText||'';
+  _excelSearchMatchIdx=state.searchMatchIdx;
+  _excelColWidths=state.colWidths;
+  _excelHiddenRows=state.hiddenRows||{};
+  _excelHiddenCols=state.hiddenCols||{};
+  _excelPickMode=null;
+  _excelClearTransientPickState();
+  var fi=document.getElementById('excelFilterInput');
+  if(fi) fi.value=_excelSearchText;
+  if(typeof _updateExcelToolbarUI==='function') _updateExcelToolbarUI();
+}
 var pdfImage=null;
 // V1_65: PDFの各ページに書いたstrokes/dimsが全ページに同じ様に表示されてしまう不具合の修正用。
 // stroke/dim作成時にこの値をpageプロパティとして付与し、描画・消しゴム等でこの値と一致するものだけを対象にする。
@@ -1232,20 +1269,67 @@ function _updateExcelToolbarUI(){
   }
   var wrap=document.getElementById('excelTableWrap');
   if(wrap) wrap.classList.toggle('excel-pick-armed',!!_excelPickMode);
+  // V1_125: 非表示/合計ピックモード中は画面下の確定ボタン(#excelConfirmBar)を表示し、
+  // 選択件数とボタン文言を都度更新する。それ以外のモードでは隠す
+  var _confirmBar125=document.getElementById('excelConfirmBar');
+  if(_confirmBar125){
+    if(_excelPickMode==='hide'){
+      var _pendCount125=Object.keys(_excelPendingHideRows).length+Object.keys(_excelPendingHideCols).length;
+      _confirmBar125.style.display='flex';
+      var _cc1=document.getElementById('excelConfirmCount');
+      if(_cc1) _cc1.textContent='選択中: '+_pendCount125+'件';
+      var _cb1=document.getElementById('excelConfirmBtn');
+      if(_cb1) _cb1.textContent='非表示を確定';
+    } else if(_excelPickMode==='sum'){
+      var _sumSelCount125=Object.keys(_excelSumSelected).length;
+      _confirmBar125.style.display='flex';
+      var _cc2=document.getElementById('excelConfirmCount');
+      if(_cc2) _cc2.textContent='選択中: '+_sumSelCount125+'件';
+      var _cb2=document.getElementById('excelConfirmBtn');
+      if(_cb2) _cb2.textContent='合計を計算';
+    } else {
+      _confirmBar125.style.display='none';
+    }
+  }
   if(_excelPickMode==='sort'){
     if(typeof showGuide==='function') showGuide('行を指定して下さい');
   } else if(_excelPickMode==='freeze'){
     if(typeof showGuide==='function') showGuide('固定したい行番号または列アルファベットをタップして下さい');
   } else if(_excelPickMode==='hide'){
-    // V1_122: 複数選択に対応。件数を表示し、確定はボタンの再押下で行う案内に変更
-    var _pendCount122=Object.keys(_excelPendingHideRows).length+Object.keys(_excelPendingHideCols).length;
-    if(typeof showGuide==='function') showGuide('非表示にしたい行番号・列アルファベットを複数タップして選べます（選択中:'+_pendCount122+'件。終わったらもう一度「非表示」ボタンを押すと確定）',0);
+    // V1_125: 確定操作を専用ボタン(画面下の確定ボタン)へ変更したことに合わせて文言も更新
+    if(typeof showGuide==='function') showGuide('非表示にしたい行番号・列アルファベットを複数タップして選べます（下の「非表示を確定」ボタンで確定）',0);
   } else if(_excelPickMode==='sum'){
-    var _sumCount122=Object.keys(_excelSumSelected).length;
-    if(typeof showGuide==='function') showGuide('合計したいセルを複数タップして選べます（選択中:'+_sumCount122+'件。終わったらもう一度「合計」ボタンを押すと計算）',0);
+    if(typeof showGuide==='function') showGuide('合計したいセルを複数タップして選べます（下の「合計を計算」ボタンで計算）',0);
   } else if(typeof hideGuide==='function'){
     hideGuide();
   }
+}
+// V1_125: 「非表示」の確定処理。従来hideBtnの2回目押下に直書きしていたロジックを
+// 独立関数化し、画面下の確定ボタン(#excelConfirmBtn)からも呼べるようにした
+function _excelConfirmHide(){
+  Object.keys(_excelPendingHideRows).forEach(function(k){ _excelHiddenRows[k]=true; });
+  Object.keys(_excelPendingHideCols).forEach(function(k){ _excelHiddenCols[k]=true; });
+  _excelPendingHideRows={};_excelPendingHideCols={};
+  _excelPickMode=null;
+  renderExcelView(); // 確定時のみ1回だけ全体を再描画する
+}
+// V1_125: 「合計」の確定処理。従来sumBtnの2回目押下に直書きしていたロジックを
+// 独立関数化し、画面下の確定ボタン(#excelConfirmBtn)からも呼べるようにした
+function _excelConfirmSum(){
+  var total=0,numCount=0,selCount=0;
+  for(var k in _excelSumSelected){
+    selCount++;
+    var raw=_excelSumSelected[k].v;
+    if(typeof _excelIsNumericStr==='function'&&_excelIsNumericStr(raw)){
+      total+=_excelToNum(raw);
+      numCount++;
+    }
+  }
+  document.querySelectorAll('.excel-sum-selected').forEach(function(el){el.classList.remove('excel-sum-selected');});
+  _excelSumSelected={};
+  _excelPickMode=null;
+  _updateExcelToolbarUI();
+  if(typeof showGuide==='function') showGuide('合計: '+total+'（数値'+numCount+'件 / 選択'+selCount+'件）',0);
 }
 // V1_115: 行番号セル（左端）を作る。ピックモードに応じて挙動が変わる:
 // ・'sort'中: タップした行がソート位置(origIdx基準・データの並び替えに関わらず固定)になる
@@ -1403,50 +1487,10 @@ function _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bott
   _excelApplyColgroup(topRightTable,rightWidths);
   _excelApplyColgroup(bottomRightTable,rightWidths);
 }
-// V1_119: 行番号ガター(左)とデータ(右)は別テーブルのため、同じ行番号に対応する
-// tr同士でも内容量の違い（例:ソート/フィルターアイコンの有無）により高さが
-// 食い違うことがある。両テーブルの対応行を先頭から順に突き合わせ、実測した
-// 高さのうち大きい方を両方のtrへ明示的に適用して行のズレを防ぐ。
-// V1_121: 全行に対してgetBoundingClientRect()のread/writeを行単位で交互に行うと
-// 強制同期レイアウトが行数ぶん発生し(O(行数)の再レイアウト)、数千行規模の
-// 大容量ファイルでフリーズする原因になっていた。実際に高さが食い違いうるのは
-// 装飾(ソート/フィルターアイコン等)が付くソート行だけであるため、呼び出し側
-// (renderExcelView)からは対象行のインデックスだけを指定して渡すようにし、
-// 対象を絞ることで実質O(1)の処理にした。indicesを省略した場合は従来通り
-// 全行を対象にする（他の呼び出し元・テストとの後方互換のため）。
-// read(測定)とwrite(適用)も完全に分離し、行ごとの交互読み書きによる
-// レイアウトスラッシングが起きないようにしている。
-function _excelSyncRowHeights(leftTable,rightTable,indices){
-  if(!leftTable||!rightTable) return;
-  var lRows=leftTable.rows,rRows=rightTable.rows;
-  var idxList=indices;
-  if(!idxList){
-    var n=Math.min(lRows.length,rRows.length);
-    idxList=[];
-    for(var k=0;k<n;k++) idxList.push(k);
-  }
-  var i,idx;
-  for(i=0;i<idxList.length;i++){
-    idx=idxList[i];
-    if(lRows[idx]) lRows[idx].style.height='';
-    if(rRows[idx]) rRows[idx].style.height='';
-  }
-  var heights=[];
-  for(i=0;i<idxList.length;i++){
-    idx=idxList[i];
-    var hl=lRows[idx]?lRows[idx].getBoundingClientRect().height:0;
-    var hr=rRows[idx]?rRows[idx].getBoundingClientRect().height:0;
-    heights.push(Math.max(hl,hr));
-  }
-  for(i=0;i<idxList.length;i++){
-    idx=idxList[i];
-    var h=heights[i];
-    if(h>0){
-      if(lRows[idx]) lRows[idx].style.height=h+'px';
-      if(rRows[idx]) rRows[idx].style.height=h+'px';
-    }
-  }
-}
+// V1_124: 旧_excelSyncRowHeights(行番号ガターとデータの行高さをJSで実測しコピーする
+// 関数)はここにあったが、index.html側でtdに固定height(box-sizing:border-box)を
+// 指定する構造的な修正に切り替えたことで不要になったため削除した。実測→コピー方式は
+// 対象行の特定ロジックの不具合により固定行使用時のズレ再発を繰り返していた。
 function _excelApplyColgroup(table,widths){
   if(!table) return;
   var old=table.querySelector('colgroup'); if(old) old.remove();
@@ -1587,15 +1631,18 @@ function renderExcelView(){
 
   // ── データ行（固定/スクロールを行ごとに判定し、列も左右split。ソート位置の行にのみ
   //    並べ替え/絞り込みアイコン・列幅ドラッグハンドルを表示する）──
-  // V1_121: 行高さ同期(_excelSyncRowHeights)を全行に対して行うと大容量ファイルで
-  // フリーズする原因になっていたため、実際に高さが食い違いうるソート行だけを対象に
-  // 絞り込む。ここではソート行がトップ/ボトムどちらのペインの何番目(そのテーブル内の
-  // 行インデックス)に描画されたかを記録しておく
-  var _topRowCounter121=0,_bottomRowCounter121=0,_sortRowSyncInfo121=null;
+  // V1_124: V1_119〜V1_123では「実際にレンダリングされた行の高さをJSで実測し、
+  // 左右パネルで食い違えばコピーして揃える」方式を取っていたが、対象行の特定ロジック
+  // (ソート行だけに絞る最適化、固定行使用時のテーブル内インデックス計算等)に起因する
+  // オフバイワン等の不具合が version を跨いで繰り返し再発した。
+  // 行番号セル(左パネル)とデータセル(右パネル)は別テーブルの別要素である以上、実測→
+  // コピーという事後対応では取りこぼしが起き続けるため、根本的に「内容量に関わらず
+  // 高さが必ず一致する」よう、index.html側で全パネル共通のtdにbox-sizing:border-box
+  // ＋固定height(32px)を指定する方式に変更した。これによりJSでの行高さ実測・同期は
+  // 不要になったため、そのための追跡処理(_topRowCounter121/_sortRowSyncInfo121等)は
+  // ここで廃止する
   finalEntries.forEach(function(entry){
     var isTop=(topCount-1>0)&&(entry.renderedPos<=topCount-2);
-    var _posInTable121=isTop?_topRowCounter121:_bottomRowCounter121;
-    if(entry.isSortRow){ _sortRowSyncInfo121={isTop:isTop,pos:_posInTable121}; }
     var trLeft=document.createElement('tr');
     var trRight=document.createElement('tr');
     if(entry.isSortRow){ trLeft.className='excel-sort-row'; trRight.className='excel-sort-row'; }
@@ -1652,23 +1699,14 @@ function renderExcelView(){
       }
       (isColFrozen2?trLeft:trRight).appendChild(td);
     }
-    if(isTop){ topLeftTable.appendChild(trLeft); topRightTable.appendChild(trRight); _topRowCounter121++; }
-    else { bottomLeftTable.appendChild(trLeft); bottomRightTable.appendChild(trRight); _bottomRowCounter121++; }
+    if(isTop){ topLeftTable.appendChild(trLeft); topRightTable.appendChild(trRight); }
+    else { bottomLeftTable.appendChild(trLeft); bottomRightTable.appendChild(trRight); }
   });
 
   // V1_117: 実テーブルを直接測定して列幅を左右パネルへ分配・適用する（隠しテーブルは廃止）
   _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bottomRightTable,leftCount,visibleColIndices.length+1);
-  // V1_119: 行番号ガター列(左ペイン)とデータ列(右ペイン)は別テーブルのため、
-  // ソート/フィルターアイコンの有無等でセルの内容量が変わると行の高さが左右で
-  // 食い違い、行番号と実データがズレて見える不具合が発生した。列幅と同様に、
-  // 実際にレンダリングされた行の高さを直接測定し、左右で高い方に合わせて
-  // 明示的に統一する（隠し要素や固定値の推測ではなく実測値で揃える方式）。
-  // V1_121: 高さが食い違いうるのは装飾(ソートアイコン等)が付くソート行だけなので、
-  // 全行ではなくその1行だけを対象に絞り込み、大容量ファイルでのフリーズを防ぐ
-  if(_sortRowSyncInfo121){
-    if(_sortRowSyncInfo121.isTop) _excelSyncRowHeights(topLeftTable,topRightTable,[_sortRowSyncInfo121.pos]);
-    else _excelSyncRowHeights(bottomLeftTable,bottomRightTable,[_sortRowSyncInfo121.pos]);
-  }
+  // V1_124: 行の高さはCSS側の固定height指定により常に一致するため、ここでのJSによる
+  // 行高さ実測・同期(旧_excelSyncRowHeights呼び出し)は不要になった（廃止）
 
   // V1_88: DXF/PDFの黄色マークと同様に、検索キーワード(_markKeyword)に一致するセルを
   // ハイライトする。シートタブ切替のたびにここが再実行されるため、切り替えた先の
@@ -1727,51 +1765,48 @@ function renderExcelView(){
     if(_excelColStripe) _excelRowStripe=false;
     renderExcelView();
   });
-  // V1_122: 「非表示」ボタンは複数選択方式に変更。1回目の押下でピックモードに入り、
-  // 行番号/列アルファベットを何度でもタップして仮選択(視認性のためのクラス切替のみで
-  // 全体再描画はしない＝高速)し、もう一度ボタンを押すと仮選択をまとめて確定して
-  // 1回だけrenderExcelView()を呼ぶ。「表示に戻す」ボタンは非表示中の行・列を
-  // 一覧するポップアップを開く
+  // V1_122: 「非表示」ボタンで複数選択モードに入り、行番号/列アルファベットを
+  // 何度でもタップして仮選択する(視認性のためのクラス切替のみで全体再描画はしない
+  // ＝高速)。「表示に戻す」ボタンは非表示中の行・列を一覧するポップアップを開く。
+  // V1_125: 従来はこのボタンをもう一度押すことで確定していたが、ヘッダーの小さな
+  // ボタンを「もう一度押すと確定」という操作がわかりにくいとの指摘のため、確定は
+  // 専用の確定ボタン(#excelConfirmBtn、画面下に大きく表示)に一本化した。
+  // このヘッダーボタンはモードへの出入り(トグル)専用にし、選択中に再度押すと
+  // 確定せずキャンセルしてモードを抜ける（迷った時にすぐやめられるように）
   if(hideBtn) hideBtn.addEventListener('click',function(){
     if(_excelPickMode!=='hide'){
       _excelClearTransientPickState();
       _excelPickMode='hide';
-      _updateExcelToolbarUI();
     } else {
-      Object.keys(_excelPendingHideRows).forEach(function(k){ _excelHiddenRows[k]=true; });
-      Object.keys(_excelPendingHideCols).forEach(function(k){ _excelHiddenCols[k]=true; });
-      _excelPendingHideRows={};_excelPendingHideCols={};
+      _excelClearTransientPickState(); // キャンセル：仮選択を破棄してモードを抜けるだけ
       _excelPickMode=null;
-      renderExcelView(); // 確定時のみ1回だけ全体を再描画する
     }
+    _updateExcelToolbarUI();
   });
   if(unhideBtn) unhideBtn.addEventListener('click',function(ev){
     ev.stopPropagation();
     _showExcelHiddenListMenu(unhideBtn);
   });
-  // V1_122: 「合計」ボタン。1回目の押下でセルの複数選択モードに入り、もう一度押すと
-  // 選択セルのうち数値として解釈できるものを合算して結果をガイド表示する
+  // V1_122: 「合計」ボタンでセルの複数選択モードに入る。
+  // V1_125: 非表示と同様、確定は専用の確定ボタンへ一本化。このボタンは
+  // モードへの出入り(トグル)専用にし、選択中の再押下はキャンセル扱いにする
   if(sumBtn) sumBtn.addEventListener('click',function(){
     if(_excelPickMode!=='sum'){
       _excelClearTransientPickState();
       _excelPickMode='sum';
-      _updateExcelToolbarUI();
     } else {
-      var total=0,numCount=0,selCount=0;
-      for(var k in _excelSumSelected){
-        selCount++;
-        var raw=_excelSumSelected[k].v;
-        if(typeof _excelIsNumericStr==='function'&&_excelIsNumericStr(raw)){
-          total+=_excelToNum(raw);
-          numCount++;
-        }
-      }
-      document.querySelectorAll('.excel-sum-selected').forEach(function(el){el.classList.remove('excel-sum-selected');});
-      _excelSumSelected={};
+      _excelClearTransientPickState();
       _excelPickMode=null;
-      _updateExcelToolbarUI();
-      if(typeof showGuide==='function') showGuide('合計: '+total+'（数値'+numCount+'件 / 選択'+selCount+'件）',0);
     }
+    _updateExcelToolbarUI();
+  });
+  // V1_125: 画面下に常時1つだけ表示される確定ボタン。現在のピックモードに応じて
+  // 非表示確定・合計計算のどちらを行うかを切り替える（表示/文言の切替は
+  // _updateExcelToolbarUI側で行う）
+  var confirmBtn=document.getElementById('excelConfirmBtn');
+  if(confirmBtn) confirmBtn.addEventListener('click',function(){
+    if(_excelPickMode==='hide') _excelConfirmHide();
+    else if(_excelPickMode==='sum') _excelConfirmSum();
   });
 })();
 // V1_113: シートタブ下の検索欄の配線。V1_111では入力のたびに行を絞り込んで
@@ -1852,7 +1887,15 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
   if(existing){existing.remove();return;}
   var menu=document.createElement('div');
   menu.id='_excelColMenu113';
-  menu.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #999;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:200px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.35);color:#222;';
+  // V1_125: 従来はmenu自体にoverflow-y:autoを指定し、昇順/降順ボタン〜値の一覧〜
+  // OK/キャンセルボタンまで全体を1つのスクロール領域にしていた。画面が縦に狭い場合、
+  // 一番下のOK/キャンセルまでスクロールしないと押せず、かつ(iPadのposition:fixed要素内の
+  // overflow-y:autoはタッチスクロールが効かないことがある、という既知の癖もあり)
+  // 「ポップアップが下側に寄って見にくく、OK操作ができない」との報告が繰り返された。
+  // 根本対応として、OK/キャンセルは常にスクロール不要で見える位置(下端固定の
+  // フッター)に配置し、スクロールが必要になり得るのは値のチェックリスト部分だけに
+  // 限定する（このリストは元々listBox自体が独立してmax-height+overflow-yを持つ）
+  menu.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #999;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:200px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.35);color:#222;overflow:hidden;';
   var r=anchorEl.getBoundingClientRect();
   // V1_117: 固定行が多い場合など、アイコンが画面下端に近い位置にあると常に下向きに
   // 開くのでは視認性が悪かった（メニューが画面外にはみ出す）。下に十分な余白が
@@ -1865,30 +1908,37 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
     menu.style.top=(r.bottom+4)+'px';
   }
   menu.style.left=Math.max(4,Math.min(r.left,window.innerWidth-296))+'px';
-  // V1_122: 画面が縦に狭い場合、上下どちらに開いてもメニュー自体が画面をはみ出し、
-  // 一番下にあるOK/キャンセルボタンに手が届かない不具合があった。メニュー自体の
-  // 最大高さを画面の高さ以内に制限し、超える場合はメニュー内部をスクロールできる
-  // ようにすることで、内容が多くても必ずボタンまでスクロールして操作できるようにする
+  // V1_122: 画面が縦に狭い場合、上下どちらに開いてもメニュー自体が画面をはみ出す
+  // ことがあるため、メニュー全体の最大高さを画面の高さ以内に制限する。
+  // V1_125: OK/キャンセルは下記の通り常時表示のフッターに分離したため、この
+  // maxHeightを超える分は「値のチェックリスト部分(scrollArea)」側で吸収される
   var _menuMaxH122=Math.max(120,window.innerHeight-16);
   menu.style.maxHeight=_menuMaxH122+'px';
-  menu.style.overflowY='auto';
   function closeMenu(){ if(document.getElementById('_excelColMenu113')) menu.remove(); }
+
+  // V1_125: 昇順/降順ボタン〜値の一覧までをまとめる、内部だけがスクロールする領域。
+  // flex:1;min-height:0でメニューの残り高さいっぱいまで広がり、それでも収まらない
+  // 分だけこの内側でスクロールする（外側のmenu自体はスクロールしないため、
+  // フッター(btnRow)は常にこのすぐ下、画面内の固定位置に見え続ける）
+  var scrollArea=document.createElement('div');
+  scrollArea.style.cssText='flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:6px;';
+  menu.appendChild(scrollArea);
 
   var ascBtn=document.createElement('button');
   ascBtn.type='button';ascBtn.textContent='昇順で並べ替え';
   ascBtn.style.cssText='text-align:left;padding:8px;border:none;background:#f5f5f5;border-radius:6px;cursor:pointer;font-size:13px;';
   ascBtn.addEventListener('click',function(){ _excelSortCol=colIdx;_excelSortDir=1;closeMenu();renderExcelView(); });
-  menu.appendChild(ascBtn);
+  scrollArea.appendChild(ascBtn);
 
   var descBtn=document.createElement('button');
   descBtn.type='button';descBtn.textContent='降順で並べ替え';
   descBtn.style.cssText=ascBtn.style.cssText;
   descBtn.addEventListener('click',function(){ _excelSortCol=colIdx;_excelSortDir=-1;closeMenu();renderExcelView(); });
-  menu.appendChild(descBtn);
+  scrollArea.appendChild(descBtn);
 
   var hr=document.createElement('div');
   hr.style.cssText='height:1px;background:#ddd;margin:2px 0;';
-  menu.appendChild(hr);
+  scrollArea.appendChild(hr);
 
   // その列に現れる一意な値の一覧（空欄も1つの値として扱う）
   var uniqSeen={};
@@ -1908,10 +1958,10 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
   selAllCb.checked=!currentAllowed;
   selAllRow.appendChild(selAllCb);
   selAllRow.appendChild(document.createTextNode('(すべて選択)'));
-  menu.appendChild(selAllRow);
+  scrollArea.appendChild(selAllRow);
 
   var listBox=document.createElement('div');
-  listBox.style.cssText='max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;border-top:1px solid #eee;border-bottom:1px solid #eee;padding:4px 0;';
+  listBox.style.cssText='max-height:180px;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:2px;border-top:1px solid #eee;border-bottom:1px solid #eee;padding:4px 0;';
   var checkboxes=[];
   uniqList.forEach(function(v){
     var row=document.createElement('label');
@@ -1930,14 +1980,16 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
     row.appendChild(labelText);
     listBox.appendChild(row);
   });
-  menu.appendChild(listBox);
+  scrollArea.appendChild(listBox);
 
   selAllCb.addEventListener('change',function(){
     checkboxes.forEach(function(cb){cb.checked=selAllCb.checked;});
   });
 
+  // V1_125: OK/キャンセルはscrollAreaの外(=常に非スクロール領域)に配置する常設フッター。
+  // これによりチェックリストがどれだけ長くてもOK/キャンセルへ確実に手が届く
   var btnRow=document.createElement('div');
-  btnRow.style.cssText='display:flex;gap:6px;margin-top:4px;';
+  btnRow.style.cssText='display:flex;gap:6px;margin-top:4px;flex-shrink:0;';
   var okBtn=document.createElement('button');
   okBtn.type='button';okBtn.textContent='OK';
   okBtn.style.cssText='flex:1;padding:8px;border:none;border-radius:6px;background:#1565c0;color:#fff;font-size:13px;cursor:pointer;';
