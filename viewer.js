@@ -1511,10 +1511,25 @@ function _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bott
     for(var a=0;a<leftCount;a++){ if(_excelColWidths[a]!=null) leftWidths[a]=_excelColWidths[a]; }
     for(var b=0;b<rightCount;b++){ if(_excelColWidths[leftCount+b]!=null) rightWidths[b]=_excelColWidths[leftCount+b]; }
   }
-  _excelApplyColgroup(topLeftTable,leftWidths);
-  _excelApplyColgroup(bottomLeftTable,leftWidths);
-  _excelApplyColgroup(topRightTable,rightWidths);
-  _excelApplyColgroup(bottomRightTable,rightWidths);
+  // V1_132: 「コンテナ幅まで広げる」処理をCSSのmin-width:100%(V1_131)に任せると、
+  // 上段(#excelTopRightWrap等、overflow:hiddenでスクロールバーが出ない)と
+  // 下段(#excelBottomRightWrap等、overflow:autoで縦スクロールバーが出うる)とでは
+  // 各コンテナ自身の実際の幅(clientWidth)がスクロールバー分だけ食い違うため、
+  // 100%の解決結果が上下で異なってしまい、その差ぶん列ごとの余白配分がズレて
+  // 「一番上のアルファベットと下のセルがずれる」不具合が再発した。そこで
+  // 「コンテナ幅まで広げる」判定をCSSではなくJSで1回だけ行い、上下の実際の
+  // スクロール担当パネル(#excelBottomLeftWrap/#excelBottomRightWrap)のclientWidthを
+  // 基準として、同じpx数値を上下・左右すべてのテーブルへ明示的に適用する
+  // （top側は自分のwrapの幅ではなく、常にbottom側を基準にすることで、
+  // スクロールバーの有無に関係なく上下で完全に同じ幅になることを保証する）
+  var bottomLeftWrap=document.getElementById('excelBottomLeftWrap');
+  var bottomRightWrap=document.getElementById('excelBottomRightWrap');
+  var leftAvail=bottomLeftWrap?bottomLeftWrap.clientWidth:0;
+  var rightAvail=bottomRightWrap?bottomRightWrap.clientWidth:0;
+  _excelApplyColgroup(topLeftTable,leftWidths,leftAvail);
+  _excelApplyColgroup(bottomLeftTable,leftWidths,leftAvail);
+  _excelApplyColgroup(topRightTable,rightWidths,rightAvail);
+  _excelApplyColgroup(bottomRightTable,rightWidths,rightAvail);
 }
 // V1_124: 旧_excelSyncRowHeights(行番号ガターとデータの行高さをJSで実測しコピーする
 // 関数)は、index.html側でtdに固定height(box-sizing:border-box)を指定する構造的な
@@ -1560,7 +1575,7 @@ function _excelSyncRowHeights(leftTable,rightTable){
     }
   }
 }
-function _excelApplyColgroup(table,widths){
+function _excelApplyColgroup(table,widths,forceAvailWidth){
   if(!table) return;
   var old=table.querySelector('colgroup'); if(old) old.remove();
   var cg=document.createElement('colgroup');
@@ -1583,7 +1598,25 @@ function _excelApplyColgroup(table,widths){
   // table自身の width を colgroup合計幅で明示指定することで、テーブルの実サイズを
   // コンテナ幅の制約から完全に切り離し、コンテナ側のoverflow:hidden＋JSによる
   // scrollLeft同期で表示位置だけを合わせる、という本来の設計通りの動作を保証する
-  table.style.width=total+'px';
+  // V1_131: しかしV1_130でwidthをcolgroup合計幅ぴったりに固定した結果、逆に
+  // 「データ巾が画面幅より狭い（コンテナの方が広い）」場合に、以前はコンテナの
+  // 余った幅ぶんが各列へ均等に配分されて列が少し広がっていた(この余白のおかげで
+  // 文字がちょうど収まっていたセルもあった)のに対し、V1_130ではテーブル幅が
+  // colgroup合計ぴったりに固定されてしまい、余白配分による“おまけの広がり”が
+  // 無くなったため、逆にセルが以前より狭く見え文字が全体表示されなくなる回帰が
+  // 生じた。そこでV1_131ではmin-width:100%を追加したが、これは各テーブルの
+  // 「親コンテナ自身」の幅に対してCSSが解決するため、上段(overflow:hidden、
+  // スクロールバー無し)と下段(overflow:auto、縦スクロールバー有りうる)とで
+  // 実際に使える幅がスクロールバーの分だけ食い違い、上下で列幅がズレる別の
+  // 不具合を生んでしまった。
+  // V1_132: min-width:100%(CSSでの解決)をやめ、呼び出し側(_excelSyncPaneColWidths)
+  // で1回だけ測定した共通のpx値(forceAvailWidth。常に下段=実際にスクロールする
+  // パネルのclientWidthを基準にする)を受け取り、それとcolgroup合計幅の大きい方を
+  // 明示的なpx値としてtable.style.widthに設定する。上下のテーブルへ完全に同じ
+  // px数値を渡すため、各コンテナのスクロールバーの有無に左右されず、上下で
+  // 必ず同じ幅・同じ列境界になる
+  var finalWidth=(forceAvailWidth>total)?forceAvailWidth:total;
+  table.style.width=finalWidth+'px';
 }
 function renderExcelView(){
   var view=document.getElementById('excelView');
