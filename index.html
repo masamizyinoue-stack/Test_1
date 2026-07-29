@@ -229,6 +229,11 @@ tr.excel-sort-row td{font-weight:700;background:#cfe2ff;border-top:2px solid #15
   border-radius:22px;background:#27ae60;color:#fff;cursor:pointer;
   -webkit-tap-highlight-color:transparent;white-space:nowrap}
 #excelConfirmBtn:active{background:#1e8449}
+/* V1_127: 合計計算の結果を表示している間は、確定(緑)ではなく閉じる操作である
+   ことが見た目でもわかるよう、ボタン色を青系に変える */
+#excelConfirmBar.excel-confirm-result #excelConfirmBtn{background:#1565c0}
+#excelConfirmBar.excel-confirm-result #excelConfirmBtn:active{background:#0d47a1}
+#excelConfirmBar.excel-confirm-result #excelConfirmCount{font-weight:700;font-size:14px}
 #settingsOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:299}
 body.settings-open #settingsOverlay{display:block}
 #settingsPanel{position:fixed;left:0;top:0;bottom:0;width:300px;max-width:80vw;
@@ -760,7 +765,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_126</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_128</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1126,7 +1131,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_126';
+const APP_VERSION = 'V1_128';
 
 // =========================================================
 // グローバル状態

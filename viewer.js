@@ -76,6 +76,13 @@ var _excelPendingHideCols={};
 // V1_122: 「合計」ピックモードで複数選択したセルの一時状態。key="origIdx_colIdx"、
 // 値はそのセルの文字列（計算時に数値判定して合算する）
 var _excelSumSelected={};
+// V1_127: 「合計を合算した数字はどこに出ますか」との指摘への対応。従来は計算結果を
+// 画面下のガイド(showGuide/snap-hint)にだけ小さく表示していたため、確定ボタンを
+// 押した直後に確定ボタン自体が消えてしまうこともあり、結果がどこに出たのか
+// 気づきにくかった。計算結果は、確定ボタンを押した場所と同じ#excelConfirmBarへ
+// そのまま表示し続け(「閉じる」ボタンに切り替わる)、目線を動かさずに確認できる
+// ようにする。このフラグはその「結果表示中」状態を表す
+var _excelConfirmResultActive=false;
 // V1_122: ピックモードを切り替える際、前のモードで仮選択していた状態(非表示の仮選択・
 // 合計選択)が残ったまま次のモードに入ると、後で意図せず反映されてしまう恐れがあるため、
 // モード切替のたびにこれらを確実にクリアする
@@ -85,6 +92,11 @@ function _excelClearTransientPickState(){
   _excelSumSelected={};
   var els=document.querySelectorAll('.excel-pending-hide,.excel-sum-selected');
   els.forEach(function(el){ el.classList.remove('excel-pending-hide','excel-sum-selected'); });
+  // V1_127: ファイル/シート切替時に、前のファイルで表示したままの合計結果表示が
+  // 残らないようにする
+  _excelConfirmResultActive=false;
+  var _cbEl127=document.getElementById('excelConfirmBar');
+  if(_cbEl127){ _cbEl127.style.display='none'; _cbEl127.classList.remove('excel-confirm-result'); }
 }
 // V1_111: 新規ファイルオープン時・シート切替時に、列ソート・行フィルタ・列幅の
 // カスタム状態をまとめてリセットする（列の意味がファイル/シートごとに異なるため）
@@ -1271,11 +1283,16 @@ function _updateExcelToolbarUI(){
   if(wrap) wrap.classList.toggle('excel-pick-armed',!!_excelPickMode);
   // V1_125: 非表示/合計ピックモード中は画面下の確定ボタン(#excelConfirmBar)を表示し、
   // 選択件数とボタン文言を都度更新する。それ以外のモードでは隠す
+  // V1_127: 合計計算の「結果」を表示している間(_excelConfirmResultActive)は、
+  // ピックモードが既にnullに戻っていてもこのバーを隠さない（結果を確認できるように
+  // するため）。新しくsort/freeze/hide/sumのいずれかのモードに入った場合のみ
+  // 結果表示状態を解除する(_excelClearTransientPickState内で行う)
   var _confirmBar125=document.getElementById('excelConfirmBar');
   if(_confirmBar125){
     if(_excelPickMode==='hide'){
       var _pendCount125=Object.keys(_excelPendingHideRows).length+Object.keys(_excelPendingHideCols).length;
       _confirmBar125.style.display='flex';
+      _confirmBar125.classList.remove('excel-confirm-result'); // V1_127: 前回の合計結果表示を解除
       var _cc1=document.getElementById('excelConfirmCount');
       if(_cc1) _cc1.textContent='選択中: '+_pendCount125+'件';
       var _cb1=document.getElementById('excelConfirmBtn');
@@ -1283,11 +1300,12 @@ function _updateExcelToolbarUI(){
     } else if(_excelPickMode==='sum'){
       var _sumSelCount125=Object.keys(_excelSumSelected).length;
       _confirmBar125.style.display='flex';
+      _confirmBar125.classList.remove('excel-confirm-result'); // V1_127: 前回の合計結果表示を解除
       var _cc2=document.getElementById('excelConfirmCount');
       if(_cc2) _cc2.textContent='選択中: '+_sumSelCount125+'件';
       var _cb2=document.getElementById('excelConfirmBtn');
       if(_cb2) _cb2.textContent='合計を計算';
-    } else {
+    } else if(!_excelConfirmResultActive){
       _confirmBar125.style.display='none';
     }
   }
@@ -1328,8 +1346,19 @@ function _excelConfirmSum(){
   document.querySelectorAll('.excel-sum-selected').forEach(function(el){el.classList.remove('excel-sum-selected');});
   _excelSumSelected={};
   _excelPickMode=null;
+  // V1_127: 「合計を合算した数字はどこに出ますか」との指摘への対応。従来は結果を
+  // 画面下のガイド(showGuide)だけに小さく出しており、確定ボタン自体が消えると
+  // 結果がどこに表示されたのか気づきにくかった。確定ボタンを押したのと同じ場所
+  // (#excelConfirmBar)に結果をそのまま表示し続け、ボタンは「閉じる」に切り替える
+  _excelConfirmResultActive=true;
   _updateExcelToolbarUI();
-  if(typeof showGuide==='function') showGuide('合計: '+total+'（数値'+numCount+'件 / 選択'+selCount+'件）',0);
+  var _resultText127='合計: '+total+'（数値'+numCount+'件 / 選択'+selCount+'件）';
+  var _bar127=document.getElementById('excelConfirmBar');
+  var _cc127=document.getElementById('excelConfirmCount');
+  var _cb127=document.getElementById('excelConfirmBtn');
+  if(_bar127){ _bar127.style.display='flex'; _bar127.classList.add('excel-confirm-result'); }
+  if(_cc127) _cc127.textContent=_resultText127;
+  if(_cb127) _cb127.textContent='閉じる';
 }
 // V1_115: 行番号セル（左端）を作る。ピックモードに応じて挙動が変わる:
 // ・'sort'中: タップした行がソート位置(origIdx基準・データの並び替えに関わらず固定)になる
@@ -1488,9 +1517,49 @@ function _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bott
   _excelApplyColgroup(bottomRightTable,rightWidths);
 }
 // V1_124: 旧_excelSyncRowHeights(行番号ガターとデータの行高さをJSで実測しコピーする
-// 関数)はここにあったが、index.html側でtdに固定height(box-sizing:border-box)を
-// 指定する構造的な修正に切り替えたことで不要になったため削除した。実測→コピー方式は
-// 対象行の特定ロジックの不具合により固定行使用時のズレ再発を繰り返していた。
+// 関数)は、index.html側でtdに固定height(box-sizing:border-box)を指定する構造的な
+// 修正に切り替えたことで不要と判断し、一旦削除していた。
+// V1_128: しかし固定height指定だけでは解決しきれない別種の不具合が判明したため復活
+// させる。行番号ガター(左テーブル)とデータ(右テーブル)は別々の<table>要素であり、
+// 同じ「height:32px」というCSS指定を与えても、ブラウザの表の高さ計算はtd単位の
+// height指定を「最小値」として扱うため、フォントの実際のグリフ・アンチエイリアス
+// 描画等に起因するごくわずかな端数(サブピクセル)の違いにより、左右で1行あたり
+// 0.0x px単位の食い違いが生じることがある。1行だけなら誤差として気づかないレベル
+// でも、行数を重ねるごとに誤差が積み重なり(累積誤差)、行数の多いシートの下の方
+// (例：30行目以降)になるほど、行番号・列アルファベットと実データの位置が目に見えて
+// ズレていく。V1_117の列幅測定と同じ考え方で、実際にレンダリングされた高さを
+// 直接測定し、左右で同じ数値(px)を明示的に書き込むことで、累積誤差が生じる余地
+// 自体を無くす。V1_121では全行処理が「読み取りと書き込みを交互に行う」実装だった
+// ため、行数ぶんの強制同期レイアウトが発生し大容量ファイルでフリーズする原因に
+// なっていたが、今回は「全行分の読み取りを終えてから、まとめて書き込む」よう
+// 完全に分離しており、レイアウト再計算は読み取り開始前後・書き込み後の合計数回で
+// 済むため、行数が多くても性能上の問題は生じない
+function _excelSyncRowHeights(leftTable,rightTable){
+  if(!leftTable||!rightTable) return;
+  var lRows=leftTable.rows,rRows=rightTable.rows;
+  var n=Math.min(lRows.length,rRows.length);
+  var i;
+  // ①まず全行のインラインheightを一旦クリアする（前回の同期結果を引きずらないため）
+  for(i=0;i<n;i++){
+    if(lRows[i]) lRows[i].style.height='';
+    if(rRows[i]) rRows[i].style.height='';
+  }
+  // ②全行分をまとめて読み取る（この時点で1回だけレイアウト計算が走る）
+  var heights=new Array(n);
+  for(i=0;i<n;i++){
+    var hl=lRows[i]?lRows[i].getBoundingClientRect().height:0;
+    var hr=rRows[i]?rRows[i].getBoundingClientRect().height:0;
+    heights[i]=Math.max(hl,hr);
+  }
+  // ③読み取りが完全に終わってから、まとめて書き込む（読み書きを交互にしない）
+  for(i=0;i<n;i++){
+    var h=heights[i];
+    if(h>0){
+      if(lRows[i]) lRows[i].style.height=h+'px';
+      if(rRows[i]) rRows[i].style.height=h+'px';
+    }
+  }
+}
 function _excelApplyColgroup(table,widths){
   if(!table) return;
   var old=table.querySelector('colgroup'); if(old) old.remove();
@@ -1705,8 +1774,13 @@ function renderExcelView(){
 
   // V1_117: 実テーブルを直接測定して列幅を左右パネルへ分配・適用する（隠しテーブルは廃止）
   _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bottomRightTable,leftCount,visibleColIndices.length+1);
-  // V1_124: 行の高さはCSS側の固定height指定により常に一致するため、ここでのJSによる
-  // 行高さ実測・同期(旧_excelSyncRowHeights呼び出し)は不要になった（廃止）
+  // V1_128: 行番号ガター(左)とデータ(右)は別テーブルのため、CSSの固定height指定
+  // だけではサブピクセル単位の誤差が行を重ねるごとに蓄積し、行数の多いシートの
+  // 下の方で目に見えるズレになる不具合が再発した。実際にレンダリングされた高さを
+  // 直接測定し、左右へ同じ値を明示的に書き込むことで累積誤差の余地自体を無くす
+  // （読み取り→書き込みを完全分離しているため、行数が多くても性能上の問題は無い）
+  _excelSyncRowHeights(topLeftTable,topRightTable);
+  _excelSyncRowHeights(bottomLeftTable,bottomRightTable);
 
   // V1_88: DXF/PDFの黄色マークと同様に、検索キーワード(_markKeyword)に一致するセルを
   // ハイライトする。シートタブ切替のたびにここが再実行されるため、切り替えた先の
@@ -1802,9 +1876,17 @@ function renderExcelView(){
   });
   // V1_125: 画面下に常時1つだけ表示される確定ボタン。現在のピックモードに応じて
   // 非表示確定・合計計算のどちらを行うかを切り替える（表示/文言の切替は
-  // _updateExcelToolbarUI側で行う）
+  // _updateExcelToolbarUI側で行う）。
+  // V1_127: 合計計算後は結果表示中(_excelConfirmResultActive)になり、ボタンは
+  // 「閉じる」として機能する（結果を消してバーを隠すだけの動作）
   var confirmBtn=document.getElementById('excelConfirmBtn');
   if(confirmBtn) confirmBtn.addEventListener('click',function(){
+    if(_excelConfirmResultActive){
+      _excelConfirmResultActive=false;
+      var _bar127b=document.getElementById('excelConfirmBar');
+      if(_bar127b){ _bar127b.style.display='none'; _bar127b.classList.remove('excel-confirm-result'); }
+      return;
+    }
     if(_excelPickMode==='hide') _excelConfirmHide();
     else if(_excelPickMode==='sum') _excelConfirmSum();
   });
