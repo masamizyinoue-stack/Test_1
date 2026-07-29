@@ -127,6 +127,12 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 #excelBottomLeftTable td:active,#excelBottomRightTable td:active{background:#ffe9a8}
 /* V1_111: 見出しセル右端の列幅ドラッグ用ハンドル */
 .excel-col-resize-handle{position:absolute;top:0;right:-4px;width:9px;height:100%;cursor:col-resize;z-index:3;-webkit-tap-highlight-color:transparent}
+/* V1_134: 列アルファベット行にもハンドルを常設したが、従来のハンドルは完全に透明で
+   見た目に存在が分からず、タッチ操作では発見しづらい。列アルファベット行のハンドルに
+   限り、中央に薄い縦線を表示し、指やApple Pencilでドラッグできることが分かるようにする
+   (ソート行側の見た目は既存動作を変えないよう据え置く) */
+.excel-letter-cell .excel-col-resize-handle::after{content:'';position:absolute;top:20%;bottom:20%;left:4px;width:1px;background:rgba(0,0,0,.35)}
+.excel-letter-cell .excel-col-resize-handle:active::after{background:rgba(0,0,0,.6);width:2px;left:3.5px}
 /* V1_88: 「検索してファイルを開く」で一致したセルをDXF/PDFの黄色マークと同様に強調表示 */
 .excel-cell-table td.cell-highlight,#excelTopLeftTable td.cell-highlight,#excelTopRightTable td.cell-highlight,#excelBottomLeftTable td.cell-highlight,#excelBottomRightTable td.cell-highlight{background:#fff3b0;box-shadow:inset 0 0 0 2px #e6b800}
 /* V1_113: シートタブ下の検索欄（純粋な検索。行は絞り込まずハイライト＋次へ移動のみ）。
@@ -765,7 +771,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_132</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_134</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1131,7 +1137,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_132';
+const APP_VERSION = 'V1_134';
 
 // =========================================================
 // グローバル状態

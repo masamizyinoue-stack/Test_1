@@ -1727,7 +1727,20 @@ function renderExcelView(){
   var leftCount=_freezeVisiblePos121>=0?(_freezeVisiblePos121+2):1; // 行番号列+固定列ぶん
   var topCount=1+(_excelFreezeRowIdx>=0?(_excelFreezeRowIdx+1):0); // 列アルファベット行+固定行ぶん
 
-  [topLeftTable,topRightTable,bottomLeftTable,bottomRightTable].forEach(function(t){ t.innerHTML=''; });
+  // V1_133: t.innerHTML=''はcolgroup等の子要素は消すが、table要素自身に直接
+  // 設定したstyle.width/style.tableLayout(V1_117〜V1_132で_excelApplyColgroupが
+  // 設定したもの)は消えずに残る。この状態のまま次の描画で_excelMeasurePaneWidths
+  // がセル幅を実測すると、そのtableは前回描画時点の古いwidth・table-layout:fixedに
+  // よってまだ制約されたままであるため、実際の内容(例：行数が増えて行番号が
+  // 2桁になった等)に本来必要な幅より狭い値しか測定できない。一度前回の固定幅を
+  // 解除してから中身を作り直すことで、実測が常に「今回描画する実際の内容」に
+  // 基づいて行われるようにする(このtable要素はシート切替・ファイル切替でも
+  // 使い回される静的なDOM要素であり、以前の描画結果を引きずってしまうため)
+  [topLeftTable,topRightTable,bottomLeftTable,bottomRightTable].forEach(function(t){
+    t.innerHTML='';
+    t.style.width='';
+    t.style.tableLayout='';
+  });
 
   // ── 列アルファベット行（常設。上左・上右パネルへ列split後にそれぞれ追加）──
   var letterTrLeft=document.createElement('tr');
@@ -1739,6 +1752,16 @@ function renderExcelView(){
     var lci=visibleColIndices[lvci];
     var isColFrozen=(lvci<leftCount-1);
     var ltd=_excelBuildLetterCell(lci,isColFrozen); // ラベル文字(A,B,...)は元の列位置基準のまま
+    // V1_134: 列幅ドラッグハンドル(_excelBuildResizeHandle、V1_115由来)は、従来は
+    // ソート行(_excelSortRowIdxを明示的に指定した場合のみ現れる、見出し・並べ替え用の行)
+    // にしか付いていなかった。ソート行を設定していない状態(初期表示)では列幅を手動で
+    // 変える手段が一切無く、見た目にも分からなかったため、常に表示される列アルファベット
+    // 行自体にもハンドルを付け、ソート行の有無に関係なくいつでも列幅を調整できるようにする
+    var absColIdx134=lvci+1; // 行番号列(index0)を含む絶対インデックス
+    var localIdx134=isColFrozen?(lvci+1):(lvci-(leftCount-1));
+    var tableIdA134=isColFrozen?'excelTopLeftTable':'excelTopRightTable';
+    var tableIdB134=isColFrozen?'excelBottomLeftTable':'excelBottomRightTable';
+    ltd.appendChild(_excelBuildResizeHandle(absColIdx134,localIdx134,tableIdA134,tableIdB134));
     (isColFrozen?letterTrLeft:letterTrRight).appendChild(ltd);
   }
   topLeftTable.appendChild(letterTrLeft);
