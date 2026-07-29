@@ -28,6 +28,54 @@ var inputMode='pen'; // 'pen' | 'freehand'  入力モード
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
 var excelWb=null,excelSheetIdx=0; // V1_76: Excel(.xlsx/.xls/.csv)表示用
+// V1_110: Excel/CSVテーブルの列ソート状態。_excelSortCol=-1は未ソート。
+// _excelSortDirは1=昇順/-1=降順/0=未ソート。新規ファイルオープン時・シート切替時にリセットする
+var _excelSortCol=-1,_excelSortDir=0;
+// V1_115: 「ソート位置」として指定した行番号(0始まり)。-1は「未指定」。V1_114までは
+// この指定が同時に「固定表示」も兼ねていたが、V1_115で固定行・固定列は完全に独立した
+// 別機能(_excelFreezeRowIdx/_excelFreezeColIdx)に分離した。この行はソート対象から除外され、
+// この行の各セルにのみ並べ替え/絞り込みアイコンが表示される。指定より前の行はソート対象外の
+// まま元の位置を維持し、指定行より後ろの行だけが選択列で並べ替えられる
+var _excelSortRowIdx=-1;
+// V1_115: 固定行・固定列の指定(0始まり、-1=未指定)。ヘッダーツールバーの「固定行列」
+// ボタン→行番号セルまたは列アルファベットセルのタップで設定する。指定した行/列および
+// それより上/左の行列はすべて固定表示領域に含まれる。行・列は独立に設定でき、
+// 両方同時に指定されている状態も有り得る（Excelの「ウィンドウ枠の固定」相当）
+var _excelFreezeRowIdx=-1,_excelFreezeColIdx=-1;
+// V1_115: ソート/固定行列ボタン押下による「タップ待ち」状態。null|'sort'|'freeze'。
+// 行番号セル・列アルファベットセルのクリックハンドラはこの値を見て挙動を切り替える
+var _excelPickMode=null;
+// V1_115: 列ストライプ(列単位の縞模様)表示のON/OFF。ONの間は列インデックスの偶奇で
+// 背景色を変え、既存の行ストライプ(V1_111)の代わりに使う
+var _excelColStripe=false;
+// V1_113: 列ごとの値フィルタ（Excelのオートフィルタ相当）。{colIdx: Set(許可する値の文字列)}。
+// キーが無い列は絞り込みなし。V1_111の「行を絞り込み（自由文字列）」機能を置き換えた
+var _excelColFilters=null;
+// V1_113: シートタブ下の検索欄の状態。V1_111では行を絞り込む機能だったが、行は絞り込まず
+// ハイライト表示＋「次へ」での巡回移動のみ行う純粋な検索に変更した
+var _excelSearchText='';
+var _excelSearchMatchIdx=-1;
+// V1_111: 列幅の手動調整結果(px)。列番号をindexとした配列。未調整の列はnullのままで
+// 自動レイアウトに従う。1列でもドラッグ調整されるとtable-layout:fixedに切り替わる
+var _excelColWidths=null;
+// V1_111: 新規ファイルオープン時・シート切替時に、列ソート・行フィルタ・列幅の
+// カスタム状態をまとめてリセットする（列の意味がファイル/シートごとに異なるため）
+// V1_113: 見出し行指定・列値フィルタ・検索状態のリセットも追加
+// V1_115: ソート位置・固定行/列・ピックモード・列ストライプのリセットも追加
+function _excelResetViewState(){
+  _excelSortCol=-1;_excelSortDir=0;
+  _excelSortRowIdx=-1;
+  _excelFreezeRowIdx=-1;_excelFreezeColIdx=-1;
+  _excelPickMode=null;
+  _excelColStripe=false;
+  _excelColFilters=null;
+  _excelSearchText='';
+  _excelSearchMatchIdx=-1;
+  _excelColWidths=null;
+  var fi=document.getElementById('excelFilterInput');
+  if(fi) fi.value='';
+  if(typeof _updateExcelToolbarUI==='function') _updateExcelToolbarUI();
+}
 var pdfImage=null;
 // V1_65: PDFの各ページに書いたstrokes/dimsが全ページに同じ様に表示されてしまう不具合の修正用。
 // stroke/dim作成時にこの値をpageプロパティとして付与し、描画・消しゴム等でこの値と一致するものだけを対象にする。
@@ -1025,6 +1073,7 @@ function loadExcel(buf,isCsv){
     return false;
   }
   excelSheetIdx=0;
+  _excelResetViewState(); // V1_111: 新規ファイルオープン時はソート/フィルタ/列幅をリセット
   renderExcelView();
   return true;
 }
@@ -1059,6 +1108,216 @@ function _updateViewmemoForExcel(isExcel){
   var els=document.querySelectorAll('#viewmemo .mem-btn, #viewmemo .show-btn, #viewmemo .vm-file');
   els.forEach(function(el){ el.style.display=isExcel?'none':''; });
 }
+// V1_110: 文字列が数値として扱えるか判定する（桁区切りカンマ許容）。
+// V1_111: ソート比較(_excelCompareVal)と集計行(件数・合計)の両方で共通利用するため関数化した
+function _excelIsNumericStr(s){
+  var t=(s===null||s===undefined)?'':String(s).trim();
+  if(t==='') return false;
+  var n=parseFloat(t.replace(/,/g,''));
+  return isFinite(n)&&/^-?[\d,]+\.?\d*$/.test(t);
+}
+function _excelToNum(s){ return parseFloat(String(s).replace(/,/g,'')); }
+// V1_110: Excel/CSVテーブルの列ソート用の値比較。両方が数値として解釈できれば数値比較、
+// それ以外は日本語ロケールでの文字列比較（濁点・長音・全角半角混在などを自然な順序で扱う）
+function _excelCompareVal(a,b){
+  var sa=(a===null||a===undefined)?'':String(a), sb=(b===null||b===undefined)?'':String(b);
+  var aNum=_excelIsNumericStr(sa), bNum=_excelIsNumericStr(sb);
+  if(aNum&&bNum) return _excelToNum(sa)-_excelToNum(sb);
+  return sa.localeCompare(sb,'ja');
+}
+// V1_114: 列番号(0始まり)をExcel風のアルファベット(A,B,...,Z,AA,AB,...)に変換する
+function _excelColLetter(idx){
+  var s='',n=idx+1;
+  while(n>0){
+    var rem=(n-1)%26;
+    s=String.fromCharCode(65+rem)+s;
+    n=Math.floor((n-1)/26);
+  }
+  return s;
+}
+// V1_115: 4分割テーブル(上左/上右/下左/下右)から、セルを走査する処理(検索・ハイライト等)が
+// 共通で使えるよう、実在する4テーブルの配列を返す
+function _excelAllCellTables(){
+  return ['excelTopLeftTable','excelTopRightTable','excelBottomLeftTable','excelBottomRightTable']
+    .map(function(id){return document.getElementById(id);}).filter(Boolean);
+}
+// V1_115: ヘッダーツールバーの「ペン〜サブ窓」ツール群(dxfToolGroup)と、
+// Excel/CSV専用ツール群(excelToolGroup)を、表示中のデータ種別に応じて入れ替える
+function _updateTopbarForExcel(isExcel){
+  var dxfGroup=document.getElementById('dxfToolGroup');
+  var excelGroup=document.getElementById('excelToolGroup');
+  if(dxfGroup) dxfGroup.style.display=isExcel?'none':'contents';
+  if(excelGroup) excelGroup.style.display=isExcel?'contents':'none';
+}
+// V1_115: ソート/固定行列ボタンの押下状態(active表示)・タップ待ちガイド文言・
+// タップ対象セルの強調(.excel-pick-armed)をまとめて同期する
+function _updateExcelToolbarUI(){
+  var sortBtn=document.getElementById('excelSortBtn');
+  var freezeBtn=document.getElementById('excelFreezeBtn');
+  var stripeBtn=document.getElementById('excelColStripeBtn');
+  if(sortBtn) sortBtn.classList.toggle('active',_excelPickMode==='sort');
+  if(freezeBtn) freezeBtn.classList.toggle('active',_excelPickMode==='freeze');
+  if(stripeBtn) stripeBtn.classList.toggle('active',!!_excelColStripe);
+  var wrap=document.getElementById('excelTableWrap');
+  if(wrap) wrap.classList.toggle('excel-pick-armed',!!_excelPickMode);
+  if(_excelPickMode==='sort'){
+    if(typeof showGuide==='function') showGuide('行を指定して下さい');
+  } else if(_excelPickMode==='freeze'){
+    if(typeof showGuide==='function') showGuide('固定したい行番号または列アルファベットをタップして下さい');
+  } else if(typeof hideGuide==='function'){
+    hideGuide();
+  }
+}
+// V1_115: 行番号セル（左端）を作る。ピックモードに応じて挙動が変わる:
+// ・'sort'中: タップした行がソート位置(origIdx基準・データの並び替えに関わらず固定)になる
+//   （同じ行の再タップで解除。ソート位置を変えるとソート列・列フィルタもリセットする）
+// ・'freeze'中: タップした行が固定行の境界(renderedPos基準・現在の表示順で数えた位置)になる
+//   （同じ位置の再タップで解除）
+// ・ピックモードでない間はタップしても何も起きない（ラベルとしてのみ機能する）
+function _excelBuildRowNumCell(rowNumLabel,origIdx,renderedPos,isFrozenTop,isSortRow){
+  var td=document.createElement('td');
+  td.className='excel-rownum-cell'+(isFrozenTop?' frozen':'');
+  td.textContent=String(rowNumLabel);
+  td.title=isSortRow?'ソート位置に指定中':'';
+  td.addEventListener('click',function(ev){
+    ev.stopPropagation();
+    if(_excelPickMode==='sort'){
+      _excelSortRowIdx=(_excelSortRowIdx===origIdx)?-1:origIdx;
+      _excelSortCol=-1;_excelSortDir=0;_excelColFilters=null;
+      _excelPickMode=null;_updateExcelToolbarUI();
+      renderExcelView();
+    } else if(_excelPickMode==='freeze'){
+      _excelFreezeRowIdx=(_excelFreezeRowIdx===renderedPos)?-1:renderedPos;
+      _excelPickMode=null;_updateExcelToolbarUI();
+      renderExcelView();
+    }
+  });
+  return td;
+}
+// V1_115: 列アルファベットセルを作る。'freeze'ピックモード中のみタップを受け付け、
+// タップした列(0始まり)が固定列の境界になる（同じ列の再タップで解除）
+function _excelBuildLetterCell(colIdx,isFrozenLeft){
+  var ltd=document.createElement('td');
+  ltd.className='excel-letter-cell'+(isFrozenLeft?' frozen':'');
+  ltd.textContent=_excelColLetter(colIdx);
+  ltd.addEventListener('click',function(ev){
+    ev.stopPropagation();
+    if(_excelPickMode==='freeze'){
+      _excelFreezeColIdx=(_excelFreezeColIdx===colIdx)?-1:colIdx;
+      _excelPickMode=null;_updateExcelToolbarUI();
+      renderExcelView();
+    }
+  });
+  return ltd;
+}
+// V1_114由来: 通常の値セルを作る（従来のセルタップ挙動＝ピックモード中は読込、それ以外はガイド表示）
+function _excelBuildDataCell(cellVal){
+  var td=document.createElement('td');
+  var _cellText110=(cellVal===null||cellVal===undefined)?'':String(cellVal);
+  td.textContent=_cellText110;
+  td.addEventListener('click',function(){ if(typeof _excelCellTapped==='function') _excelCellTapped(_cellText110); });
+  return td;
+}
+// V1_115: 列幅ドラッグ調整用ハンドル。列が左右どちらのパネルに属すかによって、
+// 更新対象のテーブル(tableIdA=上, tableIdB=下)とそのcolgroup内でのインデックス(localIdx)が
+// 異なるため呼び出し側で指定する。absColIdx(行番号列を含む絶対インデックス)は
+// _excelColWidths(手動調整の記憶用配列)の添字に使う
+function _excelBuildResizeHandle(absColIdx,localIdx,tableIdA,tableIdB){
+  var handle=document.createElement('span');
+  handle.className='excel-col-resize-handle';
+  handle.addEventListener('pointerdown',function(ev){
+    ev.stopPropagation();ev.preventDefault();
+    var startX=ev.clientX;
+    var tA=document.getElementById(tableIdA),tB=document.getElementById(tableIdB);
+    var cg=tA?tA.querySelector('colgroup'):null;
+    var cols=cg?cg.querySelectorAll('col'):[];
+    var startW=(cols[localIdx]&&parseFloat(cols[localIdx].style.width))||80;
+    if(!_excelColWidths) _excelColWidths=[];
+    function onMove(mv){
+      var dx=mv.clientX-startX;
+      var w=Math.max(30,startW+dx);
+      _excelColWidths[absColIdx]=w;
+      [tA,tB].forEach(function(t){
+        if(!t) return;
+        var c=t.querySelector('colgroup');
+        if(!c) return;
+        var col=c.querySelectorAll('col')[localIdx];
+        if(col) col.style.width=w+'px';
+      });
+    }
+    function onUp(){
+      document.removeEventListener('pointermove',onMove);
+      document.removeEventListener('pointerup',onUp);
+    }
+    document.addEventListener('pointermove',onMove);
+    document.addEventListener('pointerup',onUp);
+  });
+  return handle;
+}
+// V1_115: 列幅を計測する。#excelMeasureTable(画面には表示しない隠しテーブル)に
+// 列アルファベット行+全データ行を素のテキストのみでtable-layout:auto配置し、
+// ブラウザが自然に計算した列幅(getBoundingClientRect)を測定してから内容を破棄する。
+// ソート位置が指定されている間はソートアイコン＋リサイズハンドル分の余白を全データ列に加算する。
+// 手動でドラッグ調整済みの列(_excelColWidths、index0=行番号列)があればそちらを優先する
+function _excelMeasureColWidths(entries,colCount,hasSortRow){
+  var mTable=document.getElementById('excelMeasureTable');
+  var totalCols=colCount+1;
+  var widths=new Array(totalCols).fill(0);
+  if(mTable){
+    mTable.innerHTML='';
+    var lr=document.createElement('tr');
+    lr.appendChild(document.createElement('td'));
+    for(var i=0;i<colCount;i++){
+      var lt=document.createElement('td');
+      lt.textContent=_excelColLetter(i);
+      lr.appendChild(lt);
+    }
+    mTable.appendChild(lr);
+    entries.forEach(function(e){
+      var tr=document.createElement('tr');
+      var rn=document.createElement('td');
+      rn.textContent=String(e.label);
+      tr.appendChild(rn);
+      for(var ci=0;ci<colCount;ci++){
+        var td=document.createElement('td');
+        var v=e.cells[ci];
+        td.textContent=(v===undefined||v===null)?'':String(v);
+        tr.appendChild(td);
+      }
+      mTable.appendChild(tr);
+    });
+    for(var r=0;r<mTable.rows.length;r++){
+      var tds=mTable.rows[r].querySelectorAll('td');
+      for(var c=0;c<tds.length&&c<totalCols;c++){
+        var w=tds[c].getBoundingClientRect().width;
+        if(w>widths[c]) widths[c]=w;
+      }
+    }
+    mTable.innerHTML='';
+  }
+  for(var k=0;k<totalCols;k++){
+    if(!(widths[k]>0)) widths[k]=(k===0)?40:80;
+    if(hasSortRow&&k>0) widths[k]+=26; // ソートアイコン+リサイズハンドル分の余白
+  }
+  if(_excelColWidths){
+    for(var j=0;j<totalCols;j++){
+      if(_excelColWidths[j]!=null) widths[j]=_excelColWidths[j];
+    }
+  }
+  return widths;
+}
+function _excelApplyColgroup(table,widths){
+  if(!table) return;
+  var old=table.querySelector('colgroup'); if(old) old.remove();
+  var cg=document.createElement('colgroup');
+  widths.forEach(function(w){
+    var col=document.createElement('col');
+    col.style.width=w+'px';
+    cg.appendChild(col);
+  });
+  table.insertBefore(cg,table.firstChild);
+  table.style.tableLayout='fixed';
+}
 function renderExcelView(){
   var view=document.getElementById('excelView');
   if(!view) return;
@@ -1067,14 +1326,20 @@ function renderExcelView(){
     view.style.display='none';
     if(cv)cv.style.display='';if(ac)ac.style.display='';if(ov)ov.style.display='';
     _updateViewmemoForExcel(false);
+    _updateTopbarForExcel(false);
     return;
   }
   view.style.display='flex';
   if(cv)cv.style.display='none';if(ac)ac.style.display='none';if(ov)ov.style.display='none';
   _updateViewmemoForExcel(true);
+  _updateTopbarForExcel(true);
+  _updateExcelToolbarUI();
   var tabsEl=document.getElementById('excelSheetTabs');
-  var table=document.getElementById('excelTable');
-  if(!tabsEl||!table) return;
+  var topLeftTable=document.getElementById('excelTopLeftTable');
+  var topRightTable=document.getElementById('excelTopRightTable');
+  var bottomLeftTable=document.getElementById('excelBottomLeftTable');
+  var bottomRightTable=document.getElementById('excelBottomRightTable');
+  if(!tabsEl||!topLeftTable||!topRightTable||!bottomLeftTable||!bottomRightTable) return;
   if(excelSheetIdx<0||excelSheetIdx>=excelWb.SheetNames.length) excelSheetIdx=0;
   tabsEl.innerHTML='';
   if(excelWb.SheetNames.length>1){
@@ -1085,7 +1350,9 @@ function renderExcelView(){
       b.className='excel-sheet-tab'+(i===excelSheetIdx?' active':'');
       b.textContent=name;
       b.addEventListener('click',function(){
-        excelSheetIdx=i;renderExcelView();
+        excelSheetIdx=i;
+        _excelResetViewState(); // V1_111: シート切替時もソート/フィルタ/列幅をリセット（列の意味がシートごとに異なるため）
+        renderExcelView();
         if(typeof scheduleSave==='function')scheduleSave();
       });
       tabsEl.appendChild(b);
@@ -1095,22 +1362,346 @@ function renderExcelView(){
   }
   var ws=excelWb.Sheets[excelWb.SheetNames[excelSheetIdx]];
   var rows=ws?XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false}):[];
-  table.innerHTML='';
-  rows.forEach(function(row){
-    var tr=document.createElement('tr');
-    row.forEach(function(cell){
-      var td=document.createElement('td');
-      td.textContent=(cell===null||cell===undefined)?'':String(cell);
-      td.addEventListener('click',function(){ if(typeof _excelCellTapped==='function') _excelCellTapped(td.textContent); });
-      tr.appendChild(td);
+  var colCount111=0;
+  rows.forEach(function(r){ if(r.length>colCount111) colCount111=r.length; });
+  // V1_115: ソート位置・固定行・固定列のインデックスを範囲内にクランプする（データが
+  // 無ければ全て未指定へ戻す）。ソート位置(_excelSortRowIdx)はシート上の元の行(origIdx)を
+  // 指す一方、固定行(_excelFreezeRowIdx)は現在の表示順で数えた位置(renderedPos)を指すため、
+  // 意味が異なる点に注意（表全体のクランプはここでは行数のみで簡易チェックする）
+  if(rows.length===0){ _excelSortRowIdx=-1; _excelFreezeRowIdx=-1; }
+  else if(_excelSortRowIdx>=rows.length) _excelSortRowIdx=rows.length-1;
+  if(colCount111===0) _excelFreezeColIdx=-1;
+  else if(_excelFreezeColIdx>=colCount111) _excelFreezeColIdx=colCount111-1;
+  // V1_115: ソート位置(_excelSortRowIdx)が指定されていれば、0行目からその行までは
+  // 元の順序のまま動かさず、それより後ろの行だけがソート・列絞り込みの対象になる。
+  // 未指定(-1)ならソート・列絞り込み機能自体が無い（アイコンが表示されないため）
+  var dataStartIdx=_excelSortRowIdx>=0?_excelSortRowIdx+1:0;
+  var rowsWithIdx=rows.map(function(r,i){ return {origIdx:i,cells:r}; });
+  var unsortedPrefix=rowsWithIdx.slice(0,dataStartIdx);
+  var sortableSuffix=rowsWithIdx.slice(dataStartIdx);
+  if(_excelSortRowIdx>=0&&_excelSortCol>=0&&_excelSortDir!==0){
+    var _col110=_excelSortCol,_dir110=_excelSortDir;
+    sortableSuffix.sort(function(e1,e2){
+      var cmp=_excelCompareVal(e1.cells[_col110],e2.cells[_col110]);
+      return _dir110===1?cmp:-cmp;
     });
-    table.appendChild(tr);
+  }
+  var visible111=sortableSuffix.map(function(e){
+    if(!_excelColFilters) return true;
+    for(var ci in _excelColFilters){
+      var allowed=_excelColFilters[ci];
+      var v=(e.cells[ci]===undefined||e.cells[ci]===null)?'':String(e.cells[ci]);
+      if(!allowed.has(v)) return false;
+    }
+    return true;
   });
+  // V1_115: 最終的な表示順（フィルタで非表示の行は含めない）を1本の配列にまとめる。
+  // labelはExcelのオートフィルタと同様、絶対位置基準(欠番あり)。renderedPosは
+  // 固定行の判定に使う「現在の表示順で数えた位置」(0始まり、フィルタ後)
+  var finalEntries=[];
+  unsortedPrefix.forEach(function(e){
+    finalEntries.push({origIdx:e.origIdx,cells:e.cells,label:e.origIdx+1,isSortRow:(e.origIdx===_excelSortRowIdx)});
+  });
+  sortableSuffix.forEach(function(e,si){
+    if(!visible111[si]) return;
+    finalEntries.push({origIdx:e.origIdx,cells:e.cells,label:dataStartIdx+si+1,isSortRow:false});
+  });
+  finalEntries.forEach(function(e,idx){ e.renderedPos=idx; });
+  var hasSortRow=(_excelSortRowIdx>=0);
+  // V1_115: 固定行・固定列の絶対境界。行番号列(常設)・列アルファベット行(常設)を含めた
+  // 「絶対インデックス」で管理する(index0=行番号列/列アルファベット行相当)
+  var leftCount=_excelFreezeColIdx>=0?(_excelFreezeColIdx+2):1; // 行番号列+固定列ぶん
+  var topCount=1+(_excelFreezeRowIdx>=0?(_excelFreezeRowIdx+1):0); // 列アルファベット行+固定行ぶん
+
+  [topLeftTable,topRightTable,bottomLeftTable,bottomRightTable].forEach(function(t){ t.innerHTML=''; });
+
+  // ── 列アルファベット行（常設。上左・上右パネルへ列split後にそれぞれ追加）──
+  var letterTrLeft=document.createElement('tr');
+  var cornerTd=document.createElement('td');
+  cornerTd.className='excel-rownum-cell excel-corner-cell'+(topCount>1?' frozen':'');
+  letterTrLeft.appendChild(cornerTd);
+  var letterTrRight=document.createElement('tr');
+  for(var lci=0;lci<colCount111;lci++){
+    var isColFrozen=(lci<leftCount-1);
+    var ltd=_excelBuildLetterCell(lci,isColFrozen);
+    (isColFrozen?letterTrLeft:letterTrRight).appendChild(ltd);
+  }
+  topLeftTable.appendChild(letterTrLeft);
+  topRightTable.appendChild(letterTrRight);
+
+  // ── データ行（固定/スクロールを行ごとに判定し、列も左右split。ソート位置の行にのみ
+  //    並べ替え/絞り込みアイコン・列幅ドラッグハンドルを表示する）──
+  finalEntries.forEach(function(entry){
+    var isTop=(topCount-1>0)&&(entry.renderedPos<=topCount-2);
+    var trLeft=document.createElement('tr');
+    var trRight=document.createElement('tr');
+    if(entry.isSortRow){ trLeft.className='excel-sort-row'; trRight.className='excel-sort-row'; }
+    var rnCell=_excelBuildRowNumCell(entry.label,entry.origIdx,entry.renderedPos,isTop,entry.isSortRow);
+    trLeft.appendChild(rnCell);
+    var isPrefixRow=(entry.renderedPos<dataStartIdx)&&(!hasSortRow||entry.origIdx<=_excelSortRowIdx);
+    for(var ci=0;ci<colCount111;ci++){
+      var td=_excelBuildDataCell(entry.cells[ci]);
+      var isColFrozen2=(ci<leftCount-1);
+      if(entry.isSortRow){
+        td.style.fontWeight='700';
+        td.style.position='relative';
+        (function(colIdx,td){
+          var sortIcon=document.createElement('span');
+          var _active110=(_excelSortCol===colIdx&&_excelSortDir!==0);
+          var _hasFilter113=!!(_excelColFilters&&_excelColFilters[colIdx]);
+          sortIcon.textContent=_active110?(_excelSortDir===1?' ▲':' ▼'):' ▾';
+          sortIcon.style.cssText='margin-left:4px;color:'+((_active110||_hasFilter113)?'#1565c0':'#999')+';cursor:pointer;font-size:11px;';
+          sortIcon.title='並べ替え・絞り込み';
+          sortIcon.addEventListener('click',function(ev){
+            ev.stopPropagation();
+            _showExcelColumnMenu(sortIcon,colIdx,sortableSuffix.map(function(e){return e.cells;}));
+          });
+          td.appendChild(sortIcon);
+          var absColIdx=colIdx+1;
+          var localIdx=isColFrozen2?(colIdx+1):(colIdx-(leftCount-1));
+          var tableIdA=isColFrozen2?'excelTopLeftTable':'excelTopRightTable';
+          var tableIdB=isColFrozen2?'excelBottomLeftTable':'excelBottomRightTable';
+          td.appendChild(_excelBuildResizeHandle(absColIdx,localIdx,tableIdA,tableIdB));
+        })(ci,td);
+      } else if(isPrefixRow){
+        td.style.background='#f7f8fa';
+      } else if(_excelColStripe){
+        td.style.background=(ci%2===0)?'#fff':'#f5f7fa';
+      } else {
+        td.style.background=((entry.renderedPos-dataStartIdx)%2===0)?'#fff':'#f5f7fa';
+      }
+      (isColFrozen2?trLeft:trRight).appendChild(td);
+    }
+    if(isTop){ topLeftTable.appendChild(trLeft); topRightTable.appendChild(trRight); }
+    else { bottomLeftTable.appendChild(trLeft); bottomRightTable.appendChild(trRight); }
+  });
+
+  // V1_115: 列幅を計測し、左右パネルへ分配して適用する
+  var widths=_excelMeasureColWidths(finalEntries,colCount111,hasSortRow);
+  var leftWidths=widths.slice(0,leftCount);
+  var rightWidths=widths.slice(leftCount);
+  _excelApplyColgroup(topLeftTable,leftWidths);
+  _excelApplyColgroup(bottomLeftTable,leftWidths);
+  _excelApplyColgroup(topRightTable,rightWidths);
+  _excelApplyColgroup(bottomRightTable,rightWidths);
+
   // V1_88: DXF/PDFの黄色マークと同様に、検索キーワード(_markKeyword)に一致するセルを
   // ハイライトする。シートタブ切替のたびにここが再実行されるため、切り替えた先の
   // シートに一致セルがあれば自動的に反映される（スクロールは行わない。初回オープン時の
   // スクロールはopenDxfFromDb側から_applyExcelSearchHighlight(true)を明示的に呼ぶ）
   if(typeof _applyExcelSearchHighlight==='function') _applyExcelSearchHighlight(false);
+  // V1_113: シートタブ下の検索欄（純粋な検索。行は絞り込まずハイライト＋次へ移動のみ）を
+  // 再描画のたびに再適用する（列の並び替え・絞り込みで一致セルの位置が変わるため）
+  if(typeof _applyExcelLocalSearch==='function') _applyExcelLocalSearch(false);
+}
+
+// V1_115: 4分割テーブルのスクロール同期。#excelBottomRightWrapのみユーザー操作で
+// スクロールし、その縦スクロールを#excelBottomLeftWrapへ、横スクロールを
+// #excelTopRightWrapへそれぞれ反映する（他の3パネルはoverflow:hiddenで
+// ユーザー操作によるスクロールを受け付けない）
+(function(){
+  var br=document.getElementById('excelBottomRightWrap');
+  var bl=document.getElementById('excelBottomLeftWrap');
+  var tr=document.getElementById('excelTopRightWrap');
+  if(!br) return;
+  br.addEventListener('scroll',function(){
+    if(bl) bl.scrollTop=br.scrollTop;
+    if(tr) tr.scrollLeft=br.scrollLeft;
+  });
+})();
+// V1_115: ヘッダーツールバーのソート/固定行列/列ストライプボタンの配線。
+// いずれも常設の静的要素なので、リスナーはここで1度だけ登録する
+(function(){
+  var sortBtn=document.getElementById('excelSortBtn');
+  var freezeBtn=document.getElementById('excelFreezeBtn');
+  var stripeBtn=document.getElementById('excelColStripeBtn');
+  if(sortBtn) sortBtn.addEventListener('click',function(){
+    _excelPickMode=(_excelPickMode==='sort')?null:'sort';
+    _updateExcelToolbarUI();
+  });
+  if(freezeBtn) freezeBtn.addEventListener('click',function(){
+    _excelPickMode=(_excelPickMode==='freeze')?null:'freeze';
+    _updateExcelToolbarUI();
+  });
+  if(stripeBtn) stripeBtn.addEventListener('click',function(){
+    _excelColStripe=!_excelColStripe;
+    renderExcelView();
+  });
+})();
+// V1_113: シートタブ下の検索欄の配線。V1_111では入力のたびに行を絞り込んで
+// renderExcelView()を呼んでいたが、V1_113では行を絞り込まずハイライト表示するだけの
+// 軽い処理(_applyExcelLocalSearch)に変えたため、テーブル全体の再描画は不要になった
+(function(){
+  var input=document.getElementById('excelFilterInput');
+  var clearBtn=document.getElementById('excelFilterClearBtn');
+  var nextBtn=document.getElementById('excelFilterNextBtn');
+  if(!input||!clearBtn||!nextBtn) return;
+  var _debounceTimer111=null;
+  input.addEventListener('input',function(){
+    var v=input.value;
+    if(_debounceTimer111) clearTimeout(_debounceTimer111);
+    _debounceTimer111=setTimeout(function(){
+      _excelSearchText=v;
+      _excelSearchMatchIdx=-1; // 検索文字列が変わったら最初の一致からやり直す
+      _applyExcelLocalSearch(false);
+    },150);
+  });
+  clearBtn.addEventListener('click',function(){
+    input.value='';
+    _excelSearchText='';
+    _excelSearchMatchIdx=-1;
+    _applyExcelLocalSearch(false);
+  });
+  nextBtn.addEventListener('click',function(){
+    _excelSearchText=input.value; // デバウンス待ち中でも最新の入力値を使う
+    _applyExcelLocalSearch(true);
+  });
+})();
+// V1_115: 4分割テーブルすべてを対象に走査するよう変更。V1_113: シートタブ下の検索欄用の
+// ハイライト＋巡回移動処理。V1_88の_markKeyword由来のハイライト(.cell-highlight)とは
+// 別クラス(.excel-search-hit/-active)を使い、互いに独立して動作するようにした。
+// advance=trueの時だけ「次へ」として次の一致へ移動する
+function _applyExcelLocalSearch(advance){
+  var tables=_excelAllCellTables();
+  var fc=document.getElementById('excelFilterCount');
+  if(tables.length===0) return;
+  tables.forEach(function(table){
+    table.querySelectorAll('td.excel-search-hit,td.excel-search-hit-active').forEach(function(td){
+      td.classList.remove('excel-search-hit','excel-search-hit-active');
+    });
+  });
+  var kw=(typeof _normalizeForSearch==='function')?_normalizeForSearch(_excelSearchText):(_excelSearchText||'').toLowerCase();
+  if(!kw){ _excelSearchMatchIdx=-1; if(fc) fc.textContent=''; return; }
+  var matches=[];
+  tables.forEach(function(table){
+    table.querySelectorAll('td').forEach(function(td){
+      var t=(typeof _normalizeForSearch==='function')?_normalizeForSearch(td.textContent):td.textContent.toLowerCase();
+      if(t.indexOf(kw)>=0){ td.classList.add('excel-search-hit'); matches.push(td); }
+    });
+  });
+  if(matches.length===0){
+    _excelSearchMatchIdx=-1;
+    if(fc) fc.textContent='0件';
+    return;
+  }
+  if(advance){
+    _excelSearchMatchIdx=(_excelSearchMatchIdx+1)%matches.length;
+  } else if(_excelSearchMatchIdx<0||_excelSearchMatchIdx>=matches.length){
+    _excelSearchMatchIdx=0;
+  }
+  var cur=matches[_excelSearchMatchIdx];
+  cur.classList.add('excel-search-hit-active');
+  if(fc) fc.textContent=(_excelSearchMatchIdx+1)+'/'+matches.length+'件';
+  if(advance&&typeof cur.scrollIntoView==='function'){
+    cur.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});
+  }
+}
+// V1_113: 見出しセルの▾アイコンから開く、Excelのオートフィルタ相当のドロップダウン
+// メニュー。「昇順で並べ替え」「降順で並べ替え」に加えて、その列に含まれる値の
+// チェックリストで行を絞り込める（すべて選択/解除・個別チェック）。既存のダイアログ
+// ポップアップ(dialog.jsの_showIndexProfileNameDialog等)と同様、position:fixedで
+// アンカー要素の直下に表示し、外側タップで閉じる
+function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
+  var existing=document.getElementById('_excelColMenu113');
+  if(existing){existing.remove();return;}
+  var menu=document.createElement('div');
+  menu.id='_excelColMenu113';
+  menu.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #999;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:200px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.35);color:#222;';
+  var r=anchorEl.getBoundingClientRect();
+  menu.style.top=(r.bottom+4)+'px';
+  menu.style.left=Math.max(4,Math.min(r.left,window.innerWidth-296))+'px';
+  function closeMenu(){ if(document.getElementById('_excelColMenu113')) menu.remove(); }
+
+  var ascBtn=document.createElement('button');
+  ascBtn.type='button';ascBtn.textContent='昇順で並べ替え';
+  ascBtn.style.cssText='text-align:left;padding:8px;border:none;background:#f5f5f5;border-radius:6px;cursor:pointer;font-size:13px;';
+  ascBtn.addEventListener('click',function(){ _excelSortCol=colIdx;_excelSortDir=1;closeMenu();renderExcelView(); });
+  menu.appendChild(ascBtn);
+
+  var descBtn=document.createElement('button');
+  descBtn.type='button';descBtn.textContent='降順で並べ替え';
+  descBtn.style.cssText=ascBtn.style.cssText;
+  descBtn.addEventListener('click',function(){ _excelSortCol=colIdx;_excelSortDir=-1;closeMenu();renderExcelView(); });
+  menu.appendChild(descBtn);
+
+  var hr=document.createElement('div');
+  hr.style.cssText='height:1px;background:#ddd;margin:2px 0;';
+  menu.appendChild(hr);
+
+  // その列に現れる一意な値の一覧（空欄も1つの値として扱う）
+  var uniqSeen={};
+  var uniqList=[];
+  bodyRows.forEach(function(row){
+    var v=(row[colIdx]===undefined||row[colIdx]===null)?'':String(row[colIdx]);
+    if(!(v in uniqSeen)){ uniqSeen[v]=true; uniqList.push(v); }
+  });
+  uniqList.sort(function(a,b){return a.localeCompare(b,'ja');});
+
+  var currentAllowed=_excelColFilters&&_excelColFilters[colIdx];
+
+  var selAllRow=document.createElement('label');
+  selAllRow.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:2px 4px;';
+  var selAllCb=document.createElement('input');
+  selAllCb.type='checkbox';
+  selAllCb.checked=!currentAllowed;
+  selAllRow.appendChild(selAllCb);
+  selAllRow.appendChild(document.createTextNode('(すべて選択)'));
+  menu.appendChild(selAllRow);
+
+  var listBox=document.createElement('div');
+  listBox.style.cssText='max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;border-top:1px solid #eee;border-bottom:1px solid #eee;padding:4px 0;';
+  var checkboxes=[];
+  uniqList.forEach(function(v){
+    var row=document.createElement('label');
+    row.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 4px;';
+    var cb=document.createElement('input');
+    cb.type='checkbox';
+    cb.checked=currentAllowed?currentAllowed.has(v):true;
+    cb.addEventListener('change',function(){
+      selAllCb.checked=checkboxes.every(function(c){return c.checked;});
+    });
+    checkboxes.push(cb);
+    row.appendChild(cb);
+    var labelText=document.createElement('span');
+    labelText.textContent=v===''?'(空白)':v;
+    labelText.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    row.appendChild(labelText);
+    listBox.appendChild(row);
+  });
+  menu.appendChild(listBox);
+
+  selAllCb.addEventListener('change',function(){
+    checkboxes.forEach(function(cb){cb.checked=selAllCb.checked;});
+  });
+
+  var btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:6px;margin-top:4px;';
+  var okBtn=document.createElement('button');
+  okBtn.type='button';okBtn.textContent='OK';
+  okBtn.style.cssText='flex:1;padding:8px;border:none;border-radius:6px;background:#1565c0;color:#fff;font-size:13px;cursor:pointer;';
+  okBtn.addEventListener('click',function(){
+    var checkedVals=[];
+    uniqList.forEach(function(v,i){ if(checkboxes[i].checked) checkedVals.push(v); });
+    if(checkedVals.length===uniqList.length){
+      if(_excelColFilters) delete _excelColFilters[colIdx];
+    } else {
+      if(!_excelColFilters) _excelColFilters={};
+      _excelColFilters[colIdx]=new Set(checkedVals);
+    }
+    closeMenu();
+    renderExcelView();
+  });
+  var cnlBtn=document.createElement('button');
+  cnlBtn.type='button';cnlBtn.textContent='キャンセル';
+  cnlBtn.style.cssText='flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#555;font-size:13px;cursor:pointer;';
+  cnlBtn.addEventListener('click',closeMenu);
+  btnRow.appendChild(okBtn);btnRow.appendChild(cnlBtn);
+  menu.appendChild(btnRow);
+
+  document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('click',function _dc(ev){
+    if(!menu.contains(ev.target)&&ev.target!==anchorEl){closeMenu();document.removeEventListener('click',_dc);}
+  });},10);
 }
 
 // V1_88: 検索してファイルを開く/全図面検索で開いたExcelの、キーワード(_markKeyword)に
@@ -1118,20 +1709,23 @@ function renderExcelView(){
 // 既存のハイライトをすべて解除してから、_markKeywordが設定されていれば再度付与し直す
 // （キーワードが無ければ解除だけで終わる＝ファイルを直接開いた時は自動的にクリアされる）
 function _applyExcelSearchHighlight(scrollToFirst){
-  var table=document.getElementById('excelTable');
-  if(!table) return;
-  var prev=table.querySelectorAll('td.cell-highlight');
-  prev.forEach(function(td){td.classList.remove('cell-highlight');});
+  var tables=_excelAllCellTables();
+  if(tables.length===0) return;
+  tables.forEach(function(table){
+    table.querySelectorAll('td.cell-highlight').forEach(function(td){td.classList.remove('cell-highlight');});
+  });
   if(typeof _markKeyword==='undefined'||!_markKeyword) return;
   var kw=(typeof _normalizeForSearch==='function')?_normalizeForSearch(_markKeyword):_markKeyword;
   if(!kw) return;
   var first=null;
-  table.querySelectorAll('td').forEach(function(td){
-    var t=(typeof _normalizeForSearch==='function')?_normalizeForSearch(td.textContent):td.textContent;
-    if(t.indexOf(kw)>=0){
-      td.classList.add('cell-highlight');
-      if(!first) first=td;
-    }
+  tables.forEach(function(table){
+    table.querySelectorAll('td').forEach(function(td){
+      var t=(typeof _normalizeForSearch==='function')?_normalizeForSearch(td.textContent):td.textContent;
+      if(t.indexOf(kw)>=0){
+        td.classList.add('cell-highlight');
+        if(!first) first=td;
+      }
+    });
   });
   if(scrollToFirst&&first&&typeof first.scrollIntoView==='function'){
     first.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});
