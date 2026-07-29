@@ -84,6 +84,10 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
    数値ステッパーは廃止し、表側の行番号セルをタップして指定する方式に変更した */
 #excelFilterBar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;row-gap:6px;padding:6px 8px;background:#f3f4f6;border-bottom:1px solid #ccc;flex-shrink:0}
 #excelFilterInput{flex:1;min-width:80px;font-size:13px;padding:6px 8px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#111}
+/* V1_122: シート下の検索欄用テキスト読込ボタン。ピック中は.pickingで黄色表示にする
+   (allTextPickBtn等と同じ配色) */
+#excelFilterTextPickBtn{font-size:13px;padding:6px 10px;border:1px solid #16a085;border-radius:6px;background:#fff;color:#16a085;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+#excelFilterTextPickBtn.picking{border-color:#ffd700;background:rgba(255,215,0,.15);color:#b8860b}
 #excelFilterNextBtn{font-size:13px;padding:6px 10px;border:1px solid #1565c0;border-radius:6px;background:#1565c0;color:#fff;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 #excelFilterClearBtn{font-size:13px;padding:6px 10px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#555;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
 #excelFilterCount{font-size:12px;color:#666;flex-shrink:0;white-space:nowrap}
@@ -102,7 +106,13 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 #excelBottomLeftWrap{flex-shrink:0;overflow:hidden}
 #excelBottomRightWrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-width:0}
 #excelTopLeftTable,#excelTopRightTable,#excelBottomLeftTable,#excelBottomRightTable{border-collapse:collapse;font-size:13px;color:#111}
-#excelTopLeftTable td,#excelTopRightTable td,#excelBottomLeftTable td,#excelBottomRightTable td{border:1px solid #ccc;padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;position:relative;box-sizing:border-box}
+/* V1_122: 行番号セル(font-size:11px)とデータセル(13px継承)は文字サイズが異なるため、
+   line-heightを明示しない場合はブラウザの既定値(フォントサイズに比例)により行の高さが
+   微妙に食い違い、行番号・列アルファベットと実セルがズレて見える不具合の根本原因になって
+   いた。line-heightをpx固定で共通指定することで、フォントサイズによらず全ての行の高さを
+   そろえる（ソート行のアイコンもこの高さに収まるサイズのため、個別のJS実測同期
+   (_excelSyncRowHeights)に頼らずCSSだけで大半のケースが解決する） */
+#excelTopLeftTable td,#excelTopRightTable td,#excelBottomLeftTable td,#excelBottomRightTable td{border:1px solid #ccc;padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;position:relative;box-sizing:border-box;line-height:18px}
 #excelBottomLeftTable td:active,#excelBottomRightTable td:active{background:#ffe9a8}
 /* V1_111: 見出しセル右端の列幅ドラッグ用ハンドル */
 .excel-col-resize-handle{position:absolute;top:0;right:-4px;width:9px;height:100%;cursor:col-resize;z-index:3;-webkit-tap-highlight-color:transparent}
@@ -126,6 +136,11 @@ tr.excel-sort-row td{font-weight:700;background:#cfe2ff;border-top:2px solid #15
 /* V1_115: ピックモード中(ソート/固定行列)であることを示すため、タップ対象になる
    行番号セル・列アルファベット行に薄い点滅風の強調を付ける */
 .excel-pick-armed .excel-rownum-cell,.excel-pick-armed .excel-letter-cell{outline:2px dashed #9b59b6;outline-offset:-2px}
+/* V1_122: 非表示ピックモードで複数選択した行番号・列アルファベットの「非表示予定」表示。
+   確定(ボタン再押下)前は取り消し線+赤系背景で「これから消える」ことを示す */
+.excel-pending-hide{background:#ffcdd2!important;text-decoration:line-through;color:#b71c1c!important}
+/* V1_122: 合計計算モードで選択したセルの強調表示 */
+.excel-sum-selected{background:#fff59d!important;box-shadow:inset 0 0 0 2px #f9a825}
 #cv,#ov{position:absolute;top:0;left:0;width:100%;height:100%}
 #ac{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none} /* V0_82: Annotation専用Canvas */
 #ov{pointer-events:all;cursor:crosshair;touch-action:none}
@@ -596,6 +611,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">表示に戻す<span class="excel-unhide-count" style="font-weight:700"></span></span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
 </button>
+  <!-- V1_122: 複数セルを選択して合計を計算するボタン。1回目の押下でセル選択モードに
+       入り(_excelBuildDataCell参照)、もう一度押すと選択セルの数値を合算して表示する -->
+  <button class="tb-btn" id="excelSumBtn" title="合計計算（セルを複数タップして選択後、もう一度押すと合計を表示）" style="border:2px solid #27ae60">
+  <span class="tb-tool-label">合計</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="6" y1="12" x2="10" y2="8"/><line x1="6" y1="12" x2="10" y2="16"/></svg>
+</button>
   </div>
   <button class="tb-btn" id="calcBtn" title="計算機" style="border:2px solid #8b5a2b"> <!-- V0_158: 計算機ボタン（M_Viewer仕様） / V1_54: 茶色枠 -->
   <span class="tb-tool-label">計算機</span>
@@ -660,6 +681,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
          ここには検索欄のみを残す -->
     <div id="excelFilterBar">
       <input type="text" id="excelFilterInput" placeholder="検索...">
+      <!-- V1_122: 画面検索(ヘッダー)を廃止した代わりに、この検索欄でも図面/PDFの文字を
+           タップして読み込めるようにするボタン。押すとテキスト読込ピックモードに入る
+           （もう一度押すと解除。全図面検索と同じ手動トグル方式） -->
+      <button type="button" id="excelFilterTextPickBtn" title="図面の文字をタップして検索欄へ読込む">読込</button>
       <button type="button" id="excelFilterNextBtn">次へ</button>
       <span id="excelFilterCount"></span>
       <button type="button" id="excelFilterClearBtn">✕</button>
@@ -703,7 +728,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_121</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_122</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1069,7 +1094,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_121';
+const APP_VERSION = 'V1_122';
 
 // =========================================================
 // グローバル状態
@@ -5037,7 +5062,7 @@ async function _markGoNext(){
 // 優先して処理され（詳細はtool.js側のコメント参照）、また検索パネルの暗幕
 // (searchBg/allSearchBg)のタップも無効化して図面へタップが届くようにしている
 // (詳細は#searchOverlay.pickingのCSSコメント参照)
-var _textPickTarget=null; // null | 'screen' | 'all' | 'openFile'
+var _textPickTarget=null; // null | 'screen' | 'all' | 'openFile' | 'excelLocal'(V1_122)
 function _setTextPickMode(target){
   _textPickTarget=target;
   var ov1=document.getElementById('searchOverlay');
@@ -5057,16 +5082,30 @@ function _setTextPickMode(target){
   // 手動でトグルできたV1_62以前の文言。画面検索(screen)・検索して開く(openFile)は
   // V1_62でボタン自体を廃止しパネルの開閉と連動する自動モードになっているため、
   // 「もう一度ボタンを押す」操作自体が存在せず文言が実態と合っていなかった。
-  // 全図面検索(all)のみallTextPickBtnによる手動トグルが今も残っているため、
-  // その場合に限りこの案内を表示する
-  if(target) showGuide('図面上の文字をタップしてください'+(target==='all'?'（もう一度ボタンを押すと中止）':''),0);
+  // 全図面検索(all)・シート内検索(excelLocal)はボタンによる手動トグルが今も残っている
+  // ため、その場合に限りこの案内を表示する
+  if(target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0);
   else hideGuide();
   var b1=document.getElementById('screenTextPickBtn');
   var b2=document.getElementById('allTextPickBtn');
   var b3=document.getElementById('openFileTextPickBtn'); // V1_29
+  var b4=document.getElementById('excelFilterTextPickBtn'); // V1_122
   if(b1) b1.classList.toggle('picking', target==='screen');
   if(b2) b2.classList.toggle('picking', target==='all');
   if(b3) b3.classList.toggle('picking', target==='openFile');
+  if(b4) b4.classList.toggle('picking', target==='excelLocal');
+  // V1_122: Excel/CSV表示中に検索パネル(画面検索/検索して開く/全図面検索)を開いた状態で
+  // テキスト読込ピックモードに入ると、パネルが画面右側の一部を覆っているため、
+  // その下に隠れた列のセルをタップできない不具合があった。ピックモード中は、開いている
+  // パネルの実際の幅ぶんだけExcelテーブル領域を右から縮め、隠れていた列も
+  // タップできるようにする（'excelLocal'はシート下の検索欄自体でパネルを covers しないため対象外）
+  var _tableWrap122=document.getElementById('excelTableWrap');
+  if(_tableWrap122){
+    var _panelId122=target==='screen'?'searchPanel':(target==='all'?'allSearchPanel':(target==='openFile'?'openFilePanel':null));
+    var _panelEl122=_panelId122?document.getElementById(_panelId122):null;
+    var _pw122=(_panelEl122&&typeof excelWb!=='undefined'&&excelWb)?_panelEl122.getBoundingClientRect().width:0;
+    _tableWrap122.style.marginRight=_pw122>0?(_pw122+'px'):'';
+  }
 }
 function _tapPickText(sx0,sy0){
   // V1_51: DXFのdoc.mojiが無い場合はPDFから抽出したpdfMojiを使う
@@ -5120,18 +5159,31 @@ function _commitPickedText(text){
   } else if(target==='openFile'){ // V1_29
     document.getElementById('openFileSearchInput').value=text;
     doOpenFileSearch();
+  } else if(target==='excelLocal'){ // V1_122: シート下の検索欄(excelFilterInput)へのテキスト読込
+    var fi122=document.getElementById('excelFilterInput');
+    if(fi122){
+      fi122.value=text;
+      _excelSearchText=text;
+      if(typeof _applyExcelLocalSearch==='function') _applyExcelLocalSearch(false);
+    }
   }
   showGuide('「'+text+'」を検索欄に入力しました',2200);
   setTimeout(function(){
-    // V1_95: _setTextPickMode側と同様、'all'(全図面検索)以外はボタンによる
+    // V1_95: _setTextPickMode側と同様、'all'(全図面検索)・'excelLocal'以外はボタンによる
     // 手動トグルが存在しないため「（もう一度ボタンを押すと中止）」を表示しない
-    if(_textPickTarget===target) showGuide('図面上の文字をタップしてください'+(target==='all'?'（もう一度ボタンを押すと中止）':''),0);
+    if(_textPickTarget===target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0);
   },2200);
 }
 // V1_62: 画面検索・検索開くはパネルを開くと自動でピックモードになる(V1_58)ため
 // テキスト読込ボタン自体を廃止した。全図面検索は従来通りボタンで手動切替する
 document.getElementById('allTextPickBtn').addEventListener('click',function(){
   _setTextPickMode(_textPickTarget==='all'?null:'all');
+});
+// V1_122: シート下の検索欄(excelFilterInput)用のテキスト読込ボタン。
+// 常設のバーであり開閉と連動する対象パネルが無いため、全図面検索と同じ手動トグル方式にする
+var _excelFilterTextPickBtnEl122=document.getElementById('excelFilterTextPickBtn');
+if(_excelFilterTextPickBtnEl122) _excelFilterTextPickBtnEl122.addEventListener('click',function(){
+  _setTextPickMode(_textPickTarget==='excelLocal'?null:'excelLocal');
 });
 function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック処理を関数化）
   // DXF/PDFが開かれていたら再インデックス（念のため）V1_51: PDF(pdfMoji)にも対応

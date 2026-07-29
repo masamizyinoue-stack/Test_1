@@ -68,12 +68,31 @@ var _excelColWidths=null;
 // （_showExcelHiddenListMenu参照）
 var _excelHiddenRows={};
 var _excelHiddenCols={};
+// V1_122: 「非表示」ピックモードで複数選択できるようにするための一時的な仮選択状態。
+// タップのたびに全体を再描画すると大きい表で重くなるため、確定(非表示ボタンの再押下)まで
+// はDOMのクラス切替だけで見た目を更新し、確定時にまとめて_excelHiddenRows/Colsへ反映する
+var _excelPendingHideRows={};
+var _excelPendingHideCols={};
+// V1_122: 「合計」ピックモードで複数選択したセルの一時状態。key="origIdx_colIdx"、
+// 値はそのセルの文字列（計算時に数値判定して合算する）
+var _excelSumSelected={};
+// V1_122: ピックモードを切り替える際、前のモードで仮選択していた状態(非表示の仮選択・
+// 合計選択)が残ったまま次のモードに入ると、後で意図せず反映されてしまう恐れがあるため、
+// モード切替のたびにこれらを確実にクリアする
+function _excelClearTransientPickState(){
+  _excelPendingHideRows={};
+  _excelPendingHideCols={};
+  _excelSumSelected={};
+  var els=document.querySelectorAll('.excel-pending-hide,.excel-sum-selected');
+  els.forEach(function(el){ el.classList.remove('excel-pending-hide','excel-sum-selected'); });
+}
 // V1_111: 新規ファイルオープン時・シート切替時に、列ソート・行フィルタ・列幅の
 // カスタム状態をまとめてリセットする（列の意味がファイル/シートごとに異なるため）
 // V1_113: 見出し行指定・列値フィルタ・検索状態のリセットも追加
 // V1_115: ソート位置・固定行/列・ピックモード・列ストライプのリセットも追加
 // V1_117: 行ストライプのリセットも追加（既定値=true）
 // V1_121: 非表示行・列のリセットも追加
+// V1_122: 非表示/合計の仮選択状態のリセットも追加
 function _excelResetViewState(){
   _excelSortCol=-1;_excelSortDir=0;
   _excelSortRowIdx=-1;
@@ -87,6 +106,7 @@ function _excelResetViewState(){
   _excelColWidths=null;
   _excelHiddenRows={};
   _excelHiddenCols={};
+  _excelClearTransientPickState();
   var fi=document.getElementById('excelFilterInput');
   if(fi) fi.value='';
   if(typeof _updateExcelToolbarUI==='function') _updateExcelToolbarUI();
@@ -1172,6 +1192,11 @@ function _updateTopbarForExcel(isExcel){
   // 常設ボタンのため、ここで個別に非表示にする
   var writeBackupBtn=document.getElementById('writeBackupBtn');
   if(writeBackupBtn) writeBackupBtn.style.display=isExcel?'none':'';
+  // V1_122: ヘッダーの「画面検索」(#searchOverlay)は、Excel/CSV表示中はシート下の
+  // 検索欄(#excelFilterBar)と役割が重複し、画面上でも重なって見えるとの指摘のため、
+  // Excel/CSV表示中は非表示にする（DXF/PDF表示中は従来通り表示する）
+  var searchMenuBtn=document.getElementById('searchMenuBtn');
+  if(searchMenuBtn) searchMenuBtn.style.display=isExcel?'none':'';
 }
 // V1_116: PDF表示中は計測グループ(.dim-group、水・鉛/斜め/2線間/線と点/直径/半径)と
 // 画面(白黒切替、#bwToggleBtn)ボタンを非表示にする。ペン・蛍光ペン・消しゴム・戻る/進む・
@@ -1192,11 +1217,13 @@ function _updateExcelToolbarUI(){
   var colStripeBtn=document.getElementById('excelColStripeBtn');
   var hideBtn=document.getElementById('excelHideBtn'); // V1_121
   var unhideBtn=document.getElementById('excelUnhideBtn'); // V1_121
+  var sumBtn=document.getElementById('excelSumBtn'); // V1_122
   if(sortBtn) sortBtn.classList.toggle('active',_excelPickMode==='sort');
   if(freezeBtn) freezeBtn.classList.toggle('active',_excelPickMode==='freeze');
   if(rowStripeBtn) rowStripeBtn.classList.toggle('active',!!_excelRowStripe);
   if(colStripeBtn) colStripeBtn.classList.toggle('active',!!_excelColStripe);
   if(hideBtn) hideBtn.classList.toggle('active',_excelPickMode==='hide');
+  if(sumBtn) sumBtn.classList.toggle('active',_excelPickMode==='sum');
   // V1_121: 非表示中の行・列がある間、「表示に戻す」ボタンに件数を表示する
   if(unhideBtn){
     var _hiddenCount121=Object.keys(_excelHiddenRows).length+Object.keys(_excelHiddenCols).length;
@@ -1210,7 +1237,12 @@ function _updateExcelToolbarUI(){
   } else if(_excelPickMode==='freeze'){
     if(typeof showGuide==='function') showGuide('固定したい行番号または列アルファベットをタップして下さい');
   } else if(_excelPickMode==='hide'){
-    if(typeof showGuide==='function') showGuide('非表示にしたい行番号または列アルファベットをタップして下さい');
+    // V1_122: 複数選択に対応。件数を表示し、確定はボタンの再押下で行う案内に変更
+    var _pendCount122=Object.keys(_excelPendingHideRows).length+Object.keys(_excelPendingHideCols).length;
+    if(typeof showGuide==='function') showGuide('非表示にしたい行番号・列アルファベットを複数タップして選べます（選択中:'+_pendCount122+'件。終わったらもう一度「非表示」ボタンを押すと確定）',0);
+  } else if(_excelPickMode==='sum'){
+    var _sumCount122=Object.keys(_excelSumSelected).length;
+    if(typeof showGuide==='function') showGuide('合計したいセルを複数タップして選べます（選択中:'+_sumCount122+'件。終わったらもう一度「合計」ボタンを押すと計算）',0);
   } else if(typeof hideGuide==='function'){
     hideGuide();
   }
@@ -1220,12 +1252,13 @@ function _updateExcelToolbarUI(){
 //   （同じ行の再タップで解除。ソート位置を変えるとソート列・列フィルタもリセットする）
 // ・'freeze'中: タップした行が固定行の境界(renderedPos基準・現在の表示順で数えた位置)になる
 //   （同じ位置の再タップで解除）
-// ・V1_121 'hide'中: タップした行(origIdx基準)を非表示にする。ソート位置に指定中の行は
-//   非表示にすると見出し行が消えてソート/絞り込み自体が使えなくなるため対象外にする
+// ・V1_122 'hide'中: タップした行(origIdx基準)を「非表示予定」として複数まとめて仮選択する
+//   （全体の再描画はせずクラス切替のみ。確定は「非表示」ボタンの再押下で行う）。ソート位置に
+//   指定中の行は非表示にすると見出し行が消えてソート/絞り込み自体が使えなくなるため対象外
 // ・ピックモードでない間はタップしても何も起きない（ラベルとしてのみ機能する）
 function _excelBuildRowNumCell(rowNumLabel,origIdx,renderedPos,isFrozenTop,isSortRow){
   var td=document.createElement('td');
-  td.className='excel-rownum-cell'+(isFrozenTop?' frozen':'');
+  td.className='excel-rownum-cell'+(isFrozenTop?' frozen':'')+(_excelPendingHideRows[origIdx]?' excel-pending-hide':'');
   td.textContent=String(rowNumLabel);
   td.title=isSortRow?'ソート位置に指定中':'';
   td.addEventListener('click',function(ev){
@@ -1244,19 +1277,21 @@ function _excelBuildRowNumCell(rowNumLabel,origIdx,renderedPos,isFrozenTop,isSor
         if(typeof showGuide==='function') showGuide('見出し行(ソート位置)は非表示にできません',1800);
         return;
       }
-      _excelHiddenRows[origIdx]=true;
-      _excelPickMode=null;_updateExcelToolbarUI();
-      renderExcelView();
+      // V1_122: 複数選択できるよう、ここでは仮選択のトグルのみ行い、全体の再描画はしない
+      // （大きい表で毎タップごとの再描画が重いとの指摘のため）。確定はhideBtn側で行う
+      if(_excelPendingHideRows[origIdx]){ delete _excelPendingHideRows[origIdx]; td.classList.remove('excel-pending-hide'); }
+      else { _excelPendingHideRows[origIdx]=true; td.classList.add('excel-pending-hide'); }
+      _updateExcelToolbarUI();
     }
   });
   return td;
 }
 // V1_115: 列アルファベットセルを作る。'freeze'ピックモード中のみタップを受け付け、
 // タップした列(0始まり)が固定列の境界になる（同じ列の再タップで解除）
-// V1_121: 'hide'ピックモード中はタップした列を非表示にする
+// V1_122: 'hide'ピックモード中はタップした列を「非表示予定」として複数まとめて仮選択する
 function _excelBuildLetterCell(colIdx,isFrozenLeft){
   var ltd=document.createElement('td');
-  ltd.className='excel-letter-cell'+(isFrozenLeft?' frozen':'');
+  ltd.className='excel-letter-cell'+(isFrozenLeft?' frozen':'')+(_excelPendingHideCols[colIdx]?' excel-pending-hide':'');
   ltd.textContent=_excelColLetter(colIdx);
   ltd.addEventListener('click',function(ev){
     ev.stopPropagation();
@@ -1265,19 +1300,31 @@ function _excelBuildLetterCell(colIdx,isFrozenLeft){
       _excelPickMode=null;_updateExcelToolbarUI();
       renderExcelView();
     } else if(_excelPickMode==='hide'){
-      _excelHiddenCols[colIdx]=true;
-      _excelPickMode=null;_updateExcelToolbarUI();
-      renderExcelView();
+      if(_excelPendingHideCols[colIdx]){ delete _excelPendingHideCols[colIdx]; ltd.classList.remove('excel-pending-hide'); }
+      else { _excelPendingHideCols[colIdx]=true; ltd.classList.add('excel-pending-hide'); }
+      _updateExcelToolbarUI();
     }
   });
   return ltd;
 }
 // V1_114由来: 通常の値セルを作る（従来のセルタップ挙動＝ピックモード中は読込、それ以外はガイド表示）
-function _excelBuildDataCell(cellVal){
+// V1_122: origIdx/colIdxを受け取り、'sum'ピックモード中はセルの複数選択（合計計算対象の
+// トグル）に使う。それ以外のモードでは従来通り_excelCellTappedへ委ねる
+function _excelBuildDataCell(cellVal,origIdx,colIdx){
   var td=document.createElement('td');
   var _cellText110=(cellVal===null||cellVal===undefined)?'':String(cellVal);
   td.textContent=_cellText110;
-  td.addEventListener('click',function(){ if(typeof _excelCellTapped==='function') _excelCellTapped(_cellText110); });
+  var _sumKey122=origIdx+'_'+colIdx;
+  if(_excelSumSelected[_sumKey122]) td.classList.add('excel-sum-selected');
+  td.addEventListener('click',function(){
+    if(_excelPickMode==='sum'){
+      if(_excelSumSelected[_sumKey122]){ delete _excelSumSelected[_sumKey122]; td.classList.remove('excel-sum-selected'); }
+      else { _excelSumSelected[_sumKey122]={v:_cellText110}; td.classList.add('excel-sum-selected'); }
+      _updateExcelToolbarUI();
+      return;
+    }
+    if(typeof _excelCellTapped==='function') _excelCellTapped(_cellText110);
+  });
   return td;
 }
 // V1_115: 列幅ドラッグ調整用ハンドル。列が左右どちらのパネルに属すかによって、
@@ -1557,7 +1604,7 @@ function renderExcelView(){
     var isPrefixRow=(entry.renderedPos<dataStartIdx)&&(!hasSortRow||entry.origIdx<=_excelSortRowIdx);
     for(var vci=0;vci<visibleColIndices.length;vci++){
       var ci=visibleColIndices[vci]; // ci=元の列番号(データ/フィルタ/ソート列の特定に使う)
-      var td=_excelBuildDataCell(entry.cells[ci]);
+      var td=_excelBuildDataCell(entry.cells[ci],entry.origIdx,ci);
       var isColFrozen2=(vci<leftCount-1); // 固定範囲の判定は表示位置(vci)基準
       if(entry.isSortRow){
         td.style.fontWeight='700';
@@ -1599,7 +1646,9 @@ function renderExcelView(){
         var _rowParity117=_excelRowStripe?((entry.renderedPos-dataStartIdx)%2):0;
         var _colParity117=_excelColStripe?(vci%2):0;
         var _stripeOn117=_excelRowStripe||_excelColStripe?((_rowParity117+_colParity117)%2):0;
-        td.style.background=_stripeOn117?'#f5f7fa':'#fff';
+        // V1_122: 従来の縞色(#f5f7fa)は白とほぼ見分けがつかず視認性が低いとの指摘のため、
+        // はっきり違いがわかる濃さの青系グレーに変更した
+        td.style.background=_stripeOn117?'#c9d7ea':'#fff';
       }
       (isColFrozen2?trLeft:trRight).appendChild(td);
     }
@@ -1655,11 +1704,14 @@ function renderExcelView(){
   var colStripeBtn=document.getElementById('excelColStripeBtn');
   var hideBtn=document.getElementById('excelHideBtn'); // V1_121
   var unhideBtn=document.getElementById('excelUnhideBtn'); // V1_121
+  var sumBtn=document.getElementById('excelSumBtn'); // V1_122
   if(sortBtn) sortBtn.addEventListener('click',function(){
+    _excelClearTransientPickState(); // V1_122: 非表示/合計の仮選択が残らないようにする
     _excelPickMode=(_excelPickMode==='sort')?null:'sort';
     _updateExcelToolbarUI();
   });
   if(freezeBtn) freezeBtn.addEventListener('click',function(){
+    _excelClearTransientPickState();
     _excelPickMode=(_excelPickMode==='freeze')?null:'freeze';
     _updateExcelToolbarUI();
   });
@@ -1675,15 +1727,51 @@ function renderExcelView(){
     if(_excelColStripe) _excelRowStripe=false;
     renderExcelView();
   });
-  // V1_121: 「非表示」ボタンはソート/固定行列と同じピックモードの仕組みを使う。
-  // 「表示に戻す」ボタンは非表示中の行・列を一覧するポップアップを開く
+  // V1_122: 「非表示」ボタンは複数選択方式に変更。1回目の押下でピックモードに入り、
+  // 行番号/列アルファベットを何度でもタップして仮選択(視認性のためのクラス切替のみで
+  // 全体再描画はしない＝高速)し、もう一度ボタンを押すと仮選択をまとめて確定して
+  // 1回だけrenderExcelView()を呼ぶ。「表示に戻す」ボタンは非表示中の行・列を
+  // 一覧するポップアップを開く
   if(hideBtn) hideBtn.addEventListener('click',function(){
-    _excelPickMode=(_excelPickMode==='hide')?null:'hide';
-    _updateExcelToolbarUI();
+    if(_excelPickMode!=='hide'){
+      _excelClearTransientPickState();
+      _excelPickMode='hide';
+      _updateExcelToolbarUI();
+    } else {
+      Object.keys(_excelPendingHideRows).forEach(function(k){ _excelHiddenRows[k]=true; });
+      Object.keys(_excelPendingHideCols).forEach(function(k){ _excelHiddenCols[k]=true; });
+      _excelPendingHideRows={};_excelPendingHideCols={};
+      _excelPickMode=null;
+      renderExcelView(); // 確定時のみ1回だけ全体を再描画する
+    }
   });
   if(unhideBtn) unhideBtn.addEventListener('click',function(ev){
     ev.stopPropagation();
     _showExcelHiddenListMenu(unhideBtn);
+  });
+  // V1_122: 「合計」ボタン。1回目の押下でセルの複数選択モードに入り、もう一度押すと
+  // 選択セルのうち数値として解釈できるものを合算して結果をガイド表示する
+  if(sumBtn) sumBtn.addEventListener('click',function(){
+    if(_excelPickMode!=='sum'){
+      _excelClearTransientPickState();
+      _excelPickMode='sum';
+      _updateExcelToolbarUI();
+    } else {
+      var total=0,numCount=0,selCount=0;
+      for(var k in _excelSumSelected){
+        selCount++;
+        var raw=_excelSumSelected[k].v;
+        if(typeof _excelIsNumericStr==='function'&&_excelIsNumericStr(raw)){
+          total+=_excelToNum(raw);
+          numCount++;
+        }
+      }
+      document.querySelectorAll('.excel-sum-selected').forEach(function(el){el.classList.remove('excel-sum-selected');});
+      _excelSumSelected={};
+      _excelPickMode=null;
+      _updateExcelToolbarUI();
+      if(typeof showGuide==='function') showGuide('合計: '+total+'（数値'+numCount+'件 / 選択'+selCount+'件）',0);
+    }
   });
 })();
 // V1_113: シートタブ下の検索欄の配線。V1_111では入力のたびに行を絞り込んで
@@ -1777,6 +1865,13 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
     menu.style.top=(r.bottom+4)+'px';
   }
   menu.style.left=Math.max(4,Math.min(r.left,window.innerWidth-296))+'px';
+  // V1_122: 画面が縦に狭い場合、上下どちらに開いてもメニュー自体が画面をはみ出し、
+  // 一番下にあるOK/キャンセルボタンに手が届かない不具合があった。メニュー自体の
+  // 最大高さを画面の高さ以内に制限し、超える場合はメニュー内部をスクロールできる
+  // ようにすることで、内容が多くても必ずボタンまでスクロールして操作できるようにする
+  var _menuMaxH122=Math.max(120,window.innerHeight-16);
+  menu.style.maxHeight=_menuMaxH122+'px';
+  menu.style.overflowY='auto';
   function closeMenu(){ if(document.getElementById('_excelColMenu113')) menu.remove(); }
 
   var ascBtn=document.createElement('button');
