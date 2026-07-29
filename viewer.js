@@ -1311,6 +1311,23 @@ function _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bott
   _excelApplyColgroup(topRightTable,rightWidths);
   _excelApplyColgroup(bottomRightTable,rightWidths);
 }
+// V1_119: 行番号ガター(左)とデータ(右)は別テーブルのため、同じ行番号に対応する
+// tr同士でも内容量の違い（例:ソート/フィルターアイコンの有無）により高さが
+// 食い違うことがある。両テーブルの対応行を先頭から順に突き合わせ、実測した
+// 高さのうち大きい方を両方のtrへ明示的に適用して行のズレを防ぐ。
+function _excelSyncRowHeights(leftTable,rightTable){
+  if(!leftTable||!rightTable) return;
+  var lRows=leftTable.rows,rRows=rightTable.rows;
+  var n=Math.min(lRows.length,rRows.length);
+  var i;
+  for(i=0;i<n;i++){ lRows[i].style.height=''; rRows[i].style.height=''; }
+  for(i=0;i<n;i++){
+    var hl=lRows[i].getBoundingClientRect().height;
+    var hr=rRows[i].getBoundingClientRect().height;
+    var h=Math.max(hl,hr);
+    if(h>0){ lRows[i].style.height=h+'px'; rRows[i].style.height=h+'px'; }
+  }
+}
 function _excelApplyColgroup(table,widths){
   if(!table) return;
   var old=table.querySelector('colgroup'); if(old) old.remove();
@@ -1498,6 +1515,13 @@ function renderExcelView(){
 
   // V1_117: 実テーブルを直接測定して列幅を左右パネルへ分配・適用する（隠しテーブルは廃止）
   _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bottomRightTable,leftCount,colCount111+1);
+  // V1_119: 行番号ガター列(左ペイン)とデータ列(右ペイン)は別テーブルのため、
+  // ソート/フィルターアイコンの有無等でセルの内容量が変わると行の高さが左右で
+  // 食い違い、行番号と実データがズレて見える不具合が発生した。列幅と同様に、
+  // 実際にレンダリングされた行の高さを直接測定し、左右で高い方に合わせて
+  // 明示的に統一する（隠し要素や固定値の推測ではなく実測値で揃える方式）。
+  _excelSyncRowHeights(topLeftTable,topRightTable);
+  _excelSyncRowHeights(bottomLeftTable,bottomRightTable);
 
   // V1_88: DXF/PDFの黄色マークと同様に、検索キーワード(_markKeyword)に一致するセルを
   // ハイライトする。シートタブ切替のたびにここが再実行されるため、切り替えた先の
@@ -1539,12 +1563,16 @@ function renderExcelView(){
     _excelPickMode=(_excelPickMode==='freeze')?null:'freeze';
     _updateExcelToolbarUI();
   });
+  // V1_119: 行縞・列縞は同時にONにできないよう排他化。片方をONにする際は
+  // もう片方を自動的にOFFにする（チェッカーボード状の同時表示は廃止）
   if(rowStripeBtn) rowStripeBtn.addEventListener('click',function(){
     _excelRowStripe=!_excelRowStripe;
+    if(_excelRowStripe) _excelColStripe=false;
     renderExcelView();
   });
   if(colStripeBtn) colStripeBtn.addEventListener('click',function(){
     _excelColStripe=!_excelColStripe;
+    if(_excelColStripe) _excelRowStripe=false;
     renderExcelView();
   });
 })();
