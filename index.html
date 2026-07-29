@@ -119,8 +119,10 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
 .excel-corner-cell{cursor:default}
 .excel-letter-cell{background:#d5dbe3;color:#333;text-align:center;font-size:11px;font-weight:700}
 .excel-letter-cell.frozen{background:#16a085;color:#fff}
-/* V1_115: ソートで指定した行(旧・見出し行)の強調表示。固定表示とは独立した概念 */
-tr.excel-sort-row td{font-weight:700;background:#eef2f7}
+/* V1_115: ソートで指定した行(旧・見出し行)の強調表示。固定表示とは独立した概念
+   V1_121: 従来の薄い背景色(#eef2f7)だと縞模様と見分けづらく視認性が悪いとの
+   指摘のため、より濃い青系の背景と上下の太線で「帯」として目立たせるよう変更した */
+tr.excel-sort-row td{font-weight:700;background:#cfe2ff;border-top:2px solid #1565c0;border-bottom:2px solid #1565c0}
 /* V1_115: ピックモード中(ソート/固定行列)であることを示すため、タップ対象になる
    行番号セル・列アルファベット行に薄い点滅風の強調を付ける */
 .excel-pick-armed .excel-rownum-cell,.excel-pick-armed .excel-letter-cell{outline:2px dashed #9b59b6;outline-offset:-2px}
@@ -305,6 +307,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #searchOverlay.picking{pointer-events:none}
 #searchOverlay.picking #searchPanel{pointer-events:auto}
 #searchOverlay.picking #searchBg{background:rgba(0,0,0,.15)}
+/* V1_121: Excel/CSV表示中にこのパネルを開くと、#searchBg(画面全体を覆う暗幕)が
+   タッチ操作を奪うため、パネル右側の外にあるExcelテーブル(#excelBottomRightWrap)を
+   スクロールできなくなる不具合があった。Excel/CSV表示中はpickingモードと同様に
+   暗幕へのタップ・スクロールを無効化し、下のテーブルへ操作を届かせる
+   （代わりに背景タップでの閉じる動作はできなくなるが、✕ボタンで閉じられる） */
+#searchOverlay.excel-bg-pass #searchBg{pointer-events:none;background:rgba(0,0,0,.15)}
 #searchInput{width:100%;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);font-size:16px;box-sizing:border-box;-webkit-appearance:none;outline:none}
 #searchInput:focus{border-color:var(--accent)}
 .search-result-item{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;font-size:14px;color:var(--text);word-break:break-all;-webkit-tap-highlight-color:rgba(0,212,255,.2)}
@@ -318,6 +326,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #allSearchOverlay.picking{pointer-events:none}
 #allSearchOverlay.picking #allSearchPanel{pointer-events:auto}
 #allSearchOverlay.picking #allSearchBg{background:rgba(0,0,0,.15)}
+/* V1_121: #searchOverlay.excel-bg-passと同じ理由（詳細はそちらのコメント参照） */
+#allSearchOverlay.excel-bg-pass #allSearchBg{pointer-events:none;background:rgba(0,0,0,.15)}
 #allSearchPanel .sp-header{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 #allSearchPanel .sp-title{font-size:15px;font-weight:600;color:var(--text);flex:1}
 #allSearchPanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1}
@@ -368,6 +378,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #openFileOverlay.picking{pointer-events:none}
 #openFileOverlay.picking #openFilePanel{pointer-events:auto}
 #openFileOverlay.picking #openFileBg{background:rgba(0,0,0,.15)}
+/* V1_121: #searchOverlay.excel-bg-passと同じ理由（詳細はそちらのコメント参照） */
+#openFileOverlay.excel-bg-pass #openFileBg{pointer-events:none;background:rgba(0,0,0,.15)}
 #openFilePanel .sp-header{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 #openFilePanel .sp-title{font-size:15px;font-weight:600;color:var(--text);flex:1}
 #openFilePanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1}
@@ -574,6 +586,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">列縞</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="4" height="16" fill="currentColor" fill-opacity="0.25"/><rect x="10" y="4" width="4" height="16"/><rect x="17" y="4" width="4" height="16" fill="currentColor" fill-opacity="0.25"/></svg>
 </button>
+  <!-- V1_121: 行/列の非表示・復元機能。非表示＝ピックモードで行番号/列アルファベットを
+       タップ。復元＝一覧ポップアップから個別または一括で戻す(_showExcelHiddenListMenu) -->
+  <button class="tb-btn" id="excelHideBtn" title="非表示（行番号または列アルファベットをタップして非表示）" style="border:2px solid #7f8c8d">
+  <span class="tb-tool-label">非表示</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+</button>
+  <button class="tb-btn" id="excelUnhideBtn" title="非表示にした行・列を表示に戻す" style="border:2px solid #7f8c8d">
+  <span class="tb-tool-label">表示に戻す<span class="excel-unhide-count" style="font-weight:700"></span></span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+</button>
   </div>
   <button class="tb-btn" id="calcBtn" title="計算機" style="border:2px solid #8b5a2b"> <!-- V0_158: 計算機ボタン（M_Viewer仕様） / V1_54: 茶色枠 -->
   <span class="tb-tool-label">計算機</span>
@@ -681,7 +703,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_119</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_121</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1047,7 +1069,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_119';
+const APP_VERSION = 'V1_121';
 
 // =========================================================
 // グローバル状態
@@ -1474,8 +1496,10 @@ function _fileTypeInfo(name){
   var n=(name||'').toLowerCase();
   if(n.endsWith('.pdf')) return {label:'PDF',color:'#8e44ad'};
   // V1_120: CSVもXLSXと同じ「XLS」表示になっていたのを、データの種類が
-  // わかるようCSVファイルは「CSV」ラベルに分ける（色はXLSと同じ緑のまま）
-  if(n.endsWith('.csv')) return {label:'CSV',color:'#217346'};
+  // わかるようCSVファイルは「CSV」ラベルに分けた。
+  // V1_121: ラベルだけでなく色もXLSと同じ緑のままだったため区別しにくいとの指摘で、
+  // 既存のアクセントカラー(--accent-2、オレンジ)へ変更した
+  if(n.endsWith('.csv')) return {label:'CSV',color:'#f39c12'};
   if(_isExcelName(n)) return {label:'XLS',color:'#217346'};
   return {label:'DXF',color:'#1565c0'};
 }
@@ -5112,7 +5136,11 @@ document.getElementById('allTextPickBtn').addEventListener('click',function(){
 function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック処理を関数化）
   // DXF/PDFが開かれていたら再インデックス（念のため）V1_51: PDF(pdfMoji)にも対応
   if((doc&&doc.moji)||(typeof pdfMoji!=='undefined'&&pdfMoji&&pdfMoji.length>0)) buildSearchIndex();
-  document.getElementById('searchOverlay').classList.add('open');
+  var _so121=document.getElementById('searchOverlay');
+  // V1_121: Excel/CSV表示中は背景暗幕がテーブルのスクロールを妨げないよう、
+  // 暗幕へのタップ・スクロール捕捉を無効化するクラスを付与する
+  _so121.classList.toggle('excel-bg-pass',!!excelWb);
+  _so121.classList.add('open');
   // インデックス件数をプレースホルダーに表示
   var inp=document.getElementById('searchInput');
   inp.placeholder=_searchIdx.length>0?'キーワードを入力… ('+_searchIdx.length+'件の文字)':'文字なし（DXFを確認）';
@@ -5518,7 +5546,9 @@ function _idbGetAllNameTexts(cb){
 }
 
 function openAllSearchPanel(){
-  document.getElementById('allSearchOverlay').classList.add('open');
+  var _aso121=document.getElementById('allSearchOverlay');
+  _aso121.classList.toggle('excel-bg-pass',!!excelWb); // V1_121: 詳細はopenScreenSearch内のコメント参照
+  _aso121.classList.add('open');
   // V1_33: 進捗表示が空（インデックス処理中・完了直後の表示が残っていない）場合は
   // 直近にインデックスしたフォルダ名を表示し、どのフォルダの索引か分かるようにする
   // V1_37: 「前回のインデックス対象フォルダ」という表示だと、実際に保存済みなのか
@@ -5759,7 +5789,9 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
 // V1_22: 「ファイルを開く」フォルダインデックス検索パネル（全図面検索(V0_100〜)と同じ
 // dxfIndex(IndexedDB)を共有し、ファイル名で絞り込んで開けるようにしたもの）
 function openOpenFilePanel(){
-  document.getElementById('openFileOverlay').classList.add('open');
+  var _ofo121=document.getElementById('openFileOverlay');
+  _ofo121.classList.toggle('excel-bg-pass',!!excelWb); // V1_121: 詳細はopenScreenSearch内のコメント参照
+  _ofo121.classList.add('open');
   // V1_33: 進捗表示が空の場合は直近にインデックスしたフォルダ名を表示する
   // V1_37: 実際の保存件数を調べて表示するよう変更（詳細はopenAllSearchPanel参照）
   // V1_43: 保存済み全フォルダの内訳を表示するよう変更（詳細はopenAllSearchPanel参照）

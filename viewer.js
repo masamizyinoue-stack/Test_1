@@ -61,11 +61,19 @@ var _excelSearchMatchIdx=-1;
 // V1_111: 列幅の手動調整結果(px)。列番号をindexとした配列。未調整の列はnullのままで
 // 自動レイアウトに従う。1列でもドラッグ調整されるとtable-layout:fixedに切り替わる
 var _excelColWidths=null;
+// V1_121: 行/列の非表示機能。行は元の行番号(origIdx)、列は元の列番号(0始まり)を
+// キーとしたオブジェクトで、true=非表示。ソート/固定行列と同じ「ボタン→ピックモード→
+// 行番号/列アルファベットをタップ」の操作パターンで指定する。非表示にした行/列は
+// 画面から消えるため再タップでは戻せず、専用の「表示に戻す」ボタンから復元する
+// （_showExcelHiddenListMenu参照）
+var _excelHiddenRows={};
+var _excelHiddenCols={};
 // V1_111: 新規ファイルオープン時・シート切替時に、列ソート・行フィルタ・列幅の
 // カスタム状態をまとめてリセットする（列の意味がファイル/シートごとに異なるため）
 // V1_113: 見出し行指定・列値フィルタ・検索状態のリセットも追加
 // V1_115: ソート位置・固定行/列・ピックモード・列ストライプのリセットも追加
 // V1_117: 行ストライプのリセットも追加（既定値=true）
+// V1_121: 非表示行・列のリセットも追加
 function _excelResetViewState(){
   _excelSortCol=-1;_excelSortDir=0;
   _excelSortRowIdx=-1;
@@ -77,6 +85,8 @@ function _excelResetViewState(){
   _excelSearchText='';
   _excelSearchMatchIdx=-1;
   _excelColWidths=null;
+  _excelHiddenRows={};
+  _excelHiddenCols={};
   var fi=document.getElementById('excelFilterInput');
   if(fi) fi.value='';
   if(typeof _updateExcelToolbarUI==='function') _updateExcelToolbarUI();
@@ -1108,10 +1118,14 @@ function extractAllExcelTexts(wb){
 // excelWbがnullの場合は#excelViewを隠しcanvasを元に戻すだけの役割も兼ねる
 // （PDF/DXF側に戻る際は excelWb=null にしてから本関数を呼ぶだけでよい）
 // V1_107: Excel/CSV表示中は#viewmemo内の記憶・表示ボタン(mem-btn/show-btn/vm-file)を隠す。
-// markFitRow（マーク送り・全体ボタン）はExcel/CSV表示中も使うため対象外。
+// V1_121: 「全体」ボタン(#fitBtn、DXF/PDFのズームを画面に合わせる機能)はExcel/CSVの
+// セル表示には適用できないため、Excel/CSV表示中は非表示にする（マーク送り自体は
+// DXF/PDFの文字読込マーク機能のため、そちらは従来通り対象外のまま変更しない）
 function _updateViewmemoForExcel(isExcel){
   var els=document.querySelectorAll('#viewmemo .mem-btn, #viewmemo .show-btn, #viewmemo .vm-file');
   els.forEach(function(el){ el.style.display=isExcel?'none':''; });
+  var fitBtn=document.getElementById('fitBtn');
+  if(fitBtn) fitBtn.style.display=isExcel?'none':'';
 }
 // V1_110: 文字列が数値として扱えるか判定する（桁区切りカンマ許容）。
 // V1_111: ソート比較(_excelCompareVal)と集計行(件数・合計)の両方で共通利用するため関数化した
@@ -1153,6 +1167,11 @@ function _updateTopbarForExcel(isExcel){
   var excelGroup=document.getElementById('excelToolGroup');
   if(dxfGroup) dxfGroup.style.display=isExcel?'none':'contents';
   if(excelGroup) excelGroup.style.display=isExcel?'contents':'none';
+  // V1_121: 書込バックアップ(.dxfview書出)はスケッチ・寸法・保存ビューが対象のため、
+  // Excel/CSVデータには適用できない。dxfToolGroup/excelToolGroupいずれの外にある
+  // 常設ボタンのため、ここで個別に非表示にする
+  var writeBackupBtn=document.getElementById('writeBackupBtn');
+  if(writeBackupBtn) writeBackupBtn.style.display=isExcel?'none':'';
 }
 // V1_116: PDF表示中は計測グループ(.dim-group、水・鉛/斜め/2線間/線と点/直径/半径)と
 // 画面(白黒切替、#bwToggleBtn)ボタンを非表示にする。ペン・蛍光ペン・消しゴム・戻る/進む・
@@ -1171,16 +1190,27 @@ function _updateExcelToolbarUI(){
   var freezeBtn=document.getElementById('excelFreezeBtn');
   var rowStripeBtn=document.getElementById('excelRowStripeBtn');
   var colStripeBtn=document.getElementById('excelColStripeBtn');
+  var hideBtn=document.getElementById('excelHideBtn'); // V1_121
+  var unhideBtn=document.getElementById('excelUnhideBtn'); // V1_121
   if(sortBtn) sortBtn.classList.toggle('active',_excelPickMode==='sort');
   if(freezeBtn) freezeBtn.classList.toggle('active',_excelPickMode==='freeze');
   if(rowStripeBtn) rowStripeBtn.classList.toggle('active',!!_excelRowStripe);
   if(colStripeBtn) colStripeBtn.classList.toggle('active',!!_excelColStripe);
+  if(hideBtn) hideBtn.classList.toggle('active',_excelPickMode==='hide');
+  // V1_121: 非表示中の行・列がある間、「表示に戻す」ボタンに件数を表示する
+  if(unhideBtn){
+    var _hiddenCount121=Object.keys(_excelHiddenRows).length+Object.keys(_excelHiddenCols).length;
+    var _cntEl121=unhideBtn.querySelector('.excel-unhide-count');
+    if(_cntEl121) _cntEl121.textContent=_hiddenCount121>0?('('+_hiddenCount121+')'):'';
+  }
   var wrap=document.getElementById('excelTableWrap');
   if(wrap) wrap.classList.toggle('excel-pick-armed',!!_excelPickMode);
   if(_excelPickMode==='sort'){
     if(typeof showGuide==='function') showGuide('行を指定して下さい');
   } else if(_excelPickMode==='freeze'){
     if(typeof showGuide==='function') showGuide('固定したい行番号または列アルファベットをタップして下さい');
+  } else if(_excelPickMode==='hide'){
+    if(typeof showGuide==='function') showGuide('非表示にしたい行番号または列アルファベットをタップして下さい');
   } else if(typeof hideGuide==='function'){
     hideGuide();
   }
@@ -1190,6 +1220,8 @@ function _updateExcelToolbarUI(){
 //   （同じ行の再タップで解除。ソート位置を変えるとソート列・列フィルタもリセットする）
 // ・'freeze'中: タップした行が固定行の境界(renderedPos基準・現在の表示順で数えた位置)になる
 //   （同じ位置の再タップで解除）
+// ・V1_121 'hide'中: タップした行(origIdx基準)を非表示にする。ソート位置に指定中の行は
+//   非表示にすると見出し行が消えてソート/絞り込み自体が使えなくなるため対象外にする
 // ・ピックモードでない間はタップしても何も起きない（ラベルとしてのみ機能する）
 function _excelBuildRowNumCell(rowNumLabel,origIdx,renderedPos,isFrozenTop,isSortRow){
   var td=document.createElement('td');
@@ -1207,12 +1239,21 @@ function _excelBuildRowNumCell(rowNumLabel,origIdx,renderedPos,isFrozenTop,isSor
       _excelFreezeRowIdx=(_excelFreezeRowIdx===renderedPos)?-1:renderedPos;
       _excelPickMode=null;_updateExcelToolbarUI();
       renderExcelView();
+    } else if(_excelPickMode==='hide'){
+      if(isSortRow){
+        if(typeof showGuide==='function') showGuide('見出し行(ソート位置)は非表示にできません',1800);
+        return;
+      }
+      _excelHiddenRows[origIdx]=true;
+      _excelPickMode=null;_updateExcelToolbarUI();
+      renderExcelView();
     }
   });
   return td;
 }
 // V1_115: 列アルファベットセルを作る。'freeze'ピックモード中のみタップを受け付け、
 // タップした列(0始まり)が固定列の境界になる（同じ列の再タップで解除）
+// V1_121: 'hide'ピックモード中はタップした列を非表示にする
 function _excelBuildLetterCell(colIdx,isFrozenLeft){
   var ltd=document.createElement('td');
   ltd.className='excel-letter-cell'+(isFrozenLeft?' frozen':'');
@@ -1221,6 +1262,10 @@ function _excelBuildLetterCell(colIdx,isFrozenLeft){
     ev.stopPropagation();
     if(_excelPickMode==='freeze'){
       _excelFreezeColIdx=(_excelFreezeColIdx===colIdx)?-1:colIdx;
+      _excelPickMode=null;_updateExcelToolbarUI();
+      renderExcelView();
+    } else if(_excelPickMode==='hide'){
+      _excelHiddenCols[colIdx]=true;
       _excelPickMode=null;_updateExcelToolbarUI();
       renderExcelView();
     }
@@ -1315,17 +1360,44 @@ function _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bott
 // tr同士でも内容量の違い（例:ソート/フィルターアイコンの有無）により高さが
 // 食い違うことがある。両テーブルの対応行を先頭から順に突き合わせ、実測した
 // 高さのうち大きい方を両方のtrへ明示的に適用して行のズレを防ぐ。
-function _excelSyncRowHeights(leftTable,rightTable){
+// V1_121: 全行に対してgetBoundingClientRect()のread/writeを行単位で交互に行うと
+// 強制同期レイアウトが行数ぶん発生し(O(行数)の再レイアウト)、数千行規模の
+// 大容量ファイルでフリーズする原因になっていた。実際に高さが食い違いうるのは
+// 装飾(ソート/フィルターアイコン等)が付くソート行だけであるため、呼び出し側
+// (renderExcelView)からは対象行のインデックスだけを指定して渡すようにし、
+// 対象を絞ることで実質O(1)の処理にした。indicesを省略した場合は従来通り
+// 全行を対象にする（他の呼び出し元・テストとの後方互換のため）。
+// read(測定)とwrite(適用)も完全に分離し、行ごとの交互読み書きによる
+// レイアウトスラッシングが起きないようにしている。
+function _excelSyncRowHeights(leftTable,rightTable,indices){
   if(!leftTable||!rightTable) return;
   var lRows=leftTable.rows,rRows=rightTable.rows;
-  var n=Math.min(lRows.length,rRows.length);
-  var i;
-  for(i=0;i<n;i++){ lRows[i].style.height=''; rRows[i].style.height=''; }
-  for(i=0;i<n;i++){
-    var hl=lRows[i].getBoundingClientRect().height;
-    var hr=rRows[i].getBoundingClientRect().height;
-    var h=Math.max(hl,hr);
-    if(h>0){ lRows[i].style.height=h+'px'; rRows[i].style.height=h+'px'; }
+  var idxList=indices;
+  if(!idxList){
+    var n=Math.min(lRows.length,rRows.length);
+    idxList=[];
+    for(var k=0;k<n;k++) idxList.push(k);
+  }
+  var i,idx;
+  for(i=0;i<idxList.length;i++){
+    idx=idxList[i];
+    if(lRows[idx]) lRows[idx].style.height='';
+    if(rRows[idx]) rRows[idx].style.height='';
+  }
+  var heights=[];
+  for(i=0;i<idxList.length;i++){
+    idx=idxList[i];
+    var hl=lRows[idx]?lRows[idx].getBoundingClientRect().height:0;
+    var hr=rRows[idx]?rRows[idx].getBoundingClientRect().height:0;
+    heights.push(Math.max(hl,hr));
+  }
+  for(i=0;i<idxList.length;i++){
+    idx=idxList[i];
+    var h=heights[i];
+    if(h>0){
+      if(lRows[idx]) lRows[idx].style.height=h+'px';
+      if(rRows[idx]) rRows[idx].style.height=h+'px';
+    }
   }
 }
 function _excelApplyColgroup(table,widths){
@@ -1424,17 +1496,29 @@ function renderExcelView(){
   // 固定行の判定に使う「現在の表示順で数えた位置」(0始まり、フィルタ後)
   var finalEntries=[];
   unsortedPrefix.forEach(function(e){
+    if(_excelHiddenRows[e.origIdx]) return; // V1_121: 非表示指定された行は描画対象から除外
     finalEntries.push({origIdx:e.origIdx,cells:e.cells,label:e.origIdx+1,isSortRow:(e.origIdx===_excelSortRowIdx)});
   });
   sortableSuffix.forEach(function(e,si){
     if(!visible111[si]) return;
+    if(_excelHiddenRows[e.origIdx]) return; // V1_121: 非表示指定された行は描画対象から除外
     finalEntries.push({origIdx:e.origIdx,cells:e.cells,label:dataStartIdx+si+1,isSortRow:false});
   });
   finalEntries.forEach(function(e,idx){ e.renderedPos=idx; });
   var hasSortRow=(_excelSortRowIdx>=0);
+  // V1_121: 非表示列を除いた「表示位置」順の列リストを作る。visibleColIndices[表示位置]=元の列番号。
+  // 固定行・固定列(_excelFreezeColIdx等)は元の列番号で保持しているため、非表示列が挟まっても
+  // 固定範囲がズレないよう、固定列の「表示位置」をこのリストの中で改めて求め直す
+  var visibleColIndices=[];
+  for(var _vc121=0;_vc121<colCount111;_vc121++){
+    if(!_excelHiddenCols[_vc121]) visibleColIndices.push(_vc121);
+  }
   // V1_115: 固定行・固定列の絶対境界。行番号列(常設)・列アルファベット行(常設)を含めた
   // 「絶対インデックス」で管理する(index0=行番号列/列アルファベット行相当)
-  var leftCount=_excelFreezeColIdx>=0?(_excelFreezeColIdx+2):1; // 行番号列+固定列ぶん
+  // V1_121: 固定列は表示位置(visibleColIndices内でのindexOf)基準に変更。固定列自体が
+  // 非表示にされていた場合はindexOfが-1になり、固定なし(leftCount=1)へ自然に戻る
+  var _freezeVisiblePos121=_excelFreezeColIdx>=0?visibleColIndices.indexOf(_excelFreezeColIdx):-1;
+  var leftCount=_freezeVisiblePos121>=0?(_freezeVisiblePos121+2):1; // 行番号列+固定列ぶん
   var topCount=1+(_excelFreezeRowIdx>=0?(_excelFreezeRowIdx+1):0); // 列アルファベット行+固定行ぶん
 
   [topLeftTable,topRightTable,bottomLeftTable,bottomRightTable].forEach(function(t){ t.innerHTML=''; });
@@ -1445,9 +1529,10 @@ function renderExcelView(){
   cornerTd.className='excel-rownum-cell excel-corner-cell'+(topCount>1?' frozen':'');
   letterTrLeft.appendChild(cornerTd);
   var letterTrRight=document.createElement('tr');
-  for(var lci=0;lci<colCount111;lci++){
-    var isColFrozen=(lci<leftCount-1);
-    var ltd=_excelBuildLetterCell(lci,isColFrozen);
+  for(var lvci=0;lvci<visibleColIndices.length;lvci++){
+    var lci=visibleColIndices[lvci];
+    var isColFrozen=(lvci<leftCount-1);
+    var ltd=_excelBuildLetterCell(lci,isColFrozen); // ラベル文字(A,B,...)は元の列位置基準のまま
     (isColFrozen?letterTrLeft:letterTrRight).appendChild(ltd);
   }
   topLeftTable.appendChild(letterTrLeft);
@@ -1455,21 +1540,29 @@ function renderExcelView(){
 
   // ── データ行（固定/スクロールを行ごとに判定し、列も左右split。ソート位置の行にのみ
   //    並べ替え/絞り込みアイコン・列幅ドラッグハンドルを表示する）──
+  // V1_121: 行高さ同期(_excelSyncRowHeights)を全行に対して行うと大容量ファイルで
+  // フリーズする原因になっていたため、実際に高さが食い違いうるソート行だけを対象に
+  // 絞り込む。ここではソート行がトップ/ボトムどちらのペインの何番目(そのテーブル内の
+  // 行インデックス)に描画されたかを記録しておく
+  var _topRowCounter121=0,_bottomRowCounter121=0,_sortRowSyncInfo121=null;
   finalEntries.forEach(function(entry){
     var isTop=(topCount-1>0)&&(entry.renderedPos<=topCount-2);
+    var _posInTable121=isTop?_topRowCounter121:_bottomRowCounter121;
+    if(entry.isSortRow){ _sortRowSyncInfo121={isTop:isTop,pos:_posInTable121}; }
     var trLeft=document.createElement('tr');
     var trRight=document.createElement('tr');
     if(entry.isSortRow){ trLeft.className='excel-sort-row'; trRight.className='excel-sort-row'; }
     var rnCell=_excelBuildRowNumCell(entry.label,entry.origIdx,entry.renderedPos,isTop,entry.isSortRow);
     trLeft.appendChild(rnCell);
     var isPrefixRow=(entry.renderedPos<dataStartIdx)&&(!hasSortRow||entry.origIdx<=_excelSortRowIdx);
-    for(var ci=0;ci<colCount111;ci++){
+    for(var vci=0;vci<visibleColIndices.length;vci++){
+      var ci=visibleColIndices[vci]; // ci=元の列番号(データ/フィルタ/ソート列の特定に使う)
       var td=_excelBuildDataCell(entry.cells[ci]);
-      var isColFrozen2=(ci<leftCount-1);
+      var isColFrozen2=(vci<leftCount-1); // 固定範囲の判定は表示位置(vci)基準
       if(entry.isSortRow){
         td.style.fontWeight='700';
         td.style.position='relative';
-        (function(colIdx,td){
+        (function(colIdx,vPos,td){
           var sortIcon=document.createElement('span');
           var _active110=(_excelSortCol===colIdx&&_excelSortDir!==0);
           var _hasFilter113=!!(_excelColFilters&&_excelColFilters[colIdx]);
@@ -1491,37 +1584,42 @@ function renderExcelView(){
             _showExcelColumnMenu(sortIcon,colIdx,sortableSuffix.map(function(e){return e.cells;}));
           });
           td.appendChild(sortIcon);
-          var absColIdx=colIdx+1;
-          var localIdx=isColFrozen2?(colIdx+1):(colIdx-(leftCount-1));
+          var absColIdx=vPos+1; // V1_121: _excelColWidths添字は表示位置(vci)基準
+          var localIdx=isColFrozen2?(vPos+1):(vPos-(leftCount-1));
           var tableIdA=isColFrozen2?'excelTopLeftTable':'excelTopRightTable';
           var tableIdB=isColFrozen2?'excelBottomLeftTable':'excelBottomRightTable';
           td.appendChild(_excelBuildResizeHandle(absColIdx,localIdx,tableIdA,tableIdB));
-        })(ci,td);
+        })(ci,vci,td);
       } else if(isPrefixRow){
         td.style.background='#f7f8fa';
       } else {
         // V1_117: 行ストライプ・列ストライプを独立したON/OFFにし、両方ONの場合は
         // 行×列の偶奇を組み合わせたチェッカーボード状の縞にする。両方OFFなら縞なし(白)
+        // V1_121: 列ストライプは表示位置(vci)基準にし、非表示列を挟んでも縞が連続するようにする
         var _rowParity117=_excelRowStripe?((entry.renderedPos-dataStartIdx)%2):0;
-        var _colParity117=_excelColStripe?(ci%2):0;
+        var _colParity117=_excelColStripe?(vci%2):0;
         var _stripeOn117=_excelRowStripe||_excelColStripe?((_rowParity117+_colParity117)%2):0;
         td.style.background=_stripeOn117?'#f5f7fa':'#fff';
       }
       (isColFrozen2?trLeft:trRight).appendChild(td);
     }
-    if(isTop){ topLeftTable.appendChild(trLeft); topRightTable.appendChild(trRight); }
-    else { bottomLeftTable.appendChild(trLeft); bottomRightTable.appendChild(trRight); }
+    if(isTop){ topLeftTable.appendChild(trLeft); topRightTable.appendChild(trRight); _topRowCounter121++; }
+    else { bottomLeftTable.appendChild(trLeft); bottomRightTable.appendChild(trRight); _bottomRowCounter121++; }
   });
 
   // V1_117: 実テーブルを直接測定して列幅を左右パネルへ分配・適用する（隠しテーブルは廃止）
-  _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bottomRightTable,leftCount,colCount111+1);
+  _excelSyncPaneColWidths(topLeftTable,bottomLeftTable,topRightTable,bottomRightTable,leftCount,visibleColIndices.length+1);
   // V1_119: 行番号ガター列(左ペイン)とデータ列(右ペイン)は別テーブルのため、
   // ソート/フィルターアイコンの有無等でセルの内容量が変わると行の高さが左右で
   // 食い違い、行番号と実データがズレて見える不具合が発生した。列幅と同様に、
   // 実際にレンダリングされた行の高さを直接測定し、左右で高い方に合わせて
   // 明示的に統一する（隠し要素や固定値の推測ではなく実測値で揃える方式）。
-  _excelSyncRowHeights(topLeftTable,topRightTable);
-  _excelSyncRowHeights(bottomLeftTable,bottomRightTable);
+  // V1_121: 高さが食い違いうるのは装飾(ソートアイコン等)が付くソート行だけなので、
+  // 全行ではなくその1行だけを対象に絞り込み、大容量ファイルでのフリーズを防ぐ
+  if(_sortRowSyncInfo121){
+    if(_sortRowSyncInfo121.isTop) _excelSyncRowHeights(topLeftTable,topRightTable,[_sortRowSyncInfo121.pos]);
+    else _excelSyncRowHeights(bottomLeftTable,bottomRightTable,[_sortRowSyncInfo121.pos]);
+  }
 
   // V1_88: DXF/PDFの黄色マークと同様に、検索キーワード(_markKeyword)に一致するセルを
   // ハイライトする。シートタブ切替のたびにここが再実行されるため、切り替えた先の
@@ -1555,6 +1653,8 @@ function renderExcelView(){
   var freezeBtn=document.getElementById('excelFreezeBtn');
   var rowStripeBtn=document.getElementById('excelRowStripeBtn');
   var colStripeBtn=document.getElementById('excelColStripeBtn');
+  var hideBtn=document.getElementById('excelHideBtn'); // V1_121
+  var unhideBtn=document.getElementById('excelUnhideBtn'); // V1_121
   if(sortBtn) sortBtn.addEventListener('click',function(){
     _excelPickMode=(_excelPickMode==='sort')?null:'sort';
     _updateExcelToolbarUI();
@@ -1574,6 +1674,16 @@ function renderExcelView(){
     _excelColStripe=!_excelColStripe;
     if(_excelColStripe) _excelRowStripe=false;
     renderExcelView();
+  });
+  // V1_121: 「非表示」ボタンはソート/固定行列と同じピックモードの仕組みを使う。
+  // 「表示に戻す」ボタンは非表示中の行・列を一覧するポップアップを開く
+  if(hideBtn) hideBtn.addEventListener('click',function(){
+    _excelPickMode=(_excelPickMode==='hide')?null:'hide';
+    _updateExcelToolbarUI();
+  });
+  if(unhideBtn) unhideBtn.addEventListener('click',function(ev){
+    ev.stopPropagation();
+    _showExcelHiddenListMenu(unhideBtn);
   });
 })();
 // V1_113: シートタブ下の検索欄の配線。V1_111では入力のたびに行を絞り込んで
@@ -1754,6 +1864,92 @@ function _showExcelColumnMenu(anchorEl,colIdx,bodyRows){
   cnlBtn.addEventListener('click',closeMenu);
   btnRow.appendChild(okBtn);btnRow.appendChild(cnlBtn);
   menu.appendChild(btnRow);
+
+  document.body.appendChild(menu);
+  setTimeout(function(){document.addEventListener('click',function _dc(ev){
+    if(!menu.contains(ev.target)&&ev.target!==anchorEl){closeMenu();document.removeEventListener('click',_dc);}
+  });},10);
+}
+
+// V1_121: 「表示に戻す」ボタン用のポップアップ。非表示中の行・列を一覧表示し、
+// 個別の「戻す」ボタン、または「すべて表示に戻す」で復元できるようにする。
+// 非表示にした行・列はDOMから消えて再タップでは戻せないため、このポップアップが
+// 唯一の復元手段になる。_showExcelColumnMenuと同じ位置決め・外側タップ閉じの作法に倣う
+function _showExcelHiddenListMenu(anchorEl){
+  var existing=document.getElementById('_excelHiddenMenu121');
+  if(existing){existing.remove();return;}
+  var hiddenRowKeys=Object.keys(_excelHiddenRows);
+  var hiddenColKeys=Object.keys(_excelHiddenCols);
+  if(hiddenRowKeys.length===0&&hiddenColKeys.length===0){
+    if(typeof showGuide==='function') showGuide('非表示の行・列はありません',1600);
+    return;
+  }
+  var menu=document.createElement('div');
+  menu.id='_excelHiddenMenu121';
+  menu.style.cssText='position:fixed;z-index:9999;background:#fff;border:1px solid #999;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:200px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.35);color:#222;';
+  var r=anchorEl.getBoundingClientRect();
+  var _spaceBelow121=window.innerHeight-r.bottom;
+  var _spaceAbove121=r.top;
+  if(_spaceBelow121<220&&_spaceAbove121>_spaceBelow121){
+    menu.style.bottom=(window.innerHeight-r.top+4)+'px';
+  } else {
+    menu.style.top=(r.bottom+4)+'px';
+  }
+  menu.style.left=Math.max(4,Math.min(r.left,window.innerWidth-296))+'px';
+  function closeMenu(){ if(document.getElementById('_excelHiddenMenu121')) menu.remove(); }
+
+  var title=document.createElement('div');
+  title.textContent='非表示の行・列';
+  title.style.cssText='font-size:13px;font-weight:700;';
+  menu.appendChild(title);
+
+  var listBox=document.createElement('div');
+  listBox.style.cssText='max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;border-top:1px solid #eee;border-bottom:1px solid #eee;padding:4px 0;';
+  hiddenRowKeys.map(Number).sort(function(a,b){return a-b;}).forEach(function(origIdx){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;padding:4px;';
+    var label=document.createElement('span');
+    label.textContent='行 '+(origIdx+1);
+    row.appendChild(label);
+    var btn=document.createElement('button');
+    btn.type='button';btn.textContent='戻す';
+    btn.style.cssText='padding:4px 10px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;font-size:12px;cursor:pointer;';
+    btn.addEventListener('click',function(){
+      delete _excelHiddenRows[origIdx];
+      closeMenu();
+      renderExcelView();
+    });
+    row.appendChild(btn);
+    listBox.appendChild(row);
+  });
+  hiddenColKeys.map(Number).sort(function(a,b){return a-b;}).forEach(function(colIdx){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;padding:4px;';
+    var label=document.createElement('span');
+    label.textContent='列 '+_excelColLetter(colIdx);
+    row.appendChild(label);
+    var btn=document.createElement('button');
+    btn.type='button';btn.textContent='戻す';
+    btn.style.cssText='padding:4px 10px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;font-size:12px;cursor:pointer;';
+    btn.addEventListener('click',function(){
+      delete _excelHiddenCols[colIdx];
+      closeMenu();
+      renderExcelView();
+    });
+    row.appendChild(btn);
+    listBox.appendChild(row);
+  });
+  menu.appendChild(listBox);
+
+  var allBtn=document.createElement('button');
+  allBtn.type='button';allBtn.textContent='すべて表示に戻す';
+  allBtn.style.cssText='margin-top:4px;padding:8px;border:none;border-radius:6px;background:#1565c0;color:#fff;font-size:13px;cursor:pointer;';
+  allBtn.addEventListener('click',function(){
+    _excelHiddenRows={};_excelHiddenCols={};
+    closeMenu();
+    renderExcelView();
+  });
+  menu.appendChild(allBtn);
 
   document.body.appendChild(menu);
   setTimeout(function(){document.addEventListener('click',function _dc(ev){
