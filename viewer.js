@@ -1564,13 +1564,26 @@ function _excelApplyColgroup(table,widths){
   if(!table) return;
   var old=table.querySelector('colgroup'); if(old) old.remove();
   var cg=document.createElement('colgroup');
+  var total=0;
   widths.forEach(function(w){
     var col=document.createElement('col');
     col.style.width=w+'px';
     cg.appendChild(col);
+    total+=w;
   });
   table.insertBefore(cg,table.firstChild);
   table.style.tableLayout='fixed';
+  // V1_130: table-layout:fixed + colgroupだけでは、テーブルの実際の幅(width:auto)は
+  // 「コンテナ幅とcolgroup合計幅の大きい方」になるはずだが、#excelTopRightTableの
+  // 親(#excelTopRightWrap)はflex:1(flex-basis:0%相当)+overflow:hiddenのflexアイテムであり、
+  // コンテナ自体の幅がflexレイアウトにより先に確定してしまう構成では、ブラウザが
+  // colgroupの各列幅をコンテナ幅に収まるよう比例縮小して描画することがあった
+  // (データ巾が画面幅より広い時、一番上の列アルファベット行だけが1画面に収まる
+  // ように圧縮され、その下の実データ行とズレて見える不具合として現れていた)。
+  // table自身の width を colgroup合計幅で明示指定することで、テーブルの実サイズを
+  // コンテナ幅の制約から完全に切り離し、コンテナ側のoverflow:hidden＋JSによる
+  // scrollLeft同期で表示位置だけを合わせる、という本来の設計通りの動作を保証する
+  table.style.width=total+'px';
 }
 function renderExcelView(){
   var view=document.getElementById('excelView');
@@ -1796,15 +1809,33 @@ function renderExcelView(){
 // スクロールし、その縦スクロールを#excelBottomLeftWrapへ、横スクロールを
 // #excelTopRightWrapへそれぞれ反映する（他の3パネルはoverflow:hiddenで
 // ユーザー操作によるスクロールを受け付けない）
+// V1_129: 上記の'scroll'イベント方式は、#excelBottomRightWrapに指定している
+// -webkit-overflow-scrolling:touch(コンポジタスレッドによる慣性スクロール)と
+// 相性が悪く、指でフリックしている最中はメインスレッド側の'scroll'イベントが
+// 大幅に間引かれる(スクロールが止まるまでほぼ発火しないこともある)ため、
+// 「横スクロール中は列アルファベット行(#excelTopRightWrap)が全く追従しない」
+// という不具合として現れていた。そこで'scroll'イベントを待つのをやめ、
+// requestAnimationFrameで毎フレームbr.scrollLeft/scrollTopを直接ポーリングして
+// 反映するループに切り替える。前回値と変化が無いフレームでは書き込みを
+// 行わないため、無駄なレイアウト・ペイントは発生しない
+function _excelScrollSyncTick(br,bl,tr,state){
+  if(!br) return false;
+  var left=br.scrollLeft,top=br.scrollTop,changed=false;
+  if(left!==state.lastLeft){ if(tr) tr.scrollLeft=left; state.lastLeft=left; changed=true; }
+  if(top!==state.lastTop){ if(bl) bl.scrollTop=top; state.lastTop=top; changed=true; }
+  return changed;
+}
 (function(){
   var br=document.getElementById('excelBottomRightWrap');
   var bl=document.getElementById('excelBottomLeftWrap');
   var tr=document.getElementById('excelTopRightWrap');
   if(!br) return;
-  br.addEventListener('scroll',function(){
-    if(bl) bl.scrollTop=br.scrollTop;
-    if(tr) tr.scrollLeft=br.scrollLeft;
-  });
+  var _scrollSyncState={lastLeft:-1,lastTop:-1};
+  function loop(){
+    _excelScrollSyncTick(br,bl,tr,_scrollSyncState);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
 })();
 // V1_115: ヘッダーツールバーのソート/固定行列ボタンの配線。
 // V1_117: 列ストライプボタンを行縞/列縞の2ボタンに分離した。
