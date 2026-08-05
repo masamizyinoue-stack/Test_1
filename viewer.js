@@ -24,6 +24,10 @@ var bwMode=true;  // false=黒背景
 var dimensionTextMode='fixed'; // 'auto' | 'fixed'  寸法文字サイズモード（V0_154: 「サイズ指定」(manual)は廃止）
 var DIM_TEXT_MIN_PX=11;  // autoモード: 最小スクリーンpx
 var DIM_TEXT_MAX_PX=30;  // autoモード: 最大スクリーンpx
+// V1_166: 「DXFの文字が少し小さい」との指摘により、DXF文字(doc.moji)の表示サイズを
+// 画面表示・HD-PDF書き出し(export.js側も同じ定数を参照)の両方で1.1倍にした。
+// 寸法値(dims)の文字サイズはこの定数の対象外(別のworldFontH仕組みで決まる)
+var MOJI_SIZE_MULTIPLIER=1.1;
 var inputMode='pen'; // 'pen' | 'freehand'  入力モード
 // hiddenLayers → layer.js
 var pdfDoc=null,pdfPageNum=1;
@@ -839,7 +843,9 @@ function draw(){
   // ズーム・パン中はどのみち読み取れないため、省略による視覚的な影響は小さい
   if(!_interacting) for(const e of doc.moji){
     if(hiddenLayers.has(e.layer)) continue;
-    const sxm=e.x*scale+tx,sym=-e.y*scale+ty,fsm=Math.max(6,e.h*scale);
+    // V1_166: MOJI_SIZE_MULTIPLIERはdrawText()側と揃える(画面外判定の余白計算に使うだけの値のため、
+    // ここがズレていても実害はないが、念のため実際の描画サイズと一致させている)
+    const sxm=e.x*scale+tx,sym=-e.y*scale+ty,fsm=Math.max(6,e.h*scale*MOJI_SIZE_MULTIPLIER);
     if(sxm<-200||sxm>W+200||sym<-fsm*2-20||sym>H+200) continue;
     drawText(ctx,e,darkBg);
   }
@@ -869,7 +875,11 @@ function drawArc(ctx,e){
 function drawText(ctx,e,darkBg){
   if(!e.text||!e.text.trim()) return;
   const[sx,sy]=w2s(e.x,e.y);
-  const fs=Math.max(6,e.h*scale);
+  // V1_166: 「DXFの文字が少し小さい」との指摘により、画面表示・HD-PDF書き出し(export.js)の
+  // 両方で文字サイズをMOJI_SIZE_MULTIPLIER倍(1.1倍)に統一した。DXFファイル自体が持つ
+  // 文字高さ(e.h、DXFグループコード40)は変更していないため、DXF書き出し(元データの再保存)には
+  // 影響しない。あくまで画面表示・PDF出力時の見た目のサイズだけを拡大する
+  const fs=Math.max(6,e.h*scale*MOJI_SIZE_MULTIPLIER);
   ctx.save();
   ctx.translate(sx,sy);ctx.rotate(-e.angle*Math.PI/180);
   if(e.widthFactor&&Math.abs(e.widthFactor-1)>0.01) ctx.scale(e.widthFactor,1);
@@ -1031,6 +1041,11 @@ function _pdfNeededRectAndScale(pageRawW,pageRawH){
     subWindows.forEach(function(sw){
       if(sw&&sw.scale&&sw.W&&sw.H) views.push({txv:sw.tx,tyv:sw.ty,scalev:sw.scale,cw:sw.W,ch:sw.H});
     });
+  }
+  // V1_162: 図面番号欄インセットも表示中なら、拡大表示している範囲を高解像度化の
+  // 対象に含める（サブ窓と同じ扱い。含めないと拡大部分が低解像度のままボケる）
+  if(typeof detailInset!=='undefined'&&detailInset&&detailInset.visible&&detailInset.scale&&detailInset.W&&detailInset.H){
+    views.push({txv:detailInset.tx,tyv:detailInset.ty,scalev:detailInset.scale,cw:detailInset.W,ch:detailInset.H});
   }
   var x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity,maxScale=0;
   views.forEach(function(v){

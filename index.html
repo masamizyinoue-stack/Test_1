@@ -446,6 +446,35 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #openFilePanel .sp-header{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 #openFilePanel .sp-title{font-size:15px;font-weight:600;color:var(--text);flex:1}
 #openFilePanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1}
+/* V1_162: PDFページサムネイル一覧オーバーレイ */
+/* V1_163: 「▦」ボタン押下時に画面いっぱいに表示する全画面方式へ変更(右スライドパネル→全画面) */
+/* V1_164: M_Viewerの「ページ一覧」を参考に全面作り直し。全体サムネイルは実際のページの
+   縦横比(通常は横向き)のまま表示し、図面番号欄は別画像に分けず、サムネイルの右下に
+   直接重ねて拡大表示する(オーバーレイ方式)。幅%/高さ%/倍率の3つのステッパーで
+   クロップする範囲の大きさと拡大率を調整でき、「図面番号モード」ボタンでON/OFF切替できる */
+#pdfThumbOverlay{display:none;position:fixed;inset:0;z-index:300}
+#pdfThumbOverlay.open{display:block}
+#pdfThumbBg{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+#pdfThumbPanel{position:absolute;inset:0;width:100%;background:var(--bg-panel);display:flex;flex-direction:column;overflow:hidden;z-index:1}
+#pdfThumbPanel .sp-header{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+#pdfThumbPanel .sp-title{font-size:15px;font-weight:600;color:var(--text);margin-right:8px}
+#pdfThumbPanel .sp-close{background:#8B0000;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pdf-thumb-ctrl-group{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:4px 6px}
+.pdf-thumb-ctrl-label{font-size:12px;color:var(--text-dim);margin:0 2px}
+.pdf-thumb-step{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pdf-thumb-step:active{background:rgba(255,255,255,.14)}
+.pdf-thumb-ctrl-val{font-size:12px;color:var(--text);min-width:38px;text-align:center}
+.pdf-thumb-mode-btn{padding:7px 14px;border-radius:8px;border:1.5px solid #f39c12;background:transparent;color:#f39c12;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.pdf-thumb-mode-btn.active{background:#f39c12;color:#1a1200}
+#pdfThumbGrid{flex:1;overflow-y:auto;padding:16px;display:flex;flex-wrap:wrap;gap:20px;align-content:flex-start;justify-content:flex-start}
+.pdf-thumb-cell{width:380px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:8px;border-radius:8px}
+.pdf-thumb-cell:active{background:rgba(255,255,255,.06)}
+.pdf-thumb-imgwrap{position:relative;width:100%;border:2px solid var(--border);border-radius:6px;background:#fff;overflow:hidden;min-height:60px;display:flex;align-items:center;justify-content:center;color:#888;font-size:12px}
+.pdf-thumb-cell.current .pdf-thumb-imgwrap{border-color:var(--accent);border-width:3px}
+.pdf-thumb-imgwrap canvas.pdf-thumb-main{display:block;width:100%;height:auto}
+.pdf-thumb-crop-overlay{position:absolute;border:2.5px solid #f39c12;border-radius:3px;overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.55)}
+.pdf-thumb-crop-overlay canvas{display:block;width:100%;height:100%}
+.pdf-thumb-label{font-size:13px;color:var(--text-dim)}
 /* V1_148: 「検索枠を黄色くして」との要望により、枠線色を#2a3040(ほぼ見えない濃紺)から
    黄色系(このパネル内の.idx-stale-note警告文と同系色#e8b93c)へ変更。フォーカス時は
    さらに明るい黄色(#f5c518)にして押下中も分かりやすくした */
@@ -733,6 +762,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="prevPage" class="sp-page-btn">◀</button>
     <span id="pageInfo" class="sp-page-info">1/1</span>
     <button id="nextPage" class="sp-page-btn">▶</button>
+    <!-- V1_162: ページサムネイル一覧・図面番号欄インセット表示ボタン。
+         親div(#pdfPageCtrl)の表示/非表示に相乗りするためPDF表示時のみ自動的に出現する -->
+    <button id="pdfThumbBtn" class="sp-page-btn" title="ページサムネイル一覧">▦</button>
+    <button id="detailInsetBtn" class="sp-page-btn" title="図面番号欄インセット表示">🔍</button>
   </div>
   <!-- V1_76: Excel(.xlsx/.xls/.csv)表示用オーバーレイ。表示中はcv/ac/ov(canvas)を隠し、
        renderExcelView()(viewer.js)がタブ・テーブルを構築する -->
@@ -799,7 +832,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_159</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_167</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1149,6 +1182,39 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
 </div>
 
+<!-- V1_162: PDFページサムネイル一覧オーバーレイ -->
+<!-- V1_164: M_Viewer参考UIに変更。幅%/高さ%/倍率のステッパーと図面番号モードの
+     切替ボタンを追加(index.html側のJSで動作を実装、_pdfThumbLoadCfg等を参照) -->
+<div id="pdfThumbOverlay">
+  <div id="pdfThumbBg"></div>
+  <div id="pdfThumbPanel">
+    <div class="sp-header">
+      <span class="sp-title">ページ一覧</span>
+      <div class="pdf-thumb-ctrl-group">
+        <span class="pdf-thumb-ctrl-label">幅</span>
+        <button class="pdf-thumb-step" data-target="w" data-delta="-1">－</button>
+        <span class="pdf-thumb-ctrl-val" id="pdfThumbWVal">10%</span>
+        <button class="pdf-thumb-step" data-target="w" data-delta="1">＋</button>
+      </div>
+      <div class="pdf-thumb-ctrl-group">
+        <span class="pdf-thumb-ctrl-label">高さ</span>
+        <button class="pdf-thumb-step" data-target="h" data-delta="-1">－</button>
+        <span class="pdf-thumb-ctrl-val" id="pdfThumbHVal">10%</span>
+        <button class="pdf-thumb-step" data-target="h" data-delta="1">＋</button>
+      </div>
+      <div class="pdf-thumb-ctrl-group">
+        <span class="pdf-thumb-ctrl-label">倍率</span>
+        <button class="pdf-thumb-step" data-target="z" data-delta="-0.5">－</button>
+        <span class="pdf-thumb-ctrl-val" id="pdfThumbZVal">6.0x</span>
+        <button class="pdf-thumb-step" data-target="z" data-delta="0.5">＋</button>
+      </div>
+      <button id="pdfThumbModeBtn" class="pdf-thumb-mode-btn">図面番号モード</button>
+      <button class="sp-close" id="pdfThumbCloseBtn">閉じる</button>
+    </div>
+    <div id="pdfThumbGrid"></div>
+  </div>
+</div>
+
 <!-- V1_08: V1_07でaccept=".dxf,.pdf"を追加したところ、iOSが「.dxf」拡張子に対応する
      システム標準の書類タイプ(UTI)を持たないため、Filesアプリ側でDXFファイルを
      正しく認識・選択できなくなり「DXFが開けない」不具合が発生したためaccept属性を
@@ -1187,7 +1253,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_159';
+const APP_VERSION = 'V1_167';
 
 // =========================================================
 // グローバル状態
@@ -1800,6 +1866,7 @@ fileInput.addEventListener('change',async e=>{
   // 保存されていなかったため、このタブから他タブへ移動して戻ると必ずPDFが
   // 消えてしまう不具合があった。ここで初回登録時に保存するようにした
   {var _nf140=openFiles[currentFileIdx];_nf140.strokes=strokes;_nf140.dims=dims;_nf140.images=typeof images!=='undefined'?images:[];_nf140.savedViews=savedViews;_nf140.doc=doc;_nf140.hiddenLayersArr=Array.from(hiddenLayers);_nf140.tx=tx;_nf140.ty=ty;_nf140.scale=scale;_nf140.fitScale=fitScale;_nf140.currentFileName=currentFileName;_nf140.fileSize=currentFileSize;_nf140.pdfDoc=pdfDoc;_nf140.pdfImage=pdfImage;_nf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);_nf140.excelWb=(typeof excelWb!=='undefined'?excelWb:null);_nf140.excelSheetIdx=(typeof excelSheetIdx!=='undefined'?excelSheetIdx:0);}
+  if(typeof _diApplyStateFromFile==='function') _diApplyStateFromFile(); // V1_162: 新規に開いたファイルはインセット未設定(非表示)にする
   updateFileNavUI();// V0_112
   verify('fileInput.change:done');
   }finally{_isOpeningFileBusy=false;e.target.value='';} // V1_40
@@ -1866,6 +1933,7 @@ function switchToFile(idx){
     var _pn2=1;try{if(typeof pdfPageNum!=='undefined')_pn2=pdfPageNum;}catch(e){}
     _prevF.pdfPageNum=_pn2;
     _prevF.pdfDoc=pdfDoc;_prevF.pdfImage=pdfImage; // V1_40: PDF内容も退避
+    if(typeof _diSyncStateToFile==='function') _diSyncStateToFile(); // V1_162: 図面番号欄インセットの状態を退避
     _prevF.excelWb=(typeof excelWb!=='undefined'?excelWb:null);_prevF.excelSheetIdx=(typeof excelSheetIdx!=='undefined'?excelSheetIdx:0); // V1_76
     _prevF.hiddenLayersArr=Array.from(hiddenLayers);
     // V1_125: 離れるタブのExcel/CSV表示設定(ソート/固定行列/縞/非表示/列幅/列フィルタ等)を
@@ -1938,6 +2006,7 @@ function switchToFile(idx){
   if(nd) nd.style.display=(doc||pdfImage||excelWb)?'none':'';
   [0,1,2,3,4].forEach(function(i){if(typeof updateViewmemoState==='function')updateViewmemoState(i);});
   if(typeof updateFileNavUI==='function') updateFileNavUI(); // V0_107: タブ強調表示を同期
+  if(typeof _diApplyStateFromFile==='function') _diApplyStateFromFile(); // V1_162: 図面番号欄インセットの状態を復元
   verify('switchToFile:after');
 }
 
@@ -2414,6 +2483,476 @@ document.getElementById('pageInfo').addEventListener('click',function(ev){
   if(typeof _showPageJumpDialog==='function') _showPageJumpDialog(ev.currentTarget);
 });
 
+// =========================================================
+// V1_162〜V1_165: PDFページサムネイル一覧(全画面)＋図面番号欄オーバーレイ表示
+// V1_164: M_Viewerの「ページ一覧」画面を参考に全面作り直し。
+// - 「全体」サムネイルは実際のページの縦横比のまま表示する(横向きの図面は横向きに表示)。
+// - 図面番号欄は別画像に分けず、サムネイルの右下に直接重ねて拡大表示する(オーバーレイ方式)。
+// - 幅%/高さ%(クロップするページ右下領域の大きさ)と倍率(重ねて表示する際の拡大率)を
+//   ステッパーで調整でき、「図面番号モード」ボタンでON/OFF切替できる。これらの設定値は
+//   ファイル横断のグローバル設定としてlocalStorageに保存し、次回開いた時も復元する
+// V1_165: 図面番号欄オーバーレイが粗く見える不具合を修正。従来は「全体」用の中解像度
+// レンダリング(RENDER_TARGET_W=900)から単純に切り出していたため、幅%が小さいほど
+// 元になるピクセル数が少なく粗くなっていた。viewer.jsの高解像度タイル再描画
+// (_pdfRenderVisibleTile)と同じ「pdf.jsのtransformオプションでページの一部分だけを
+// 直接高解像度レンダリングする」手法を使い、右下クロップ領域だけを別途高解像度で
+// 描画するようにした。これにより幅%・倍率を大きくしてもくっきり見えるようになる
+// =========================================================
+var _pdfThumbCache=null; // {doc, overviews:[canvas|null,...], crops:[canvas|null,...], cropWPct, cropHPct}
+var _pdfThumbCfg=null; // {widthPct,heightPct,zoom,modeOn}
+var PDF_THUMB_CFG_KEY='dxfViewerPdfThumbCfg';
+
+function _pdfThumbLoadCfg(){
+  if(_pdfThumbCfg) return _pdfThumbCfg;
+  var d={widthPct:10,heightPct:10,zoom:6.0,modeOn:true};
+  try{
+    var raw=localStorage.getItem(PDF_THUMB_CFG_KEY);
+    if(raw){
+      var p=JSON.parse(raw);
+      if(p&&typeof p==='object'){
+        if(typeof p.widthPct==='number')d.widthPct=p.widthPct;
+        if(typeof p.heightPct==='number')d.heightPct=p.heightPct;
+        if(typeof p.zoom==='number')d.zoom=p.zoom;
+        if(typeof p.modeOn==='boolean')d.modeOn=p.modeOn;
+      }
+    }
+  }catch(e){}
+  _pdfThumbCfg=d;
+  return d;
+}
+function _pdfThumbSaveCfg(){try{localStorage.setItem(PDF_THUMB_CFG_KEY,JSON.stringify(_pdfThumbCfg));}catch(e){}}
+function _pdfThumbUpdateCtrlUI(){
+  var c=_pdfThumbLoadCfg();
+  var wv=document.getElementById('pdfThumbWVal');if(wv)wv.textContent=c.widthPct+'%';
+  var hv=document.getElementById('pdfThumbHVal');if(hv)hv.textContent=c.heightPct+'%';
+  var zv=document.getElementById('pdfThumbZVal');if(zv)zv.textContent=c.zoom.toFixed(1)+'x';
+  var mb=document.getElementById('pdfThumbModeBtn');if(mb)mb.classList.toggle('active',!!c.modeOn);
+}
+// 倍率・モードON/OFFの変更時: PDFの再描画はせず(生成済みのoverviews/cropsをそのまま再利用し)
+// 各セルの表示だけを更新する(軽量な操作。クロップ画像そのものは変わらないため再描画不要)
+function _pdfThumbRefreshOverlaysOnly(){
+  if(!_pdfThumbCache) return;
+  var grid=document.getElementById('pdfThumbGrid');
+  var cellEls=grid.querySelectorAll('.pdf-thumb-cell');
+  cellEls.forEach(function(cellEl){
+    var pg=parseInt(cellEl.dataset.pg,10);
+    var ov=_pdfThumbCache.overviews[pg-1];
+    if(ov) _pdfThumbFillCell(cellEl,ov,_pdfThumbCache.crops[pg-1]);
+  });
+}
+document.querySelectorAll('.pdf-thumb-step').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var c=_pdfThumbLoadCfg();
+    var target=btn.dataset.target, delta=parseFloat(btn.dataset.delta);
+    var needCropRerender=false;
+    if(target==='w'){c.widthPct=Math.max(2,Math.min(60,Math.round((c.widthPct+delta)*10)/10));needCropRerender=true;}
+    else if(target==='h'){c.heightPct=Math.max(2,Math.min(60,Math.round((c.heightPct+delta)*10)/10));needCropRerender=true;}
+    else if(target==='z') c.zoom=Math.max(1,Math.min(15,Math.round((c.zoom+delta)*10)/10));
+    _pdfThumbSaveCfg();_pdfThumbUpdateCtrlUI();
+    // 幅%・高さ%はクロップする範囲そのものが変わるため高解像度クロップの再生成が必要。
+    // 倍率は表示上の拡大率が変わるだけ(クロップ画像自体は変わらない)なので再描画は不要
+    if(needCropRerender) _buildPdfThumbGrid(); else _pdfThumbRefreshOverlaysOnly();
+  });
+});
+document.getElementById('pdfThumbModeBtn').addEventListener('click',function(){
+  var c=_pdfThumbLoadCfg();
+  c.modeOn=!c.modeOn;
+  _pdfThumbSaveCfg();_pdfThumbUpdateCtrlUI();
+  // ONにした際、まだ現在の幅%/高さ%でクロップを生成していなければ_buildPdfThumbGrid内の
+  // needCropRegen判定により自動的に生成される。OFFにする場合は非表示にするだけでよい
+  if(c.modeOn) _buildPdfThumbGrid(); else _pdfThumbRefreshOverlaysOnly();
+});
+
+function closePdfThumbOverlay(){document.getElementById('pdfThumbOverlay').classList.remove('open');}
+document.getElementById('pdfThumbBtn').addEventListener('click',function(){
+  if(!pdfDoc){showGuide('PDFが開かれていません',1500);return;}
+  document.getElementById('pdfThumbOverlay').classList.add('open');
+  _buildPdfThumbGrid();
+});
+document.getElementById('pdfThumbCloseBtn').addEventListener('click',closePdfThumbOverlay);
+document.getElementById('pdfThumbBg').addEventListener('click',closePdfThumbOverlay);
+
+function _pdfThumbCellHtml(pg,total){
+  var cell=document.createElement('div');
+  cell.className='pdf-thumb-cell'+(pg===pdfPageNum?' current':'');
+  cell.dataset.pg=pg;
+  var wrap=document.createElement('div');
+  wrap.className='pdf-thumb-imgwrap';
+  wrap.textContent='…';
+  var label=document.createElement('div');
+  label.className='pdf-thumb-label';
+  label.textContent=pg+'ページ';
+  cell.appendChild(wrap);cell.appendChild(label);
+  cell.addEventListener('click',async function(){
+    closePdfThumbOverlay();
+    var n=parseInt(cell.dataset.pg,10);
+    if(!pdfDoc||n===pdfPageNum) return;
+    pdfPageNum=n;
+    var pi=document.getElementById('pageInfo');if(pi)pi.textContent=pdfPageNum+'/'+pdfDoc.numPages;
+    await renderPdfPage(pdfPageNum);
+    scheduleSave(); // V0_135と同じくページ変更を保存
+  });
+  return cell;
+}
+
+// V1_165: ページの右下(wPct%×hPct%)領域だけを、pdf.jsのtransformオプションで
+// 直接高解像度レンダリングする(viewer.js _pdfRenderVisibleTileと同じ技法)。
+// ページ全体を高解像度化するのではなく、必要な小さな範囲だけを大きなscaleで
+// 描画するため、軽い処理のままくっきりした画像が得られる
+async function _pdfThumbRenderCrop(page,wPct,hPct){
+  var CROP_TARGET_PX=800; // クロップ領域の目標描画幅(px)。大きいほどくっきりするが生成が重くなる
+  var vp1=page.getViewport({scale:1});
+  var s=Math.min(25,Math.max(1,CROP_TARGET_PX/((wPct/100)*vp1.width)));
+  var fullVp=page.getViewport({scale:s});
+  var cropW=Math.max(1,Math.round((wPct/100)*fullVp.width));
+  var cropH=Math.max(1,Math.round((hPct/100)*fullVp.height));
+  var px0=Math.round(fullVp.width-cropW), py0=Math.round(fullVp.height-cropH);
+  var canvas=document.createElement('canvas');
+  canvas.width=cropW;canvas.height=cropH;
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:fullVp,transform:[1,0,0,1,-px0,-py0]}).promise;
+  return canvas;
+}
+
+// 「全体」サムネイル(overview)をそのまま表示し、図面番号モードONの場合は高解像度で
+// 別途生成済みのクロップ画像(crop)を、倍率に応じた大きさで右下に重ねて表示する
+function _pdfThumbFillCell(cell,overview,crop){
+  var wrap=cell.querySelector('.pdf-thumb-imgwrap');
+  if(!wrap) return;
+  wrap.innerHTML='';
+  if(overview){
+    var main=document.createElement('canvas');
+    main.className='pdf-thumb-main';
+    main.width=overview.width;main.height=overview.height;
+    main.getContext('2d').drawImage(overview,0,0);
+    wrap.appendChild(main);
+  }
+  var cfg=_pdfThumbLoadCfg();
+  if(!cfg.modeOn||!crop) return;
+  var dispW=Math.min(96,cfg.widthPct*cfg.zoom), dispH=Math.min(96,cfg.heightPct*cfg.zoom); // %単位(セルに対する比率)
+  var overlay=document.createElement('div');
+  overlay.className='pdf-thumb-crop-overlay';
+  overlay.style.left=(100-dispW)+'%';
+  overlay.style.top=(100-dispH)+'%';
+  overlay.style.width=dispW+'%';
+  overlay.style.height=dispH+'%';
+  var cropCv=document.createElement('canvas');
+  cropCv.width=crop.width;cropCv.height=crop.height;
+  cropCv.getContext('2d').drawImage(crop,0,0);
+  overlay.appendChild(cropCv);
+  wrap.appendChild(overlay);
+}
+
+// 全ページの「全体」サムネイルを中解像度でレンダリングしグリッドに敷き詰め、図面番号
+// モードがONなら右下クロップも高解像度で別途生成する。既に同一pdfDoc・同一幅%/高さ%で
+// 生成済みのキャッシュがあればそれを再利用し、PDFの再描画は行わない
+async function _buildPdfThumbGrid(){
+  var grid=document.getElementById('pdfThumbGrid');
+  grid.innerHTML='';
+  if(!pdfDoc) return;
+  var cfg=_pdfThumbLoadCfg();
+  _pdfThumbUpdateCtrlUI();
+  var total=pdfDoc.numPages;
+  var reuse=(_pdfThumbCache&&_pdfThumbCache.doc===pdfDoc&&_pdfThumbCache.overviews.length===total);
+  if(!reuse) _pdfThumbCache={doc:pdfDoc,overviews:new Array(total).fill(null),crops:new Array(total).fill(null),cropWPct:null,cropHPct:null};
+  var cache=_pdfThumbCache;
+  // 幅%・高さ%が前回生成時と異なる場合は、クロップキャッシュを作り直す(全体サムネイルは影響なし)
+  if(cfg.modeOn&&(cache.cropWPct!==cfg.widthPct||cache.cropHPct!==cfg.heightPct)){
+    cache.crops=new Array(total).fill(null);
+    cache.cropWPct=cfg.widthPct;cache.cropHPct=cfg.heightPct;
+  }
+  var cells=[];
+  for(var i=1;i<=total;i++){
+    var cell=_pdfThumbCellHtml(i,total);
+    grid.appendChild(cell);
+    cells.push(cell);
+    if(cache.overviews[i-1]) _pdfThumbFillCell(cell,cache.overviews[i-1],cache.crops[i-1]);
+  }
+  var RENDER_TARGET_W=900; // 「全体」サムネイル用の基準幅(px)。図面番号欄の鮮明さは別途高解像度クロップが担う
+  for(var p=1;p<=total;p++){
+    if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return; // 生成中にファイル/ページ集合が変わったら中断
+    if(cache.overviews[p-1]) continue; // 生成済み
+    try{
+      var page=await pdfDoc.getPage(p);
+      var vp1=page.getViewport({scale:1});
+      var rs=Math.min(3,Math.max(0.5,RENDER_TARGET_W/vp1.width));
+      var vp=page.getViewport({scale:rs});
+      var c=document.createElement('canvas');
+      c.width=vp.width;c.height=vp.height;
+      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+      if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
+      cache.overviews[p-1]=c;
+      var cellNow=cells[p-1];
+      if(cellNow&&cellNow.isConnected) _pdfThumbFillCell(cellNow,c,cache.crops[p-1]);
+    }catch(e){console.warn('[ページサムネイル:全体]',e);}
+  }
+  if(!cfg.modeOn) return;
+  for(var q=1;q<=total;q++){
+    if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
+    if(cache.crops[q-1]) continue; // 生成済み
+    try{
+      var page2=await pdfDoc.getPage(q);
+      var cropCanvas=await _pdfThumbRenderCrop(page2,cfg.widthPct,cfg.heightPct);
+      if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
+      cache.crops[q-1]=cropCanvas;
+      var cellNow2=cells[q-1];
+      if(cellNow2&&cellNow2.isConnected) _pdfThumbFillCell(cellNow2,cache.overviews[q-1],cropCanvas);
+    }catch(e){console.warn('[ページサムネイル:図面番号クロップ]',e);}
+  }
+}
+
+// =========================================================
+// V1_162: 図面番号欄インセット表示
+// メイン画面とは別のtx/ty/scaleを持つ小さな浮動パネル。サブ窓(SW)機能と同じ
+// swap-and-delegate方式(グローバルcv/ctx/ov/octx/tx/ty/scaleを一時退避して
+// draw()を再利用)でDXF/PDF両方をそのまま描画できる。既存のサブ窓機能・
+// #subWinBtn・subWindows[]配列には一切手を入れていない（完全に独立した実装）
+// =========================================================
+var detailInset=null;
+var DI_W=200, DI_HEADER_H=26, DI_BODY_H=150;
+var DI_H=DI_HEADER_H+DI_BODY_H;
+
+function _diPointerPos(e){
+  if(e.touches&&e.touches.length) return {x:e.touches[0].clientX,y:e.touches[0].clientY};
+  if(e.changedTouches&&e.changedTouches.length) return {x:e.changedTouches[0].clientX,y:e.changedTouches[0].clientY};
+  return {x:e.clientX,y:e.clientY};
+}
+
+function _diCreate(){
+  if(detailInset) return detailInset;
+  var el=document.createElement('div');
+  el.id='detailInsetEl';
+  var left=Math.max(4,window.innerWidth-DI_W-16);
+  var top=Math.max(4,window.innerHeight-DI_H-100);
+  el.style.cssText='position:fixed;left:'+left+'px;top:'+top+'px;width:'+DI_W+'px;height:'+DI_H+'px;'+
+    'z-index:4900;background:#131921;border:1.5px solid #f39c12;border-radius:10px;'+
+    'box-shadow:0 8px 30px rgba(0,0,0,.55);display:none;flex-direction:column;overflow:hidden;touch-action:none;';
+  var header=document.createElement('div');
+  header.style.cssText='height:'+DI_HEADER_H+'px;flex-shrink:0;display:flex;align-items:center;padding:0 8px;background:#1a2430;cursor:move;';
+  header.innerHTML='<span style="font-size:11px;color:#f39c12;flex:1;">図面番号欄</span>'+
+    '<button class="di-close" style="width:20px;height:20px;border:none;background:transparent;color:#aaa;font-size:14px;cursor:pointer;line-height:1;">×</button>';
+  var body=document.createElement('div');
+  body.style.cssText='position:relative;flex:1;overflow:hidden;';
+  var cvEl=document.createElement('canvas'),acEl=document.createElement('canvas'),ovEl=document.createElement('canvas');
+  [cvEl,acEl,ovEl].forEach(function(c){c.style.cssText='position:absolute;left:0;top:0;width:100%;height:100%;';});
+  body.appendChild(cvEl);body.appendChild(acEl);body.appendChild(ovEl);
+  el.appendChild(header);el.appendChild(body);
+  document.body.appendChild(el);
+  detailInset={
+    el:el,headerEl:header,bodyEl:body,
+    cvEl:cvEl,acEl:acEl,ovEl:ovEl,
+    ctxEl:cvEl.getContext('2d'),acCtxEl:acEl.getContext('2d'),octxEl:ovEl.getContext('2d'),
+    W:DI_W,H:DI_BODY_H,
+    tx:0,ty:0,scale:1,
+    visible:false,_inited:false
+  };
+  _diResizeCanvases();
+  header.querySelector('.di-close').addEventListener('click',function(e){e.stopPropagation();_diSetVisible(false);});
+  _diAttachDrag();
+  _diAttachContentInput();
+  return detailInset;
+}
+
+function _diResizeCanvases(){
+  var di=detailInset;if(!di)return;
+  var dpr=window.devicePixelRatio||1;
+  [di.cvEl,di.acEl,di.ovEl].forEach(function(c){c.width=Math.round(di.W*dpr);c.height=Math.round(di.H*dpr);});
+}
+
+// 図面全体のバウンディングボックスから、右下(図面番号欄が置かれることが多い位置)を
+// 初期の拡大表示位置として算出する。ユーザーがドラッグ/ピンチで調整した後は
+// この関数は呼ばれず、記憶されたtx/ty/scaleがそのまま使われる
+function _diDefaultView(){
+  var di=detailInset;
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  function ex(x,y){if(!isFinite(x)||!isFinite(y))return;if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;}
+  if(typeof pdfImage!=='undefined'&&pdfImage){ex(pdfImage.wx,pdfImage.wy-pdfImage.wh);ex(pdfImage.wx+pdfImage.ww,pdfImage.wy);}
+  else if(typeof doc!=='undefined'&&doc){
+    (doc.sen||[]).forEach(function(e){ex(e.x1,e.y1);ex(e.x2,e.y2);});
+    (doc.enko||[]).forEach(function(e){var r=e.rx||e.r||0;ex(e.cx-r,e.cy-r);ex(e.cx+r,e.cy+r);});
+    (doc.moji||[]).forEach(function(e){ex(e.x,e.y);});
+  }
+  if(!isFinite(minX)) return {tx:0,ty:0,scale:1};
+  var w=Math.max(maxX-minX,1e-6), h=Math.max(maxY-minY,1e-6);
+  var cx=maxX-w*0.14, cy=minY+h*0.07; // 右下寄りの既定位置
+  var frac=0.24; // バウンディング幅のこの割合をパネル幅いっぱいに拡大する
+  var s=di.W/(w*frac);
+  return {tx:di.W/2-cx*s, ty:di.H/2+cy*s, scale:s};
+}
+
+function _diSyncStateToFile(){
+  if(typeof currentFileIdx==='undefined'||currentFileIdx<0||!openFiles[currentFileIdx])return;
+  var di=detailInset;if(!di)return;
+  openFiles[currentFileIdx].insetState={
+    visible:!!di.visible,tx:di.tx,ty:di.ty,scale:di.scale,
+    left:parseFloat(di.el.style.left)||0,top:parseFloat(di.el.style.top)||0
+  };
+}
+
+function _diApplyStateFromFile(){
+  var di=_diCreate();
+  var f=(typeof currentFileIdx!=='undefined'&&currentFileIdx>=0)?openFiles[currentFileIdx]:null;
+  var st=f&&f.insetState;
+  if(st){
+    di.tx=st.tx;di.ty=st.ty;di.scale=st.scale;di._inited=true;
+    var left=Math.max(0,Math.min(window.innerWidth-di.W,st.left||0));
+    var top=Math.max(0,Math.min(window.innerHeight-DI_H,st.top||0));
+    di.el.style.left=left+'px';di.el.style.top=top+'px';
+    di.visible=!!st.visible;
+  } else {
+    di.visible=false;di._inited=false;
+  }
+  di.el.style.display=di.visible?'flex':'none';
+  if(di.visible) scheduleDraw();
+}
+
+function _diSetVisible(on){
+  var di=_diCreate();
+  di.visible=!!on;
+  di.el.style.display=on?'flex':'none';
+  if(on&&!di._inited){
+    var v=_diDefaultView();
+    di.tx=v.tx;di.ty=v.ty;di.scale=v.scale;
+    di._inited=true;
+  }
+  if(on) scheduleDraw();
+  _diSyncStateToFile();
+  if(typeof scheduleSave==='function') scheduleSave();
+}
+
+document.getElementById('detailInsetBtn').addEventListener('click',function(){
+  if(!pdfDoc&&!(typeof doc!=='undefined'&&doc)){showGuide('図面がありません',1500);return;}
+  var di=_diCreate();
+  _diSetVisible(!di.visible);
+});
+
+// ヘッダードラッグでパネル自体の画面上の位置を移動(サブ窓のヘッダードラッグと同じ発想)
+function _diAttachDrag(){
+  var di=detailInset;
+  var dragging=false,startX=0,startY=0,elStartLeft=0,elStartTop=0;
+  function onDown(e){
+    if(e.target&&e.target.closest&&e.target.closest('.di-close'))return;
+    dragging=true;
+    var p=_diPointerPos(e);
+    startX=p.x;startY=p.y;
+    elStartLeft=parseFloat(di.el.style.left)||0;elStartTop=parseFloat(di.el.style.top)||0;
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!dragging)return;
+    var p=_diPointerPos(e);
+    var left=elStartLeft+(p.x-startX), top=elStartTop+(p.y-startY);
+    left=Math.max(0,Math.min(window.innerWidth-di.W,left));
+    top=Math.max(0,Math.min(window.innerHeight-DI_H,top));
+    di.el.style.left=left+'px';di.el.style.top=top+'px';
+    e.preventDefault();
+  }
+  function onUp(){if(dragging){dragging=false;_diSyncStateToFile();if(typeof scheduleSave==='function')scheduleSave();}}
+  di.headerEl.addEventListener('mousedown',onDown);
+  di.headerEl.addEventListener('touchstart',onDown,{passive:false});
+  window.addEventListener('mousemove',onMove);
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('mouseup',onUp);
+  window.addEventListener('touchend',onUp);
+  window.addEventListener('touchcancel',onUp);
+}
+
+// グローバルcv/ctx/ov/octx/tx/ty/scaleを一時的にインセット用に差し替えてfnを実行する
+// (サブ窓のwithCtx()と同じswap-and-delegateパターン)
+function _diWithCtx(fn){
+  var di=detailInset;if(!di)return;
+  var _svCv=window.cv,_svCtx=window.ctx,_svOv=window.ov,_svOctx=window.octx;
+  var _svTx=tx,_svTy=ty,_svScale=scale;
+  try{
+    window.cv=di.cvEl;window.ctx=di.ctxEl;window.ov=di.ovEl;window.octx=di.octxEl;
+    tx=di.tx;ty=di.ty;scale=di.scale;
+    fn();
+  }finally{
+    di.tx=tx;di.ty=ty;di.scale=scale;
+    window.cv=_svCv;window.ctx=_svCtx;window.ov=_svOv;window.octx=_svOctx;
+    tx=_svTx;ty=_svTy;scale=_svScale;
+  }
+}
+
+// インセットの中身(tx/ty/scale)を1本指ドラッグでパン、2本指ピンチでズーム調整する
+function _diAttachContentInput(){
+  var di=detailInset;
+  var el=di.ovEl;
+  var panning=false,lastX=0,lastY=0,pinchDist=null,pinchMid=null,mDown=false;
+  function fingersOf(e){return e.touches?Array.prototype.slice.call(e.touches):[{clientX:e.clientX,clientY:e.clientY}];}
+  function getR(){return el.getBoundingClientRect();}
+  function afterAdjust(){_diSyncStateToFile();if(typeof scheduleSave==='function')scheduleSave();}
+  el.addEventListener('touchstart',function(e){
+    var f=fingersOf(e),r=getR();
+    if(f.length===1){panning=true;lastX=f[0].clientX-r.left;lastY=f[0].clientY-r.top;}
+    else if(f.length>=2){
+      var x0=f[0].clientX-r.left,y0=f[0].clientY-r.top,x1=f[1].clientX-r.left,y1=f[1].clientY-r.top;
+      pinchDist=Math.hypot(x1-x0,y1-y0);pinchMid={x:(x0+x1)/2,y:(y0+y1)/2};
+    }
+    e.preventDefault();
+  },{passive:false});
+  el.addEventListener('touchmove',function(e){
+    var f=fingersOf(e),r=getR();
+    if(f.length===1&&panning){
+      var sx=f[0].clientX-r.left,sy=f[0].clientY-r.top;
+      _diWithCtx(function(){tx+=sx-lastX;ty+=sy-lastY;});
+      lastX=sx;lastY=sy;scheduleDraw();
+    } else if(f.length>=2&&pinchDist!==null){
+      var x0=f[0].clientX-r.left,y0=f[0].clientY-r.top,x1=f[1].clientX-r.left,y1=f[1].clientY-r.top;
+      var dist=Math.hypot(x1-x0,y1-y0);
+      var mid={x:(x0+x1)/2,y:(y0+y1)/2};
+      _diWithCtx(function(){
+        var wp=s2w(pinchMid.x,pinchMid.y);
+        if(pinchDist>5){var fct=dist/pinchDist;if(fct>0.5&&fct<2.0) scale*=fct;}
+        tx=mid.x-wp[0]*scale;ty=mid.y+wp[1]*scale;
+      });
+      pinchDist=dist;pinchMid=mid;scheduleDraw();
+    }
+    e.preventDefault();
+  },{passive:false});
+  function endTouch(){if(panning||pinchDist!==null){panning=false;pinchDist=null;pinchMid=null;afterAdjust();}}
+  el.addEventListener('touchend',endTouch);
+  el.addEventListener('touchcancel',endTouch);
+  // PC(マウス)簡易対応: 左ドラッグでパン、ホイールでズーム
+  el.addEventListener('mousedown',function(e){var r=getR();mDown=true;lastX=e.clientX-r.left;lastY=e.clientY-r.top;});
+  window.addEventListener('mousemove',function(e){
+    if(!mDown)return;
+    var r=getR(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+    _diWithCtx(function(){tx+=sx-lastX;ty+=sy-lastY;});
+    lastX=sx;lastY=sy;scheduleDraw();
+  });
+  window.addEventListener('mouseup',function(){if(mDown){mDown=false;afterAdjust();}});
+  el.addEventListener('wheel',function(e){
+    e.preventDefault();
+    var r=getR(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+    var f=e.deltaY<0?1.1:0.9;
+    _diWithCtx(function(){
+      var wp=s2w(sx,sy);
+      scale*=f;
+      tx=sx-wp[0]*scale;ty=sy+wp[1]*scale;
+    });
+    scheduleDraw();afterAdjust();
+  },{passive:false});
+}
+
+// メイン画面の再描画のたびにインセットも再描画する(サブ窓のwindow._renderAllSubWindows
+// と同じ、viewer.jsのrafLoopから呼ばれるフック関数に相乗りさせる。viewer.js自体は
+// 変更せず、既存の同名グローバル関数の中身だけをここで拡張する)
+function _diRender(){
+  var di=detailInset;
+  if(!di||!di.visible)return;
+  var _svCv=window.cv,_svCtx=window.ctx,_svOv=window.ov,_svOctx=window.octx;
+  var _svTx=tx,_svTy=ty,_svScale=scale;
+  try{
+    window.cv=di.cvEl;window.ctx=di.ctxEl;window.ov=di.ovEl;window.octx=di.octxEl;
+    tx=di.tx;ty=di.ty;scale=di.scale;
+    if(typeof draw==='function') draw();
+  }catch(e){console.warn('[図面番号欄インセット] render failed',e);}
+  finally{
+    window.cv=_svCv;window.ctx=_svCtx;window.ov=_svOv;window.octx=_svOctx;
+    tx=_svTx;ty=_svTy;scale=_svScale;
+  }
+}
+
 // tool-btn / color-btn / lw-btn イベントリスナー → tool.js
 
 
@@ -2479,7 +3018,9 @@ document.querySelectorAll('.mem-btn').forEach(btn=>{
       // 未記憶 → 現在位置を記憶（V0_160: どのファイルの記憶かをfileKey/fileNameで保持。
       // ファイルを跨いで「表示」した時に元のファイルへ自動で切り替えるための情報）
       var _fk160=(currentFileIdx>=0&&openFiles[currentFileIdx])?openFiles[currentFileIdx].fileKey:null;
-      savedViews[i]={tx,ty,scale,fileKey:_fk160,fileName:currentFileName};
+      // V1_161: 複数ページPDFで「今見ていたページ」も記憶する。DXF等pdfDocが無い場合はnull
+      var _pnSv161=(typeof pdfDoc!=='undefined'&&pdfDoc&&typeof pdfPageNum!=='undefined')?pdfPageNum:null;
+      savedViews[i]={tx,ty,scale,fileKey:_fk160,fileName:currentFileName,pdfPageNum:_pnSv161};
       updateViewmemoState(i);scheduleSave();verify('savedViews変更',{slot:i});
       btn.style.transform='scale(.88)';setTimeout(()=>{btn.style.transform='';},180);
       showGuide('記憶'+(i+1)+'に保存しました',1500);
@@ -2525,7 +3066,7 @@ document.querySelectorAll('.show-btn').forEach(btn=>{
   btn.addEventListener('touchmove',function(){
     if(_lpTimer){clearTimeout(_lpTimer);_lpTimer=null;}
   });
-  btn.addEventListener('click',function(){
+  btn.addEventListener('click',async function(){
     if(_lpFired){_lpFired=false;return;}
     const i=parseInt(btn.dataset.vs);
     var sv=savedViews[i];
@@ -2539,6 +3080,15 @@ document.querySelectorAll('.show-btn').forEach(btn=>{
         return;
       }
       switchToFile(_ti160);
+    }
+    // V1_161: 記憶したページ番号(複数ページPDFのみ)が現在のページと異なる場合、
+    // 先にそのページへ移動してからtx/ty/scaleを復元する。旧バージョンで保存された
+    // 記憶やDXFファイルの記憶はpdfPageNumが無いため従来通り何もしない
+    if(sv.pdfPageNum&&typeof pdfDoc!=='undefined'&&pdfDoc&&pdfPageNum!==sv.pdfPageNum&&sv.pdfPageNum>=1&&sv.pdfPageNum<=pdfDoc.numPages){
+      pdfPageNum=sv.pdfPageNum;
+      var _piMv161=document.getElementById('pageInfo');if(_piMv161)_piMv161.textContent=pdfPageNum+'/'+pdfDoc.numPages;
+      await renderPdfPage(pdfPageNum);
+      scheduleSave();
     }
     tx=sv.tx;ty=sv.ty;scale=sv.scale;scheduleDraw();scheduleOverlay();
   });
@@ -4734,7 +5284,9 @@ function _swRenderOne(sw){
 }
 
 // V0_153.1: メイン表示の更新のたびに全サブ窓を再描画（viewer.js rafLoopから呼ばれる）
+// V1_162: 図面番号欄インセットの再描画もこの関数名に相乗りさせる(viewer.js側は無改造)
 window._renderAllSubWindows=function(){
+  if(typeof _diRender==='function') _diRender();
   if(subWindows.length===0)return;
   for(var i=0;i<subWindows.length;i++) _swRenderOne(subWindows[i]);
 };

@@ -25,7 +25,9 @@ function _showMemMenu(idx,anchorBtn){
     // V0_160: savedViewsはファイル横断のグローバル項目。上書き保存時も現在ファイルの
     // fileKey/fileNameを記録し直す（表示時にどのファイルへ切り替えるか判定するため）
     var _fk160=(typeof currentFileIdx!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx])?openFiles[currentFileIdx].fileKey:null;
-    savedViews[idx]={tx:tx,ty:ty,scale:scale,fileKey:_fk160,fileName:(typeof currentFileName!=='undefined'?currentFileName:null)};
+    // V1_161: 複数ページPDFで「今見ていたページ」も上書き保存時に記憶し直す
+    var _pnOvr161=(typeof pdfDoc!=='undefined'&&pdfDoc&&typeof pdfPageNum!=='undefined')?pdfPageNum:null;
+    savedViews[idx]={tx:tx,ty:ty,scale:scale,fileKey:_fk160,fileName:(typeof currentFileName!=='undefined'?currentFileName:null),pdfPageNum:_pnOvr161};
     updateViewmemoState(idx);scheduleSave();if(typeof verify==='function')verify('savedViews変更',{slot:idx,action:'overwrite'});
     closeMenu();showGuide('記憶'+(idx+1)+'を上書き保存しました',1500);
   };

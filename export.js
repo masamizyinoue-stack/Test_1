@@ -890,6 +890,18 @@ document.addEventListener('visibilitychange', function() {
 //   MIN_TEXT_MM、寸法文字(dims)のDIM_MIN_TEXT_MMをともに1.1mm→0.6mmへさらに
 //   引き下げた。完全な不可視化(V1_152の実測不具合値は約0.1mm)を防ぐ安全弁としての
 //   役割は0.6mmでも6倍以上の余裕があり十分に果たせる。
+// V1_160: 「寸法の数字が若干PDFにすると小さくなります」との指摘に対応。ユーザー
+//   提供のPDF(2B-034_hd.pdf)の内部データを実測したところ、寸法値(dims)の
+//   テキスト13個のうち5個が、V1_159で0.6mmに揃えたDIM_MIN_TEXT_MMにちょうど
+//   張り付いており(1.7007874pt=0.6mm)、周囲のDXF文字(黒、この図面では大半が
+//   約4.08pt≒1.44mm相当)や、床に張り付いていない他の寸法値(約2.07〜6.57pt=
+//   0.73〜2.3mm相当)より明らかに小さく浮いて見えていた。dimsはユーザーが寸法を
+//   作成した時点のワールド座標系での文字高(worldFontH)を記録しており、画面表示
+//   (dimensionTextMode='fixed')でもズームに依存せず一定の見やすさで表示される
+//   設計になっているため、doc.moji(V1_159で密な図面での重なり対策として0.6mmに
+//   下げた)とは別に、dims専用の下限を引き上げるのが適切と判断した。
+//   DIM_MIN_TEXT_MM(dims専用)を0.6mm→1.2mmへ引き上げ、MIN_TEXT_MM(doc.moji用、
+//   V1_158/159の密な図面対策)は0.6mmのまま変更していない。
 // =========================================================
 var _jpFontLoaded=false;
 function _loadJPFont(){
@@ -1132,7 +1144,11 @@ async function exportHybridPDF(){
         // 判断し、フロアをさらに約半分(1.1mm→0.6mm)に下げた。完全な不可視化(V1_152の実測不具合値は
         // 約0.1mm)を防ぐ安全弁としての役割は0.6mmでも十分に果たせる
         const MIN_TEXT_MM=0.6;
-        const fsMM=Math.max(MIN_TEXT_MM, e.h*pdfScale*_sx);
+        // V1_166: 「DXFの文字が少し小さい」との指摘により、画面表示(viewer.js)と揃えて
+        // HD-PDF書き出しでも文字サイズを1.1倍にした(MOJI_SIZE_MULTIPLIERはviewer.js定義。
+        // 未定義環境でも壊れないよう既定値1.1でフォールバックする)
+        const _mojiMul166=(typeof MOJI_SIZE_MULTIPLIER!=='undefined')?MOJI_SIZE_MULTIPLIER:1.1;
+        const fsMM=Math.max(MIN_TEXT_MM, e.h*pdfScale*_sx*_mojiMul166);
         const fsPx=fsMM/_sx; // 画面実測(measureText)用の対応ピクセルサイズ
         if(fsMM<=0) continue;
         const css=(typeof rgbCss==='function')?rgbCss(e.color,false):'rgb(0,0,0)';
@@ -1245,7 +1261,14 @@ async function exportHybridPDF(){
     if(typeof dims!=='undefined'&&dims.length>0){
       // V1_158: doc.moji側と同じ理由(密な図面での文字の重なり緩和)により2.2mm→1.1mmへ
       // V1_159: さらに1.1mm→0.6mmへ(doc.moji側と同じ理由・同じ値)
-      const DIM_MIN_TEXT_MM=0.6;
+      // V1_160: 「寸法の数字が若干PDFにすると小さくなる」との指摘を受け実測PDFを
+      // 解析した結果、寸法値(dims)の文字13個中5個がこの下限(0.6mm)にちょうど
+      // 張り付いており、周囲のDXF文字(黒、この図面では自然サイズが約1.4mm相当)や
+      // 他の寸法値(自然サイズで0.7〜2.3mm相当)より明らかに小さく浮いて見えていた。
+      // dimsは寸法作成時にworldFontHが記録されズーム非依存の一定サイズを意図して
+      // いるため、doc.mojiの下限(0.6mm、密な図面での重なり対策)とは別に、dims
+      // 専用の下限を引き上げてこの見た目の不揃いを解消する
+      const DIM_MIN_TEXT_MM=1.2;
       const _curPg155b=_curPage();
       for(const d of dims){
         if((d.page||1)!==_curPg155b) continue;
