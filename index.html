@@ -727,8 +727,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
 </button>
   <!-- V0_147: スクショボタン削除 / V0_154: PDF書出ボタンは設定パネルへ移動 -->
-  <button class="tb-btn" id="writeBackupBtn" title="書込みデータをバックアップ保存（.dxfview）" style="border:2px solid #f1c40f"> <!-- V0_136: 書込バックアップボタン / V1_54: 黄色枠 -->
-  <span class="tb-tool-label">書込バックアップ</span>
+  <!-- V1_168: 書込バックアップは設定パネル(PDF書出の下)へ移動し、この位置にはHD-PDF書出を配置 -->
+  <button class="tb-btn" id="hybridPDFBtn" title="DXF線・円弧・文字をベクター、書き込み・寸法を画像として重ねる高解像度PDF（文字幅補正Phase1）" style="border:2px solid #f1c40f"> <!-- V1_168: 設定パネルから移動・「（試験）」表記を削除 -->
+  <span class="tb-tool-label">HD-PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
 </div>
@@ -832,7 +833,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_167</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_169</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -915,7 +916,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="savePDFBtn" class="sp-action-btn" title="図面全体をPDF出力（倍率を選択できます）">PDF書出</button> <!-- V0_154: ヘッダーから移動・品質選択廃止(3倍固定) → V1_146: 倍率選択ダイアログを復活 -->
   </div>
   <div class="sp-section">
-    <button id="hybridPDFBtn" class="sp-action-btn" title="DXF線・円弧・文字をベクター、書き込み・寸法を画像として重ねる高解像度PDF（試験機能・文字幅補正Phase1）">HD-PDF書出（試験）</button> <!-- V1_151: V0_154で削除されたHD-PDF機能を文字幅補正Phase1つきで復元 -->
+    <button id="writeBackupBtn" class="sp-action-btn" title="書込みデータをバックアップ保存（.dxfview）">書込バックアップ</button> <!-- V1_168: ヘッダーから移動(PDF書出の下) -->
   </div>
   <div class="sp-section">
     <button id="importDxfviewBtn" class="sp-action-btn">書込復元</button> <!-- V0_136: .dxfview保存→書込復元に変更 -->
@@ -1253,7 +1254,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_167';
+const APP_VERSION = 'V1_169';
 
 // =========================================================
 // グローバル状態
@@ -2233,11 +2234,11 @@ function closeTab(idx){
     b.addEventListener('click',function(){document.body.removeChild(dlg);cb();});
     box.appendChild(b);
   }
-  makeBtn('書込バックアップして閉じる','#00d4ff','#000',function(){
+  makeBtn('HD-PDF書出して閉じる','#00d4ff','#000',function(){
     if(idx!==currentFileIdx) switchToFile(idx); // V0_107: 対象タブのdoc/strokes/dimsを確実にロード
-    // V0_145: PDF書出し→書込バックアップ(.dxfview)に変更
-    // exportDxfviewManualの完了(false=キャンセル/失敗)を待ってから閉じる
-    Promise.resolve(exportDxfviewManual()).then(function(ok){
+    // V1_169: 書込バックアップ(.dxfview)→HD-PDF書出に変更
+    // exportHybridPDFの完了(false=失敗)を待ってから閉じる
+    Promise.resolve(exportHybridPDF()).then(function(ok){
       if(ok!==false) doCloseTab(idx);
     });
   });

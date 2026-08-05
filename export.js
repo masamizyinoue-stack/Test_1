@@ -1001,7 +1001,7 @@ async function exportHybridPDF(){
       for(const l of(d.lines||[])){_hExp(l.x1,l.y1);_hExp(l.x2,l.y2);}
       if(d.tx!=null&&d.ty!=null)_hExp(d.tx,d.ty);
     }
-    if(!isFinite(_hMnX)){showGuide('描画データがありません',2000);return;}
+    if(!isFinite(_hMnX)){showGuide('描画データがありません',2000);return true;} // V1_169: 閉じる連携用(データなし=出力不要なので閉じる処理は継続)
 
     // ── 2. ページサイズ・スケール決定 ──
     const PAD=0.02;
@@ -1032,7 +1032,7 @@ async function exportHybridPDF(){
     const w2my = wy => (-wy * pdfScale + ty_p) * _sy;
 
     // ── 5. jsPDF 生成 ──
-    if(typeof window.jspdf==='undefined'){showGuide('jsPDFが読み込まれていません',2000);return;}
+    if(typeof window.jspdf==='undefined'){showGuide('jsPDFが読み込まれていません',2000);return false;} // V1_169: 閉じる連携用(出力失敗時は閉じない)
     const {jsPDF}=window.jspdf;
     const orient=pageMM_W>=pageMM_H?'l':'p';
     const pdf=new jsPDF({orientation:orient,unit:'mm',format:[pageMM_W,pageMM_H],compress:true});
@@ -1343,10 +1343,12 @@ async function exportHybridPDF(){
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'_hd.pdf';
     pdf.save(fname);
     showGuide('HD-PDFを保存しました',2000);
+    return true; // V1_169: 閉じる連携用(出力成功)
 
   }catch(err){
     console.error('[HybridPDF]',err);
     showGuide('HD-PDF出力に失敗しました: '+err.message,3000);
+    return false; // V1_169: 閉じる連携用(出力失敗時は閉じない、データ消失防止)
   }finally{
     btn.disabled=false;
   }
