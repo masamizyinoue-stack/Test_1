@@ -842,7 +842,9 @@ function importDxfviewManual(){
     if(!file)return;
     var isZip176=file.name.toLowerCase().endsWith('.zip');
     if(isZip176){
-      if(!confirm('ZIP内のDXF(またはtdf)を開き、書込みデータも復元します。よろしいですか？'))return;
+      // V1_191: PDFのバックアップにも対応した旨をわかりやすくするため文言を更新
+      // (復元処理自体はV1_177から拡張子非依存でPDFにも対応済みだった)
+      if(!confirm('ZIP内の図面(DXF/PDF/tdf)を開き、書込みデータも復元します。よろしいですか？'))return;
       if(typeof JSZip==='undefined'){
         showGuide('ZIP機能が読み込まれていません',2000);return;
       }
@@ -1065,14 +1067,17 @@ function _abCheck() {
 // V0_142: 10分タイマー → visibilitychange に変更
 // ページが非表示になった時（Safari離脱・アプリ切替）にトリガー
 // ① 未保存のdebounce中データを doSave() で即時フラッシュ
-// ② 変更があれば「今すぐ保存」バナーを表示（ユーザーが戻った時に見える）
+// ② V1_193: 「10分間隔で出るバックアップして、というポップアップを中止してほしい」
+//    との要望により、_abCheck()(「今すぐ保存」バナー表示)の呼び出しを削除した。
+//    データ消失防止のための①doSave()即時フラッシュは通知の有無に関わらず必要な
+//    処理のため維持している。_abCheck/_abShowBanner等の関数定義自体は既存機能
+//    保護のため残しており(呼び出し元がここだけなので通常は使われなくなるが)、
+//    _abMarkSaved()は他の保存成功箇所からも呼ばれる内部状態更新用のため無関係
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) {
     // 800msデバウンス中のsaveTimerが未発火でも即時保存（データ消失防止）
     // V0_144: currentFileNameガード追加（ファイル未読込時にdoSaveすると空データで保存を上書きし消失するため。V0_132のHTML側ハンドラと同一パターン）
     try { if(typeof doSave==='function' && typeof currentFileName!=='undefined' && currentFileName) doSave(); } catch(e) {}
-    // 変更があればバナーを表示（ユーザーがSafariに戻った時に確認できる）
-    _abCheck();
   }
 });
 
@@ -1359,7 +1364,14 @@ async function exportHybridPDF(_collectInto182){
         if(filterMode==='pen'&&s.hl) continue;
         const n=s.pts.length;
         const col=s.color||{r:0,g:0,b:0};
-        const lwPx=s.hl?(s.lw*(scale/lwRef155)):Math.max(1,s.lw*(scale/lwRef155));
+        // V1_189: 「HD-PDFの蛍光ペンが画面より細くなる」との指摘により修正。
+        // 画面表示(drawAnnotation)ではs.lwに現在の表示ズーム(scale/fitScale比)を掛けて
+        // 物理pxの太さを求めるが、PDF書出のベクター座標はscale(=クリック時点の画面ズーム、
+        // ユーザーがどこまで拡大して見ていたかで毎回変わる値)ではなく、PDF自身の座標系
+        // (図面全体をLONG_PXへ収めるための固定スケールpdfScale)で計算しているため、
+        // 太さだけscale基準のままだと現在のズーム状態次第で細くなったり太くなったりして
+        // いた。DXF線の太さ(_lwMM)と同じくpdfScale基準に統一する。
+        const lwPx=s.hl?(s.lw*(pdfScale/lwRef155)):Math.max(1,s.lw*(pdfScale/lwRef155));
         pdf.setDrawColor(col.r,col.g,col.b);
         pdf.setLineWidth(Math.max(0.05,lwPx*_sx));
         pdf.setLineCap('round'); pdf.setLineJoin('round');
@@ -1654,6 +1666,214 @@ async function exportHybridPDF(_collectInto182){
     btn.disabled=false;
   }
 }
+// =========================================================
+// V1_190: PDFを開いている時の「HD-PDF書出」— 元PDFのページ自体(ベクター)へ
+// ペン・蛍光ペン・寸法をpdf-libで直接ベクター合成する。ユーザーが提供した
+// M_Viewer(V7.09)の実装(pdf-lib使用、page.drawSvgPath/drawLine/drawTextで
+// 元PDFページに直接重ねる方式)を参考にした。DXFの場合のexportHybridPDF()
+// (DXFエンティティを一から再描画する方式)とは別の専用関数。
+//
+// 【座標系についての重要な前提】
+// PDFページを開いている間、strokes/dimsの「ワールド座標」はrenderPdfPage()
+// (viewer.js)がpdfImage={wx:0,wy:pageHeightPt,ww:pageWidthPt,wh:pageHeightPt}
+// として設定するため、「ワールド座標 = そのページ自身のPDFポイント座標
+// (左下原点・Y上向き)」と完全に一致する。よってDXFの場合のような世界→PDF
+// 独自スケール(pdfScale)への変換が一切不要で、strokes/dimsの座標をそのまま
+// pdf-libの描画座標として使える(sc=1)。
+//
+// 【ペン・蛍光ペンの太さについて】
+// V1_189でDXFのHD-PDF書出について「太さがクリック時点の画面ズームscaleに
+// 依存してしまう」不具合を修正したが、その時の対策(pdfScale基準に統一)は
+// 「PDF出力用に一度だけ計算される固定スケール」がある場合の解法だった。
+// PDFページのHD-PDF書出では、ワールド座標が既にページ自身のポイント座標と
+// 一致している(=出力先の物理単位がそもそも固定)ため、同種の対策として
+// 「現在の画面ズームscale」ではなく「現在のfitScale(画面にページ全体が
+// ぴったり収まるズーム)」を基準に太さを計算する。fitScaleは表示ウィンドウの
+// 大きさ(画面回転等)に依存するため厳密には完全固定ではないが、少なくとも
+// 「たまたまその瞬間どれだけ拡大して見ていたか」には左右されなくなる。
+async function exportPdfMergedHybrid190(pageNums){
+  if(typeof PDFLib==='undefined'){showGuide('pdf-libが読み込まれていません',2000);return false;}
+  var origBuf190=(typeof openFilesBufs!=='undefined'&&typeof currentFileIdx!=='undefined'&&currentFileIdx>=0)?openFilesBufs[currentFileIdx]:null;
+  if(!origBuf190){showGuide('元のPDFデータが見つかりません',2000);return false;}
+  if(!pageNums||!pageNums.length){showGuide('ページが指定されていません',2000);return false;}
+  var btn190=document.getElementById('hybridPDFBtn');
+  if(btn190) btn190.disabled=true;
+  showGuide('HD-PDFを生成中...');
+  try{
+    var PDFDocument190=PDFLib.PDFDocument, rgb190=PDFLib.rgb, degrees190=PDFLib.degrees, LineCapStyle190=PDFLib.LineCapStyle;
+    var srcDoc190=await PDFDocument190.load(origBuf190.slice(0),{ignoreEncryption:true});
+    var outDoc190=await PDFDocument190.create();
+    if(typeof fontkit!=='undefined') outDoc190.registerFontkit(fontkit);
+    var jpFont190=null;
+    if(window._notoSansJPBase64){
+      try{
+        var fontBytes190=Uint8Array.from(atob(window._notoSansJPBase64),function(c){return c.charCodeAt(0);});
+        jpFont190=await outDoc190.embedFont(fontBytes190,{subset:true});
+      }catch(fe190){ console.warn('[PDF merge] JPフォント埋込失敗',fe190); }
+    }
+    var fitRef190=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:(scale||1);
+    var srcPageCount190=srcDoc190.getPageCount();
+    var okCount190=0, failedPages190=[];
+    for(var pi190=0;pi190<pageNums.length;pi190++){
+      var pg190=pageNums[pi190];
+      if(pg190<1||pg190>srcPageCount190) continue;
+      if(pageNums.length>1) showGuide('HD-PDF生成中 ('+(pi190+1)+'/'+pageNums.length+')ページ'+pg190,1500);
+      try{
+        var copied190=(await outDoc190.copyPages(srcDoc190,[pg190-1]))[0];
+        outDoc190.addPage(copied190);
+        var pageH190=copied190.getSize().height;
+        var pgStrokes190=(typeof strokes!=='undefined'?strokes:[]).filter(function(s){return (s.page||1)===pg190;});
+        var pgDims190=(typeof dims!=='undefined'?dims:[]).filter(function(d){return (d.page||1)===pg190;});
+        // 蛍光ペン(下)→寸法(中)→ペン(上)の順で重ねる(exportHybridPDFの重ね順に倣う)
+        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'hl',fitRef190,pageH190,rgb190,LineCapStyle190);
+        _hpDrawDimsPdfLib190(copied190,pgDims190,jpFont190,rgb190,degrees190,pageH190);
+        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'pen',fitRef190,pageH190,rgb190,LineCapStyle190);
+        okCount190++;
+      }catch(pe190){
+        console.error('[PDF merge] page='+pg190,pe190);
+        failedPages190.push(pg190);
+      }
+    }
+    if(okCount190===0){
+      showGuide('出力できるページがありませんでした',2500);
+      return false;
+    }
+    var bytes190=await outDoc190.save();
+    var blob190=new Blob([bytes190],{type:'application/pdf'});
+    var fname190=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'_hd.pdf';
+    await _saveBlobWithFallback183(blob190,fname190,'PDF (書込み・寸法付き)');
+    showGuide(failedPages190.length?('HD-PDFを保存しました(失敗ページ:'+failedPages190.join(',')+')'):'HD-PDFを保存しました',2500);
+    return true;
+  }catch(e190){
+    console.error('[PDF merge]',e190);
+    showGuide('HD-PDF出力に失敗しました: '+e190.message,3000);
+    return false;
+  }finally{
+    if(btn190) btn190.disabled=false;
+  }
+}
+
+// V1_190: M_Viewer(参考実装)のCatmull-Rom→3次ベジェSVGパス変換を移植。
+// pts:[{x,y},...] ワールド座標(=出力先PDFページのポイント座標そのもの)、
+// h:出力ページの高さ(pt)。pdf-libのdrawSvgPathはSVG流儀(Y下向き)のパスを
+// そのまま解釈するため、Y座標をh-yで反転してから渡す(drawSvgPath呼び出し時に
+// x:0,y:hを原点オフセットとして指定する組み合わせで、通常のPDF座標(Y上向き)の
+// 点を正しい位置に描画できる。M_Viewer実装と同じ手法)
+function _buildSmoothSvgPath190(pts,h){
+  if(!pts||pts.length<2) return null;
+  var MIN_D2=0.01; // 0.1pt^2未満の移動は重複とみなして除去
+  var raw=[];
+  for(var i=0;i<pts.length;i++){
+    var x=pts[i].x, y=h-pts[i].y;
+    if(!isFinite(x)||!isFinite(y)) continue;
+    if(raw.length>0){
+      var prev=raw[raw.length-1];
+      var dx=x-prev.x, dy=y-prev.y;
+      if(dx*dx+dy*dy<MIN_D2) continue;
+    }
+    raw.push({x:+x.toFixed(3),y:+y.toFixed(3)});
+  }
+  if(raw.length<2) return null;
+  if(raw.length===2) return 'M'+raw[0].x+' '+raw[0].y+' L'+raw[1].x+' '+raw[1].y;
+  var d='M'+raw[0].x+' '+raw[0].y+' ';
+  for(var i=0;i<raw.length-1;i++){
+    var p0=raw[Math.max(0,i-1)],p1=raw[i],p2=raw[i+1],p3=raw[Math.min(raw.length-1,i+2)];
+    var cp1x=+(p1.x+(p2.x-p0.x)/6).toFixed(3), cp1y=+(p1.y+(p2.y-p0.y)/6).toFixed(3);
+    var cp2x=+(p2.x-(p3.x-p1.x)/6).toFixed(3), cp2y=+(p2.y-(p3.y-p1.y)/6).toFixed(3);
+    d+='C'+cp1x+' '+cp1y+' '+cp2x+' '+cp2y+' '+p2.x+' '+p2.y+' ';
+  }
+  return d.trim();
+}
+
+// V1_190: ペン・蛍光ペン(strokes)をpdf-libで元PDFページへ直接ベクター描画する。
+// 太さはfitRef(現在のfitScale)基準(前掲コメント参照)。DXF向け_hpDrawStrokes170
+// と役割は同じだが、pdfScale/w2mx/w2my変換が不要(ワールド座標=出力ページ座標)なため
+// 別関数として実装している
+function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,LineCapStyle){
+  for(var i=0;i<pgStrokes.length;i++){
+    var s=pgStrokes[i];
+    if(!s.pts||s.pts.length<2) continue;
+    if(filterMode==='hl'&&!s.hl) continue;
+    if(filterMode==='pen'&&s.hl) continue;
+    var col=s.color||{r:0,g:0,b:0};
+    var lwPt=Math.max(0.1, (s.hl?s.lw:Math.max(1,s.lw)) / fitRef);
+    var svgPath=_buildSmoothSvgPath190(s.pts,pageH);
+    if(!svgPath) continue;
+    try{
+      page.drawSvgPath(svgPath,{
+        x:0,y:pageH,
+        borderColor:rgbFn(col.r/255,col.g/255,col.b/255),
+        borderWidth:lwPt,
+        borderOpacity:s.hl?0.45:1,
+        borderLineCap:LineCapStyle?LineCapStyle.Round:undefined
+      });
+    }catch(se190){ console.warn('[PDF merge] stroke draw fail',se190); }
+  }
+}
+
+// V1_190: 寸法(dims)をpdf-libで元PDFページへ直接ベクター描画する。既存の
+// DXF向け寸法描画(exportHybridPDF内、9.節)と同じ比率定数(矢印長10/17、
+// 矢印幅4/17、離れ8/17、芯マーク8/17、線幅fs/17)を、mm単位からpt単位へ
+// そのまま読み替えて使用している(ワールド座標=出力ページのpt座標のため、
+// pdfScale/_sxによる単位変換が不要になった分だけDXF向けよりシンプル)。
+// 日本語フォントはNotoSansJPひとつを埋め込んで使うため、DXF向けのような
+// ASCII/日本語のフォント使い分け(_hpSplitRuns等)は行わず単純に中央揃えする
+function _hpDrawDimsPdfLib190(page,pgDims,jpFont,rgbFn,degreesFn,pageH){
+  var DIM_MIN_TEXT_PT=1.2*72/25.4; // 旧DIM_MIN_TEXT_MM(1.2mm)のpt換算
+  for(var i=0;i<pgDims.length;i++){
+    var d=pgDims[i];
+    var colArr=_hpHexColor(d.color);
+    var pdfCol=rgbFn(colArr[0]/255,colArr[1]/255,colArr[2]/255);
+    var worldH=d.worldFontH||(17/((typeof scale!=='undefined'&&scale)?scale:1));
+    var fsPt=Math.max(DIM_MIN_TEXT_PT, worldH*1.5);
+    var linePt=Math.max(0.1, fsPt/17);
+    var arrowLenPt=fsPt*(10/(17*1.5));
+    var arrowWPt=fsPt*(4/(17*1.5));
+    var gapPt=fsPt*(8/(17*1.5));
+    var centerMarkPt=fsPt*(8/(17*1.5));
+    (d.lines||[]).forEach(function(l){
+      try{ page.drawLine({start:{x:l.x1,y:l.y1},end:{x:l.x2,y:l.y2},thickness:linePt,color:pdfCol}); }catch(le190){}
+    });
+    (d.arrows||[]).forEach(function(a){
+      var p1=_hpRotPt(-arrowLenPt,arrowWPt,a.angle);
+      var p2=_hpRotPt(-arrowLenPt,-arrowWPt,a.angle);
+      var tx0=a.x, ty0=pageH-a.y;
+      var tx1=a.x+p1[0], ty1=pageH-(a.y+p1[1]);
+      var tx2=a.x+p2[0], ty2=pageH-(a.y+p2[1]);
+      var path='M'+tx0.toFixed(3)+' '+ty0.toFixed(3)+' L'+tx1.toFixed(3)+' '+ty1.toFixed(3)+' L'+tx2.toFixed(3)+' '+ty2.toFixed(3)+' Z';
+      try{ page.drawSvgPath(path,{x:0,y:pageH,color:pdfCol}); }catch(ae190){}
+    });
+    if(d.text&&jpFont){
+      var dtext=_hpFixChars(d.text);
+      var angleDeg=-(d.tangle||0)*180/Math.PI;
+      var off=_hpRotPt(0,-gapPt,d.tangle||0);
+      var totalW=0;
+      try{ totalW=jpFont.widthOfTextAtSize(dtext,fsPt); }catch(we190){}
+      var anchorX=d.tx+off[0], anchorY=d.ty+off[1];
+      var startAdv=_hpPdfAdvance(-totalW/2,angleDeg);
+      var drawX=anchorX+startAdv[0], drawY=anchorY+startAdv[1];
+      try{
+        page.drawText(dtext,{x:drawX,y:drawY,size:fsPt,font:jpFont,color:pdfCol,rotate:degreesFn(angleDeg)});
+      }catch(txe190){ console.warn('[PDF merge] text draw fail',txe190); }
+      if(typeof needsUnderbar==='function'&&needsUnderbar(dtext)){
+        var ubOff=0.3*72/25.4; // 旧+0.3mmのpt換算
+        var u1=_hpRotPt(-totalW/2,-gapPt+ubOff,d.tangle||0);
+        var u2=_hpRotPt(totalW/2,-gapPt+ubOff,d.tangle||0);
+        try{
+          page.drawLine({start:{x:d.tx+u1[0],y:d.ty+u1[1]},end:{x:d.tx+u2[0],y:d.ty+u2[1]},thickness:Math.max(0.1,fsPt*0.07),color:pdfCol});
+        }catch(ue190){}
+      }
+    }
+    if(d.centerMark){
+      var cx190=d.centerMark.cx, cy190=d.centerMark.cy;
+      try{
+        page.drawLine({start:{x:cx190-centerMarkPt,y:cy190},end:{x:cx190+centerMarkPt,y:cy190},thickness:linePt,color:pdfCol});
+        page.drawLine({start:{x:cx190,y:cy190-centerMarkPt},end:{x:cx190,y:cy190+centerMarkPt},thickness:linePt,color:pdfCol});
+      }catch(cme190){}
+    }
+  }
+}
+
 // V1_188: V1_183でexportHybridPDF()に_collectInto182(バッチ収集用配列)引数を
 // 追加した際、このリスナー登録を直接参照(exportHybridPDF)のままにしていたため、
 // クリック時にブラウザが自動で渡すMouseEventオブジェクトが_collectInto182として
@@ -1661,4 +1881,19 @@ async function exportHybridPDF(_collectInto182){
 // バグがあった(Event.pushが無く内部でエラーになり、かつエラー時のガイド表示も
 // 「バッチモード中は個別ガイドを出さない」分岐によって抑制されるため、ボタンが
 // 「反応しない」ように見えていた)。無名関数でラップし引数を渡さないよう修正。
-document.getElementById('hybridPDFBtn').addEventListener('click',function(){ exportHybridPDF(); });
+// V1_190: PDFを開いている場合は、元PDF+書込み・寸法を合体するページ選択付きの
+// 専用フロー(exportPdfMergedHybrid190)を使う。DXF等それ以外は従来通り
+// exportHybridPDF()を呼ぶ(挙動は一切変更していない)
+document.getElementById('hybridPDFBtn').addEventListener('click',function(){
+  if(typeof pdfDoc!=='undefined'&&pdfDoc){
+    if(typeof _showPdfHdExportPageDialog190==='function'){
+      _showPdfHdExportPageDialog190(document.getElementById('hybridPDFBtn'),function(pages){
+        exportPdfMergedHybrid190(pages);
+      });
+    } else {
+      showGuide('ページ選択機能が読み込まれていません',2000);
+    }
+    return;
+  }
+  exportHybridPDF();
+});

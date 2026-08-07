@@ -34,6 +34,12 @@
      classic scriptタグ(window.XLSXグローバル)で配布しているため、pdf.jsのような
      ESモジュール移行の問題は発生しない -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<!-- V1_193: PDFを開いている時の「HD-PDF書出」で、元PDFのページ自体(ベクター)に
+     書込み・寸法を直接合成するために追加。pdf-libは既存PDFページのコピー・
+     ベクター描画(線・SVGパス・文字)ができるが日本語のような非埋め込み標準14書体
+     以外のフォントはfontkitを登録しないと埋め込めないため、あわせて追加した -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -54,8 +60,8 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none} /* V0_159: コマンドが収まらない場合は横スライドで全て選択可能に */
 .topbar::-webkit-scrollbar{display:none}
 /* V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間だけ表示する点滅警告バナー。
-   V1_188: ヘッダー右端だとボタン類をスクロールしないと隠れて見えないとの指摘のため、
-   画面左上への固定表示に変更したが、V1_188でヘッダーに重なる配置は不適切との
+   V1_193: ヘッダー右端だとボタン類をスクロールしないと隠れて見えないとの指摘のため、
+   画面左上への固定表示に変更したが、V1_193でヘッダーに重なる配置は不適切との
    指摘を受け、ファイルタブ列(#tabBarRow)の下にある図面表示エリア(#stage、
    position:relative)内の左上に変更(#pdfPageCtrlと同じ配置方式)。ヘッダー・
    タブ列と重ならず、かつ常に画面内に見える。点滅間隔は1s→3sのまま(3倍) */
@@ -747,7 +753,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 </button>
   <!-- V1_180: 設定パネルからヘッダー(HD-PDF書出の右)へ移動し「バックアップ」に改名。
        表示はDXFを開いている時だけ(_updateWriteBackupBtnVisibility/updateFileNavUIから呼出) -->
-  <button class="tb-btn" id="writeBackupBtn" title="元DXFと書込みデータ(.dxfview)を1つのZIPにまとめてバックアップ保存" style="border:2px solid #fff">
+  <button class="tb-btn" id="writeBackupBtn" title="元のDXF/PDFと書込みデータ(.dxfview)を1つのZIPにまとめてバックアップ保存" style="border:2px solid #fff">
   <span class="tb-tool-label">バックアップ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 </button>
@@ -763,7 +769,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <canvas id="ac"></canvas>
   <canvas id="ov"></canvas>
   <!-- V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間は目立つ点滅表示で警告する。
-       V1_188: ヘッダーと重ならないよう、タブ列の下にある本エリア(#stage)内の左上に配置 -->
+       V1_193: ヘッダーと重ならないよう、タブ列の下にある本エリア(#stage)内の左上に配置 -->
   <div id="tdfWarnBanner">実寸法師データ表示は現在テスト段階の為、正規使用NG</div>
   <div id="noDrawingMsg">
     <svg width="72" height="68" viewBox="0 0 72 68" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -860,12 +866,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_188</span>
+    <span id="ver-label">V1_194</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
-    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF,PDF,XLSX,CSV 対応</small></span> <!-- V1_188: 対応形式表記を実態に合わせて更新（機能は変更なし） -->
+    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF,PDF,XLSX,CSV 対応</small></span> <!-- V1_193: 対応形式表記を実態に合わせて更新（機能は変更なし） -->
   </button>
   <!-- V1_24: 「ファイルを開く」の中で検索とネイティブ選択を両方行うのはわかりにくいとの
        指摘を受け、検索してファイルを開く機能を別ボタンとして分離した。
@@ -1278,7 +1284,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_188';
+const APP_VERSION = 'V1_194';
 
 // =========================================================
 // グローバル状態
@@ -1673,6 +1679,33 @@ function drawOverlay(){
       octx.fillStyle='rgba(255,215,0,0.12)';octx.beginPath();octx.arc(_mx,_my,_mr,0,Math.PI*2);octx.fill();
       octx.restore();
     });
+  }
+  // V1_194: PDF表示中かつテキスト読込ピックモード時、タップ判定範囲を薄いオレンジで可視化
+  // (_tapPickTextのPDF側判定式(V1_192)と同一の幾何計算を用いて、実際のヒット範囲と完全に一致させる)
+  if(typeof pdfDoc!=='undefined'&&pdfDoc&&typeof _textPickTarget!=='undefined'&&_textPickTarget&&typeof pdfMoji!=='undefined'&&pdfMoji&&pdfMoji.length>0){
+    octx.save();
+    octx.fillStyle='rgba(255,165,0,0.28)';
+    for(var _pi194=0;_pi194<pdfMoji.length;_pi194++){
+      var _pe194=pdfMoji[_pi194];
+      if(!_pe194.text||!_pe194.text.trim()) continue;
+      var _pfs194=Math.max(6,_pe194.h*scale);
+      octx.font=_pfs194+'px sans-serif';
+      var _plines194=_pe194.text.split('\n');
+      var _pmaxW194=0;
+      for(var _li194=0;_li194<_plines194.length;_li194++){var _pw194=octx.measureText(_plines194[_li194]).width;if(_pw194>_pmaxW194)_pmaxW194=_pw194;}
+      var _pn194=_plines194.length;
+      var _ppad194=Math.max(8,_pfs194*0.35);
+      var _ptopMg194=_pfs194*1.05,_pbotMg194=_pfs194*0.45;
+      var _ptop194=-_pfs194*(_pn194-1)-_ptopMg194-_ppad194,_pbottom194=_pbotMg194+_ppad194,_pleft194=-_ppad194,_pright194=_pmaxW194+_ppad194;
+      var _pxy194=w2s(_pe194.x,_pe194.y);
+      var _pang194=(_pe194.angle||0)*Math.PI/180;
+      octx.save();
+      octx.translate(_pxy194[0],_pxy194[1]);
+      octx.rotate(-_pang194);
+      octx.fillRect(_pleft194,_ptop194,_pright194-_pleft194,_pbottom194-_ptop194);
+      octx.restore();
+    }
+    octx.restore();
   }
   octx.restore();
 }
@@ -2175,11 +2208,17 @@ function _updateTdfWarnBanner(){
 // V1_180: ヘッダーの「バックアップ」ボタンはDXFを開いている時だけ表示する
 // (PDF/エクセル/実寸法師(.tdf)表示中や、ファイルを何も開いていない時は隠す)。
 // updateFileNavUI()から呼ぶことで、_updateTdfWarnBannerと同様に全ての読込経路をカバーする
+// V1_193: PDFを開いている時にもバックアップ機能を使えるようにしたため、PDFの時も
+// 表示するよう対象を拡張。バックアップ本体(exportDxfviewManual/
+// _buildDxfviewBackupPayload183)は元々ファイル種別を判定しておらず(openFilesBufs[]
+// から生バイトを取得するだけ)、復元(importDxfviewManual→openDxfFromDb)も拡張子で
+// DXF/PDFを自動判定する実装のため、表示条件をここで広げるだけで両方向とも対応できる
 function _updateWriteBackupBtnVisibility(){
   var btn=document.getElementById('writeBackupBtn');
   if(!btn) return;
   var isDxf=(currentFileName||'').toLowerCase().endsWith('.dxf');
-  btn.style.display=isDxf?'':'none';
+  var isPdf191=(currentFileName||'').toLowerCase().endsWith('.pdf');
+  btn.style.display=(isDxf||isPdf191)?'':'none';
 }
 function updateFileNavUI(){
   _updateTdfWarnBanner();
@@ -5804,7 +5843,7 @@ function _setTextPickMode(target){
   // 「もう一度ボタンを押す」操作自体が存在せず文言が実態と合っていなかった。
   // 全図面検索(all)・シート内検索(excelLocal)はボタンによる手動トグルが今も残っている
   // ため、その場合に限りこの案内を表示する
-  if(target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0);
+  if(target) showGuide('図面上の文字をタップしてください'+((typeof pdfDoc!=='undefined'&&pdfDoc)?'（オレンジ色の部分をタップ）':'')+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0); // V1_194: PDF中はオレンジ可視化の説明を追加
   else hideGuide();
   var b1=document.getElementById('screenTextPickBtn');
   var b2=document.getElementById('allTextPickBtn');
@@ -5833,10 +5872,12 @@ function _setTextPickMode(target){
     var _shrink125=(target==='screen'||target==='all'||target==='openFile')&&(typeof excelWb!=='undefined'&&excelWb);
     _tableWrap122.classList.toggle('excel-search-shrink',_shrink125);
   }
+  if(typeof scheduleOverlay==='function') scheduleOverlay(); // V1_194: ピックモード切替時にオレンジ可視化を即反映
 }
 function _tapPickText(sx0,sy0){
   // V1_51: DXFのdoc.mojiが無い場合はPDFから抽出したpdfMojiを使う
-  var _mojiArr151=(doc&&doc.moji)?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
+  var _isDxfMoji192=!!(doc&&doc.moji); // V1_193
+  var _mojiArr151=_isDxfMoji192?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
   if(!_mojiArr151||_mojiArr151.length===0){showGuide('図面に文字がありません',2000);return;}
   var mctx=document.getElementById('ov').getContext('2d');
   var best=null,bestArea=Infinity;
@@ -5851,14 +5892,28 @@ function _tapPickText(sx0,sy0){
     // タップ座標を文字ローカル座標系に戻す
     var lx=dx*cos-dy*sin, ly=dx*sin+dy*cos;
     if(e.widthFactor&&Math.abs(e.widthFactor-1)>0.01) lx/=e.widthFactor;
-    var fs=Math.max(6,e.h*scale);
+    // V1_193: 「PDFの文字はタップ位置が微妙にずれた所じゃないとヒットしない」との
+    // 指摘を受けて2点を修正した。
+    // ① DXF文字(doc.moji)は画面表示(drawText、viewer.js)がMOJI_SIZE_MULTIPLIER
+    //    (1.1倍)込みのフォントサイズで描画しているのに、この当たり判定だけ
+    //    掛け忘れており、見た目より小さい判定枠になっていた(DXF文字の場合の
+    //    ズレの主因)。表示と同じ倍率を掛けて完全に一致させる。
+    // ② PDF文字(pdfMoji)は実際にはアプリが描画しているのではなく、元PDFの
+    //    埋め込みフォントでpdf.js側がラスター画像として焼き込んだものであり、
+    //    実際のフォントのアセント/ディセント比はここで使う汎用sans-serifとは
+    //    一致しない(フォントによって上下の実寸が変わる)。DXF文字のように
+    //    厳密な一致は望めないため、上下左右の当たり判定を広めに取り、
+    //    多少の位置ズレがあってもヒットしやすくする
+    var fs=Math.max(6,e.h*scale*(_isDxfMoji192?MOJI_SIZE_MULTIPLIER:1));
     mctx.font=fs+'px sans-serif';
     var lines=e.text.split('\n');
     var maxW=0;
     for(var li=0;li<lines.length;li++){var w=mctx.measureText(lines[li]).width;if(w>maxW)maxW=w;}
     var n=lines.length;
-    var pad=Math.max(4,fs*0.15);
-    var top=-fs*(n-1)-fs*0.85-pad, bottom=fs*0.3+pad, left=-pad, right=maxW+pad;
+    var pad=_isDxfMoji192?Math.max(4,fs*0.15):Math.max(8,fs*0.35);
+    var topMg192=_isDxfMoji192?fs*0.85:fs*1.05;
+    var botMg192=_isDxfMoji192?fs*0.3:fs*0.45;
+    var top=-fs*(n-1)-topMg192-pad, bottom=botMg192+pad, left=-pad, right=maxW+pad;
     if(lx>=left&&lx<=right&&ly>=top&&ly<=bottom){
       var area=(right-left)*(bottom-top);
       if(area<bestArea){bestArea=area;best=e;}

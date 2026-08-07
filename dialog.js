@@ -84,6 +84,73 @@ function _showPageJumpDialog(anchorEl){
 }
 
 // =========================================================
+// V1_190: PDFを開いている時の「HD-PDF書出」用ページ選択ダイアログ。
+// アップロードされたM_Viewer(V7.09、参考実装)の「現在のページ/全ページ」クイック
+// ボタン+範囲テキスト入力(例: 1-3,5)方式を、本アプリの既存ダイアログ配色・構造
+// (_showPageJumpDialog等)に合わせて実装したもの。
+// 依存関数: _parsePageRange190(本ファイル), showGuide (ui.js)
+// =========================================================
+function _showPdfHdExportPageDialog190(anchorEl,onConfirm){
+  if(!pdfDoc) return;
+  var existing=document.getElementById('_pdfHdPageMenu190');
+  if(existing){existing.remove();return;}
+  var total=pdfDoc.numPages;
+  var menu=document.createElement('div');
+  menu.id='_pdfHdPageMenu190';
+  menu.style.cssText='position:fixed;z-index:9999;background:#1e3a5f;border:2px solid #4a9eff;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:230px;box-shadow:0 4px 20px rgba(0,0,0,.7);';
+  var r=anchorEl.getBoundingClientRect();
+  menu.style.top=(r.bottom+6)+'px';
+  menu.style.right=Math.max(4,window.innerWidth-r.right)+'px';
+  menu.innerHTML='<div style="color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;">HD-PDF書出 — ページ指定（全'+total+'ページ）</div>'
+    +'<div style="display:flex;gap:7px;">'
+    +'<button type="button" id="_pdfHdCur190" style="flex:1;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:8px;padding:9px 4px;font-size:12px;cursor:pointer;">現在のページ</button>'
+    +'<button type="button" id="_pdfHdAll190" style="flex:1;background:#0a0c10;color:#eee;border:1px solid #2a3040;border-radius:8px;padding:9px 4px;font-size:12px;cursor:pointer;">全ページ</button>'
+    +'</div>'
+    +'<input type="text" id="_pdfHdRangeInput190" placeholder="例: 1, 1-5, 1,3,5-8" style="width:100%;box-sizing:border-box;padding:10px;border-radius:9px;font-size:15px;background:#0a0c10;color:#eee;border:1px solid #2a3040;text-align:center">'
+    +'<button id="_pdfHdGo190" style="background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">出力</button>'
+    +'<button id="_pdfHdCnl190" style="background:#333;color:#aaa;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;">キャンセル</button>';
+  document.body.appendChild(menu);
+  function closeMenu(){if(document.getElementById('_pdfHdPageMenu190'))menu.remove();}
+  var inp=document.getElementById('_pdfHdRangeInput190');
+  document.getElementById('_pdfHdCur190').onclick=function(){inp.value=String(pdfPageNum);};
+  document.getElementById('_pdfHdAll190').onclick=function(){inp.value='1-'+total;};
+  function doGo(){
+    var pages=_parsePageRange190(inp.value.trim(),total);
+    if(!pages.length){showGuide('ページ指定が無効です',2000);return;}
+    closeMenu();
+    onConfirm(pages);
+  }
+  document.getElementById('_pdfHdGo190').onclick=doGo;
+  inp.addEventListener('keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();doGo();}});
+  document.getElementById('_pdfHdCnl190').onclick=closeMenu;
+  inp.focus();
+  setTimeout(function(){document.addEventListener('click',function _dc(ev){
+    if(!menu.contains(ev.target)&&ev.target!==anchorEl){closeMenu();document.removeEventListener('click',_dc);}
+  });},10);
+}
+
+// V1_190: ページ範囲文字列("1, 1-5, 1,3,5-8"形式)を解析してページ番号配列を返す。
+// M_Viewer(参考実装)と同じ記法・仕様(範囲外・不正値は無視、重複除去、昇順ソート)
+function _parsePageRange190(str,total){
+  var pages=[],seen={};
+  (str||'').split(',').forEach(function(s){
+    s=s.trim();
+    if(!s) return;
+    if(s.indexOf('-')>=0){
+      var parts=s.split('-');
+      var a=parseInt(parts[0],10), b=parseInt(parts[1],10);
+      if(isNaN(a)||isNaN(b)) return;
+      for(var i=Math.max(1,a);i<=Math.min(total,b);i++){ if(!seen[i]){seen[i]=true;pages.push(i);} }
+    } else {
+      var n=parseInt(s,10);
+      if(n>=1&&n<=total&&!seen[n]){ seen[n]=true; pages.push(n); }
+    }
+  });
+  pages.sort(function(a,b){return a-b;});
+  return pages;
+}
+
+// =========================================================
 // V1_69: インデックスパターンの登録名入力ダイアログ
 // 依存関数: showGuide (ui.js)
 // =========================================================
