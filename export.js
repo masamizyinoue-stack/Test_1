@@ -1654,4 +1654,11 @@ async function exportHybridPDF(_collectInto182){
     btn.disabled=false;
   }
 }
-document.getElementById('hybridPDFBtn').addEventListener('click',exportHybridPDF);
+// V1_188: V1_183でexportHybridPDF()に_collectInto182(バッチ収集用配列)引数を
+// 追加した際、このリスナー登録を直接参照(exportHybridPDF)のままにしていたため、
+// クリック時にブラウザが自動で渡すMouseEventオブジェクトが_collectInto182として
+// 渡ってしまい、真の引数無し呼び出しのつもりが常にバッチモードと誤認識される
+// バグがあった(Event.pushが無く内部でエラーになり、かつエラー時のガイド表示も
+// 「バッチモード中は個別ガイドを出さない」分岐によって抑制されるため、ボタンが
+// 「反応しない」ように見えていた)。無名関数でラップし引数を渡さないよう修正。
+document.getElementById('hybridPDFBtn').addEventListener('click',function(){ exportHybridPDF(); });

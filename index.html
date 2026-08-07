@@ -54,10 +54,12 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none} /* V0_159: コマンドが収まらない場合は横スライドで全て選択可能に */
 .topbar::-webkit-scrollbar{display:none}
 /* V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間だけ表示する点滅警告バナー。
-   V1_186: ヘッダー右端だとボタン類をスクロールしないと隠れて見えないとの指摘のため、
-   画面左上に固定表示(position:fixed)に変更し、常に見える状態にした。点滅間隔も
-   読みにくいとの指摘により1s→3sに変更(3倍) */
-#tdfWarnBanner{display:none;position:fixed;top:8px;left:8px;z-index:9999;background:#e74c3c;color:#fff;
+   V1_188: ヘッダー右端だとボタン類をスクロールしないと隠れて見えないとの指摘のため、
+   画面左上への固定表示に変更したが、V1_188でヘッダーに重なる配置は不適切との
+   指摘を受け、ファイルタブ列(#tabBarRow)の下にある図面表示エリア(#stage、
+   position:relative)内の左上に変更(#pdfPageCtrlと同じ配置方式)。ヘッダー・
+   タブ列と重ならず、かつ常に画面内に見える。点滅間隔は1s→3sのまま(3倍) */
+#tdfWarnBanner{display:none;position:absolute;top:10px;left:10px;z-index:100;background:#e74c3c;color:#fff;
   font-weight:700;font-size:12px;line-height:1.3;padding:6px 10px;border-radius:8px;
   box-shadow:0 2px 8px rgba(0,0,0,.4);
   white-space:nowrap;animation:tdfWarnBlink 3s steps(1,end) infinite;}
@@ -749,8 +751,6 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">バックアップ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 </button>
-<!-- V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間は目立つ点滅表示で警告する -->
-<div id="tdfWarnBanner">実寸法師データ表示は現在テスト段階の為、正規使用NG</div>
 </div>
 <div id="tabBarRow">
   <button id="tabScrollLeftBtn" class="tab-scroll-btn" title="左へスクロール">‹</button>
@@ -762,6 +762,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <canvas id="cv"></canvas>
   <canvas id="ac"></canvas>
   <canvas id="ov"></canvas>
+  <!-- V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間は目立つ点滅表示で警告する。
+       V1_188: ヘッダーと重ならないよう、タブ列の下にある本エリア(#stage)内の左上に配置 -->
+  <div id="tdfWarnBanner">実寸法師データ表示は現在テスト段階の為、正規使用NG</div>
   <div id="noDrawingMsg">
     <svg width="72" height="68" viewBox="0 0 72 68" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect x="2" y="4" width="68" height="46" rx="3" stroke="#4a6080" stroke-width="2.5"/>
@@ -857,12 +860,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_186</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_188</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
-    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF,PDF,XLSX,CSV 対応</small></span> <!-- V1_186: 対応形式表記を実態に合わせて更新（機能は変更なし） -->
+    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF,PDF,XLSX,CSV 対応</small></span> <!-- V1_188: 対応形式表記を実態に合わせて更新（機能は変更なし） -->
   </button>
   <!-- V1_24: 「ファイルを開く」の中で検索とネイティブ選択を両方行うのはわかりにくいとの
        指摘を受け、検索してファイルを開く機能を別ボタンとして分離した。
@@ -1275,7 +1278,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_186';
+const APP_VERSION = 'V1_188';
 
 // =========================================================
 // グローバル状態
