@@ -27,6 +27,8 @@
 </script>
 <!-- V0_147: html2canvas削除（スクショ機能廃止に伴い不要） -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- V1_176: 書込みバックアップ(.dxfview)を元DXFと1つのZIPにまとめて保存するために追加 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <!-- V1_76: Excel(.xlsx/.xls/.csv)表示・テキスト読込用。SheetJSはcdnjs/unpkgでは
      旧版(0.18.5)しか配布されておらず、公式CDN(cdn.sheetjs.com)のみ最新版を
      classic scriptタグ(window.XLSXグローバル)で配布しているため、pdf.jsのような
@@ -51,6 +53,12 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   display:flex;align-items:center;gap:6px;padding:0 10px;position:relative;z-index:10;flex-shrink:0;
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none} /* V0_159: コマンドが収まらない場合は横スライドで全て選択可能に */
 .topbar::-webkit-scrollbar{display:none}
+/* V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間だけ表示する点滅警告バナー。
+   .topbarの右端にflex子要素として置き(margin-left:autoで右詰め)、既存ボタン配置には影響しない */
+#tdfWarnBanner{display:none;flex-shrink:0;margin-left:auto;background:#e74c3c;color:#fff;
+  font-weight:700;font-size:12px;line-height:1.3;padding:6px 10px;border-radius:8px;
+  white-space:nowrap;animation:tdfWarnBlink 1s steps(1,end) infinite;}
+@keyframes tdfWarnBlink{0%,50%{opacity:1}50.01%,100%{opacity:0.15}}
 /* V1_38: フォルダ検索は「検索してファイルを開く」と機能が重複するため廃止。
    検索ボタンは画面検索の単独ボタンとなったため、選択メニュー用CSS(#searchMenuPopup等)は削除した */
 .logo-block{display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex-shrink:0;padding:0 4px;max-width:150px;min-width:0}
@@ -732,6 +740,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">HD-PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
+<!-- V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間は目立つ点滅表示で警告する -->
+<div id="tdfWarnBanner">実寸法師データ表示は現在テスト段階の為、正規使用NG</div>
 </div>
 <div id="tabBarRow">
   <button id="tabScrollLeftBtn" class="tab-scroll-btn" title="左へスクロール">‹</button>
@@ -833,7 +843,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_169</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_176</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -916,10 +926,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="savePDFBtn" class="sp-action-btn" title="図面全体をPDF出力（倍率を選択できます）">PDF書出</button> <!-- V0_154: ヘッダーから移動・品質選択廃止(3倍固定) → V1_146: 倍率選択ダイアログを復活 -->
   </div>
   <div class="sp-section">
-    <button id="writeBackupBtn" class="sp-action-btn" title="書込みデータをバックアップ保存（.dxfview）">書込バックアップ</button> <!-- V1_168: ヘッダーから移動(PDF書出の下) -->
+    <button id="writeBackupBtn" class="sp-action-btn" title="元DXFと書込みデータ(.dxfview)を1つのZIPにまとめてバックアップ保存">書込バックアップ</button> <!-- V1_168: ヘッダーから移動(PDF書出の下) / V1_176: ZIP化 -->
   </div>
   <div class="sp-section">
-    <button id="importDxfviewBtn" class="sp-action-btn">書込復元</button> <!-- V0_136: .dxfview保存→書込復元に変更 -->
+    <button id="importDxfviewBtn" class="sp-action-btn" title="書込みバックアップ(.zipまたは旧形式.dxfview)を選んで復元">書込復元</button> <!-- V0_136: .dxfview保存→書込復元に変更 / V1_176: ZIP対応 -->
   </div>
   <div class="sp-section"> <!-- V1_03: クラウド保存状況（Supabaseの保存件数・使用サイズ） -->
     <div class="sp-label">クラウド保存状況（Supabase）</div>
@@ -1227,13 +1237,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
      省略しつつ、Filesアプリ側でDXFファイルが表示・選択できるようにする狙い。
      ※iOSバージョンにより挙動が異なる可能性があるため実機での確認が必要。
      もしDXFが開けない場合は直ちにV1_08（accept属性なし）へ戻すこと -->
-<input type="file" id="file" accept=".dxf,application/octet-stream" hidden>
-<input type="file" id="folderInput" webkitdirectory accept=".dxf" hidden>
+<!-- V1_173: 実寸法師(.tdf)読込対応のため、既存のaccept指定に".tdf"を追記した
+     （前述の経緯により.dxf側の並び・application/octet-streamのフォールバックは変更していない） -->
+<input type="file" id="file" accept=".dxf,.tdf,application/octet-stream" hidden>
+<input type="file" id="folderInput" webkitdirectory accept=".dxf,.tdf" hidden>
 <!-- V1_112: 検索結果1件だけインデックスを更新するための単一ファイル選択用input -->
-<input type="file" id="singleReindexInput" accept=".dxf,.pdf,.xlsx,.xls,.csv" hidden>
+<input type="file" id="singleReindexInput" accept=".dxf,.tdf,.pdf,.xlsx,.xls,.csv" hidden>
 <!-- V1_144: 「ファイルを選択してインデックス作成」用。フォルダ単位(folderInput)とは別に、
      複数の個別ファイルを直接選んでインデックスに追加・更新できるようにしたもの -->
-<input type="file" id="filesIndexInput" accept=".dxf,.pdf,.xlsx,.xls,.csv,application/octet-stream" multiple hidden>
+<input type="file" id="filesIndexInput" accept=".dxf,.tdf,.pdf,.xlsx,.xls,.csv,application/octet-stream" multiple hidden>
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
@@ -1254,7 +1266,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_169';
+const APP_VERSION = 'V1_176';
 
 // =========================================================
 // グローバル状態
@@ -1329,7 +1341,11 @@ var _panAnchorX=null,_panAnchorY=null;
 // アノテーション描画 V0_82: #ac専用Canvas（CTM=identity）
 // ワールド座標 → 物理ピクセル直接変換でzoom非依存
 // =========================================================
-function drawAnnotation(targetCtx) {
+function drawAnnotation(targetCtx, strokeFilter) {
+  // V1_170: strokeFilterで描画対象を絞り込めるようにした。'hl'=蛍光ペンのみ、
+  // 'pen'=ペンのみ、未指定(既存呼び出し)は従来通り全て描画する。
+  // 印刷時、蛍光ペン(半透明)をDXF文字より先に描画して文字の下に敷くことで、
+  // 黒文字が蛍光色で薄く見えてしまう問題を解消するために追加した(PDF書出のみで使用)。
   var atc = targetCtx || actx;
   if (!atc) return;
   var dpr = window.devicePixelRatio || 1;
@@ -1353,6 +1369,8 @@ function drawAnnotation(targetCtx) {
     var s = strokes[si];
     if(!s.pts || s.pts.length < 2) continue;
     if((s.page||1)!==_curPg65) continue;
+    if(strokeFilter==='hl' && !s.hl) continue; // V1_170
+    if(strokeFilter==='pen' && s.hl) continue; // V1_170
     var _sxMn=Infinity,_sxMx=-Infinity,_syMn=Infinity,_syMx=-Infinity;
     for(var _pi=0;_pi<s.pts.length;_pi++){var _ppx=physX(s.pts[_pi].x),_ppy=physY(s.pts[_pi].y);if(_ppx<_sxMn)_sxMn=_ppx;if(_ppx>_sxMx)_sxMx=_ppx;if(_ppy<_syMn)_syMn=_ppy;if(_ppy>_syMx)_syMx=_ppy;}
     if(_sxMx<-_mgPx||_sxMn>_cwPx+_mgPx||_syMx<-_mgPx||_syMn>_chPx+_mgPx) continue;
@@ -1670,7 +1688,7 @@ function _fileTypeSortKey(f){
   var n=((f&&(f.currentFileName||f.name))||'').toLowerCase();
   if(n.endsWith('.pdf')) return 1;
   if(_isExcelName(n)) return 2;
-  return 0; // DXF（既定）
+  return 0; // DXF・TDF（既定。V1_173: tdfもDXFと同じ並び扱い）
 }
 // V1_109: ファイル種類ごとのバッジ表示（ラベル・背景色）を一元管理する。
 // タブ一覧パネル(dialog.js)とメイン画面のタブバー(updateFileNavUI)の両方でこの関数を
@@ -1686,6 +1704,7 @@ function _fileTypeInfo(name){
   // 既存のアクセントカラー(--accent-2、オレンジ)へ変更した
   if(n.endsWith('.csv')) return {label:'CSV',color:'#f39c12'};
   if(_isExcelName(n)) return {label:'XLS',color:'#217346'};
+  if(n.endsWith('.tdf')) return {label:'TDF',color:'#e74c3c'}; // V1_175: DXF(青)と同色でかぶって見分けづらいとの指摘で赤に変更
   return {label:'DXF',color:'#1565c0'};
 }
 
@@ -1824,7 +1843,7 @@ fileInput.addEventListener('change',async e=>{
     }
   } else {
     try{
-      doc=parseDXF(buf);
+      doc=parseAnyDrawing(buf,f.name); // V1_173: .tdf(実寸法師)対応
       currentFileSize=f.size; // V0_103
       hiddenLayers.clear();strokes=[];dims=[];images=[];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_160: savedViewsはファイル横断のグローバル項目のためここではリセットしない
       // V0_131: ファイル切替時にマーク自動クリア
@@ -2132,7 +2151,17 @@ function _computeTabOrder(){
   return order;
 }
 
+// V1_175: 現在表示中のファイルが実寸法師(.tdf)由来かどうかで、試験段階警告バナーの表示を切り替える。
+// updateFileNavUI()はファイルを開く/切り替える/閉じる等、タブの状態が変わるたびに必ず呼ばれるため
+// (2144行目コメント参照)、ここに集約するだけで全ての読込経路をカバーできる
+function _updateTdfWarnBanner(){
+  var el=document.getElementById('tdfWarnBanner');
+  if(!el) return;
+  var isTdf=(currentFileName||'').toLowerCase().endsWith('.tdf');
+  el.style.display=isTdf?'block':'none';
+}
 function updateFileNavUI(){
+  _updateTdfWarnBanner();
   var bar=document.getElementById('tabBar');
   if(!bar) return;
   // V1_70: currentFileIdxのタブに「最後に表示していた通し番号」を記録する。
@@ -6407,7 +6436,7 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
       // V1_88: 検索で一致したシートがあれば切り替える（この後のrenderExcelView()で反映）
       if(sheet!=null&&sheet>=0&&excelWb&&sheet<excelWb.SheetNames.length) excelSheetIdx=sheet;
     } else {
-      doc=parseDXF(buf);
+      doc=parseAnyDrawing(buf,name); // V1_173: .tdf(実寸法師)対応
     }
     if(typeof renderExcelView==='function') renderExcelView(); // V1_76: excelWbの有無に応じて表示を同期
     currentFileSize=buf.byteLength;
@@ -6783,7 +6812,7 @@ document.getElementById('folderInput').addEventListener('change', function(e){
   // V1_76: Excel(.xlsx/.xls/.csv)も対象に追加
   var files = allFiles.filter(function(f){
     var n=f.name.toLowerCase();
-    return n.endsWith('.dxf')||n.endsWith('.pdf')||_isExcelName(n);
+    return n.endsWith('.dxf')||n.endsWith('.tdf')||n.endsWith('.pdf')||_isExcelName(n); // V1_173: .tdf対応
   });
   if(files.length === 0){
     progEl.textContent = 'DXF・PDF・Excelファイルが見つかりません';
@@ -6806,7 +6835,7 @@ document.getElementById('filesIndexInput').addEventListener('change', function(e
   var allFiles = Array.from(e.target.files);
   var files = allFiles.filter(function(f){
     var n=f.name.toLowerCase();
-    return n.endsWith('.dxf')||n.endsWith('.pdf')||_isExcelName(n);
+    return n.endsWith('.dxf')||n.endsWith('.tdf')||n.endsWith('.pdf')||_isExcelName(n); // V1_173: .tdf対応
   });
   if(files.length === 0){
     progEl.textContent = 'DXF・PDF・Excelファイルが見つかりません';
@@ -6841,7 +6870,7 @@ async function _readFileForSingleReindex(f){
       :XLSX.read(buf,{type:'array'});
     texts=extractAllExcelTexts(_wbSR112);
   } else {
-    var d=parseDXF(buf);
+    var d=parseAnyDrawing(buf,f.name); // V1_173: .tdf(実寸法師)対応
     if(d&&d.moji){
       d.moji.forEach(function(m){var t=(m.text||'').trim(); if(t) texts.push(t);});
     }
@@ -6934,7 +6963,7 @@ function processFolderFiles(files, progEl, folderName){
             :XLSX.read(buf,{type:'array'});
           texts=extractAllExcelTexts(_wb176);
         } else {
-          var d = parseDXF(buf);
+          var d = parseAnyDrawing(buf,f.name); // V1_173: .tdf(実寸法師)対応
           if(d && d.moji){
             d.moji.forEach(function(m){
               var t = (m.text || '').trim();

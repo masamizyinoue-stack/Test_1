@@ -259,7 +259,7 @@ async function tryRestore(){
             continue;
           }
           try{
-            var _pdoc=parseDXF(_buf2);
+            var _pdoc=parseAnyDrawing(_buf2,_mf.currentFileName||_mf.name); // V1_173: .tdf対応
             var _sv=(_mf.savedViews||[]).slice();
             while(_sv.length<5)_sv.push(null);
             var _fst={
@@ -391,7 +391,7 @@ async function tryRestore(){
         } else if(typeof _isExcelName==='function'&&_isExcelName(_sfName)){ // V1_76
           loadExcel(_restoreBuf,_sfName.toLowerCase().endsWith('.csv')); // V1_106: CSVは文字コード自動判定させる
         } else {
-          doc=parseDXF(_restoreBuf);detectScale();
+          doc=parseAnyDrawing(_restoreBuf,_sfName);detectScale(); // V1_173: .tdf対応
         }
         const nd=document.getElementById('noDrawingMsg');if(nd)nd.style.display='none';
         updateFileNameDisplay();

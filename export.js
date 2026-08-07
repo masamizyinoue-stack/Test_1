@@ -173,7 +173,7 @@ async function _runPdfExport(_dlgSel){
   showGuide('PDFを生成中...');
 
   // V0_141: Canvas解放用参照（outer finally でクリア）
-  let _rCv=null, _rOv=null, _rAc=null, _rComp=null;
+  let _rCv=null, _rOv=null, _rAc=null, _rComp=null, _rHl=null; // V1_170: _rHl追加(蛍光ペン先行描画用)
 
   try{
     // ── 1. バウンディングボックス計算（V0_111: 全エンティティ対象・hiddenLayer無視）─
@@ -308,6 +308,18 @@ async function _runPdfExport(_dlgSel){
       pctx.fillStyle=bwMode?'#fff':'#1e2430';
       pctx.fillRect(0,0,CW,CH);
 
+      // ①' 蛍光ペンのみ先行描画（V1_170: DXF/文字より下に敷くことで、印刷時に黒文字が
+      // 蛍光の半透明色で薄く見えてしまう問題を解消。実際の蛍光ペンのように「先に引いた
+      // 上へ黒字が重なる」順序にする。drawAnnotation()の第2引数'hl'で蛍光のみ描画）
+      {
+        const pdfHl=document.createElement('canvas'); pdfHl.width=CW; pdfHl.height=CH;
+        const pdfHlCtx=pdfHl.getContext('2d');
+        _rHl=pdfHl;
+        if(typeof drawAnnotation==='function') drawAnnotation(pdfHlCtx,'hl');
+        pctx.drawImage(pdfHl,0,0);
+        pdfHl.width=1; pdfHl.height=1; _rHl=null; // 即解放
+      }
+
       // ① メインDXF図形（draw: cv/ctxのみ使用）
       {
         const pdfCv=document.createElement('canvas'); pdfCv.width=CW; pdfCv.height=CH;
@@ -319,12 +331,13 @@ async function _runPdfExport(_dlgSel){
         pdfCv.width=1; pdfCv.height=1; _rCv=null; // 即解放
       }
 
-      // ② 手書き・蛍光ペン（drawAnnotation: 引数ctxのみで完結、グローバル不要）
+      // ② ペン書き込み（drawAnnotation: 第2引数'pen'で蛍光を除外し、文字の上に重ねる
+      // 従来通りの見た目を維持する。蛍光ペンは①'で描画済みのためここでは対象外）
       {
         const pdfAc=document.createElement('canvas'); pdfAc.width=CW; pdfAc.height=CH;
         const pdfAcCtx=pdfAc.getContext('2d');
         _rAc=pdfAc;
-        if(typeof drawAnnotation==='function') drawAnnotation(pdfAcCtx);
+        if(typeof drawAnnotation==='function') drawAnnotation(pdfAcCtx,'pen');
         pctx.drawImage(pdfAc,0,0);
         pdfAc.width=1; pdfAc.height=1; _rAc=null; // 即解放
       }
@@ -387,6 +400,7 @@ async function _runPdfExport(_dlgSel){
       if(_rCv)  { _rCv.width=1;   _rCv.height=1;   } _rCv=null;
       if(_rOv)  { _rOv.width=1;   _rOv.height=1;   } _rOv=null;
       if(_rAc)  { _rAc.width=1;   _rAc.height=1;   } _rAc=null;
+      if(_rHl)  { _rHl.width=1;   _rHl.height=1;   } _rHl=null; // V1_170
       if(_rComp){ _rComp.width=1; _rComp.height=1; } _rComp=null;
     }catch(e){}
     // V1_146: btn.disabled=falseは呼び出し元(savePDFBtnハンドラ)の.finally()側で
@@ -505,6 +519,7 @@ function _bkHandleSave(handle) {
 // V0_136: 書込バックアップ（ヘッダーボタン）
 // strokes / dims / savedViews / hiddenLayers を .dxfview に保存
 // V0_141.1: File System Access API 対応（保存先フォルダ記憶）
+// V1_176: .dxfviewと元DXFの生データを1つのZIPにまとめて保存する方式に変更
 // =========================================================
 async function exportDxfviewManual(){
   try{
@@ -530,15 +545,28 @@ async function exportDxfviewManual(){
       savedViews:(typeof savedViews!=='undefined'?savedViews:[null,null,null,null,null]),
       hiddenLayers:(typeof hiddenLayers!=='undefined'?[...hiddenLayers]:[])
     };
-    // V1_16: type:'application/json'のままだと、PWA(standalone)でのプレビュー画面
-    // 経由の保存時にiOSがJSONと認識して勝手に「.json」を末尾に付与してしまい、
-    // 「◯◯_書込み.dxfview.json」という名前で保存される不具合が判明した（書込復元側の
-    // accept='.dxfview'と拡張子が一致せず、復元時に選べなくなる恐れがある）。
-    // application/octet-stream（種類不明の汎用バイナリ）にすることで、iOSに拡張子を
-    // 推測・付与させず、ダウンロード時のファイル名(fname)をそのまま使わせる
-    const blob=new Blob([JSON.stringify(payload)],{type:'application/octet-stream'});
     const base=(currentFileName||'').replace(/\.[^.]+$/,'')||null;
-    const fname=(base?base+'_書込み':'書込み')+'.dxfview';
+    const dxfviewName=(base?base+'_書込み':'書込み')+'.dxfview';
+
+    // V1_176: 「.dxfviewと元のDXFを同じフォルダに残すと、どちらがどのファイルの
+    // バックアップか分かりにくい／片方だけ移動して対応が取れなくなる」との指摘により、
+    // .dxfview単体ではなく、元DXFの生データと.dxfviewを1つのZIPにまとめて保存する方式に変更した。
+    if(typeof JSZip==='undefined'){
+      showGuide('ZIP機能が読み込まれていません',2000);
+      return false;
+    }
+    const zip=new JSZip();
+    zip.file(dxfviewName, JSON.stringify(payload));
+    // openFilesBufs[]には開いている各タブの元ファイルの生バイナリがキャッシュされている
+    // (index.html fileInput.change等で設定)。取得できた場合のみ元DXFも同梱する
+    const _origBuf176=(typeof openFilesBufs!=='undefined'&&typeof currentFileIdx!=='undefined'&&currentFileIdx>=0)?openFilesBufs[currentFileIdx]:null;
+    var _dxfIncluded176=false;
+    if(_origBuf176 && currentFileName){
+      zip.file(currentFileName, _origBuf176);
+      _dxfIncluded176=true;
+    }
+    const blob=await zip.generateAsync({type:'blob'});
+    const fname=(base?base+'_書込みバックアップ':'書込みバックアップ')+'.zip';
 
     // ── V0_141.1: File System Access API でフォルダ記憶保存 ────────
     var _fsaSaved = false;
@@ -548,7 +576,7 @@ async function exportDxfviewManual(){
         var _prevHandle = await _bkHandleLoad();
         var opts = {
           suggestedName: fname,
-          types: [{ description: 'DXFView Backup', accept: { 'application/octet-stream': ['.dxfview'] } }] // V1_16: blobのtype変更に合わせて一致させる
+          types: [{ description: 'DXF+書込みバックアップ(ZIP)', accept: { 'application/zip': ['.zip'] } }] // V1_176: ZIP化に合わせて一致させる
         };
         if (_prevHandle) {
           // 前回ハンドルをstartInに指定（無効な場合はブラウザが自動的にデフォルトへ）
@@ -592,7 +620,7 @@ async function exportDxfviewManual(){
                           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
       if (_isStandalone && navigator.share && typeof navigator.canShare === 'function') {
         try {
-          var shareFile = new File([blob], fname, { type: 'application/json' });
+          var shareFile = new File([blob], fname, { type: 'application/zip' }); // V1_176: ZIP化に合わせて変更
           if (navigator.canShare({ files: [shareFile] })) {
             // V1_17: text指定のWeb Share方式（上記経緯により最終採用）。
             // 余分なテキストファイルが毎回もう1つ保存されるのは既知・許容済みの
@@ -616,9 +644,10 @@ async function exportDxfviewManual(){
       setTimeout(function(){URL.revokeObjectURL(url);},2000);
     }
 
-    if(typeof verify==='function')verify('バックアップ保存',{strokes:typeof strokes!=='undefined'?strokes.length:-1,dims:typeof dims!=='undefined'?dims.length:-1});
+    if(typeof verify==='function')verify('バックアップ保存',{strokes:typeof strokes!=='undefined'?strokes.length:-1,dims:typeof dims!=='undefined'?dims.length:-1,dxfIncluded:_dxfIncluded176});
     _abMarkSaved(); // V0_141.2: バックアップ成功時に自動バックアップ促進タイマーをリセット
-    showGuide('書込みデータを保存しました',2000);
+    // V1_176: 元DXFを同梱できなかった場合はその旨を伝える(書込みデータ自体は保存済み)
+    showGuide(_dxfIncluded176?'DXFと書込みデータをZIPに保存しました':'書込みデータのみZIPに保存しました(元DXFは同梱できませんでした)',2500);
     return true; // V0_145: 保存成功（閉じる連携用）
   }catch(e){
     console.warn('[dxfview backup] failed',e);
@@ -631,21 +660,50 @@ document.getElementById('writeBackupBtn').addEventListener('click',exportDxfview
 // =========================================================
 // V0_136: 書込復元（設定パネルボタン）
 // .dxfview ファイルを選択して strokes / dims / savedViews / hiddenLayers を復元
+// V1_176: 元DXFと.dxfviewをまとめたZIP(V1_176以降のバックアップ)にも対応。
+// 旧バージョンで保存した単体の.dxfviewファイルもそのまま復元できる(後方互換)
 // =========================================================
 function importDxfviewManual(){
   if(!confirm('現在の書込み内容は上書きされます。よろしいですか？'))return;
   var input=document.createElement('input');
   input.type='file';
-  input.accept='.dxfview';
+  input.accept='.dxfview,.zip';
   input.onchange=function(e){
     var file=e.target.files[0];
     if(!file)return;
+    var isZip176=file.name.toLowerCase().endsWith('.zip');
+    if(isZip176){
+      if(typeof JSZip==='undefined'){
+        showGuide('ZIP機能が読み込まれていません',2000);return;
+      }
+      JSZip.loadAsync(file).then(function(zipObj){
+        var dvName=Object.keys(zipObj.files).find(function(n){return n.toLowerCase().endsWith('.dxfview');});
+        if(!dvName){
+          showGuide('ZIP内に.dxfviewファイルが見つかりません',2500);return;
+        }
+        return zipObj.files[dvName].async('string');
+      }).then(function(text){
+        if(text===undefined)return; // 上のfindで見つからず既にガイド表示済み
+        _applyDxfviewJson176(text);
+      }).catch(function(err){
+        console.warn('[dxfview import zip] failed',err);
+        showGuide('ZIP読み込みに失敗しました',2000);
+      });
+      return;
+    }
     var reader=new FileReader();
-    reader.onload=function(ev){
+    reader.onload=function(ev){ _applyDxfviewJson176(ev.target.result); };
+    reader.readAsText(file,'UTF-8');
+  };
+  input.click();
+}
+// V1_176: importDxfviewManualから.dxfview形式のJSON文字列を受け取り、実際にstrokes/dims等へ
+// 適用する処理を切り出した共通関数(旧FileReader経路・新ZIP経路の両方から呼ばれる)
+function _applyDxfviewJson176(jsonText){
       try{
-        var d=JSON.parse(ev.target.result);
+        var d=JSON.parse(jsonText);
         if(!d||!d.format||(d.format!=='dxfview'&&d.format!=='dxfview-backup')){
-          showGuide('無効な.dxfviewファイルです',2000);return;
+          showGuide('無効な.dxfviewデータです',2000);return;
         }
         if(typeof snapshot==='function')snapshot();
         if(typeof strokes!=='undefined') strokes=d.strokes||[];
@@ -685,10 +743,6 @@ function importDxfviewManual(){
         console.warn('[dxfview import] failed',err);
         showGuide('.dxfview読み込みに失敗しました',2000);
       }
-    };
-    reader.readAsText(file,'UTF-8');
-  };
-  input.click();
 }
 document.getElementById('importDxfviewBtn').addEventListener('click',importDxfviewManual);
 
@@ -1004,7 +1058,11 @@ async function exportHybridPDF(){
     if(!isFinite(_hMnX)){showGuide('描画データがありません',2000);return true;} // V1_169: 閉じる連携用(データなし=出力不要なので閉じる処理は継続)
 
     // ── 2. ページサイズ・スケール決定 ──
-    const PAD=0.02;
+    // V1_171: 「周りの余白が多い。四隅のトリムマーク(隅の絵)がギリギリ見える程度まで
+    // 余白を減らしたい」との要望により、0.02(2%)→0.005(0.5%)に縮小。
+    // 完全に0にすると実際のプリンタの印字不可領域で用紙端が切れるリスクがあるため、
+    // 安全な最小限の余白として0.5%を残した
+    const PAD=0.005;
     const eW=_hMxX-_hMnX, eH=_hMxY-_hMnY;
     const extMinX=_hMnX-eW*PAD, extMinY=_hMnY-eH*PAD;
     const extW=eW*(1+2*PAD), extH=eH*(1+2*PAD);
@@ -1064,6 +1122,49 @@ async function exportHybridPDF(){
       return dashArr.map(function(d){ return Math.max(0.05, d*pdfScale*_sx); });
     }
 
+    // V1_170: 手書き（ペン・蛍光ペン）ベクター描画をfilterModeで絞り込めるよう関数化。
+    // 'hl'指定時は蛍光ペンのみ、'pen'指定時はペンのみを描画する。
+    // 蛍光ペンをDXF線・文字より先に(下に)描画することで、印刷時に黒文字が蛍光の
+    // 半透明色で薄く見えてしまう問題を解消する(実際の蛍光ペンのように、先に引いた
+    // マークの上へ黒字が重なる見た目にする)。ペンは従来通り文字の後(上)に描画する。
+    function _hpDrawStrokes170(filterMode){
+      if(typeof strokes==='undefined'||strokes.length===0) return;
+      const _curPg155=_curPage();
+      const lwRef155=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:scale;
+      for(const s of strokes){
+        if(!s.pts||s.pts.length<2) continue;
+        if((s.page||1)!==_curPg155) continue;
+        if(filterMode==='hl'&&!s.hl) continue;
+        if(filterMode==='pen'&&s.hl) continue;
+        const n=s.pts.length;
+        const col=s.color||{r:0,g:0,b:0};
+        const lwPx=s.hl?(s.lw*(scale/lwRef155)):Math.max(1,s.lw*(scale/lwRef155));
+        pdf.setDrawColor(col.r,col.g,col.b);
+        pdf.setLineWidth(Math.max(0.05,lwPx*_sx));
+        pdf.setLineCap('round'); pdf.setLineJoin('round');
+        if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':0.45}));
+        const P=s.pts.map(p=>[w2mx(p.x),w2my(p.y)]);
+        if(n===2){
+          pdf.line(P[0][0],P[0][1],P[1][0],P[1][1]);
+        }else{
+          let curX=(P[0][0]+P[1][0])/2, curY=(P[0][1]+P[1][1])/2;
+          const startX=curX, startY=curY;
+          const segs=[];
+          for(let i=1;i<n-1;i++){
+            const Qx=P[i][0], Qy=P[i][1];
+            const P2x=(P[i][0]+P[i+1][0])/2, P2y=(P[i][1]+P[i+1][1])/2;
+            const C1x=curX+2/3*(Qx-curX), C1y=curY+2/3*(Qy-curY);
+            const C2x=P2x+2/3*(Qx-P2x), C2y=P2y+2/3*(Qy-P2y);
+            segs.push([C1x-curX,C1y-curY,C2x-curX,C2y-curY,P2x-curX,P2y-curY]);
+            curX=P2x; curY=P2y;
+          }
+          segs.push([P[n-1][0]-curX, P[n-1][1]-curY]);
+          pdf.lines(segs,startX,startY,[1,1],'S',false);
+        }
+        if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':1}));
+      }
+    }
+
     // ── 6. DXF線分（sen）ベクター描画 ──
     if(doc&&doc.sen){
       for(const e of doc.sen){
@@ -1108,6 +1209,11 @@ async function exportHybridPDF(){
 
     // V1_153: 線分・円弧の描画で設定したダッシュ状態が後続の描画に残らないよう解除
     pdf.setLineDashPattern([],0);
+
+    // ── 7.6 蛍光ペンのみ先行描画（V1_170）──
+    // DXF線・文字より先に(下に)描画することで、印刷時に黒文字が蛍光の半透明色で
+    // 薄く見えてしまう問題を解消する。ペンは従来通り8.で文字の後(上)に描画する。
+    _hpDrawStrokes170('hl');
 
     // ── 7.5 文字（moji）をjsPDFベクター描画（V0_124: 日本語フォント対応、V1_151: 文字幅補正Phase1）──
     if(doc&&doc.moji&&doc.moji.length>0&&window._notoSansJPBase64){
@@ -1205,43 +1311,10 @@ async function exportHybridPDF(){
     // V1_155: 画面描画(drawAnnotation)と同じCatmull-Rom風2次ベジェのスムージングを、
     // jsPDFのpdf.lines()が対応する3次ベジェへ変換して描画する(標準変換式:
     // 現在のペン位置P0・2次制御点Q・終点P2に対しC1=P0+2/3(Q-P0), C2=P2+2/3(Q-P2))。
-    // ハイライトは setGState({'stroke-opacity':0.45}) で不透明度0.45を再現(ノード上で
-    // ExtGState/ca出力を実測確認済み)。ラスター画像を一切使わないため、V1_152で
-    // 対応した「巨大画像展開による黒画面」不具合の要因自体が構造的に無くなる。
-    if(typeof strokes!=='undefined'&&strokes.length>0){
-      const _curPg155=_curPage();
-      const lwRef155=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:scale;
-      for(const s of strokes){
-        if(!s.pts||s.pts.length<2) continue;
-        if((s.page||1)!==_curPg155) continue;
-        const n=s.pts.length;
-        const col=s.color||{r:0,g:0,b:0};
-        const lwPx=s.hl?(s.lw*(scale/lwRef155)):Math.max(1,s.lw*(scale/lwRef155));
-        pdf.setDrawColor(col.r,col.g,col.b);
-        pdf.setLineWidth(Math.max(0.05,lwPx*_sx));
-        pdf.setLineCap('round'); pdf.setLineJoin('round');
-        if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':0.45}));
-        const P=s.pts.map(p=>[w2mx(p.x),w2my(p.y)]);
-        if(n===2){
-          pdf.line(P[0][0],P[0][1],P[1][0],P[1][1]);
-        }else{
-          let curX=(P[0][0]+P[1][0])/2, curY=(P[0][1]+P[1][1])/2;
-          const startX=curX, startY=curY;
-          const segs=[];
-          for(let i=1;i<n-1;i++){
-            const Qx=P[i][0], Qy=P[i][1];
-            const P2x=(P[i][0]+P[i+1][0])/2, P2y=(P[i][1]+P[i+1][1])/2;
-            const C1x=curX+2/3*(Qx-curX), C1y=curY+2/3*(Qy-curY);
-            const C2x=P2x+2/3*(Qx-P2x), C2y=P2y+2/3*(Qy-P2y);
-            segs.push([C1x-curX,C1y-curY,C2x-curX,C2y-curY,P2x-curX,P2y-curY]);
-            curX=P2x; curY=P2y;
-          }
-          segs.push([P[n-1][0]-curX, P[n-1][1]-curY]);
-          pdf.lines(segs,startX,startY,[1,1],'S',false);
-        }
-        if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':1}));
-      }
-    }
+    // ラスター画像を一切使わないため、V1_152で対応した「巨大画像展開による黒画面」
+    // 不具合の要因自体が構造的に無くなる。
+    // V1_170: 蛍光ペンは7.6で文字より先に描画済みのため、ここではペンのみ描画する。
+    _hpDrawStrokes170('pen');
 
     // ── 9. 寸法（dims）ベクター描画 ──
     // V1_155: 寸法線・矢印・センターマーク・寸法文字・アンダーバーを全てベクター化。
