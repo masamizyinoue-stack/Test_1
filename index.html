@@ -866,7 +866,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V1_194</span>
+    <span id="ver-label">V1_197</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1237,6 +1237,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <span class="pdf-thumb-ctrl-val" id="pdfThumbZVal">6.0x</span>
         <button class="pdf-thumb-step" data-target="z" data-delta="0.5">＋</button>
       </div>
+      <!-- V1_197: 図面番号モードの拡大位置(ポイント)を上下左右に移動する調整ボタン。
+           既定値は従来通りデータ右下(offXPct=0,offYPct=0)のまま変更なし -->
+      <div class="pdf-thumb-ctrl-group">
+        <span class="pdf-thumb-ctrl-label">位置</span>
+        <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="left">◀</button>
+        <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="up">▲</button>
+        <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="down">▼</button>
+        <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="right">▶</button>
+      </div>
       <button id="pdfThumbModeBtn" class="pdf-thumb-mode-btn">図面番号モード</button>
       <button class="sp-close" id="pdfThumbCloseBtn">閉じる</button>
     </div>
@@ -1267,24 +1276,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=1113"></script>
-<script src="viewer.js?v=1113"></script>
-<script src="utils.js?v=1113"></script>
-<script src="ui.js?v=1113"></script>
-<script src="dialog.js?v=1113"></script>
-<script src="storage.js?v=1113"></script>
-<script src="fonts/NotoSansJP.js?v=1113"></script>
-<script src="export.js?v=1113"></script>
-<script src="tool.js?v=1113"></script>
-<script src="verify.js?v=1113"></script>
+<script src="layer.js?v=1197"></script>
+<script src="viewer.js?v=1197"></script>
+<script src="utils.js?v=1197"></script>
+<script src="ui.js?v=1197"></script>
+<script src="dialog.js?v=1197"></script>
+<script src="storage.js?v=1197"></script>
+<script src="fonts/NotoSansJP.js?v=1197"></script>
+<script src="export.js?v=1197"></script>
+<script src="tool.js?v=1197"></script>
+<script src="verify.js?v=1197"></script>
+<!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
+<script src="shxGlyphs.js?v=1197"></script>
+<script src="stroke-text.js?v=1197"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=1113"></script>
+<script src="pc.js?v=1197"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=1113"></script>
+<script src="supabase-sync.js?v=1197"></script>
 <script>
-const APP_VERSION = 'V1_194';
+const APP_VERSION = 'V1_197';
 
 // =========================================================
 // グローバル状態
@@ -2595,7 +2607,9 @@ var PDF_THUMB_CFG_KEY='dxfViewerPdfThumbCfg';
 
 function _pdfThumbLoadCfg(){
   if(_pdfThumbCfg) return _pdfThumbCfg;
-  var d={widthPct:10,heightPct:10,zoom:6.0,modeOn:true};
+  // V1_197: offXPct/offYPct = 図面番号モードの拡大ポイントを右下基準からどれだけ
+  // 左/上へ移動したか(page幅・高さに対する%)。既定0は従来通りの右下固定と完全に同じ
+  var d={widthPct:10,heightPct:10,zoom:6.0,modeOn:true,offXPct:0,offYPct:0};
   try{
     var raw=localStorage.getItem(PDF_THUMB_CFG_KEY);
     if(raw){
@@ -2605,11 +2619,20 @@ function _pdfThumbLoadCfg(){
         if(typeof p.heightPct==='number')d.heightPct=p.heightPct;
         if(typeof p.zoom==='number')d.zoom=p.zoom;
         if(typeof p.modeOn==='boolean')d.modeOn=p.modeOn;
+        if(typeof p.offXPct==='number')d.offXPct=p.offXPct;
+        if(typeof p.offYPct==='number')d.offYPct=p.offYPct;
       }
     }
   }catch(e){}
   _pdfThumbCfg=d;
   return d;
+}
+// V1_197: offXPct/offYPctが幅%/高さ%の範囲を超えないよう(=クロップ範囲がページ外に
+// 出ないよう)クランプする。幅%/高さ%を変更した直後にも呼ぶ
+function _pdfThumbClampOffset(c){
+  var maxX=Math.max(0,100-c.widthPct), maxY=Math.max(0,100-c.heightPct);
+  c.offXPct=Math.max(0,Math.min(maxX,c.offXPct||0));
+  c.offYPct=Math.max(0,Math.min(maxY,c.offYPct||0));
 }
 function _pdfThumbSaveCfg(){try{localStorage.setItem(PDF_THUMB_CFG_KEY,JSON.stringify(_pdfThumbCfg));}catch(e){}}
 function _pdfThumbUpdateCtrlUI(){
@@ -2639,6 +2662,7 @@ document.querySelectorAll('.pdf-thumb-step').forEach(function(btn){
     if(target==='w'){c.widthPct=Math.max(2,Math.min(60,Math.round((c.widthPct+delta)*10)/10));needCropRerender=true;}
     else if(target==='h'){c.heightPct=Math.max(2,Math.min(60,Math.round((c.heightPct+delta)*10)/10));needCropRerender=true;}
     else if(target==='z') c.zoom=Math.max(1,Math.min(15,Math.round((c.zoom+delta)*10)/10));
+    if(needCropRerender) _pdfThumbClampOffset(c); // V1_197: 幅%/高さ%変更でoffが範囲外になったら補正
     _pdfThumbSaveCfg();_pdfThumbUpdateCtrlUI();
     // 幅%・高さ%はクロップする範囲そのものが変わるため高解像度クロップの再生成が必要。
     // 倍率は表示上の拡大率が変わるだけ(クロップ画像自体は変わらない)なので再描画は不要
@@ -2652,6 +2676,21 @@ document.getElementById('pdfThumbModeBtn').addEventListener('click',function(){
   // ONにした際、まだ現在の幅%/高さ%でクロップを生成していなければ_buildPdfThumbGrid内の
   // needCropRegen判定により自動的に生成される。OFFにする場合は非表示にするだけでよい
   if(c.modeOn) _buildPdfThumbGrid(); else _pdfThumbRefreshOverlaysOnly();
+});
+// V1_197: 図面番号モードの拡大ポイント(上下左右)移動ボタン。押すたびにoffXPct/offYPctを
+// 2%刻みで変更し、ページ範囲内にクランプしてクロップを再生成する
+document.querySelectorAll('.pdf-thumb-pos-step').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var c=_pdfThumbLoadCfg();
+    var dir=btn.dataset.dir, STEP=2;
+    if(dir==='left') c.offXPct=(c.offXPct||0)+STEP;
+    else if(dir==='right') c.offXPct=(c.offXPct||0)-STEP;
+    else if(dir==='up') c.offYPct=(c.offYPct||0)+STEP;
+    else if(dir==='down') c.offYPct=(c.offYPct||0)-STEP;
+    _pdfThumbClampOffset(c);
+    _pdfThumbSaveCfg();
+    _buildPdfThumbGrid();
+  });
 });
 
 function closePdfThumbOverlay(){document.getElementById('pdfThumbOverlay').classList.remove('open');}
@@ -2690,14 +2729,20 @@ function _pdfThumbCellHtml(pg,total){
 // 直接高解像度レンダリングする(viewer.js _pdfRenderVisibleTileと同じ技法)。
 // ページ全体を高解像度化するのではなく、必要な小さな範囲だけを大きなscaleで
 // 描画するため、軽い処理のままくっきりした画像が得られる
-async function _pdfThumbRenderCrop(page,wPct,hPct){
+async function _pdfThumbRenderCrop(page,wPct,hPct,offXPct,offYPct){
   var CROP_TARGET_PX=800; // クロップ領域の目標描画幅(px)。大きいほどくっきりするが生成が重くなる
   var vp1=page.getViewport({scale:1});
   var s=Math.min(25,Math.max(1,CROP_TARGET_PX/((wPct/100)*vp1.width)));
   var fullVp=page.getViewport({scale:s});
   var cropW=Math.max(1,Math.round((wPct/100)*fullVp.width));
   var cropH=Math.max(1,Math.round((hPct/100)*fullVp.height));
-  var px0=Math.round(fullVp.width-cropW), py0=Math.round(fullVp.height-cropH);
+  // V1_197: offXPct/offYPct(ページ幅・高さに対する%)分だけ右下の基準位置から
+  // 左/上へ移動する。既定0の場合は従来通り右下ぴったりのクロップになる
+  var maxPx=fullVp.width-cropW, maxPy=fullVp.height-cropH;
+  var px0=Math.round(maxPx-(offXPct||0)/100*fullVp.width);
+  var py0=Math.round(maxPy-(offYPct||0)/100*fullVp.height);
+  px0=Math.max(0,Math.min(maxPx,px0));
+  py0=Math.max(0,Math.min(maxPy,py0));
   var canvas=document.createElement('canvas');
   canvas.width=cropW;canvas.height=cropH;
   await page.render({canvasContext:canvas.getContext('2d'),viewport:fullVp,transform:[1,0,0,1,-px0,-py0]}).promise;
@@ -2720,10 +2765,13 @@ function _pdfThumbFillCell(cell,overview,crop){
   var cfg=_pdfThumbLoadCfg();
   if(!cfg.modeOn||!crop) return;
   var dispW=Math.min(96,cfg.widthPct*cfg.zoom), dispH=Math.min(96,cfg.heightPct*cfg.zoom); // %単位(セルに対する比率)
+  // V1_197: offXPct/offYPct分だけ右下基準位置からオーバーレイの表示位置もずらす
+  var ovLeft=Math.max(0,Math.min(100-dispW,(100-dispW)-(cfg.offXPct||0)));
+  var ovTop=Math.max(0,Math.min(100-dispH,(100-dispH)-(cfg.offYPct||0)));
   var overlay=document.createElement('div');
   overlay.className='pdf-thumb-crop-overlay';
-  overlay.style.left=(100-dispW)+'%';
-  overlay.style.top=(100-dispH)+'%';
+  overlay.style.left=ovLeft+'%';
+  overlay.style.top=ovTop+'%';
   overlay.style.width=dispW+'%';
   overlay.style.height=dispH+'%';
   var cropCv=document.createElement('canvas');
@@ -2744,12 +2792,14 @@ async function _buildPdfThumbGrid(){
   _pdfThumbUpdateCtrlUI();
   var total=pdfDoc.numPages;
   var reuse=(_pdfThumbCache&&_pdfThumbCache.doc===pdfDoc&&_pdfThumbCache.overviews.length===total);
-  if(!reuse) _pdfThumbCache={doc:pdfDoc,overviews:new Array(total).fill(null),crops:new Array(total).fill(null),cropWPct:null,cropHPct:null};
+  if(!reuse) _pdfThumbCache={doc:pdfDoc,overviews:new Array(total).fill(null),crops:new Array(total).fill(null),cropWPct:null,cropHPct:null,cropOffXPct:null,cropOffYPct:null};
   var cache=_pdfThumbCache;
-  // 幅%・高さ%が前回生成時と異なる場合は、クロップキャッシュを作り直す(全体サムネイルは影響なし)
-  if(cfg.modeOn&&(cache.cropWPct!==cfg.widthPct||cache.cropHPct!==cfg.heightPct)){
+  // 幅%・高さ%・位置(offX/offY)が前回生成時と異なる場合は、クロップキャッシュを
+  // 作り直す(全体サムネイルは影響なし) V1_197: offXPct/offYPctも判定条件に追加
+  if(cfg.modeOn&&(cache.cropWPct!==cfg.widthPct||cache.cropHPct!==cfg.heightPct||cache.cropOffXPct!==cfg.offXPct||cache.cropOffYPct!==cfg.offYPct)){
     cache.crops=new Array(total).fill(null);
     cache.cropWPct=cfg.widthPct;cache.cropHPct=cfg.heightPct;
+    cache.cropOffXPct=cfg.offXPct;cache.cropOffYPct=cfg.offYPct;
   }
   var cells=[];
   for(var i=1;i<=total;i++){
@@ -2782,7 +2832,7 @@ async function _buildPdfThumbGrid(){
     if(cache.crops[q-1]) continue; // 生成済み
     try{
       var page2=await pdfDoc.getPage(q);
-      var cropCanvas=await _pdfThumbRenderCrop(page2,cfg.widthPct,cfg.heightPct);
+      var cropCanvas=await _pdfThumbRenderCrop(page2,cfg.widthPct,cfg.heightPct,cfg.offXPct,cfg.offYPct);
       if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
       cache.crops[q-1]=cropCanvas;
       var cellNow2=cells[q-1];
@@ -5878,10 +5928,11 @@ function _tapPickText(sx0,sy0){
   // V1_51: DXFのdoc.mojiが無い場合はPDFから抽出したpdfMojiを使う
   var _isDxfMoji192=!!(doc&&doc.moji); // V1_193
   var _mojiArr151=_isDxfMoji192?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
-  if(!_mojiArr151||_mojiArr151.length===0){showGuide('図面に文字がありません',2000);return;}
+  // V1_195: doc.mojiが空(TEXT/MTEXT/ATTRIBが1つも無い)場合も、後段のストローク文字
+  // 認識フォールバックを試せるようにするため、ここでは即return せず素通りさせる
   var mctx=document.getElementById('ov').getContext('2d');
   var best=null,bestArea=Infinity;
-  for(var i=0;i<_mojiArr151.length;i++){
+  for(var i=0;i<(_mojiArr151?_mojiArr151.length:0);i++){
     var e=_mojiArr151[i];
     if(!e.text||!e.text.trim()) continue;
     var pos=w2s(e.x,e.y);
@@ -5919,7 +5970,23 @@ function _tapPickText(sx0,sy0){
       if(area<bestArea){bestArea=area;best=e;}
     }
   }
-  if(!best){showGuide('文字が見つかりませんでした。もう一度タップしてください',2200);return;}
+  if(!best){
+    // V1_195: 通常の文字(TEXT/MTEXT/ATTRIB)で見つからなかった場合のみ、DXF表示中
+    // (PDF・Excel表示中は対象外)に限ってストローク文字認識にフォールバックする。
+    // 線分・円弧だけで描かれた文字(分解済みテキスト等)をタップ位置周辺の形状から
+    // 推定する処理で、既存のdoc.moji読み込みには一切影響しない独立処理。
+    if(_isDxfMoji192 && typeof recognizeStrokeTextAt==='function'){
+      var _wp195=s2w(sx0,sy0);
+      var _sr195=null;
+      try{ _sr195=recognizeStrokeTextAt(_wp195[0],_wp195[1]); }catch(e195){ _sr195=null; }
+      if(_sr195 && _sr195.text){
+        _commitPickedText(_sr195.text);
+        return;
+      }
+    }
+    showGuide('文字が見つかりませんでした。もう一度タップしてください',2200);
+    return;
+  }
   _commitPickedText(best.text.replace(/\n/g,' ').trim());
 }
 

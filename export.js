@@ -1722,12 +1722,18 @@ async function exportPdfMergedHybrid190(pageNums){
         var copied190=(await outDoc190.copyPages(srcDoc190,[pg190-1]))[0];
         outDoc190.addPage(copied190);
         var pageH190=copied190.getSize().height;
+        // V1_196: ページに/Rotate(90/180/270)が付いている場合、書込み座標(表示上の
+        // 回転済みフレーム=world)とpdf-lib描画先(常に回転前の生PDF座標系)がずれて
+        // 書込みが回転して見えるバグの修正。pdf.jsのconvertToPdfPointで正しく変換する
+        var pdfPage190=await pdfDoc.getPage(pg190);
+        var vp190=pdfPage190.getViewport({scale:1});
+        var mapper190=_hpMakeRawMapper196(vp190);
         var pgStrokes190=(typeof strokes!=='undefined'?strokes:[]).filter(function(s){return (s.page||1)===pg190;});
         var pgDims190=(typeof dims!=='undefined'?dims:[]).filter(function(d){return (d.page||1)===pg190;});
         // 蛍光ペン(下)→寸法(中)→ペン(上)の順で重ねる(exportHybridPDFの重ね順に倣う)
-        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'hl',fitRef190,pageH190,rgb190,LineCapStyle190);
-        _hpDrawDimsPdfLib190(copied190,pgDims190,jpFont190,rgb190,degrees190,pageH190);
-        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'pen',fitRef190,pageH190,rgb190,LineCapStyle190);
+        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'hl',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190);
+        _hpDrawDimsPdfLib190(copied190,pgDims190,jpFont190,rgb190,degrees190,pageH190,mapper190);
+        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'pen',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190);
         okCount190++;
       }catch(pe190){
         console.error('[PDF merge] page='+pg190,pe190);
@@ -1785,11 +1791,29 @@ function _buildSmoothSvgPath190(pts,h){
   return d.trim();
 }
 
+// V1_196: ページの/Rotate(90/180/270度)による座標系のずれを補正するマッパーを
+// 生成する。vp=pdfPage.getViewport({scale:1})(表示中の回転済みビジュアルフレーム)。
+// 本アプリの「ワールド座標」はY上向き(w2s系)だが、pdf.jsのconvertToPdfPointは
+// Y下向きのビューポート座標を期待するため、まずY反転してから変換する。戻り値の
+// pt(wx,wy)はpdf-lib描画にそのまま使える生PDF座標(Y上向き)。angleDeltaDegは
+// 「ワールド上の角度」を「生PDF座標上の角度」に直すための加算量(度)。
+function _hpMakeRawMapper196(vp){
+  function pt(wx,wy){
+    var p=vp.convertToPdfPoint(wx, vp.height-wy);
+    return {x:p[0], y:p[1]};
+  }
+  var p0=pt(0,0), p1=pt(1,0);
+  var angleDeltaDeg=Math.atan2(p1.y-p0.y, p1.x-p0.x)*180/Math.PI;
+  return {pt:pt, angleDeltaDeg:angleDeltaDeg};
+}
+
 // V1_190: ペン・蛍光ペン(strokes)をpdf-libで元PDFページへ直接ベクター描画する。
 // 太さはfitRef(現在のfitScale)基準(前掲コメント参照)。DXF向け_hpDrawStrokes170
 // と役割は同じだが、pdfScale/w2mx/w2my変換が不要(ワールド座標=出力ページ座標)なため
 // 別関数として実装している
-function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,LineCapStyle){
+// V1_196: mapper引数を追加。ページ回転がある場合、各点をワールド座標→生PDF座標へ
+// 変換してから描画することで、書込みが回転してずれるバグを修正した
+function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,LineCapStyle,mapper){
   for(var i=0;i<pgStrokes.length;i++){
     var s=pgStrokes[i];
     if(!s.pts||s.pts.length<2) continue;
@@ -1797,7 +1821,8 @@ function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,Li
     if(filterMode==='pen'&&s.hl) continue;
     var col=s.color||{r:0,g:0,b:0};
     var lwPt=Math.max(0.1, (s.hl?s.lw:Math.max(1,s.lw)) / fitRef);
-    var svgPath=_buildSmoothSvgPath190(s.pts,pageH);
+    var rawPts196=mapper?s.pts.map(function(p){return mapper.pt(p.x,p.y);}):s.pts;
+    var svgPath=_buildSmoothSvgPath190(rawPts196,pageH);
     if(!svgPath) continue;
     try{
       page.drawSvgPath(svgPath,{
@@ -1818,8 +1843,20 @@ function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,Li
 // pdfScale/_sxによる単位変換が不要になった分だけDXF向けよりシンプル)。
 // 日本語フォントはNotoSansJPひとつを埋め込んで使うため、DXF向けのような
 // ASCII/日本語のフォント使い分け(_hpSplitRuns等)は行わず単純に中央揃えする
-function _hpDrawDimsPdfLib190(page,pgDims,jpFont,rgbFn,degreesFn,pageH){
+// V1_196: mapper引数を追加。すべての座標(線・矢印・文字位置・中心マーク)は
+// 「ワールド座標で絶対位置を計算し切ってから、最後にmapper.ptで生PDF座標へ
+// 変換する」方針で統一している(ローカルオフセットのベクトル自体はワールド座標系
+// のまま_hpRotPt等で計算してよい。回転していると混同しやすいのは、オフセット
+// 加算前の"中心点だけ"を変換して後からオフセットを足すような書き方で、90度/270度
+// 回転時はワールドのX方向と生PDF側のX方向が一致しないため、それをやると軸が
+// ずれる。必ず絶対座標を確定させた後に1点ずつ変換すること)。
+// 文字の回転角(drawTextのrotate)はmapper.angleDeltaDegを加算して補正する
+// (位置と違い、角度パラメータはpdf-lib内部でその生PDF座標系上の回転として
+// 直接使われるため、mapper.ptでは補正できないことに注意)
+function _hpDrawDimsPdfLib190(page,pgDims,jpFont,rgbFn,degreesFn,pageH,mapper){
   var DIM_MIN_TEXT_PT=1.2*72/25.4; // 旧DIM_MIN_TEXT_MM(1.2mm)のpt換算
+  function P196(x,y){ return mapper?mapper.pt(x,y):{x:x,y:y}; }
+  var angleDelta196=mapper?mapper.angleDeltaDeg:0;
   for(var i=0;i<pgDims.length;i++){
     var d=pgDims[i];
     var colArr=_hpHexColor(d.color);
@@ -1832,14 +1869,17 @@ function _hpDrawDimsPdfLib190(page,pgDims,jpFont,rgbFn,degreesFn,pageH){
     var gapPt=fsPt*(8/(17*1.5));
     var centerMarkPt=fsPt*(8/(17*1.5));
     (d.lines||[]).forEach(function(l){
-      try{ page.drawLine({start:{x:l.x1,y:l.y1},end:{x:l.x2,y:l.y2},thickness:linePt,color:pdfCol}); }catch(le190){}
+      var p1=P196(l.x1,l.y1), p2=P196(l.x2,l.y2);
+      try{ page.drawLine({start:p1,end:p2,thickness:linePt,color:pdfCol}); }catch(le190){}
     });
     (d.arrows||[]).forEach(function(a){
-      var p1=_hpRotPt(-arrowLenPt,arrowWPt,a.angle);
-      var p2=_hpRotPt(-arrowLenPt,-arrowWPt,a.angle);
-      var tx0=a.x, ty0=pageH-a.y;
-      var tx1=a.x+p1[0], ty1=pageH-(a.y+p1[1]);
-      var tx2=a.x+p2[0], ty2=pageH-(a.y+p2[1]);
+      var o1=_hpRotPt(-arrowLenPt,arrowWPt,a.angle);
+      var o2=_hpRotPt(-arrowLenPt,-arrowWPt,a.angle);
+      // 3頂点はワールド絶対座標を確定させてから個別に変換する
+      var q0=P196(a.x,a.y), q1=P196(a.x+o1[0],a.y+o1[1]), q2=P196(a.x+o2[0],a.y+o2[1]);
+      var tx0=q0.x, ty0=pageH-q0.y;
+      var tx1=q1.x, ty1=pageH-q1.y;
+      var tx2=q2.x, ty2=pageH-q2.y;
       var path='M'+tx0.toFixed(3)+' '+ty0.toFixed(3)+' L'+tx1.toFixed(3)+' '+ty1.toFixed(3)+' L'+tx2.toFixed(3)+' '+ty2.toFixed(3)+' Z';
       try{ page.drawSvgPath(path,{x:0,y:pageH,color:pdfCol}); }catch(ae190){}
     });
@@ -1851,24 +1891,29 @@ function _hpDrawDimsPdfLib190(page,pgDims,jpFont,rgbFn,degreesFn,pageH){
       try{ totalW=jpFont.widthOfTextAtSize(dtext,fsPt); }catch(we190){}
       var anchorX=d.tx+off[0], anchorY=d.ty+off[1];
       var startAdv=_hpPdfAdvance(-totalW/2,angleDeg);
-      var drawX=anchorX+startAdv[0], drawY=anchorY+startAdv[1];
+      var drawXW=anchorX+startAdv[0], drawYW=anchorY+startAdv[1]; // ワールド絶対座標
+      var qd=P196(drawXW,drawYW);
       try{
-        page.drawText(dtext,{x:drawX,y:drawY,size:fsPt,font:jpFont,color:pdfCol,rotate:degreesFn(angleDeg)});
+        page.drawText(dtext,{x:qd.x,y:qd.y,size:fsPt,font:jpFont,color:pdfCol,rotate:degreesFn(angleDeg+angleDelta196)});
       }catch(txe190){ console.warn('[PDF merge] text draw fail',txe190); }
       if(typeof needsUnderbar==='function'&&needsUnderbar(dtext)){
         var ubOff=0.3*72/25.4; // 旧+0.3mmのpt換算
         var u1=_hpRotPt(-totalW/2,-gapPt+ubOff,d.tangle||0);
         var u2=_hpRotPt(totalW/2,-gapPt+ubOff,d.tangle||0);
+        var uq1=P196(d.tx+u1[0],d.ty+u1[1]), uq2=P196(d.tx+u2[0],d.ty+u2[1]);
         try{
-          page.drawLine({start:{x:d.tx+u1[0],y:d.ty+u1[1]},end:{x:d.tx+u2[0],y:d.ty+u2[1]},thickness:Math.max(0.1,fsPt*0.07),color:pdfCol});
+          page.drawLine({start:uq1,end:uq2,thickness:Math.max(0.1,fsPt*0.07),color:pdfCol});
         }catch(ue190){}
       }
     }
     if(d.centerMark){
       var cx190=d.centerMark.cx, cy190=d.centerMark.cy;
+      // 十字の4端点はワールド絶対座標を確定させてから個別に変換する
+      var cL=P196(cx190-centerMarkPt,cy190), cR=P196(cx190+centerMarkPt,cy190);
+      var cB=P196(cx190,cy190-centerMarkPt), cT=P196(cx190,cy190+centerMarkPt);
       try{
-        page.drawLine({start:{x:cx190-centerMarkPt,y:cy190},end:{x:cx190+centerMarkPt,y:cy190},thickness:linePt,color:pdfCol});
-        page.drawLine({start:{x:cx190,y:cy190-centerMarkPt},end:{x:cx190,y:cy190+centerMarkPt},thickness:linePt,color:pdfCol});
+        page.drawLine({start:cL,end:cR,thickness:linePt,color:pdfCol});
+        page.drawLine({start:cB,end:cT,thickness:linePt,color:pdfCol});
       }catch(cme190){}
     }
   }
