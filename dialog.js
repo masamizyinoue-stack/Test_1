@@ -365,6 +365,28 @@ function _showOpenFilesListMenu(anchorEl){
   listBody.style.cssText='display:flex;flex-direction:column;gap:2px;';
   listWrap.appendChild(listBody);
 
+  // V1_182: 複数選択したファイルへの一括「HD-PDF書出」「バックアップ」ボタン。
+  // どちらもファイルを閉じない(選択したタブを閉じるボタンとは独立)。
+  // exportHybridPDF/exportDxfviewManualはいずれもグローバル変数(doc/strokes/dims/
+  // currentFileName等)を直接参照する実装のため、switchToFile(idx)で対象タブに
+  // 切り替えた直後にそのまま呼び出せば、そのタブのデータを正しく処理できる
+  // (switchToFileは同期関数でありrAFの描画完了を待つ必要はない)
+  var batchRow=document.createElement('div');
+  batchRow.style.cssText='display:flex;gap:6px;margin-top:4px;flex-shrink:0;';
+  var batchPdfBtn=document.createElement('button');
+  batchPdfBtn.type='button';
+  batchPdfBtn.disabled=true;
+  batchPdfBtn.style.cssText='flex:1;background:#f1c40f;color:#000;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;opacity:.5;';
+  batchPdfBtn.textContent='HD-PDF書出';
+  var batchBackupBtn=document.createElement('button');
+  batchBackupBtn.type='button';
+  batchBackupBtn.disabled=true;
+  batchBackupBtn.style.cssText='flex:1;background:#fff;color:#000;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;opacity:.5;';
+  batchBackupBtn.textContent='バックアップ';
+  batchRow.appendChild(batchPdfBtn);
+  batchRow.appendChild(batchBackupBtn);
+  menu.appendChild(batchRow);
+
   var closeSelBtn=document.createElement('button');
   closeSelBtn.type='button';
   closeSelBtn.disabled=true;
@@ -395,6 +417,13 @@ function _showOpenFilesListMenu(anchorEl){
     closeSelBtn.disabled=(n===0);
     closeSelBtn.style.opacity=(n===0)?'.5':'1';
     closeSelBtn.textContent=(n===0)?'選択したタブを閉じる':('選択した'+n+'件を閉じる');
+    // V1_182: HD-PDF書出/バックアップボタンの有効/無効・件数表示もここで一緒に更新する
+    batchPdfBtn.disabled=(n===0);
+    batchPdfBtn.style.opacity=(n===0)?'.5':'1';
+    batchPdfBtn.textContent=(n===0)?'HD-PDF書出':('HD-PDF書出('+n+'件)');
+    batchBackupBtn.disabled=(n===0);
+    batchBackupBtn.style.opacity=(n===0)?'.5':'1';
+    batchBackupBtn.textContent=(n===0)?'バックアップ':('バックアップ('+n+'件)');
     updateSelectAllCb();
   }
   closeSelBtn.onclick=function(){
@@ -410,6 +439,45 @@ function _showOpenFilesListMenu(anchorEl){
     idxs.forEach(function(i){ if(typeof doCloseTab==='function') doCloseTab(i); });
     closeMenu();
     if(typeof showGuide==='function') showGuide(idxs.length+'件のタブを閉じました',2000);
+  };
+
+  // V1_182: 選択したfileKey群を、閉じるたびにインデックスがずれても正しく引けるよう
+  // 都度openFiles内のインデックスへ変換する共通処理
+  function _selectedIdxs182(){
+    var keys=Array.from(selected);
+    return keys.map(function(k){return openFiles.findIndex(function(x){return x.fileKey===k;});})
+      .filter(function(i){return i>=0;});
+  }
+  // V1_183: 複数選択時のHD-PDF書出/バックアップは、以前は1件ずつ個別に保存(pdf.save/
+  // showSaveFilePicker等)していたが、iOS Safari等のブラウザは「1回のユーザー操作につき
+  // 1回」しか保存/共有を許可しないため、1件目しか保存されず2件目以降が出てこない不具合が
+  // あった。export.js側にexportHybridPDFBatch183/exportDxfviewManualBatch183を新設し、
+  // 各ファイルの生成物をいったん集めて1つのZIPにまとめ、保存自体は1回だけ行うようにした
+  batchPdfBtn.onclick=function(){
+    if(selected.size===0) return;
+    var n=selected.size;
+    if(!confirm('選択した'+n+'件をHD-PDF書出します。よろしいですか？')) return;
+    var idxs=_selectedIdxs182();
+    closeMenu();
+    if(typeof exportHybridPDFBatch183!=='function') return;
+    exportHybridPDFBatch183(idxs).then(function(res){
+      if(typeof showGuide==='function'){
+        showGuide('HD-PDF書出完了: '+res.count+'件'+(res.skipped>0?(' (データなし等で'+res.skipped+'件スキップ)'):''),3000);
+      }
+    });
+  };
+  batchBackupBtn.onclick=function(){
+    if(selected.size===0) return;
+    var n=selected.size;
+    if(!confirm('選択した'+n+'件をバックアップします。よろしいですか？')) return;
+    var idxs=_selectedIdxs182();
+    closeMenu();
+    if(typeof exportDxfviewManualBatch183!=='function') return;
+    exportDxfviewManualBatch183(idxs).then(function(res){
+      if(typeof showGuide==='function'){
+        showGuide('バックアップ完了: '+res.count+'件'+(res.skipped>0?(' (データなし等で'+res.skipped+'件スキップ)'):''),3000);
+      }
+    });
   };
 
   function renderList(){

@@ -54,10 +54,13 @@ body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none} /* V0_159: コマンドが収まらない場合は横スライドで全て選択可能に */
 .topbar::-webkit-scrollbar{display:none}
 /* V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間だけ表示する点滅警告バナー。
-   .topbarの右端にflex子要素として置き(margin-left:autoで右詰め)、既存ボタン配置には影響しない */
-#tdfWarnBanner{display:none;flex-shrink:0;margin-left:auto;background:#e74c3c;color:#fff;
+   V1_186: ヘッダー右端だとボタン類をスクロールしないと隠れて見えないとの指摘のため、
+   画面左上に固定表示(position:fixed)に変更し、常に見える状態にした。点滅間隔も
+   読みにくいとの指摘により1s→3sに変更(3倍) */
+#tdfWarnBanner{display:none;position:fixed;top:8px;left:8px;z-index:9999;background:#e74c3c;color:#fff;
   font-weight:700;font-size:12px;line-height:1.3;padding:6px 10px;border-radius:8px;
-  white-space:nowrap;animation:tdfWarnBlink 1s steps(1,end) infinite;}
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+  white-space:nowrap;animation:tdfWarnBlink 3s steps(1,end) infinite;}
 @keyframes tdfWarnBlink{0%,50%{opacity:1}50.01%,100%{opacity:0.15}}
 /* V1_38: フォルダ検索は「検索してファイルを開く」と機能が重複するため廃止。
    検索ボタンは画面検索の単独ボタンとなったため、選択メニュー用CSS(#searchMenuPopup等)は削除した */
@@ -740,6 +743,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">HD-PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
+  <!-- V1_180: 設定パネルからヘッダー(HD-PDF書出の右)へ移動し「バックアップ」に改名。
+       表示はDXFを開いている時だけ(_updateWriteBackupBtnVisibility/updateFileNavUIから呼出) -->
+  <button class="tb-btn" id="writeBackupBtn" title="元DXFと書込みデータ(.dxfview)を1つのZIPにまとめてバックアップ保存" style="border:2px solid #fff">
+  <span class="tb-tool-label">バックアップ</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+</button>
 <!-- V1_175: 実寸法師(.tdf)読込は試験段階のため、開いている間は目立つ点滅表示で警告する -->
 <div id="tdfWarnBanner">実寸法師データ表示は現在テスト段階の為、正規使用NG</div>
 </div>
@@ -773,10 +782,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="prevPage" class="sp-page-btn">◀</button>
     <span id="pageInfo" class="sp-page-info">1/1</span>
     <button id="nextPage" class="sp-page-btn">▶</button>
-    <!-- V1_162: ページサムネイル一覧・図面番号欄インセット表示ボタン。
-         親div(#pdfPageCtrl)の表示/非表示に相乗りするためPDF表示時のみ自動的に出現する -->
-    <button id="pdfThumbBtn" class="sp-page-btn" title="ページサムネイル一覧">▦</button>
-    <button id="detailInsetBtn" class="sp-page-btn" title="図面番号欄インセット表示">🔍</button>
+    <!-- V1_162: ページサムネイル一覧ボタン。親div(#pdfPageCtrl)の表示/非表示に
+         相乗りするためPDF表示時のみ自動的に出現する。
+         V1_184: 「図面番号欄インセット表示」ボタン(detailInsetBtn)は使う場面が
+         無く分かりにくいとの指摘で削除。デザインもヘッダーの他ボタン(tb-btn)と
+         揃うようアイコン+ラベル付きのスタイルに変更した -->
+    <button class="tb-btn" id="pdfThumbBtn" title="ページサムネイル一覧" style="border:2px solid #8e44ad;width:44px;height:44px">
+      <span class="tb-tool-label">一覧</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    </button>
   </div>
   <!-- V1_76: Excel(.xlsx/.xls/.csv)表示用オーバーレイ。表示中はcv/ac/ov(canvas)を隠し、
        renderExcelView()(viewer.js)がタブ・テーブルを構築する -->
@@ -843,12 +857,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_176</span>
+    <span id="ver-label" style="font-size:11px;color:var(--text-dim);margin-right:auto;padding-left:8px">V1_186</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
     <span class="sp-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
-    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF 対応</small></span> <!-- V0_148.3: 表記のみ変更（機能は変更なし） -->
+    <span>ファイルを開く<br><small style="font-size:12px;opacity:.7">DXF,PDF,XLSX,CSV 対応</small></span> <!-- V1_186: 対応形式表記を実態に合わせて更新（機能は変更なし） -->
   </button>
   <!-- V1_24: 「ファイルを開く」の中で検索とネイティブ選択を両方行うのはわかりにくいとの
        指摘を受け、検索してファイルを開く機能を別ボタンとして分離した。
@@ -922,14 +936,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-section">
     <button id="layerBtn" class="sp-action-btn">レイヤ設定</button>
   </div>
+  <!-- V1_180: PDF書出はHD-PDF書出と機能重複のため削除。書込バックアップはヘッダーへ移動(「バックアップ」に改名) -->
   <div class="sp-section">
-    <button id="savePDFBtn" class="sp-action-btn" title="図面全体をPDF出力（倍率を選択できます）">PDF書出</button> <!-- V0_154: ヘッダーから移動・品質選択廃止(3倍固定) → V1_146: 倍率選択ダイアログを復活 -->
-  </div>
-  <div class="sp-section">
-    <button id="writeBackupBtn" class="sp-action-btn" title="元DXFと書込みデータ(.dxfview)を1つのZIPにまとめてバックアップ保存">書込バックアップ</button> <!-- V1_168: ヘッダーから移動(PDF書出の下) / V1_176: ZIP化 -->
-  </div>
-  <div class="sp-section">
-    <button id="importDxfviewBtn" class="sp-action-btn" title="書込みバックアップ(.zipまたは旧形式.dxfview)を選んで復元">書込復元</button> <!-- V0_136: .dxfview保存→書込復元に変更 / V1_176: ZIP対応 -->
+    <button id="importDxfviewBtn" class="sp-action-btn" title="ZIPバックアップを選択し、中のDXFを開いた上で書込みデータ(.dxfview)も復元(旧形式.dxfview単体にも対応)">バックアップ復元</button> <!-- V0_136: .dxfview保存→書込復元に変更 / V1_176: ZIP対応 / V1_177: ZIP内のDXFも開くよう変更しボタン名を「バックアップ復元」に -->
   </div>
   <div class="sp-section"> <!-- V1_03: クラウド保存状況（Supabaseの保存件数・使用サイズ） -->
     <div class="sp-label">クラウド保存状況（Supabase）</div>
@@ -1266,7 +1275,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=1113"></script>
 <script>
-const APP_VERSION = 'V1_176';
+const APP_VERSION = 'V1_186';
 
 // =========================================================
 // グローバル状態
@@ -2160,8 +2169,18 @@ function _updateTdfWarnBanner(){
   var isTdf=(currentFileName||'').toLowerCase().endsWith('.tdf');
   el.style.display=isTdf?'block':'none';
 }
+// V1_180: ヘッダーの「バックアップ」ボタンはDXFを開いている時だけ表示する
+// (PDF/エクセル/実寸法師(.tdf)表示中や、ファイルを何も開いていない時は隠す)。
+// updateFileNavUI()から呼ぶことで、_updateTdfWarnBannerと同様に全ての読込経路をカバーする
+function _updateWriteBackupBtnVisibility(){
+  var btn=document.getElementById('writeBackupBtn');
+  if(!btn) return;
+  var isDxf=(currentFileName||'').toLowerCase().endsWith('.dxf');
+  btn.style.display=isDxf?'':'none';
+}
 function updateFileNavUI(){
   _updateTdfWarnBanner();
+  _updateWriteBackupBtnVisibility();
   var bar=document.getElementById('tabBar');
   if(!bar) return;
   // V1_70: currentFileIdxのタブに「最後に表示していた通し番号」を記録する。
@@ -2263,11 +2282,11 @@ function closeTab(idx){
     b.addEventListener('click',function(){document.body.removeChild(dlg);cb();});
     box.appendChild(b);
   }
-  makeBtn('HD-PDF書出して閉じる','#00d4ff','#000',function(){
+  makeBtn('バックアップして閉じる','#00d4ff','#000',function(){
     if(idx!==currentFileIdx) switchToFile(idx); // V0_107: 対象タブのdoc/strokes/dimsを確実にロード
-    // V1_169: 書込バックアップ(.dxfview)→HD-PDF書出に変更
-    // exportHybridPDFの完了(false=失敗)を待ってから閉じる
-    Promise.resolve(exportHybridPDF()).then(function(ok){
+    // V1_169: 書込バックアップ(.dxfview)→HD-PDF書出に変更 / V1_181: HD-PDF書出→書込みバックアップ(ZIP)に戻す
+    // exportDxfviewManualの完了(false=失敗・キャンセル)を待ってから閉じる
+    Promise.resolve(exportDxfviewManual()).then(function(ok){
       if(ok!==false) doCloseTab(idx);
     });
   });
@@ -2849,11 +2868,10 @@ function _diSetVisible(on){
   if(typeof scheduleSave==='function') scheduleSave();
 }
 
-document.getElementById('detailInsetBtn').addEventListener('click',function(){
-  if(!pdfDoc&&!(typeof doc!=='undefined'&&doc)){showGuide('図面がありません',1500);return;}
-  var di=_diCreate();
-  _diSetVisible(!di.visible);
-});
+// V1_184: 図面番号欄インセット表示の起動ボタン(detailInsetBtn)は削除した。
+// 以下の_di*関数群自体は他に安全に呼び出す経路が無くなり事実上休止するが、
+// switchToFile等から typeof チェック付きで参照されている箇所があるため
+// 関数定義自体は残す(既存機能保護のため、参照エラーを避ける安全策)
 
 // ヘッダードラッグでパネル自体の画面上の位置を移動(サブ窓のヘッダードラッグと同じ発想)
 function _diAttachDrag(){

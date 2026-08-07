@@ -151,7 +151,12 @@ var _PDF_SAFE_MEM_MB = 700;
 // 倍率(2/3/4)を選んでもらい、選択後に実際のPDF生成処理(_runPdfExport、旧ハンドラの
 // 中身をそのまま関数化しただけで生成ロジック自体は変更していない)を呼ぶ。
 // ダイアログをキャンセルした場合はボタンを再度押せる状態に戻すだけで何もしない
-document.getElementById('savePDFBtn').addEventListener('click', function(){
+// V1_180: savePDFBtn(設定パネルの「PDF書出」)はHD-PDF書出と機能重複のため削除した。
+// _runPdfExport自体は他から参照されなくなるが、念のため関数定義は残す。
+// 要素が無くなったためnullガードを追加(旧来は無条件addEventListenerでエラーの元だった)
+{var _spdfBtn180=document.getElementById('savePDFBtn');
+if(_spdfBtn180){
+_spdfBtn180.addEventListener('click', function(){
   const btn = document.getElementById('savePDFBtn');
   if(typeof _showPdfQualityDialog!=='function'){
     // ダイアログ関数が無い場合のフォールバック（従来通り3倍固定で実行）
@@ -164,6 +169,7 @@ document.getElementById('savePDFBtn').addEventListener('click', function(){
     _runPdfExport(multi).finally(function(){ btn.disabled=false; });
   });
 });
+}}
 async function _runPdfExport(_dlgSel){
   // ── V1_146: 倍率(_dlgSel)は呼び出し元(savePDFBtnハンドラ)がダイアログで選ばせた値を
   // 引数として受け取る。以下の生成ロジック自体はV0_141〜V0_154から変更していない ──
@@ -521,32 +527,53 @@ function _bkHandleSave(handle) {
 // V0_141.1: File System Access API 対応（保存先フォルダ記憶）
 // V1_176: .dxfviewと元DXFの生データを1つのZIPにまとめて保存する方式に変更
 // =========================================================
+// V1_183: exportDxfviewManualからペイロード(JSON文字列)・同梱DXF情報の構築部分だけを
+// 切り出した共通処理。保存(showSaveFilePicker等)は行わない。データが無ければnullを返す。
+// 複数ファイル一括バックアップ(exportDxfviewManualBatch183)からも使う
+function _buildDxfviewBackupPayload183(){
+  if((!dims||dims.length===0)&&(!strokes||strokes.length===0)&&
+     (!savedViews||savedViews.every(function(v){return!v;}))&&
+     (!hiddenLayers||hiddenLayers.size===0)){
+    return null;
+  }
+  const fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
+  const payload={
+    version:1,
+    format:'dxfview-backup',
+    createdAt:new Date().toISOString(),
+    appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),
+    meta:{
+      fileName:currentFileName||'',
+      fileSize:currentFileSize||0,
+      fileKey:fk
+    },
+    strokes:(typeof strokes!=='undefined'?strokes:[]),
+    dims:(typeof dims!=='undefined'?dims:[]),
+    savedViews:(typeof savedViews!=='undefined'?savedViews:[null,null,null,null,null]),
+    hiddenLayers:(typeof hiddenLayers!=='undefined'?[...hiddenLayers]:[])
+  };
+  const base=(currentFileName||'').replace(/\.[^.]+$/,'')||null;
+  const dxfviewName=(base?base+'_書込み':'書込み')+'.dxfview';
+  // openFilesBufs[]には開いている各タブの元ファイルの生バイナリがキャッシュされている
+  // (index.html fileInput.change等で設定)。取得できた場合のみ元DXFも同梱する
+  const origBuf=(typeof openFilesBufs!=='undefined'&&typeof currentFileIdx!=='undefined'&&currentFileIdx>=0)?openFilesBufs[currentFileIdx]:null;
+  return {
+    payloadJson: JSON.stringify(payload),
+    dxfviewName: dxfviewName,
+    drawName: currentFileName||null,
+    drawBuf: (origBuf&&currentFileName)?origBuf:null,
+    base: base
+  };
+}
 async function exportDxfviewManual(){
   try{
-    if((!dims||dims.length===0)&&(!strokes||strokes.length===0)&&
-       (!savedViews||savedViews.every(function(v){return!v;}))&&
-       (!hiddenLayers||hiddenLayers.size===0)){
+    // ── ペイロード作成（V1_183: _buildDxfviewBackupPayload183に切り出し。ロジック自体は無変更）───
+    var _entry183=_buildDxfviewBackupPayload183();
+    if(!_entry183){
       showGuide('保存するデータがありません',2000);return true; // V0_145: データなし=バックアップ不要なので閉じる処理は継続
     }
-    // ── ペイロード作成（V0_136から変更なし）────────────────────────
-    const fk=(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null)||currentFileName||'';
-    const payload={
-      version:1,
-      format:'dxfview-backup',
-      createdAt:new Date().toISOString(),
-      appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),
-      meta:{
-        fileName:currentFileName||'',
-        fileSize:currentFileSize||0,
-        fileKey:fk
-      },
-      strokes:(typeof strokes!=='undefined'?strokes:[]),
-      dims:(typeof dims!=='undefined'?dims:[]),
-      savedViews:(typeof savedViews!=='undefined'?savedViews:[null,null,null,null,null]),
-      hiddenLayers:(typeof hiddenLayers!=='undefined'?[...hiddenLayers]:[])
-    };
-    const base=(currentFileName||'').replace(/\.[^.]+$/,'')||null;
-    const dxfviewName=(base?base+'_書込み':'書込み')+'.dxfview';
+    const dxfviewName=_entry183.dxfviewName;
+    const base=_entry183.base;
 
     // V1_176: 「.dxfviewと元のDXFを同じフォルダに残すと、どちらがどのファイルの
     // バックアップか分かりにくい／片方だけ移動して対応が取れなくなる」との指摘により、
@@ -556,13 +583,10 @@ async function exportDxfviewManual(){
       return false;
     }
     const zip=new JSZip();
-    zip.file(dxfviewName, JSON.stringify(payload));
-    // openFilesBufs[]には開いている各タブの元ファイルの生バイナリがキャッシュされている
-    // (index.html fileInput.change等で設定)。取得できた場合のみ元DXFも同梱する
-    const _origBuf176=(typeof openFilesBufs!=='undefined'&&typeof currentFileIdx!=='undefined'&&currentFileIdx>=0)?openFilesBufs[currentFileIdx]:null;
+    zip.file(dxfviewName, _entry183.payloadJson);
     var _dxfIncluded176=false;
-    if(_origBuf176 && currentFileName){
-      zip.file(currentFileName, _origBuf176);
+    if(_entry183.drawBuf && _entry183.drawName){
+      zip.file(_entry183.drawName, _entry183.drawBuf);
       _dxfIncluded176=true;
     }
     const blob=await zip.generateAsync({type:'blob'});
@@ -658,13 +682,158 @@ async function exportDxfviewManual(){
 document.getElementById('writeBackupBtn').addEventListener('click',exportDxfviewManual);
 
 // =========================================================
-// V0_136: 書込復元（設定パネルボタン）
+// V1_183: 複数ファイル一括書出(HD-PDF書出/バックアップ)用の共通保存処理。
+// exportDxfviewManual内の保存処理(showSaveFilePicker→Web Share→<a>download の
+// 3段フォールバック)と同じロジックを、任意のBlob/ファイル名向けに汎用化したもの。
+//
+// 【なぜ複数ファイルをまとめて1回だけ保存するのか】
+// 「開いているファイル一覧」で複数選択してHD-PDF書出/バックアップを実行すると、
+// 1件目は保存されるが2件目以降が保存されない(何も起きない)という不具合が報告された。
+// 原因は、showSaveFilePicker/navigator.share/<a>ダウンロードのいずれも
+// 「1回のユーザー操作(タップ)につき1回」しかブラウザ側が保存・共有を許可しない
+// ことにある(特にiOS Safariで顕著)。複数ファイルをループで1件ずつ
+// switchToFile→exportHybridPDF/exportDxfviewManualのように毎回保存処理まで
+// 実行すると、2回目以降のshowSaveFilePicker/share呼び出しがブラウザに拒否され、
+// <a>ダウンロードへのフォールバックも同様にブロックされてしまっていた。
+// 対策として、各ファイルの生成物(PDFのBlob、またはバックアップ用ZIPの中身)は
+// 個別に保存せずいったん集めておき、全ファイル処理後にそれらを1つのZIPへ
+// まとめて、保存処理(このファイル関数)を「ボタン操作1回につき1回」だけ呼ぶ
+// ようにした。
+// =========================================================
+async function _saveBlobWithFallback183(blob, fname, typeDesc){
+  var _fsaSaved=false;
+  if(typeof window.showSaveFilePicker==='function'){
+    try{
+      var _prevHandle=await _bkHandleLoad();
+      var opts={suggestedName:fname, types:[{description:typeDesc||'ZIP', accept:{'application/zip':['.zip']}}]};
+      if(_prevHandle){ try{opts.startIn=_prevHandle;}catch(e){} }
+      var fh=await window.showSaveFilePicker(opts);
+      var writable=await fh.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      _bkHandleSave(fh);
+      _fsaSaved=true;
+    }catch(e){
+      if(e&&e.name==='AbortError') return false;
+      console.warn('[batch save] showSaveFilePicker failed, fallback:',e);
+    }
+  }
+  if(!_fsaSaved){
+    var _isStandalone=(window.navigator.standalone===true)||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);
+    if(_isStandalone&&navigator.share&&typeof navigator.canShare==='function'){
+      try{
+        var shareFile=new File([blob],fname,{type:'application/zip'});
+        if(navigator.canShare({files:[shareFile]})){
+          await navigator.share({files:[shareFile],text:fname});
+          _fsaSaved=true;
+        }
+      }catch(e){
+        if(e&&e.name==='AbortError') return false;
+        console.warn('[batch save] navigator.share failed, fallback:',e);
+      }
+    }
+  }
+  if(!_fsaSaved){
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=fname;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+  }
+  return true;
+}
+
+// V1_183: 複数ファイル一括「HD-PDF書出」。各ファイルのHD-PDFは個別保存せずBlobとして
+// 集め、最後に1つのZIPにまとめて1回だけ保存する(理由は_saveBlobWithFallback183参照)
+async function exportHybridPDFBatch183(indices){
+  var collected=[];
+  var skipped=0;
+  for(var i=0;i<indices.length;i++){
+    var idx=indices[i];
+    var f=openFiles[idx];
+    var fname183=(f&&(f.currentFileName||f.name))||'';
+    if(typeof showGuide==='function') showGuide('HD-PDF生成中 ('+(i+1)+'/'+indices.length+') '+fname183,2000);
+    if(idx!==currentFileIdx&&typeof switchToFile==='function') switchToFile(idx);
+    try{
+      var before=collected.length;
+      var ok=await exportHybridPDF(collected);
+      if(ok===false||collected.length===before) skipped++;
+    }catch(e){ console.warn('[batch HD-PDF]',e); skipped++; }
+  }
+  if(collected.length===0){
+    if(typeof showGuide==='function') showGuide('HD-PDFを生成できるデータがありませんでした',2500);
+    return {count:0,skipped:skipped};
+  }
+  if(typeof JSZip==='undefined'){
+    if(typeof showGuide==='function') showGuide('ZIP機能が読み込まれていません',2000);
+    return {count:0,skipped:indices.length};
+  }
+  var zip183=new JSZip();
+  var usedNames183={};
+  collected.forEach(function(item){
+    var name=item.fname;
+    if(usedNames183[name]){ usedNames183[name]++; name=name.replace(/\.pdf$/i,'')+'_'+usedNames183[name]+'.pdf'; }
+    else usedNames183[name]=1;
+    zip183.file(name, item.blob);
+  });
+  var blob183=await zip183.generateAsync({type:'blob'});
+  var dateStr183=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var zipFname183='HD-PDF書出_'+collected.length+'件_'+dateStr183+'.zip';
+  await _saveBlobWithFallback183(blob183, zipFname183, 'HD-PDF書出(ZIP)');
+  return {count:collected.length, skipped:skipped};
+}
+
+// V1_183: 複数ファイル一括「バックアップ」。各ファイルの書込みバックアップを
+// ファイルごとのサブフォルダに分けて1つの親ZIPにまとめ、1回だけ保存する
+// (理由は_saveBlobWithFallback183参照)
+async function exportDxfviewManualBatch183(indices){
+  if(typeof JSZip==='undefined'){
+    if(typeof showGuide==='function') showGuide('ZIP機能が読み込まれていません',2000);
+    return {count:0,skipped:indices.length};
+  }
+  var zip183=new JSZip();
+  var included=0, skipped=0;
+  var usedFolders183={};
+  for(var i=0;i<indices.length;i++){
+    var idx=indices[i];
+    var f=openFiles[idx];
+    var fname183=(f&&(f.currentFileName||f.name))||'';
+    if(typeof showGuide==='function') showGuide('バックアップ準備中 ('+(i+1)+'/'+indices.length+') '+fname183,2000);
+    if(idx!==currentFileIdx&&typeof switchToFile==='function') switchToFile(idx);
+    var entry=_buildDxfviewBackupPayload183();
+    if(!entry){ skipped++; continue; }
+    var folderBase183=entry.base||fname183.replace(/\.[^.]+$/,'')||('file'+idx);
+    var folderName183=folderBase183;
+    var n183=usedFolders183[folderBase183];
+    if(n183){ usedFolders183[folderBase183]=n183+1; folderName183=folderBase183+'_'+(n183+1); }
+    else usedFolders183[folderBase183]=1;
+    var folder183=zip183.folder(folderName183);
+    folder183.file(entry.dxfviewName, entry.payloadJson);
+    if(entry.drawBuf&&entry.drawName) folder183.file(entry.drawName, entry.drawBuf);
+    included++;
+  }
+  if(included===0){
+    if(typeof showGuide==='function') showGuide('バックアップするデータがありませんでした',2500);
+    return {count:0,skipped:skipped};
+  }
+  var blob183=await zip183.generateAsync({type:'blob'});
+  var dateStr183b=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var zipFname183=(included+'件_書込みバックアップ_'+dateStr183b)+'.zip';
+  await _saveBlobWithFallback183(blob183, zipFname183, 'まとめてバックアップ(ZIP)');
+  if(typeof _abMarkSaved==='function') _abMarkSaved();
+  return {count:included, skipped:skipped};
+}
+
+// =========================================================
+// V0_136: バックアップ復元（設定パネルボタン、旧名称:書込復元）
 // .dxfview ファイルを選択して strokes / dims / savedViews / hiddenLayers を復元
 // V1_176: 元DXFと.dxfviewをまとめたZIP(V1_176以降のバックアップ)にも対応。
 // 旧バージョンで保存した単体の.dxfviewファイルもそのまま復元できる(後方互換)
+// V1_177: ZIPの場合、書込みデータだけでなく中に同梱されている元DXF(またはtdf)自体も
+// 新しいタブとして開いた上で書込みデータを適用するよう変更(旧:現在開いているファイルに
+// 書込みデータだけ適用。元ファイルを手元で開き直しておく必要があった)
 // =========================================================
 function importDxfviewManual(){
-  if(!confirm('現在の書込み内容は上書きされます。よろしいですか？'))return;
   var input=document.createElement('input');
   input.type='file';
   input.accept='.dxfview,.zip';
@@ -673,24 +842,59 @@ function importDxfviewManual(){
     if(!file)return;
     var isZip176=file.name.toLowerCase().endsWith('.zip');
     if(isZip176){
+      if(!confirm('ZIP内のDXF(またはtdf)を開き、書込みデータも復元します。よろしいですか？'))return;
       if(typeof JSZip==='undefined'){
         showGuide('ZIP機能が読み込まれていません',2000);return;
       }
-      JSZip.loadAsync(file).then(function(zipObj){
-        var dvName=Object.keys(zipObj.files).find(function(n){return n.toLowerCase().endsWith('.dxfview');});
+      JSZip.loadAsync(file).then(async function(zipObj){
+        var names=Object.keys(zipObj.files);
+        // V1_179: 原因切り分けのため、ZIP内の実際のファイル一覧を必ず記録しておく
+        verify('バックアップ復元:zip内容',{names:names});
+        var dvName=names.find(function(n){return n.toLowerCase().endsWith('.dxfview');});
         if(!dvName){
-          showGuide('ZIP内に.dxfviewファイルが見つかりません',2500);return;
+          alert('ZIP内に.dxfviewファイルが見つかりません。\nZIP内のファイル: '+names.join(', '));return;
         }
-        return zipObj.files[dvName].async('string');
-      }).then(function(text){
-        if(text===undefined)return; // 上のfindで見つからず既にガイド表示済み
-        _applyDxfviewJson176(text);
+        // V1_177: .dxfview以外の1件を元図面(DXF/tdf)として扱う
+        var drawName=names.find(function(n){return n!==dvName;});
+        var dvText=await zipObj.files[dvName].async('string');
+        var _drawOpened179=false;
+        if(drawName){
+          var drawBuf=await zipObj.files[drawName].async('arraybuffer');
+          // V1_178: 同名だが内容(サイズ)が異なるタブが既に開いている場合、
+          // openDxfFromDb内の「二重オープン防止」ガードに引っかかり、ZIP内のDXFを
+          // 読み込まずに既存の古いタブへ切り替えるだけで終わってしまう不具合を修正。
+          // この場合、書込みデータ自体は復元されるが古い図面の表示位置に適用されるため、
+          // 「DXFは開くが書込みが表示されない(実際は画面外にある)」ように見えていた。
+          // 復元時は必ずZIP内のDXFを正として開き直したいので、同名の古いタブは先に閉じる。
+          if(typeof openFiles!=='undefined'&&typeof _fileKey==='function'){
+            var _fkNew178=_fileKey(drawName,drawBuf.byteLength);
+            var _staleIdx178=openFiles.findIndex(function(x){
+              return (x.currentFileName||x.name)===drawName && x.fileKey!==_fkNew178;
+            });
+            if(_staleIdx178>=0&&typeof doCloseTab==='function'){
+              doCloseTab(_staleIdx178);
+            }
+          }
+          if(typeof openDxfFromDb==='function'){
+            await openDxfFromDb(drawName,drawBuf);
+            _drawOpened179=true;
+          } else {
+            alert('図面を開く機能が読み込まれていません');return;
+          }
+        } else {
+          // V1_179: 見落とされやすいため、消えるガイドではなくalertで必ず気づけるようにする
+          alert('このZIPには元図面(DXF/tdf)が同梱されていません。\nZIP内のファイル: '+names.join(', ')+'\n書込みデータのみ、現在開いているファイルに復元します。');
+        }
+        _applyDxfviewJson176(dvText,{drawName:drawName,drawOpened:_drawOpened179});
       }).catch(function(err){
         console.warn('[dxfview import zip] failed',err);
-        showGuide('ZIP読み込みに失敗しました',2000);
+        alert('ZIP読み込みに失敗しました: '+err.message);
       });
       return;
     }
+    // V1_177: 旧形式(.dxfview単体)は元図面を同梱していないため、従来通り
+    // 「現在開いているファイルに書込みデータだけ適用する」動作のまま維持する
+    if(!confirm('現在の書込み内容は上書きされます。よろしいですか？'))return;
     var reader=new FileReader();
     reader.onload=function(ev){ _applyDxfviewJson176(ev.target.result); };
     reader.readAsText(file,'UTF-8');
@@ -699,11 +903,11 @@ function importDxfviewManual(){
 }
 // V1_176: importDxfviewManualから.dxfview形式のJSON文字列を受け取り、実際にstrokes/dims等へ
 // 適用する処理を切り出した共通関数(旧FileReader経路・新ZIP経路の両方から呼ばれる)
-function _applyDxfviewJson176(jsonText){
+function _applyDxfviewJson176(jsonText,_meta179){
       try{
         var d=JSON.parse(jsonText);
         if(!d||!d.format||(d.format!=='dxfview'&&d.format!=='dxfview-backup')){
-          showGuide('無効な.dxfviewデータです',2000);return;
+          alert('無効な.dxfviewデータです(format='+(d&&d.format)+')');return;
         }
         if(typeof snapshot==='function')snapshot();
         if(typeof strokes!=='undefined') strokes=d.strokes||[];
@@ -738,10 +942,24 @@ function _applyDxfviewJson176(jsonText){
         else if(typeof scheduleSave==='function')scheduleSave();
         if(typeof verify==='function')verify('バックアップ復元:done');
         _abMarkSaved(); // V0_141.2: 復元後はバックアップ済みとしてリセット
-        showGuide('書込みデータを復元しました',2000);
+        // V1_178: 復元件数を表示し、「復元はしたが実際は0件だった」等をその場で判別できるようにする
+        // V1_179: 「表示されない」報告が続いたため、消えるガイドではなくalertで
+        // 図面の同梱有無・復元件数を必ず確認できるようにした(原因切り分け用)
+        var _sCnt178=(d.strokes||[]).length, _dCnt178=(d.dims||[]).length;
+        if(_meta179){
+          var _msg179='書込みデータを復元しました\n'
+            +'図面: '+(_meta179.drawOpened?('ZIP内の「'+_meta179.drawName+'」を開きました'):'ZIP内の図面は開いていません(現在表示中のファイルに適用)')+'\n'
+            +'線・図形: '+_sCnt178+'件 / 寸法: '+_dCnt178+'件';
+          if(_sCnt178===0&&_dCnt178===0){
+            _msg179+='\n\n※復元件数が0件です。このバックアップ作成時点で書込み内容が保存されていなかった可能性があります。';
+          }
+          alert(_msg179);
+        } else {
+          showGuide('書込みデータを復元しました(線・図形:'+_sCnt178+'件 寸法:'+_dCnt178+'件)',2500);
+        }
       }catch(err){
         console.warn('[dxfview import] failed',err);
-        showGuide('.dxfview読み込みに失敗しました',2000);
+        alert('.dxfview読み込みに失敗しました: '+err.message);
       }
 }
 document.getElementById('importDxfviewBtn').addEventListener('click',importDxfviewManual);
@@ -1030,10 +1248,13 @@ function _hpPdfAdvance(w,angleDeg){
   return [w*Math.cos(rad), -w*Math.sin(rad)];
 }
 
-async function exportHybridPDF(){
+// V1_183: _collectInto182(配列)を渡すと、個別保存(pdf.save)を行わず
+// {fname,blob}をこの配列にpushして終わる「収集モード」で動作する。
+// 複数ファイル一括書出(exportHybridPDFBatch183)から使う。理由は下記参照
+async function exportHybridPDF(_collectInto182){
   const btn=document.getElementById('hybridPDFBtn');
   btn.disabled=true;
-  showGuide('HD-PDFを生成中...');
+  if(!_collectInto182) showGuide('HD-PDFを生成中...');
   try{
     // V0_124: 日本語フォントを事前ロード
     await _loadJPFont();
@@ -1414,13 +1635,20 @@ async function exportHybridPDF(){
 
     // ── 10. 保存 ──
     const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'_hd.pdf';
+    if(_collectInto182){
+      // V1_183: 収集モード。個別に保存せずBlobを呼び出し元へ渡す
+      // (iOS Safari等は1回のユーザー操作につき1回しか保存/共有を許可しないため、
+      // 複数ファイルをループ内で毎回pdf.save()すると2件目以降が保存されない問題があった)
+      _collectInto182.push({fname:fname, blob:pdf.output('blob')});
+      return true;
+    }
     pdf.save(fname);
     showGuide('HD-PDFを保存しました',2000);
     return true; // V1_169: 閉じる連携用(出力成功)
 
   }catch(err){
     console.error('[HybridPDF]',err);
-    showGuide('HD-PDF出力に失敗しました: '+err.message,3000);
+    if(!_collectInto182) showGuide('HD-PDF出力に失敗しました: '+err.message,3000);
     return false; // V1_169: 閉じる連携用(出力失敗時は閉じない、データ消失防止)
   }finally{
     btn.disabled=false;
