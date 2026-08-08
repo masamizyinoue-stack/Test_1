@@ -707,6 +707,30 @@ const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',dxdy:'dim',diag:
 // アイコンを再タップした場合(下のstopImmediatePropagation分岐)はこの処理には来ない
 // (色/太さポップアップが開くだけで、選択自体は変わらないため表示更新も不要)
 const _MEASURE_TOOL_LABELS={dxdy:'水・鉛',diag:'斜め',ll:'2線間',lp:'線と点',circDim:'直径',radDim:'半径'};
+// V1_219: 「計測ボタンのアイコンを、選択中の計測ツールのアイコンにしてほしい」との
+// 依頼への対応。ヘッダーの計測ボタン(#measureToolIcon)は従来ずっと定規アイコン固定
+// だったが、計測ツールが選択されている間はそのツール専用のアイコン(下記、
+// #measureToolPopup内の各.dimToolIconと全く同じ形状)に差し替え、未選択(ペン等の
+// 他ツール選択中)の時は定規アイコンに戻す。style.color(選択中の計測線色)は
+// svg要素自身に付くため、innerHTML(子要素)だけを差し替えるこの方式なら
+// updateToolColorDots()側の色反映処理には一切影響しない。
+// var(constではない)で宣言し、index.html/storage.jsの別スクリプトタグからも
+// 直接参照できるようにする(_MEASURE_TOOL_LABELS等のconstは別タグから参照できず
+// 過去にハードコード重複が必要だった前例があるため、今回は最初からvarにした)
+var _MEASURE_RULER_ICON_INNER='<rect x="2" y="9" width="20" height="6" rx="1"/><line x1="6" y1="9" x2="6" y2="12"/><line x1="10" y1="9" x2="10" y2="12"/><line x1="14" y1="9" x2="14" y2="12"/><line x1="18" y1="9" x2="18" y2="12"/>';
+var _MEASURE_TOOL_ICON_INNER={
+  dxdy:'<line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/>',
+  diag:'<line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/>',
+  ll:'<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="12" y1="7" x2="12" y2="17"/><polyline points="9 10 12 7 15 10"/><polyline points="9 14 12 17 15 14"/>',
+  lp:'<line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/>',
+  circDim:'<circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/>',
+  radDim:'<circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text>'
+};
+function _syncMeasureToggleBtnIcon(){
+  var el=document.getElementById('measureToolIcon');
+  if(!el) return;
+  el.innerHTML=_MEASURE_TOOL_ICON_INNER[currentTool]||_MEASURE_RULER_ICON_INNER;
+}
 document.querySelectorAll('.tool-btn').forEach(btn=>{
   btn.addEventListener('click',(e)=>{
     const _mode=_TOOL_COLOR_MODE[btn.dataset.tool];
@@ -740,6 +764,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     // どのツールが選ばれてもここを通るので、計測系以外に切り替えた時は正しく外れる
     var _measureBtn207=document.getElementById('measureToggleBtn');
     if(_measureBtn207) _measureBtn207.classList.toggle('tool-active',!!_MEASURE_TOOL_LABELS[currentTool]);
+    _syncMeasureToggleBtnIcon(); // V1_219: 計測ボタンのアイコンを選択中ツールの形状に同期
     if(window.IPX&&window.IPX.active&&typeof ipxCancel==='function')ipxCancel(); // V1_48: ツール切替時は交点ピックを中止
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     if(typeof updateToolColorDots==='function')updateToolColorDots();

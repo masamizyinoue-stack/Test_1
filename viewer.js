@@ -257,6 +257,16 @@ function hsvToRgb(h,s,v){
 // =========================================================
 // DXF パーサ
 // =========================================================
+// V1_215: 「DXFが読み込めたように見えるが、実は一部の要素が無音で消えている」状態を
+// 無くすための読込診断。convertOne()がif/elseで実際に処理している(=simplified/部分対応
+// 含め、何かしらの描画要素に変換している)エンティティtype名の一覧。ENTITIES直下の
+// トップレベルエンティティのtypeがこの一覧に無ければ「未対応」としてdoc.diagに記録する。
+// この一覧は診断カウント専用であり、実際の変換可否はconvertOne自身のif/elseで決まる
+// (この一覧を変えても変換ロジック自体は変わらない。二重管理にならないよう、
+// convertOne()の分岐を変更した場合はこの一覧も合わせて更新すること)
+var KNOWN_ENTITY_TYPES=new Set(['LINE','CIRCLE','ARC','ELLIPSE','POINT','TEXT','ATTRIB',
+  'MTEXT','SOLID','TRACE','3DFACE','LWPOLYLINE','SPLINE','LEADER','INSERT','DIMENSION',
+  'POLYLINE']); // POLYLINEはparseDXF内で専用処理(convertOne経由ではない)だが同様に対応済み扱い
 // V1_106: 文字コード自動判定（UTF-8として妥当ならUTF-8、そうでなければShift-JISとみなす）。
 // 元々DXF読込専用だったdecodeDXF()内のロジックを切り出し、CSV読込(loadExcel)からも
 // 共通で使えるようにした。日本語Windows環境で作成されたCSVはShift-JIS(CP932)であることが
@@ -283,7 +293,25 @@ function parseDXF(buf){
 
   const out={
     ver:'',sen:[],enko:[],ten:[],moji:[],solid:[],sunpou:[],
-    usedLayers:{},header:{},layerMap:{},ltypeMap:{},blockMap:{}
+    usedLayers:{},header:{},layerMap:{},ltypeMap:{},blockMap:{},
+    // V1_215: DXF読込診断。既存の描画データ(sen/enko/ten/moji等)とは完全に分離した
+    // 独立領域として保持し、既存の描画・検索・保存処理には一切参照させない。
+    //   totalEntities    : ENTITIES セクション直下で処理を試みたトップレベルエンティティの総数
+    //   generatedElements: そこから実際に生成された内部描画要素の総数
+    //                      (INSERT/POLYLINE等、1エンティティから複数生成されるものがあるため、
+    //                       totalEntitiesとは別に数える。両者は意味が異なり混同しないこと)
+    //   byType           : type別の出現数(対応・未対応問わず全て)
+    //   supported        : KNOWN_ENTITY_TYPESに含まれるtype別の出現数(簡易対応等を含む)
+    //   unsupported       : KNOWN_ENTITY_TYPESに無いtype別の出現数(convertOne()のif/elseの
+    //                      どれにも一致せず、無音で描画要素を生成できなかったもの)
+    // V1_216: 「BLOCK定義の中(INSERTで参照される部品)にHATCH等が仕込まれていると、
+    // ENTITIES直下だけを見ている上記のtotalEntities/byType/supported/unsupportedでは
+    // 検知できない」との指摘への対応。BLOCK定義内部の集計は上記と混ぜず、blockDefTotal/
+    // blockByType/blockSupported/blockUnsupportedという別領域に保持する(意味が異なる
+    // ため=BLOCK側は「その部品定義に1回だけ出現する数」であり、INSERTで実際に何回
+    // 使われるかとは無関係。ENTITIES直下の総数と混同しないよう、あえて分離した)
+    diag:{totalEntities:0,generatedElements:0,byType:{},supported:{},unsupported:{},
+      blockDefTotal:0,blockByType:{},blockSupported:{},blockUnsupported:{}}
   };
 
   let si=0;
@@ -367,9 +395,17 @@ function parseDXF(buf){
       } else if(c===0&&v==='ENDBLK'){
         si++;curBlock=null;
       } else if(c===0&&curBlock){
+        const _blkEntType216=v; // V1_216: BLOCK定義内部の診断カウント用(convertOne呼び出し前のtype名)
         const r=convertOne(P,si,out.layerMap,out.ltypeMap,out.blockMap,0);
         curBlock.ents.push(...r);
         si=r._nextSi||si+1;
+        // V1_216: BLOCK定義内部の読込診断(ENTITIES直下とは別集計)。ネストしたBLOCK
+        // (BLOCK定義の中にさらにINSERTがある場合)も、このBLOCKSセクション自体の
+        // 逐次走査で1回ずつ処理されるため、ネスト段数に関係なく漏れなくカウントされる
+        out.diag.blockDefTotal++;
+        out.diag.blockByType[_blkEntType216]=(out.diag.blockByType[_blkEntType216]||0)+1;
+        if(KNOWN_ENTITY_TYPES.has(_blkEntType216)) out.diag.blockSupported[_blkEntType216]=(out.diag.blockSupported[_blkEntType216]||0)+1;
+        else out.diag.blockUnsupported[_blkEntType216]=(out.diag.blockUnsupported[_blkEntType216]||0)+1;
       } else si++;
     }
   }
@@ -428,7 +464,13 @@ function parseDXF(buf){
           const p1=verts[verts.length-1],p2=verts[0];
           out.sen.push({type:'sen',x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,color:plyColorR,dash:plyDash,layer:plyLayer,lw:plyLw});
         }
+        // V1_215: 読込診断カウント(POLYLINEは専用処理のため対応済み扱い)
+        out.diag.totalEntities++;
+        out.diag.byType['POLYLINE']=(out.diag.byType['POLYLINE']||0)+1;
+        out.diag.supported['POLYLINE']=(out.diag.supported['POLYLINE']||0)+1;
+        out.diag.generatedElements+=verts.length; // 生成された線分本数の目安(bulge分割は含まない概数)
       } else if(c===0){
+        const _entType215=v; // V1_215: convertOne呼び出し前のtype名(診断カウント用)
         const r=convertOne(P,si,out.layerMap,out.ltypeMap,out.blockMap,0);
         r.forEach(e=>{
           if(e.type==='sen') out.sen.push(e);
@@ -438,6 +480,13 @@ function parseDXF(buf){
           else if(e.type==='solid') out.solid.push(e);
         });
         si=r._nextSi||si+1;
+        // V1_215: 読込診断カウント。KNOWN_ENTITY_TYPESに無いtypeは「未対応」として記録する
+        // (convertOne()のif/elseのどれにも一致せず、無音で描画要素が生成されなかったもの)
+        out.diag.totalEntities++;
+        out.diag.byType[_entType215]=(out.diag.byType[_entType215]||0)+1;
+        out.diag.generatedElements+=r.length;
+        if(KNOWN_ENTITY_TYPES.has(_entType215)) out.diag.supported[_entType215]=(out.diag.supported[_entType215]||0)+1;
+        else out.diag.unsupported[_entType215]=(out.diag.unsupported[_entType215]||0)+1;
       } else si++;
     }
   }
@@ -445,6 +494,13 @@ function parseDXF(buf){
   [...out.sen,...out.enko,...out.ten,...out.moji,...out.solid].forEach(e=>{
     if(e.layer) out.usedLayers[e.layer]=true;
   });
+  // V1_215: UI側で使いやすいよう、未対応の合計・処理済み合計もあらかじめ計算しておく
+  out.diag.unsupportedTotal=Object.values(out.diag.unsupported).reduce((a,b)=>a+b,0);
+  out.diag.processedTotal=out.diag.totalEntities-out.diag.unsupportedTotal;
+  // V1_216: BLOCK定義内部の未対応合計。ENTITIES直下(unsupportedTotal)とは意味が異なる
+  // ため別値として保持しつつ、警告の要否判定にはunsupportedTotalAll(合算値)を使う
+  out.diag.blockUnsupportedTotal=Object.values(out.diag.blockUnsupported).reduce((a,b)=>a+b,0);
+  out.diag.unsupportedTotalAll=out.diag.unsupportedTotal+out.diag.blockUnsupportedTotal;
   return out;
 }
 
@@ -496,7 +552,11 @@ function parseTDF(buf){
 
   const out={
     ver:'TDF',sen:[],enko:[],ten:[],moji:[],solid:[],sunpou:[],
-    usedLayers:{},header:{},layerMap:{},ltypeMap:{},blockMap:{}
+    usedLayers:{},header:{},layerMap:{},ltypeMap:{},blockMap:{},
+    // V1_215: .tdf(実寸法師)はDXFではないため今回の読込診断の対象外。
+    // doc.diagを参照するUI側が未定義エラーにならないよう空の診断値を持たせておくだけ
+    diag:{totalEntities:0,generatedElements:0,byType:{},supported:{},unsupported:{},unsupportedTotal:0,processedTotal:0,
+      blockDefTotal:0,blockByType:{},blockSupported:{},blockUnsupported:{},blockUnsupportedTotal:0,unsupportedTotalAll:0}
   };
   const LAYER='実寸法師読込'; // V1_173: レイヤー分け未対応のため単一レイヤーに統一
   const COLOR={r:255,g:255,b:255};
@@ -757,8 +817,33 @@ function convertOne(P,si,layerMap,ltypeMap,blockMap,depth){
     // group code 3 (continuation) + 1 (last/only part) を結合
     var _mt3=extras.filter(function(e){return e[0]===3;}).map(function(e){return e[1];}).join('');
     let txt=_mt3+(gv(1,'')||'');
+    // V1_215: MTEXT文字消失バグ修正。
+    // 旧実装は「\S1/2;」のような分数書式(スタック)を、書式コード除去用の汎用正規表現
+    // (\\[A-Za-z][^;]*;)にマッチさせてしまい、書式記号だけでなく中身の数字「1/2」ごと
+    // 削除していた。分数用の書式コード(\S...;)は他の書式コード(\H,\W,\F,\C等)より先に
+    // 処理し、区切り文字(^や#)を「/」に正規化した上で中身の数字は必ず残す。
+    // (上下スタック表示そのものの再現は第2段階以降の課題とし、今回は「数字を消さない」
+    // ことを最優先する)
+    txt=txt.replace(/\\S([^;]*);/g,function(_m,inner){return inner.replace(/[\^#]/g,'/');});
+    // V1_215: Unicodeエスケープ(\U+XXXX)を実際のUnicode文字に変換する。
+    // 旧実装はこの書式を変換しておらず、「\U+2205」のような文字列がそのまま画面に
+    // 残ってしまっていた。日本語(Shift-JIS/UTF-8)本文には\U+という並びは通常出現しない
+    // ため、既存の日本語処理への影響はない
+    txt=txt.replace(/\\U\+([0-9A-Fa-f]{4,6})/g,function(_m,hex){
+      try{return String.fromCodePoint(parseInt(hex,16));}catch(e){return _m;}
+    });
     txt=txt.replace(/\\[pP]/g,'\n').replace(/\{\\[^;]+;/g,'').replace(/\}/g,'').replace(/\\[A-Za-z][^;]*;/g,'').replace(/%%[cCdDpP]/g,'');
-    result.push({type:'moji',x:gf(10),y:gf(20),text:txt,h:gf(40,1),angle:0,color,layer,widthFactor:1});
+    // V1_215: MTEXT回転角の反映(旧実装はangle:0固定で回転文字が正立表示されていた)。
+    // MTEXTのgroup50はTEXT/INSERT等と異なり「ラジアン」表記のため、既存のTEXT処理(角度は
+    // 度=degree)と単位・座標系を統一するためdegreeへ変換する。DXFはgroup50より
+    // X軸方向ベクトル(11/21)を優先すべき仕様のため、11/21が存在すればそちらを優先する
+    var _mtAngleDeg=0;
+    if(gv(11,null)!==null||gv(21,null)!==null){
+      _mtAngleDeg=Math.atan2(gf(21,0),gf(11,1))*180/Math.PI;
+    } else if(gv(50,null)!==null){
+      _mtAngleDeg=gf(50,0)*180/Math.PI;
+    }
+    result.push({type:'moji',x:gf(10),y:gf(20),text:txt,h:gf(40,1),angle:_mtAngleDeg,color,layer,widthFactor:1});
   } else if(type==='SOLID'||type==='TRACE'){
     const pts=[{x:gf(10),y:gf(20)},{x:gf(11),y:gf(21)},{x:gf(13),y:gf(23)},{x:gf(12),y:gf(22)}];
     result.push({type:'solid',pts,color,layer});
@@ -1120,6 +1205,56 @@ function showInfo(){
   if(!doc){document.getElementById('infoBox').textContent='ファイルを開いてください';return;}
   document.getElementById('infoBox').innerHTML=
     `線:${doc.sen.length} 円弧:${doc.enko.length}<br>文字:${doc.moji.length} 点:${doc.ten.length}<br>ソリッド:${doc.solid.length}<br>レイヤ:${Object.keys(doc.layerMap).length}<br>Ver:${doc.ver||'不明'}`;
+}
+
+// =========================================================
+// V1_215: DXF読込診断の警告表示
+// 「DXFが読み込めたように見えるが、実は一部の要素が無音で消えている」ことに利用者が
+// 気づけるようにするための最小限の通知。未対応エンティティが1件も無ければ何も表示しない
+// (既存のUI/デザインを変えないため、新規モーダルは作らず既存alert()/confirm()方式を使う。
+// export.jsの_applyDxfviewJson176が既に同じ方式で復元結果を通知しているのに合わせた)
+// =========================================================
+function _showDxfDiagWarningIfNeeded215(d){
+  try{
+    if(!d||!d.diag) return; // .tdf(実寸法師)や旧データにdiagが無い場合は何もしない
+    // V1_216: ENTITIES直下(unsupportedTotal)に加え、BLOCK定義内部(blockUnsupportedTotal)の
+    // 未対応も合算した値(unsupportedTotalAll)で警告要否を判定する。旧バージョンのdoc等
+    // unsupportedTotalAllが無い場合にも対応できるよう、無ければ従来通りunsupportedTotalで代用する
+    var u=(d.diag.unsupportedTotalAll!==undefined)?d.diag.unsupportedTotalAll:(d.diag.unsupportedTotal||0);
+    if(u<=0) return; // 未対応0件なら警告を出さない
+    var msg='⚠ DXF読込確認\n\nこの図面にはViewer未対応の要素が\n'+u+'件あります。\n\n'
+      +'[OK] 詳細を見る　/　[キャンセル] 閉じる';
+    if(confirm(msg)) _showDxfDiagDetail215(d);
+  }catch(e){console.warn('[DXF読込診断]',e);}
+}
+function _showDxfDiagDetail215(d){
+  try{
+    var diag=d.diag||{};
+    var lines=['DXF読込診断','','総エンティティ(ENTITIES直下)　'+(diag.totalEntities||0),
+      '処理済み　　　　　　　　　　'+(diag.processedTotal||0),
+      '未対応(ENTITIES直下)　　　　'+(diag.unsupportedTotal||0)];
+    // V1_216: BLOCK定義内部(INSERTで参照される部品)の集計。値が存在する場合のみ追記する
+    // (旧バージョンのdoc等、この項目が無いデータでも安全に動作させるため)
+    if(diag.blockDefTotal!==undefined){
+      lines.push('BLOCK定義内部の要素　　　　　'+(diag.blockDefTotal||0));
+      lines.push('BLOCK内部の未対応　　　　　　'+(diag.blockUnsupportedTotal||0));
+    }
+    lines.push('','内訳(未対応type別、ENTITIES直下+BLOCK内部合算):');
+    // V1_216: ENTITIES直下とBLOCK内部の未対応type別件数を合算して1つの一覧として見せる
+    // (利用者にとっては「どこにあるか」より「何がどれだけ足りないか」の方が重要なため)
+    var merged={};
+    var u1=diag.unsupported||{};
+    Object.keys(u1).forEach(function(k){ merged[k]=(merged[k]||0)+u1[k]; });
+    var u2=diag.blockUnsupported||{};
+    Object.keys(u2).forEach(function(k){ merged[k]=(merged[k]||0)+u2[k]; });
+    var keys=Object.keys(merged);
+    if(keys.length===0){ lines.push('(なし)'); }
+    else{
+      keys.sort(function(a,b){return (merged[b]||0)-(merged[a]||0);});
+      keys.forEach(function(k){ lines.push(k+'　　'+merged[k]+'件'); });
+    }
+    alert(lines.join('\n'));
+  }catch(e){console.warn('[DXF読込診断detail]',e);}
 }
 
 // buildLayerModal → layer.js
@@ -2807,6 +2942,7 @@ window.viewer = {
     checkPerfMode();
     fit();
     scheduleDraw();
+    _showDxfDiagWarningIfNeeded215(doc); // V1_215: DXF読込診断の警告
   },
   loadPDF: async function(buf, fname) {
     currentFileName = fname || '';

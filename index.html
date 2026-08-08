@@ -534,7 +534,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #pdfThumbPanel .sp-title{font-size:15px;font-weight:600;color:var(--text);margin-right:8px}
 /* V1_214: 「閉じる」が赤地の文字ボタンで他パネルと統一感が無いとの指摘により、
    allSearch/openFileパネルと同じ地味な✕アイコン方式に統一した(ボタン文字も✕に変更) */
-#pdfThumbPanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;-webkit-tap-highlight-color:transparent}
+/* V1_223: 「図面番号モード」ボタンの位置が固定されず、モードONで幅/高さ/倍率/位置/
+   リセットの調整ボタンが表示されると、それらがDOM順で先(タイトルより後・モードボタンより前)
+   にあるためflex-wrapの折返し行が増え、モードボタンと✕が右へ押し出されたり次の行へ
+   ずれたりして見にくいとの指摘への対応。orderプロパティで「タイトル→モードボタン→✕」を
+   常に最優先(見た目上の折返し1行目)に固定し、調整ボタン群(.pdf-thumb-mode-adjust、
+   order未指定時0のため明示的に3を指定)は表示/非表示に関わらずそれより後ろに回して、
+   折返しが増えても1行目のモードボタン・✕の位置には影響しないようにした */
+#pdfThumbPanel .pdf-thumb-mode-btn{order:1}
+#pdfThumbPanel .sp-close{order:2;background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;-webkit-tap-highlight-color:transparent}
+#pdfThumbPanel .pdf-thumb-mode-adjust{order:3}
 .pdf-thumb-ctrl-group{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:4px 6px}
 .pdf-thumb-ctrl-label{font-size:12px;color:var(--text-dim);margin:0 2px}
 .pdf-thumb-step{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -610,8 +619,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
    直前まで表示していたタブは黄色、その1つ前は青色にして、タブが多くても直近の
    行き来を目で追えるようにする */
 .tab-item.active{background:#223451;border-bottom:3px solid var(--accent,#00d4ff)}
+/* V1_223: 上段(種類バッジ)の行。従来はtypeBadge単体がこの位置(align-self:flex-start)に
+   直接置かれていたが、お気に入り★マークをバッジの左に並べて表示するため、
+   両者をまとめる横並びのラッパーを追加した(align-self指定はこちらへ移動) */
+.tab-top-row{display:flex;align-items:center;gap:3px;align-self:flex-start;flex-shrink:0}
+/* V1_223: お気に入り登録済みファイルのタブに表示する★マーク。V1_217のファイル一覧
+   (dialog.js、_favIsFav217)で登録したfileKeyと同じ判定を使う。未登録の場合は
+   要素自体を生成しない(常時グレー表示等はせず、登録済みの時だけ表示する) */
+.tab-fav-mark{font-size:11px;color:#ffd60a;line-height:1.2;flex-shrink:0}
 /* V1_109: 上段のファイル種類バッジ（DXF/PDF/XLS）。色は_fileTypeInfo()と対応 */
-.tab-type-badge{font-size:9px;font-weight:700;line-height:1.2;padding:1px 4px;border-radius:3px;color:#fff;align-self:flex-start;flex-shrink:0}
+.tab-type-badge{font-size:9px;font-weight:700;line-height:1.2;padding:1px 4px;border-radius:3px;color:#fff;flex-shrink:0}
 /* V1_109: 下段（ファイル名+閉じるボタン）の横並び行 */
 .tab-name-row{display:flex;align-items:center;gap:2px;min-width:0}
 .tab-name{font-size:12px;color:#b0bec5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
@@ -991,7 +1008,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V1_214</span>
+    <span id="ver-label">V1_223</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1408,27 +1425,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=1214"></script>
-<script src="viewer.js?v=1214"></script>
-<script src="utils.js?v=1214"></script>
-<script src="ui.js?v=1214"></script>
-<script src="dialog.js?v=1214"></script>
-<script src="storage.js?v=1214"></script>
-<script src="fonts/NotoSansJP.js?v=1214"></script>
-<script src="export.js?v=1214"></script>
-<script src="tool.js?v=1214"></script>
-<script src="verify.js?v=1214"></script>
+<script src="layer.js?v=1223"></script>
+<script src="viewer.js?v=1223"></script>
+<script src="utils.js?v=1223"></script>
+<script src="ui.js?v=1223"></script>
+<script src="dialog.js?v=1223"></script>
+<script src="storage.js?v=1223"></script>
+<script src="fonts/NotoSansJP.js?v=1223"></script>
+<script src="export.js?v=1223"></script>
+<script src="tool.js?v=1223"></script>
+<script src="verify.js?v=1223"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=1214"></script>
-<script src="stroke-text.js?v=1214"></script>
+<script src="shxGlyphs.js?v=1223"></script>
+<script src="stroke-text.js?v=1223"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=1214"></script>
+<script src="pc.js?v=1223"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=1214"></script>
+<script src="supabase-sync.js?v=1223"></script>
 <script>
-const APP_VERSION = 'V1_214';
+const APP_VERSION = 'V1_223';
 
 // =========================================================
 // グローバル状態
@@ -1961,7 +1978,7 @@ fileInput.addEventListener('change',async e=>{
   _isOpeningFileBusy=true;
   try{
   verify('fileInput.change:start');
-  resetToolStates(); // V0_139: ファイル切替時に計測ツール状態をリセット
+  resetToolStates(true); // V0_139: ファイル切替時に計測ツール状態をリセット / V1_223: 計測ツールは選択維持
   // V0_140: saveCurrentFileState廃止 → 前ファイルのviewport状態をinline同期
   // V1_40: PDFタブの表示内容(pdfDoc/pdfImage/pdfPageNum)もここで退避しないと、
   // 別ファイルを開いた後にこのタブへ戻った際PDFが消えてしまうため追加
@@ -2074,6 +2091,7 @@ fileInput.addEventListener('change',async e=>{
       // インデックスに含めたい場合は「フォルダを選択してインデックス作成」から
       // 明示的に行う（buildSearchIndex自体は画面検索(_searchIdx)用に維持する）
       buildSnapCache();checkPerfMode();buildLayerModal();detectScale();fit();scheduleDraw();showInfo();buildSearchIndex();{const _nd=document.getElementById('noDrawingMsg');if(_nd)_nd.style.display='none';}
+      if(typeof _showDxfDiagWarningIfNeeded215==='function') _showDxfDiagWarningIfNeeded215(doc); // V1_215: DXF読込診断の警告
       saveFile(buf,_fileKey(f.name,f.size));scheduleSave();updateFileNameDisplay();// V0_113: openFiles[]登録後に保存されるようdoSave→scheduleSave
       document.body.classList.remove('settings-open');
     }catch(err){alert('ファイルを開けません: '+err.message);}
@@ -2110,7 +2128,12 @@ var _tabDragTimer=null, _tabDragActive=false, _tabDragJustHappened=false;
 
 // V0_139: DXF切替時に計測ツール状態を安全にリセットする共通関数
 // 将来ツールが増えた場合はここに追加するだけでよい
-function resetToolStates(){
+// V1_223: keepMeasureTool=true を渡すと、計測ツール選択中でもペン等と同様に
+// currentToolをそのまま維持し、DIM/LP/LLをそのツール用に再アクティブ化する
+// (ファイル切替・別ファイルを開く用)。false/省略時は従来通り計測ツール選択中なら
+// ペンへ強制的に戻す(サブ窓作成・検索して開くパネルなど、計測操作そのものを
+// 完全に中断させたい場面用)
+function resetToolStates(keepMeasureTool){
   if(window.DIM && typeof resetDIM==='function') resetDIM();
   if(window.LP  && typeof resetLP ==='function') resetLP();
   if(window.LL  && typeof resetLL ==='function') resetLL(); // V0_153.1: 2線間
@@ -2127,12 +2150,44 @@ function resetToolStates(){
   // 従来はタブ切替をまたいで選択状態が保たれていた）。DIM/LP/LLのいずれかを使う
   // 計測ツール（水平鉛直・斜め・2線間・線と点・直径・半径）が選択中だった場合に限り、
   // currentToolとツールボタンの見た目を「ペン」に戻すよう修正した
+  // V1_223: 「他のファイルを開くと計測ツールだけペンに戻ってしまう。ペン/蛍光/消しゴムと
+  // 同じように引き継いでほしい」との依頼を受け、V1_66/V1_67の「ペンへ戻す」仕様自体を廃止。
+  // 計測ツール選択中にファイルを切り替えても、ペン等と同様にcurrentTool・ボタンの見た目
+  // (activeクラス)・#measureToggleBtnの.tool-active・アイコン(_syncMeasureToggleBtnIcon)は
+  // 一切変更せずそのまま維持する。ただしDIM/LP/LLのactive状態は上のresetDIM/resetLP/resetLL
+  // 呼び出しで既にfalseに戻っているため、これをそのままにするとV1_66の不具合（ボタンは
+  // 選択中に見えるのにApple Pencilで反応せずペン書き込みになってしまう）がそのまま
+  // 再発してしまう。そこで、currentToolが計測ツールのままなら、そのツールを今クリックし
+  // 直したのと同じ状態までDIM/LP/LLを再アクティブ化することで、見た目通りに新しいファイル
+  // でもすぐ計測を続けられるようにする（旧ファイルの選択線・候補点等の内部状態は
+  // resetDIM/resetLP/resetLLで既にクリア済みなので、古い参照を引きずる心配はない）
   var _measureTools67=['dxdy','diag','ll','lp','circDim','radDim'];
   if(_measureTools67.indexOf(currentTool)!==-1){
-    currentTool='sketch';
-    document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
-    var _sketchBtn66=document.querySelector('.tool-btn[data-tool="sketch"]');
-    if(_sketchBtn66) _sketchBtn66.classList.add('active');
+    if(keepMeasureTool){
+      // V1_223: 選択状態を維持したまま、DIM/LP/LLだけをこのツール用に再アクティブ化する
+      dimState={pts:[]};dimPendingDown=false; // 前のファイルの計測途中点を持ち越さない
+      if(currentTool==='circDim'||currentTool==='radDim'){
+        DIM.active=true; DIM.tool=currentTool; DIM.phase=0;
+      } else if(currentTool==='lp'){
+        LP.active=true; LP.phase=0;
+      } else if(currentTool==='ll'){
+        LL.active=true; LL.phase=0;
+      }
+      // dxdy/diagはactiveフラグを持たずcurrentTool判定のみで動作するため追加処理不要
+    } else {
+      // 従来通り：計測操作そのものを中断させたい場面(サブ窓作成・検索して開く等)ではペンへ戻す
+      currentTool='sketch';
+      document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
+      var _sketchBtn66=document.querySelector('.tool-btn[data-tool="sketch"]');
+      if(_sketchBtn66) _sketchBtn66.classList.add('active');
+      // V1_218: 「Aで計測ツールを使った後にBを開くと、ペンボタンと計測ボタンの両方が
+      // 選択中に見える」不具合の修正。#measureToggleBtnの.tool-active(枠が光る表示)を
+      // ペンへ戻す処理と同じ場所で明示的に外す
+      var _measureBtn218=document.getElementById('measureToggleBtn');
+      if(_measureBtn218) _measureBtn218.classList.remove('tool-active');
+      // V1_219: ペンへ戻すのに合わせて、計測ボタンのアイコンも定規アイコンへ戻す
+      if(typeof _syncMeasureToggleBtnIcon==='function') _syncMeasureToggleBtnIcon();
+    }
   }
 }
 
@@ -2145,7 +2200,7 @@ function switchToFile(idx){
   verify('switchToFile:before',{from:currentFileIdx,to:idx});
   // V0_131: タブ切替時にマーク自動クリア
   _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
-  resetToolStates(); // V0_139: タブ切替時に計測ツール状態をリセット
+  resetToolStates(true); // V0_139: タブ切替時に計測ツール状態をリセット / V1_223: 計測ツールは選択維持
   // V0_140: ビュー状態のみ同期（strokes/dimsは参照エイリアスで既に同期済み）
   if(currentFileIdx>=0&&currentFileIdx<openFiles.length){
     var _prevF=openFiles[currentFileIdx];
@@ -2406,6 +2461,19 @@ function updateFileNavUI(){
       typeBadge.className='tab-type-badge';
       typeBadge.textContent=typeInfo109.label;
       typeBadge.style.background=typeInfo109.color;
+      // V1_223: お気に入り(V1_217、dialog.jsの_favIsFav217)登録済みなら、
+      // 種類バッジの左に★マークを表示する。バッジと横並びにするため、
+      // 両者をtopRowでまとめてから.tab-itemへ追加する(topRow自体が従来
+      // typeBadgeが単独で持っていたalign-self:flex-startの位置に来る)
+      var topRow=document.createElement('div');
+      topRow.className='tab-top-row';
+      if(openFiles[idx].fileKey&&typeof _favIsFav217==='function'&&_favIsFav217(openFiles[idx].fileKey)){
+        var favMark220=document.createElement('span');
+        favMark220.className='tab-fav-mark';
+        favMark220.textContent='★';
+        topRow.appendChild(favMark220);
+      }
+      topRow.appendChild(typeBadge);
       var nameRow=document.createElement('div');
       nameRow.className='tab-name-row';
       var name=document.createElement('span');
@@ -2418,7 +2486,7 @@ function updateFileNavUI(){
       close.addEventListener('click',function(e){e.stopPropagation();if(_isOpeningFileBusy)return;closeTab(idx);}); // V1_40: 読込中は操作不可
       nameRow.appendChild(name);
       nameRow.appendChild(close);
-      item.appendChild(typeBadge);
+      item.appendChild(topRow);
       item.appendChild(nameRow);
       item.addEventListener('pointerdown',function(e){_tabItemPointerDown(e,item,item.dataset.filekey);}); // V1_71: 長押しドラッグ並び替え
       item.addEventListener('click',function(){if(_isOpeningFileBusy)return;if(_tabDragJustHappened)return;if(idx!==currentFileIdx) switchToFile(idx);}); // V1_40: 読込中は操作不可 / V1_71: ドラッグ直後のクリックは無視
@@ -6873,8 +6941,8 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
       showGuide('「'+name+'」は既に開いています。開いているタブに切り替えました',3000);
       return;
     }}
-    // ① resetToolStates（計測ツール状態をリセット）
-    resetToolStates();
+    // ① resetToolStates（計測ツール状態をリセット） V1_223: 計測ツールは選択維持
+    resetToolStates(true);
     // ② V0_140: saveCurrentFileState廃止 → 前ファイルのビュー状態のみinline同期
     // V1_51: PDFタブのpdfDoc/pdfImage/pdfPageNumも退避（V1_40でfileInput側に追加した処理と同様）
     if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140=openFiles[currentFileIdx];_pf140.tx=tx;_pf140.ty=ty;_pf140.scale=scale;_pf140.fitScale=fitScale;_pf140.hiddenLayersArr=Array.from(hiddenLayers);_pf140.pdfDoc=pdfDoc;_pf140.pdfImage=pdfImage;_pf140.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);if(typeof _excelCaptureViewState==='function')_pf140.excelViewState=_excelCaptureViewState();} // V1_125: 離れるタブのExcel表示設定を保存
@@ -6992,6 +7060,7 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
     buildSnapCache();checkPerfMode();buildLayerModal();detectScale();
     if(_isNew) fit(); // 新規タブのみ全体表示にリセット（V0_107）
     scheduleDraw();scheduleOverlay();showInfo();buildSearchIndex();
+    if(typeof _showDxfDiagWarningIfNeeded215==='function') _showDxfDiagWarningIfNeeded215(doc); // V1_215: DXF読込診断の警告
     updateFileNameDisplay();updateUndoRedo();
 
     // V0_140: saveCurrentFileState廃止 → fit()後のviewport状態をinline同期

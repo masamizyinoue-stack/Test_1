@@ -356,6 +356,7 @@ async function tryRestore(){
               b.classList.toggle('active',b.dataset.tool===currentTool);
             });
             {const _mb207=document.getElementById('measureToggleBtn');if(_mb207)_mb207.classList.toggle('tool-active',['dxdy','diag','ll','lp','circDim','radDim'].indexOf(currentTool)>=0);} // V1_207: tool.jsのconst _MEASURE_TOOL_LABELSは別scriptタグのためbareでは参照できず、ここでは同じ判定を直接書く
+            if(typeof _syncMeasureToggleBtnIcon==='function') _syncMeasureToggleBtnIcon(); // V1_219: 計測ボタンのアイコンも復元したcurrentToolに同期
             if(_d2.dimensionTextMode&&_d2.dimensionTextMode!=='manual')dimensionTextMode=_d2.dimensionTextMode; // V0_154: manual廃止
             if(typeof updateDimTextModeUI==='function')updateDimTextModeUI();
             if(_d2.inputMode)inputMode=_d2.inputMode;
@@ -456,6 +457,7 @@ async function tryRestore(){
       b.classList.toggle('active',b.dataset.tool===currentTool);
     });
     {const mb207=document.getElementById('measureToggleBtn');if(mb207)mb207.classList.toggle('tool-active',['dxdy','diag','ll','lp','circDim','radDim'].indexOf(currentTool)>=0);} // V1_207: tool.jsのconst _MEASURE_TOOL_LABELSは別scriptタグのためbareでは参照できず、ここでは同じ判定を直接書く
+    if(typeof _syncMeasureToggleBtnIcon==='function') _syncMeasureToggleBtnIcon(); // V1_219: 計測ボタンのアイコンも復元したcurrentToolに同期
     [0,1,2,3,4].forEach(i=>updateViewmemoState(i));
     buildLayerModal();
     scheduleDraw();scheduleOverlay();updateUndoRedo();

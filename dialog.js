@@ -56,7 +56,13 @@ function _showPageJumpDialog(anchorEl){
   menu.style.cssText='position:fixed;z-index:9999;background:#1e3a5f;border:2px solid #4a9eff;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,.7);';
   var r=anchorEl.getBoundingClientRect();
   menu.style.top=(r.bottom+6)+'px';
-  menu.style.right=(window.innerWidth-r.right)+'px';
+  // V1_223: 従来はmenu.style.right=(window.innerWidth-r.right)でアンカー(#pageInfo)の
+  // 右端に揃えていたが、#pageInfoは#pdfPageCtrl(画面左上)内にあり右端が画面左端に近いため、
+  // ポップアップ本体の幅(min-width:180px)がその位置に収まりきらず左側が画面外にはみ出して
+  // 表示されてしまっていた(「移動」「キャンセル」ボタンの文字が欠けて見える不具合の原因)。
+  // 他のダイアログ(_showIndexProfileNameDialog等)と同じ「アンカー左端に合わせつつ、
+  // 画面端では4px以上・幅+16px分は必ず画面内に収まるようclamp」する方式に統一した
+  menu.style.left=Math.max(4,Math.min(r.left,window.innerWidth-196))+'px';
   menu.innerHTML='<div style="color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;">ページ移動（全'+total+'ページ）</div>'
     +'<input type="number" id="_pageJumpInput" min="1" max="'+total+'" value="'+pdfPageNum+'" style="width:100%;box-sizing:border-box;padding:10px;border-radius:9px;font-size:16px;background:#0a0c10;color:#eee;border:1px solid #2a3040;text-align:center">'
     +'<button id="_pageJumpGo" style="background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">移動</button>'
@@ -449,6 +455,61 @@ function _genFileThumb201(f,W,H,cb){
 // 依存グローバル: openFiles, currentFileIdx, _tabSortMode (index.html)
 // 依存関数: switchToFile, _computeTabOrder, _setTabSortMode, doCloseTab (index.html)
 // =========================================================
+// =========================================================
+// V1_217: お気に入りファイル機能
+// 「開いているファイル一覧」の各行/カードに★トグルを付け、fileKey単位で
+// localStorageに永続化する。タブを閉じても消えないようにするため、お気に入りに
+// 追加した瞬間にそのタブのバイナリをsaveFile()経由でIndexedDB(dxfViewerFilesDB、
+// storage.js既存)へも保存しておき、閉じた後でも再度開けるようにする。
+// 既存のopenFiles/タブ管理・保存処理には一切手を加えない(お気に入り用の情報は
+// 完全に別のlocalStorageキーに独立して保持する)
+// =========================================================
+var _FAV_KEY217='_dxfFavorites217';
+function _favLoadAll217(){
+  try{ return JSON.parse(localStorage.getItem(_FAV_KEY217)||'{}')||{}; }catch(e){ return {}; }
+}
+function _favSaveAll217(m){
+  try{ localStorage.setItem(_FAV_KEY217,JSON.stringify(m)); }catch(e){}
+}
+function _favIsFav217(fileKey){
+  if(!fileKey) return false;
+  return !!_favLoadAll217()[fileKey];
+}
+// buf(ArrayBuffer)は「お気に入りに追加する」時だけ渡す(既存タブのバイナリを
+// dxfViewerFilesDBへ保存し、閉じた後も再オープンできるようにするため)。
+// 外す時はbuf不要(登録メタ情報を消すのみ。保存済みバイナリ自体は消さない＝
+// 既存のdxfViewerFilesDBの他用途にも影響を与えないための安全策)
+function _favToggle217(fileKey,name,folder,buf){
+  if(!fileKey) return false;
+  var m=_favLoadAll217();
+  if(m[fileKey]){
+    delete m[fileKey];
+    _favSaveAll217(m);
+    return false;
+  } else {
+    m[fileKey]={name:name||'',folder:folder||'',favAt:Date.now()};
+    _favSaveAll217(m);
+    if(buf&&typeof saveFile==='function') saveFile(buf,fileKey);
+    return true;
+  }
+}
+// お気に入りだが現在開いていない(タブが閉じられた)ファイルを再度開く。
+// 保存済みバイナリが見つからない場合は既存のshowGuide()で案内するのみで、
+// 既存の開く処理(openDxfFromDb)自体には一切手を加えない
+function _favReopenClosed217(fileKey){
+  var m=_favLoadAll217();
+  var meta=m[fileKey];
+  if(!meta) return;
+  if(typeof _lsIdbGetP!=='function'){ if(typeof showGuide==='function') showGuide('再オープン機能が利用できません',2000); return; }
+  _lsIdbGetP(fileKey,null).then(function(buf){
+    if(!buf){
+      if(typeof showGuide==='function') showGuide('「'+(meta.name||'')+'」の保存データが見つからず開けません。一度ファイルから開くと次回から開けるようになります',3500);
+      return;
+    }
+    if(typeof openDxfFromDb==='function') openDxfFromDb(meta.name,buf,null,meta.folder);
+  });
+}
+
 function _showOpenFilesListMenu(anchorEl){
   var existing=document.getElementById('_tabListMenu');
   if(existing){existing.remove();return;}
@@ -532,6 +593,30 @@ function _showOpenFilesListMenu(anchorEl){
     });
   }
   menu.appendChild(sortRow);
+
+  // V1_217: 「お気に入りのみ表示」トグル。ONにすると、開いているタブのうち
+  // お気に入り登録済みのものに絞り込み、さらに現在は閉じているお気に入りファイルも
+  // (再度開けるボタンとして)一覧の末尾に表示する。OFF(既定)では従来通りの表示のまま
+  var _favOnly217=false;
+  var favOnlyRow=document.createElement('div');
+  favOnlyRow.style.cssText='display:flex;justify-content:center;padding:0 0 4px;flex-shrink:0;';
+  var favOnlyBtn=document.createElement('button');
+  favOnlyBtn.type='button';
+  favOnlyBtn.style.cssText='font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid #3a5578;cursor:pointer;background:none;color:#aac8e8;';
+  function updateFavOnlyBtn(){
+    favOnlyBtn.textContent=_favOnly217?'★ お気に入りのみ表示中':'☆ お気に入りのみ表示';
+    favOnlyBtn.style.background=_favOnly217?'#4a9eff':'none';
+    favOnlyBtn.style.color=_favOnly217?'#04203f':'#aac8e8';
+    favOnlyBtn.style.fontWeight=_favOnly217?'700':'400';
+  }
+  favOnlyBtn.addEventListener('click',function(){
+    _favOnly217=!_favOnly217;
+    updateFavOnlyBtn();
+    render();
+  });
+  updateFavOnlyBtn();
+  favOnlyRow.appendChild(favOnlyBtn);
+  menu.appendChild(favOnlyRow);
 
   // V1_104: 「全て選択」チェックボックス。ファイル数が多い時に1件ずつタップせずに
   // まとめて選択・解除できるようにする
@@ -680,18 +765,48 @@ function _showOpenFilesListMenu(anchorEl){
     });
   };
 
+  // V1_217: ★お気に入りトグルのボタンを1つ生成する共通ヘルパー(文字一覧・
+  // プレビュー一覧の両方で使う)。isFav=現在お気に入りかどうか、onToggleは
+  // トグル後に呼ぶコールバック(再描画用)
+  function _makeFavStarBtn217(isFav,onToggle){
+    var star=document.createElement('button');
+    star.type='button';
+    star.textContent=isFav?'★':'☆';
+    star.title=isFav?'お気に入りから外す':'お気に入りに追加';
+    star.style.cssText='background:none;border:none;font-size:18px;line-height:1;padding:2px 4px;cursor:pointer;flex-shrink:0;color:'+(isFav?'#ffd60a':'#889')+';';
+    star.addEventListener('click',function(ev){
+      ev.stopPropagation(); // 行/カードのクリック(タブ切替)を誘発しない
+      onToggle();
+    });
+    return star;
+  }
+  // V1_217: 現在お気に入りだが、開いているタブには無い(閉じられた)ファイルの
+  // 一覧を返す。{fileKey,name,folder}の配列
+  function _closedFavEntries217(){
+    var m=_favLoadAll217();
+    var openKeys={};
+    openFiles.forEach(function(f){ if(f.fileKey) openKeys[f.fileKey]=true; });
+    var out=[];
+    Object.keys(m).forEach(function(k){ if(!openKeys[k]) out.push({fileKey:k,name:m[k].name,folder:m[k].folder}); });
+    return out;
+  }
+
   function renderList(){
     listBody.innerHTML='';
-    if(openFiles.length===0){
-      var e=document.createElement('div');
-      e.style.cssText='color:#889;font-size:13px;text-align:center;padding:8px 0;';
-      e.textContent='開いているファイルはありません';
-      listBody.appendChild(e);
-      return;
-    }
     // V1_80: 設定パネルの「タブの並び順」と同じ並び順ロジックを共有する
     // （従来はこのパネルだけ常にアクセス順(_lastActiveTs降順)固定だった）
     var idxs=(typeof _computeTabOrder==='function')?_computeTabOrder():openFiles.map(function(f,i){return i;});
+    // V1_217: 「お気に入りのみ表示」がONの場合、開いているタブはお気に入り登録済みの
+    // ものだけに絞り込む(既存の並び順ロジック自体はそのまま利用する)
+    if(_favOnly217) idxs=idxs.filter(function(idx){ var f=openFiles[idx]; return f.fileKey&&_favIsFav217(f.fileKey); });
+    var closedFavs=_favOnly217?_closedFavEntries217():[];
+    if(idxs.length===0&&closedFavs.length===0){
+      var e=document.createElement('div');
+      e.style.cssText='color:#889;font-size:13px;text-align:center;padding:8px 0;';
+      e.textContent=_favOnly217?'お気に入りはまだありません':'開いているファイルはありません';
+      listBody.appendChild(e);
+      return;
+    }
     // V1_71: タブバーと同じ配色（赤=アクティブ/黄=前回/青=前々回）を共通関数で判定し統一する
     var _ranks71=(typeof _getTabRecencyRanks==='function')?_getTabRecencyRanks():{recent1:-1,recent2:-1};
     idxs.forEach(function(idx){
@@ -712,6 +827,15 @@ function _showOpenFilesListMenu(anchorEl){
         updateCloseSelBtn();
       });
 
+      // V1_217: ★お気に入りトグル。追加時はopenFilesBufs[idx](このタブの
+      // バイナリ)を渡し、閉じた後も再度開けるよう保存しておく
+      var star217=_makeFavStarBtn217(f.fileKey?_favIsFav217(f.fileKey):false,function(){
+        if(!f.fileKey) return;
+        _favToggle217(f.fileKey,f.currentFileName||f.name,f.folder,openFilesBufs[idx]);
+        render();
+        if(typeof updateFileNavUI==='function') updateFileNavUI(); // V1_220: タブバーの★表示も即時反映
+      });
+
       // V1_109: バッジのラベル・色は_fileTypeInfo()（index.html）に一元化。
       // タブバー側と同じ配色（DXF=青/PDF=紫/XLS=緑）になるようにするため
       var _typeInfo109=(typeof _fileTypeInfo==='function')?_fileTypeInfo(f.currentFileName||f.name):{label:'DXF',color:'#1565c0'};
@@ -725,11 +849,27 @@ function _showOpenFilesListMenu(anchorEl){
       var nameColor=isActive?'#ff5555':isRecent1?'#ffd60a':isRecent2?'#4da6ff':'#eee';
       info.innerHTML='<div style="color:'+nameColor+';font-size:13px;font-weight:'+(isActive?'700':'400')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(f.currentFileName||f.name||'---')+'</div>'
         +'<div style="color:#889;font-size:11px;">'+sub+'</div>';
-      row.appendChild(cb);row.appendChild(badge);row.appendChild(info);
+      row.appendChild(cb);row.appendChild(star217);row.appendChild(badge);row.appendChild(info);
       row.addEventListener('click',function(){
         closeMenu();
         if(idx!==currentFileIdx&&typeof switchToFile==='function') switchToFile(idx);
       });
+      listBody.appendChild(row);
+    });
+    // V1_217: 閉じているお気に入りファイル(再度開くボタンとして表示)
+    closedFavs.forEach(function(cf){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:8px;border-bottom:1px dashed #2a3d55;cursor:pointer;opacity:.8;';
+      var star217=_makeFavStarBtn217(true,function(){ _favToggle217(cf.fileKey,cf.name,cf.folder); render(); });
+      var badge=document.createElement('span');
+      badge.textContent='閉';
+      badge.style.cssText='font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;flex-shrink:0;background:#555;color:#fff;';
+      var info=document.createElement('div');
+      info.style.cssText='flex:1;min-width:0;';
+      info.innerHTML='<div style="color:#ccc;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(cf.name||'---')+'</div>'
+        +'<div style="color:#889;font-size:11px;">'+(cf.folder||'')+'（タップで再度開く）</div>';
+      row.appendChild(star217);row.appendChild(badge);row.appendChild(info);
+      row.addEventListener('click',function(){ closeMenu(); _favReopenClosed217(cf.fileKey); });
       listBody.appendChild(row);
     });
   }
@@ -738,14 +878,18 @@ function _showOpenFilesListMenu(anchorEl){
   // タブ切替という機能面はrenderList()と同じで、見た目だけをカード形式にしたもの。
   function renderGrid(){
     listBody.innerHTML='';
-    if(openFiles.length===0){
+    var idxs=(typeof _computeTabOrder==='function')?_computeTabOrder():openFiles.map(function(f,i){return i;});
+    // V1_217: 「お気に入りのみ表示」がONの場合、開いているタブはお気に入り登録済みの
+    // ものだけに絞り込む
+    if(_favOnly217) idxs=idxs.filter(function(idx){ var f=openFiles[idx]; return f.fileKey&&_favIsFav217(f.fileKey); });
+    var closedFavs=_favOnly217?_closedFavEntries217():[];
+    if(idxs.length===0&&closedFavs.length===0){
       var e=document.createElement('div');
       e.style.cssText='color:#889;font-size:13px;text-align:center;padding:8px 0;grid-column:1/-1;';
-      e.textContent='開いているファイルはありません';
+      e.textContent=_favOnly217?'お気に入りはまだありません':'開いているファイルはありません';
       listBody.appendChild(e);
       return;
     }
-    var idxs=(typeof _computeTabOrder==='function')?_computeTabOrder():openFiles.map(function(f,i){return i;});
     var _ranks71=(typeof _getTabRecencyRanks==='function')?_getTabRecencyRanks():{recent1:-1,recent2:-1};
     idxs.forEach(function(idx){
       var f=openFiles[idx];
@@ -781,6 +925,18 @@ function _showOpenFilesListMenu(anchorEl){
       badge.textContent=_typeInfo109.label;
       badge.style.cssText='position:absolute;top:4px;right:4px;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;background:'+_typeInfo109.color+';color:#fff;';
       thumbWrap.appendChild(badge);
+
+      // V1_217: ★お気に入りトグル。サムネイル左下(チェックボックス=左上、種類
+      // バッジ=右上と重ならない位置)に配置する
+      var star217=_makeFavStarBtn217(f.fileKey?_favIsFav217(f.fileKey):false,function(){
+        if(!f.fileKey) return;
+        _favToggle217(f.fileKey,f.currentFileName||f.name,f.folder,openFilesBufs[idx]);
+        render();
+        if(typeof updateFileNavUI==='function') updateFileNavUI(); // V1_220: タブバーの★表示も即時反映
+      });
+      star217.style.position='absolute';star217.style.bottom='4px';star217.style.left='4px';
+      star217.style.background='rgba(4,32,63,.7)';star217.style.borderRadius='6px';
+      thumbWrap.appendChild(star217);
       card.appendChild(thumbWrap);
 
       var nameColor=isActive?'#ff5555':isRecent1?'#ffd60a':isRecent2?'#4da6ff':'#eee';
@@ -793,6 +949,30 @@ function _showOpenFilesListMenu(anchorEl){
         closeMenu();
         if(idx!==currentFileIdx&&typeof switchToFile==='function') switchToFile(idx);
       });
+      listBody.appendChild(card);
+    });
+    // V1_217: 閉じているお気に入りファイル(タップで再度開く、プレビューは生成できない
+    // ためサムネイル欄にアイコンのみ表示するシンプルなカード)
+    closedFavs.forEach(function(cf){
+      var card=document.createElement('div');
+      card.style.cssText='display:flex;flex-direction:column;background:#1e3a5f;border-radius:10px;overflow:hidden;cursor:pointer;border:2px dashed #556;opacity:.8;';
+      var thumbWrap=document.createElement('div');
+      thumbWrap.style.cssText='position:relative;width:100%;height:200px;background:#04203f;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#556;font-size:13px;';
+      thumbWrap.textContent='（タップで再度開く）';
+      var star217=_makeFavStarBtn217(true,function(){ _favToggle217(cf.fileKey,cf.name,cf.folder); render(); });
+      star217.style.position='absolute';star217.style.bottom='4px';star217.style.left='4px';
+      star217.style.background='rgba(4,32,63,.7)';star217.style.borderRadius='6px';
+      thumbWrap.appendChild(star217);
+      var badge=document.createElement('span');
+      badge.textContent='閉';
+      badge.style.cssText='position:absolute;top:4px;right:4px;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;background:#555;color:#fff;';
+      thumbWrap.appendChild(badge);
+      card.appendChild(thumbWrap);
+      var nameEl=document.createElement('div');
+      nameEl.style.cssText='color:#ccc;font-size:12px;padding:6px 6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;';
+      nameEl.textContent=cf.name||'---';
+      card.appendChild(nameEl);
+      card.addEventListener('click',function(){ closeMenu(); _favReopenClosed217(cf.fileKey); });
       listBody.appendChild(card);
     });
   }
