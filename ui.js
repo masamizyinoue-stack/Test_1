@@ -34,6 +34,10 @@ function updateViewmemoState(i){
   // V0_160: savedViewsはファイル横断のグローバル項目になったため、
   // どのファイルの記憶かを小さく表示（別ファイルを誤って開かないように）
   const vf=document.querySelector('.vm-file[data-vf="'+i+'"]');
-  if(vf) vf.textContent=(savedViews[i]&&savedViews[i].fileName)?savedViews[i].fileName:'';
+  // V1_206: 長いファイル名はCSS側(min-width:0+text-overflow:ellipsis)で右側を省略表示する。
+  // title属性にフルネームを入れておくことで、省略された場合もトラックパッド等での
+  // ホバー時に全体を確認できる
+  const _vfName206=(savedViews[i]&&savedViews[i].fileName)?savedViews[i].fileName:'';
+  if(vf){ vf.textContent=_vfName206; vf.title=_vfName206; }
 }
 

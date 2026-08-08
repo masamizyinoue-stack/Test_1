@@ -19,6 +19,10 @@
 
 // ERASER_RADIUS_PX: var宣言でグローバル公開（drawOverlayがHTMLから参照するため）
 var ERASER_RADIUS_PX=20;
+// V1_210: ペン等の他ツールから計測ボタンを1回押した時に、前回選んでいた計測ツールを
+// 直接復元できるようにするため記憶する。var宣言でグローバル公開(index.html側の
+// #measureToggleBtnクリックハンドラが参照するため)
+var _lastMeasureTool=null;
 // V1_46: 手書きモードで指計測時、指に隠れないようカーソルを上にずらすオフセット量(px)
 var FINGER_CURSOR_OFFSET_Y=60;
 
@@ -691,7 +695,18 @@ ov.addEventListener('touchend',e=>{
 // 色・太さの選択ポップアップが開く」という操作に統合した。対象はペン・蛍光・
 // 寸法系ツール（色/太さ設定を持つもの）のみで、それ以外（消しゴム等）は
 // 従来通り再選択の動作のみとなる。
-const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim'};
+// V1_207: 消しゴム(eraser)を追加し、ペン・蛍光ペンと同じ「選択中のアイコンを再タップ
+// すると範囲選択ポップアップが開く」動作にした。計測系6ツール(dxdy等)は従来通り'dim'を
+// 維持する(下のクリックハンドラでこの値を見て「状態リセットをしない」保護を掛けている
+// ため)が、色選択が#measureToolPopupに常時表示されるようになったので、再タップ時に
+// 別ポップアップを開く処理自体は行わない(下のif(_mode==='dim')分岐を参照)
+const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim'};
+// V1_205: 計測ツール選択ポップアップ(#measureToolPopup、index.html)用。6つの計測ツールの
+// うちどれかが新たに選択された時、ヘッダーの計測ボタン(#measureCurrentLabel、3段表示の
+// 3段目)に選択中のツール名を表示し、ポップアップを閉じる。すでに選択中のツールの
+// アイコンを再タップした場合(下のstopImmediatePropagation分岐)はこの処理には来ない
+// (色/太さポップアップが開くだけで、選択自体は変わらないため表示更新も不要)
+const _MEASURE_TOOL_LABELS={dxdy:'水・鉛',diag:'斜め',ll:'2線間',lp:'線と点',circDim:'直径',radDim:'半径'};
 document.querySelectorAll('.tool-btn').forEach(btn=>{
   btn.addEventListener('click',(e)=>{
     const _mode=_TOOL_COLOR_MODE[btn.dataset.tool];
@@ -701,11 +716,30 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
       // 他のフックリスナー（計測状態のリセットを行う）が発火して計測途中の状態を
       // 壊してしまわないよう、stopImmediatePropagation()で止める
       if(e&&e.stopImmediatePropagation)e.stopImmediatePropagation();
+      // V1_207: 計測系ツール('dim')は色選択が#measureToolPopupに常時表示されている
+      // ため、再タップで別ポップアップを開く必要がない。ここでは「状態リセットを
+      // しない」保護だけを効かせ、それ以外は何もしない(何も起きないのが正しい)
+      if(_mode==='dim') return;
       if(typeof openContextPopup==='function')openContextPopup(_mode,btn);
       return;
     }
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
+    // V1_205: 計測ツールが新たに選択されたら、計測ボタンの3段目ラベルを更新し、
+    // 計測ツール選択ポップアップ(#measureToolPopup)を閉じる
+    if(_MEASURE_TOOL_LABELS[currentTool]){
+      var _mtLabel205=document.getElementById('measureCurrentLabel');
+      if(_mtLabel205) _mtLabel205.textContent=_MEASURE_TOOL_LABELS[currentTool];
+      if(typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
+      // V1_210: 次に他ツールから計測ボタンを押した時にこのツールを直接復元できるよう記憶
+      // (この下のscheduleSave()で一緒に保存される)
+      _lastMeasureTool=currentTool;
+    }
+    // V1_207: 計測ボタン(#measureToggleBtn)の枠は、計測系ツールがcurrentToolの時だけ
+    // 色付きにする(常時色付きだと選択中かどうか分かりにくいとの指摘のため)。
+    // どのツールが選ばれてもここを通るので、計測系以外に切り替えた時は正しく外れる
+    var _measureBtn207=document.getElementById('measureToggleBtn');
+    if(_measureBtn207) _measureBtn207.classList.toggle('tool-active',!!_MEASURE_TOOL_LABELS[currentTool]);
     if(window.IPX&&window.IPX.active&&typeof ipxCancel==='function')ipxCancel(); // V1_48: ツール切替時は交点ピックを中止
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
@@ -783,7 +817,24 @@ document.querySelectorAll('.hl-lw-btn').forEach(btn=>{
     btn.classList.add('active');
     currentHL_LW=parseFloat(btn.dataset.lw);
     document.getElementById('colorOverlay').classList.remove('open');
+    // V1_207: 蛍光ペンボタンの3段目(id="hlLwLabel")に現在の線幅を表示する
+    const hlwl=document.getElementById('hlLwLabel');if(hlwl)hlwl.textContent=currentHL_LW;
     scheduleSave(); // V0_135: 蛍光ペン線幅変更を保存
+  });
+});
+
+// =========================================================
+// V1_207: 消しゴム範囲選択ボタン
+// =========================================================
+document.querySelectorAll('.er-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.er-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    ERASER_RADIUS_PX=parseFloat(btn.dataset.er);
+    document.getElementById('colorOverlay').classList.remove('open');
+    const erl=document.getElementById('eraserSizeLabel');if(erl)erl.textContent=ERASER_RADIUS_PX;
+    if(typeof scheduleOverlay==='function')scheduleOverlay(); // 消しゴム範囲の可視化円を即反映
+    scheduleSave(); // 消しゴム範囲を保存
   });
 });
 

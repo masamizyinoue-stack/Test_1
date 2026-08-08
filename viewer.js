@@ -1495,32 +1495,24 @@ function _updateTopbarForExcel(isExcel){
   // Excel/CSV表示中は非表示にする（DXF/PDF表示中は従来通り表示する）
   var searchMenuBtn=document.getElementById('searchMenuBtn');
   if(searchMenuBtn) searchMenuBtn.style.display=isExcel?'none':'';
-  // V1_202: 計測トグルボタン(#measureToggleBtn)はdxfToolGroup内にあるため上のdisplay
-  // 切替で自動的に隠れるが、第2段バー(#measureBar)自体はdxfToolGroupの外にある
-  // 独立要素のため、Excel表示に切り替わったタイミングで開いていれば強制的に閉じる
-  // (トグルボタンが隠れたまま計測バーだけ表示され続ける状態を防ぐ)
-  if(isExcel){
-    var mBar=document.getElementById('measureBar');
-    var mBtn=document.getElementById('measureToggleBtn');
-    if(mBar) mBar.classList.remove('open');
-    if(mBtn) mBtn.classList.remove('active');
-  }
+  // V1_202: 計測ボタン(#measureToggleBtn)はdxfToolGroup内にあるため上のdisplay切替で
+  // 自動的に隠れるが、選択ポップアップ(V1_205: #measureToolPopup)自体はdxfToolGroupの
+  // 外にある独立要素のため、Excel表示に切り替わったタイミングで開いていれば強制的に閉じる
+  // (ボタンが隠れたままポップアップだけ表示され続ける状態を防ぐ)
+  if(isExcel&&typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
 }
-// V1_116: PDF表示中は計測トグルボタン(#measureToggleBtn、V1_202で.dim-groupから改称・
-// 第2段バー化)と画面(白黒切替、#bwToggleBtn)ボタンを非表示にする。ペン・蛍光ペン・
-// 消しゴム・戻る/進む・サブ窓・計算機等その他のボタンは現状の位置のまま表示を維持するため、
-// dxfToolGroup全体を隠す_updateTopbarForExcelとは別に、この2要素だけを個別にdisplay切替する
+// V1_116: PDF表示中は計測ボタン(#measureToggleBtn、V1_202で.dim-groupから改称、
+// V1_205で第2段バーからポップアップ選択方式に変更)と画面(白黒切替、#bwToggleBtn)
+// ボタンを非表示にする。ペン・蛍光ペン・消しゴム・戻る/進む・サブ窓・計算機等その他の
+// ボタンは現状の位置のまま表示を維持するため、dxfToolGroup全体を隠す
+// _updateTopbarForExcelとは別に、この2要素だけを個別にdisplay切替する
 function _updateTopbarForPdf(isPdf){
   var measureBtn=document.getElementById('measureToggleBtn');
-  var measureBar=document.getElementById('measureBar');
   var bwBtn=document.getElementById('bwToggleBtn');
   if(measureBtn) measureBtn.style.display=isPdf?'none':'';
-  // V1_202: PDF表示に切り替わったタイミングで計測バーが開いていれば強制的に閉じる
-  // (トグルボタンが隠れたまま計測バーだけ表示され続ける状態を防ぐ)
-  if(isPdf){
-    if(measureBar) measureBar.classList.remove('open');
-    if(measureBtn) measureBtn.classList.remove('active');
-  }
+  // V1_205: PDF表示に切り替わったタイミングで計測ツール選択ポップアップが開いていれば
+  // 強制的に閉じる(ボタンが隠れたままポップアップだけ表示され続ける状態を防ぐ)
+  if(isPdf&&typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
   if(bwBtn) bwBtn.style.display=isPdf?'none':'';
 }
 // V1_115: ソート/固定行列ボタンの押下状態(active表示)・タップ待ちガイド文言・

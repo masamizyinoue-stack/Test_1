@@ -558,8 +558,9 @@ function _showOpenFilesListMenu(anchorEl){
   // V1_201: 文字一覧(縦積みの行)とプレビュー一覧(サムネイル付きグリッド)でlistBodyの
   // レイアウトを切り替える
   function applyListBodyStyle(){
+    // V1_208: プレビューが小さいとの指摘のため、カード最小幅を150px→300px(約2倍)に拡大
     listBody.style.cssText=(_mode==='preview')
-      ?'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start;'
+      ?'display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-content:start;'
       :'display:flex;flex-direction:column;gap:2px;';
   }
   applyListBodyStyle();
@@ -753,13 +754,14 @@ function _showOpenFilesListMenu(anchorEl){
       var card=document.createElement('div');
       card.style.cssText='display:flex;flex-direction:column;background:#1e3a5f;border-radius:10px;overflow:hidden;cursor:pointer;border:2px solid '+(isActive?'#ff5555':'transparent')+';';
 
+      // V1_208: プレビューが小さいとの指摘のため、サムネイル高さ・生成解像度を約2倍に拡大
       var thumbWrap=document.createElement('div');
-      thumbWrap.style.cssText='position:relative;width:100%;height:100px;background:#04203f;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+      thumbWrap.style.cssText='position:relative;width:100%;height:200px;background:#04203f;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
       var img=document.createElement('img');
       img.style.cssText='max-width:100%;max-height:100%;object-fit:contain;';
       thumbWrap.appendChild(img);
       if(typeof _genFileThumb201==='function'){
-        _genFileThumb201(f,150,100,function(url){ if(url) img.src=url; });
+        _genFileThumb201(f,300,200,function(url){ if(url) img.src=url; });
       }
 
       var cb=document.createElement('input');
