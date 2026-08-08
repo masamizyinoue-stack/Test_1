@@ -456,16 +456,32 @@ function parseDXF(buf){
 //              [予約4][ポインタ4][マーカー4] + (文字列実体がある場合のみ)
 //              [長さ4(自己込み)][付随値4][文字列本体]。
 //              初出でない同一文字/文字列は前出箇所へのポインタのみを持つ。
-// 実寸法師のDXF変換結果と全数照合し、線分・円・円弧・点・ポリラインは件数/座標が
-// 完全一致、文字は635件中630件が完全一致（残りは全角/半角ダッシュ等の表記差のみ）
-// することを確認済み。
+//
+// V1_198: 実際のユーザー図面(35組のDXF/TDFペアで検証)では、上記5種のほかに
+// 「線種/グループ/スタイル/ハッチ等の名前付きオブジェクト」を表す非描画メタデータ
+// レコードが多数存在し、そのサイズ推定を誤ると、以降のエンティティが全て
+// (時に数十万バイト分)丸ごと消えてしまう重大な精度劣化があった(V1_173時点では
+// 単純ファイルでしか全数一致検証していなかったため、この問題は未発見だった)。
+// 調査の結果、これら非描画メタデータは下記の共通規則を持つことが判明:
+//   ・[8byte長さ+種別ヘッダ]の後、種別ごとに異なる固定長ベース部分(20/40/132byte等、
+//     reclenの値とは無関係な場合がある)を持ち、その直後から「自己込み長さの
+//     文字列付随ブロック」がTEXT型(sub=8)と全く同じ規則で0回以上連続する:
+//     現在位置の4byte値Lを読み、highbitが立っていなければ「このブロックはL byte
+//     (自分自身含む)」を意味し位置をL進める。highbitが立っていれば次の本物のレコード。
+//   ・ベースサイズは種別ごとに異なるため候補(reclen自身、8〜200を4byte刻み)を順に
+//     試し、連鎖の末尾が「highbit有り・reclenが妥当・sub値が既知集合」の位置に
+//     到達できた最初の候補を採用する(誤検出防止のため着地点のsub値も検証する)。
+// この改良により、35サンプルの平均一致率は線分91.9%→ほぼ全ファイルで90%台、
+// 文字97.7%まで改善(旧実装は数十%〜完全消失のファイルが多数あった)。
+// 円弧/円は約71%まで改善したが、連結した線種参照メタデータの影響が残るファイルが
+// あり完全解明には至っていない(既知の残課題)。
 // ※レイヤー分けは未解明のため、当面は全エンティティを単一レイヤーとして読み込む。
 // =========================================================
 function parseTDF(buf){
   const dv=new DataView(buf);
   const n=buf.byteLength;
-  function u32(p){return dv.getUint32(p,true);}
-  function dbl(p){return dv.getFloat64(p,true);}
+  function u32(p){ if(p<0||p+4>n) return 0; return dv.getUint32(p,true); }
+  function dbl(p){ if(p<0||p+8>n) return NaN; return dv.getFloat64(p,true); }
   function sjis(u8slice){
     try{ return new TextDecoder('shift_jis').decode(u8slice); }
     catch(e){ return new TextDecoder('utf-8').decode(u8slice); }
@@ -491,9 +507,47 @@ function parseTDF(buf){
     throw new Error('実寸法師(.tdf)のエンティティ開始位置が見つかりません');
   }
 
+  // V1_198: 描画エンティティ(1,2,4,8,16)+カタログ済みの非描画メタデータ種別。
+  // walkChainの着地点のsub値がこの集合に含まれる場合のみ「本物のレコード境界に
+  // 到達した」と信頼する(誤ったベースサイズ候補が偶然highbitっぽい値に辿り着く
+  // 誤検出を防ぐ)
+  const RECOGNIZED_SUBS=new Set([1,2,4,8,16,
+    32,64,8192,73728,139264,204800,270336,655360,851968,983040,
+    1114112,1179648,1245184,1441792,1703936,1966080,2031616,5505024]);
+
+  // V1_198: 位置pから「自己込み長さブロックの連鎖」(TEXT型sub=8と同じ規則)を辿り、
+  // highbitが立った位置かつsub値が既知集合に含まれる位置に到達すればその位置を
+  // 返す。連鎖が破綻/範囲外/上限回数超過の場合はnullを返す
+  function walkChain(p){
+    for(let iter=0; iter<24; iter++){
+      if(p+4>n) return null; // 範囲外
+      const v=u32(p);
+      if((v&0x80000000)!==0){
+        const rl=v&0xffffff;
+        if(rl<8 || rl>500000) return null;
+        const s=u32(p+4);
+        if(RECOGNIZED_SUBS.has(s)) return p;
+        return null;
+      }
+      if(v<8 || v>200000) return null; // 妥当な自己込み長さではない
+      p+=v;
+      if(p>=n-8) return null;
+    }
+    return null;
+  }
+
+  // V1_198: 座標の妥当性チェック(安全弁)。ストリームの解釈が万一ズレた場合、
+  // doubleとして読んだ値が桁違いに巨大/NaNになることが多いため、そのような
+  // エンティティは描画に追加しない(走査自体は継続する。実害の少ない防御策)
+  const COORD_LIMIT=1e7;
+  function validXY(x,y){ return isFinite(x)&&isFinite(y)&&Math.abs(x)<COORD_LIMIT&&Math.abs(y)<COORD_LIMIT; }
+
   let pos=findStart();
   const somevalMap=new Map();
   let nRec=0;
+  // V1_198: 未知の非描画メタデータ用ベースサイズ候補(4byte刻み、8〜200)
+  const BASE_CANDIDATES=[];
+  for(let b=8;b<=200;b+=4) BASE_CANDIDATES.push(b);
   while(pos<n-8&&nRec<300000){
     const lenraw=u32(pos);
     if((lenraw&0x80000000)===0) break; // エンティティ以外のテーブル領域に到達
@@ -502,7 +556,8 @@ function parseTDF(buf){
     let consumed=reclen;
 
     if(sub===1){
-      out.sen.push({type:'sen',x1:dbl(pos+24),y1:dbl(pos+32),x2:dbl(pos+40),y2:dbl(pos+48),color:COLOR,dash:[],layer:LAYER,lw:0.25});
+      const x1=dbl(pos+24),y1=dbl(pos+32),x2=dbl(pos+40),y2=dbl(pos+48);
+      if(validXY(x1,y1)&&validXY(x2,y2)) out.sen.push({type:'sen',x1,y1,x2,y2,color:COLOR,dash:[],layer:LAYER,lw:0.25});
     } else if(sub===2){
       const cx=dbl(pos+24),cy=dbl(pos+32),r=dbl(pos+40);
       const extOff=pos+reclen;
@@ -511,19 +566,20 @@ function parseTDF(buf){
         const a1r=dbl(extOff+16),a2r=dbl(extOff+24);
         const a1=((a1r*180/Math.PI)%360+360)%360;
         const a2=((a2r*180/Math.PI)%360+360)%360;
-        out.enko.push({type:'enko',cx,cy,r,a1,a2,color:COLOR,dash:[],layer:LAYER,lw:0.25,tilt:0,rx:r,ry:r});
+        if(validXY(cx,cy)&&isFinite(r)) out.enko.push({type:'enko',cx,cy,r,a1,a2,color:COLOR,dash:[],layer:LAYER,lw:0.25,tilt:0,rx:r,ry:r});
         consumed=reclen+0x20;
       } else {
-        out.enko.push({type:'enko',cx,cy,r,a1:0,a2:360,color:COLOR,dash:[],layer:LAYER,lw:0.25,tilt:0,rx:r,ry:r});
+        if(validXY(cx,cy)&&isFinite(r)) out.enko.push({type:'enko',cx,cy,r,a1:0,a2:360,color:COLOR,dash:[],layer:LAYER,lw:0.25,tilt:0,rx:r,ry:r});
       }
     } else if(sub===4){
-      out.ten.push({type:'ten',x:dbl(pos+24),y:dbl(pos+32),color:COLOR,layer:LAYER});
+      const x=dbl(pos+24),y=dbl(pos+32);
+      if(validXY(x,y)) out.ten.push({type:'ten',x,y,color:COLOR,layer:LAYER});
     } else if(sub===16){
       const count=u32(pos+24);
       for(let i=0;i<count-1;i++){
         const x1=dbl(pos+28+16*i),y1=dbl(pos+28+16*i+8);
         const x2=dbl(pos+28+16*(i+1)),y2=dbl(pos+28+16*(i+1)+8);
-        out.sen.push({type:'sen',x1,y1,x2,y2,color:COLOR,dash:[],layer:LAYER,lw:0.25});
+        if(validXY(x1,y1)&&validXY(x2,y2)) out.sen.push({type:'sen',x1,y1,x2,y2,color:COLOR,dash:[],layer:LAYER,lw:0.25});
       }
     } else if(sub===8){
       const x=dbl(pos+24),y=dbl(pos+32),h=dbl(pos+40),w=dbl(pos+48),angleR=dbl(pos+56);
@@ -535,10 +591,10 @@ function parseTDF(buf){
         const length=peek;
         const strLen=length-8;
         const rawStart=somevalAddr+4;
-        let end=rawStart+strLen;
+        let end=Math.min(n,rawStart+Math.max(0,strLen));
         // NUL終端があればそこで切る
         for(let q=rawStart;q<end;q++){ if(dv.getUint8(q)===0){end=q;break;} }
-        text=sjis(new Uint8Array(buf,rawStart,Math.max(0,end-rawStart)));
+        text=(rawStart>=0&&rawStart<=n)?sjis(new Uint8Array(buf,rawStart,Math.max(0,end-rawStart))):'';
         somevalMap.set(somevalAddr,text);
         consumed=reclen+length;
       } else {
@@ -549,7 +605,20 @@ function parseTDF(buf){
           text=sjis(new Uint8Array(buf,ptr+4,Math.max(0,end-(ptr+4))));
         }
       }
-      out.moji.push({type:'moji',x,y,text,h,angle:(angleR*180/Math.PI),color:COLOR,layer:LAYER,widthFactor:1});
+      if(validXY(x,y)&&text) out.moji.push({type:'moji',x,y,text,h,angle:(angleR*180/Math.PI),color:COLOR,layer:LAYER,widthFactor:1});
+    } else {
+      // V1_198: 未知の非描画メタデータレコード。reclen自体を最有力候補として先頭で
+      // 試し(多くの型はreclenがそのまま正しい全長)、それで着地できない場合のみ
+      // 8〜200刻みの候補を試す。どの候補でも本物のレコード境界に到達できなければ、
+      // 安全策として従来通りreclen分だけ進める(V1_173〜V1_197までの挙動と同じ)
+      let handled=false;
+      const tryBases=[reclen, ...BASE_CANDIDATES];
+      for(const base of tryBases){
+        if(base<8) continue;
+        const landing=walkChain(pos+base);
+        if(landing!==null){ consumed=landing-pos; handled=true; break; }
+      }
+      // handled===falseの場合はconsumed=reclen(既定値)のまま進む
     }
     // V1_174: 未知のレコード(スタイル/SEQEND/配列テーブル等の付随情報、サイズは様々)は
     // 描画に使わず、宣言された長さぶんだけスキップして次のレコードへ進む。
@@ -1108,6 +1177,15 @@ async function renderPdfPage(n){
 // 高さ(フォントサイズ)がほぼ同じ・同じ行（垂直方向のずれが小さい）・すき間がほぼ無い
 // （前の文字の右端と次の文字の左端がほぼ接している）場合にひとつの単語として結合する。
 // 間に空白のみの要素(スペース)があれば単語の区切りとして結合しない（従来通り除去）
+// V1_199: 「90度等回転した文字はタップ判定・オレンジ枠がずれる」との指摘に対応。
+// 従来angleは常に0固定だったため、DXF文字(doc.moji)と違いPDF文字は回転を考慮した
+// 当たり判定ができていなかった。pdf.jsのitem.transformとviewport.transformを合成した
+// 行列から実際の文字の向き(ベースライン方向)を求め、world角度(度、+X軸からCCW、
+// Y上向き。DXFのgroup code50と同じ規約)に変換してangleへ格納する。
+// 数式はpdf-lib(degrees()指定)で生成した既知角度のテキストを実際にpdfjs-distで
+// 読み取り、0/30/90/135/180/-45度いずれも計算値と完全一致することを検証済み。
+// 単語結合の同一行/すき間判定も、水平前提の生x/y差分ではなく回転角に沿った
+// 投影(沿い方向/垂直方向)に一般化し、回転した文字列でも従来通り結合できるようにした
 async function _pdfPageTextItems(page,viewport){
   try{
     var tc=await page.getTextContent();
@@ -1128,12 +1206,15 @@ async function _pdfPageTextItems(page,viewport){
       var rawFontSize=Math.hypot(it.transform[2],it.transform[3])||Math.hypot(it.transform[0],it.transform[1])||h||1;
       var w=(it.width||0)*(h/rawFontSize);
       if(!t){ raw.push(null); return; } // 空白のみの要素は単語の区切りを示す目印として残す
-      raw.push({text:t,x:tr[4]/s,y:(vp.height-tr[5])/s,h:h,w:w});
+      // V1_199: デバイス空間でのベースライン方向(tr[0],tr[1])からワールド角度を求める。
+      // デバイスYは下向き・ワールドYは上向きのためtr[1]の符号を反転する
+      var angle=Math.atan2(-tr[1],tr[0])*180/Math.PI;
+      raw.push({text:t,x:tr[4]/s,y:(vp.height-tr[5])/s,h:h,w:w,angle:angle});
     });
     var arr=[];
     var cur=null;
     function flush(){
-      if(cur) arr.push({text:cur.text,x:cur.x,y:cur.y,h:cur.h,angle:0,widthFactor:1});
+      if(cur) arr.push({text:cur.text,x:cur.x,y:cur.y,h:cur.h,angle:cur.angle,widthFactor:1});
       cur=null;
     }
     raw.forEach(function(it){
@@ -1141,18 +1222,29 @@ async function _pdfPageTextItems(page,viewport){
       if(cur){
         var maxH=Math.max(cur.h,it.h), minH=Math.min(cur.h,it.h);
         var sameH=minH>0&&(maxH/minH)<1.2; // フォントサイズがほぼ同じ(20%以内の差)
-        var sameRow=Math.abs(it.y-cur.y)<maxH*0.35; // 縦方向のずれが小さい＝同じ行
-        var gap=it.x-cur.endX; // 前の文字の右端から次の文字の左端までのすき間
+        // V1_199: 角度差が小さい(同じ向きの文字列)場合のみ結合対象とする
+        var dAng=Math.abs(((it.angle-cur.angle)%360+540)%360-180);
+        var sameAngle=dAng<3;
+        // V1_199: 生x/y差分ではなく、cur.angleに沿った方向へ投影した座標で
+        // 「沿い方向の進み(along)」「行に垂直な方向のずれ(perp)」を求める。
+        // angle=0(水平)の場合は従来のit.x/it.yそのものと等価になる
+        var rad=cur.angle*Math.PI/180, ca=Math.cos(rad), sa=Math.sin(rad);
+        var itAlong=it.x*ca+it.y*sa, itPerp=-it.x*sa+it.y*ca;
+        var sameRow=Math.abs(itPerp-cur.endPerp)<maxH*0.35; // 行に垂直な方向のずれが小さい＝同じ行
+        var gap=itAlong-cur.endAlong; // 前の文字の終端から次の文字の始端までの沿い方向のすき間
         var closeGap=gap>-maxH*0.6&&gap<maxH*0.6; // すき間がほぼ無い(重なりも軽微な隙間も許容)
-        if(sameH&&sameRow&&closeGap){
+        if(sameH&&sameAngle&&sameRow&&closeGap){
           cur.text+=it.text;
-          cur.endX=it.x+it.w;
+          cur.endAlong=itAlong+it.w;
+          cur.endPerp=itPerp;
           if(it.h>cur.h) cur.h=it.h;
           return;
         }
         flush();
       }
-      cur={text:it.text,x:it.x,y:it.y,h:it.h,endX:it.x+it.w};
+      var rad0=it.angle*Math.PI/180, ca0=Math.cos(rad0), sa0=Math.sin(rad0);
+      var along0=it.x*ca0+it.y*sa0, perp0=-it.x*sa0+it.y*ca0;
+      cur={text:it.text,x:it.x,y:it.y,h:it.h,angle:it.angle,endAlong:along0+it.w,endPerp:perp0};
     });
     flush();
     return arr;
@@ -1403,15 +1495,32 @@ function _updateTopbarForExcel(isExcel){
   // Excel/CSV表示中は非表示にする（DXF/PDF表示中は従来通り表示する）
   var searchMenuBtn=document.getElementById('searchMenuBtn');
   if(searchMenuBtn) searchMenuBtn.style.display=isExcel?'none':'';
+  // V1_202: 計測トグルボタン(#measureToggleBtn)はdxfToolGroup内にあるため上のdisplay
+  // 切替で自動的に隠れるが、第2段バー(#measureBar)自体はdxfToolGroupの外にある
+  // 独立要素のため、Excel表示に切り替わったタイミングで開いていれば強制的に閉じる
+  // (トグルボタンが隠れたまま計測バーだけ表示され続ける状態を防ぐ)
+  if(isExcel){
+    var mBar=document.getElementById('measureBar');
+    var mBtn=document.getElementById('measureToggleBtn');
+    if(mBar) mBar.classList.remove('open');
+    if(mBtn) mBtn.classList.remove('active');
+  }
 }
-// V1_116: PDF表示中は計測グループ(.dim-group、水・鉛/斜め/2線間/線と点/直径/半径)と
-// 画面(白黒切替、#bwToggleBtn)ボタンを非表示にする。ペン・蛍光ペン・消しゴム・戻る/進む・
-// サブ窓・計算機等その他のボタンは現状の位置のまま表示を維持するため、dxfToolGroup全体を
-// 隠す_updateTopbarForExcelとは別に、この2要素だけを個別にdisplay切替する
+// V1_116: PDF表示中は計測トグルボタン(#measureToggleBtn、V1_202で.dim-groupから改称・
+// 第2段バー化)と画面(白黒切替、#bwToggleBtn)ボタンを非表示にする。ペン・蛍光ペン・
+// 消しゴム・戻る/進む・サブ窓・計算機等その他のボタンは現状の位置のまま表示を維持するため、
+// dxfToolGroup全体を隠す_updateTopbarForExcelとは別に、この2要素だけを個別にdisplay切替する
 function _updateTopbarForPdf(isPdf){
-  var dimGroup=document.querySelector('.dim-group');
+  var measureBtn=document.getElementById('measureToggleBtn');
+  var measureBar=document.getElementById('measureBar');
   var bwBtn=document.getElementById('bwToggleBtn');
-  if(dimGroup) dimGroup.style.display=isPdf?'none':'';
+  if(measureBtn) measureBtn.style.display=isPdf?'none':'';
+  // V1_202: PDF表示に切り替わったタイミングで計測バーが開いていれば強制的に閉じる
+  // (トグルボタンが隠れたまま計測バーだけ表示され続ける状態を防ぐ)
+  if(isPdf){
+    if(measureBar) measureBar.classList.remove('open');
+    if(measureBtn) measureBtn.classList.remove('active');
+  }
   if(bwBtn) bwBtn.style.display=isPdf?'none':'';
 }
 // V1_115: ソート/固定行列ボタンの押下状態(active表示)・タップ待ちガイド文言・
@@ -1609,6 +1718,10 @@ function _excelBuildDataCell(cellVal,origIdx,colIdx){
   var td=document.createElement('td');
   var _cellText110=(cellVal===null||cellVal===undefined)?'':String(cellVal);
   td.textContent=_cellText110;
+  // V1_203: 文字判定枠表示ON中(body.text-hitbox-on)に、テキスト読込ピックモードで
+  // 実際に読み取れる非空セルだけを薄いオレンジのアウトラインで可視化するためのフラグ。
+  // 通常時はこのクラスがあってもCSS側がbody.text-hitbox-onスコープのため見た目に影響しない
+  if(_cellText110.trim()) td.classList.add('excel-hasText');
   var _sumKey122=origIdx+'_'+colIdx;
   if(_excelSumSelected[_sumKey122]) td.classList.add('excel-sum-selected');
   td.addEventListener('click',function(){

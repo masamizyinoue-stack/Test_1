@@ -353,10 +353,99 @@ function _showIndexProfileListMenu(anchorEl){
 }
 
 // =========================================================
+// V1_201: ファイル一覧「プレビュー付き一覧」用のサムネイル生成
+// DXF/TDFはグローバルのcv/ctx/doc/hiddenLayers/tx/ty/scale/fitScale/pdfImage/imagesを
+// 一時的にオフスクリーンcanvas用の値へ退避・差し替えてfit()→draw()を呼び、終わったら
+// 復元する「退避→委譲→復元」方式(index.htmlの_diWithCtxと同じ考え方)。すべて同期処理
+// のため他の描画(rAFループ等)と衝突する隙間は生まれない。
+// PDFはpdfDoc(タブごとに独立したPDF.jsオブジェクト)から直接ページ取得・render。
+// Excel/CSVはexcelWbから先頭数行×数列を簡易表として描画する。
+// 生成結果はfileKeyでキャッシュし、同じセッション中は再利用する。
+// 依存グローバル: cv, ctx, doc, hiddenLayers, tx, ty, scale, fitScale, pdfImage, images (viewer.js)
+// 依存関数: fit, draw (viewer.js)
+var _fileThumbCache201={};
+function _genPdfThumb201(f,W,H,cb){
+  try{
+    if(!f.pdfDoc){cb(null);return;}
+    var pnum=f.pdfPageNum||1;
+    f.pdfDoc.getPage(pnum).then(function(page){
+      var vp1=page.getViewport({scale:1});
+      var rs=Math.min(3,Math.max(0.1,(W*2)/vp1.width));
+      var vp=page.getViewport({scale:rs});
+      var c=document.createElement('canvas');
+      c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+      return page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise.then(function(){
+        cb(c.toDataURL());
+      });
+    }).catch(function(){cb(null);});
+  }catch(e){cb(null);}
+}
+function _genDxfThumb201(f,W,H,cb){
+  try{
+    if(!f.doc){cb(null);return;}
+    var dpr=window.devicePixelRatio||1;
+    var c=document.createElement('canvas');
+    c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);
+    var _svCv=cv,_svCtx=ctx,_svDoc=doc,_svHidden=hiddenLayers,_svPdfImg=pdfImage,_svImages=images;
+    var _svTx=tx,_svTy=ty,_svScale=scale,_svFit=fitScale;
+    try{
+      cv=c;ctx=c.getContext('2d');
+      doc=f.doc;hiddenLayers=new Set(f.hiddenLayersArr||[]);
+      pdfImage=null;images=[];
+      fit();draw();
+      cb(c.toDataURL());
+    }finally{
+      cv=_svCv;ctx=_svCtx;doc=_svDoc;hiddenLayers=_svHidden;pdfImage=_svPdfImg;images=_svImages;
+      tx=_svTx;ty=_svTy;scale=_svScale;fitScale=_svFit;
+    }
+  }catch(e){cb(null);}
+}
+function _genExcelThumb201(f,W,H,cb){
+  try{
+    var wb=f.excelWb;
+    if(!wb||typeof XLSX==='undefined'){cb(null);return;}
+    var dpr=window.devicePixelRatio||1;
+    var c=document.createElement('canvas');
+    c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);
+    var cx=c.getContext('2d');
+    cx.scale(dpr,dpr);
+    cx.fillStyle='#fff';cx.fillRect(0,0,W,H);
+    var ws=wb.Sheets[wb.SheetNames[f.excelSheetIdx||0]];
+    var rows=ws?XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false}):[];
+    var R=Math.min(6,rows.length),C=rows[0]?Math.min(5,rows[0].length):0;
+    if(R>0&&C>0){
+      var cellW=W/C,cellH=H/R;
+      cx.strokeStyle='#ccc';cx.lineWidth=1;
+      cx.fillStyle='#333';cx.font='9px sans-serif';cx.textBaseline='middle';
+      for(var r=0;r<R;r++){
+        for(var col=0;col<C;col++){
+          var x=col*cellW,y=r*cellH;
+          cx.strokeRect(x,y,cellW,cellH);
+          var txt=String(rows[r][col]==null?'':rows[r][col]).slice(0,8);
+          cx.fillText(txt,x+2,y+cellH/2);
+        }
+      }
+    }
+    cb(c.toDataURL());
+  }catch(e){cb(null);}
+}
+function _genFileThumb201(f,W,H,cb){
+  if(f.fileKey&&_fileThumbCache201[f.fileKey]){cb(_fileThumbCache201[f.fileKey]);return;}
+  function done(url){ if(url&&f.fileKey) _fileThumbCache201[f.fileKey]=url; cb(url); }
+  if(f.pdfDoc)_genPdfThumb201(f,W,H,done);
+  else if(f.excelWb)_genExcelThumb201(f,W,H,done);
+  else if(f.doc)_genDxfThumb201(f,W,H,done);
+  else cb(null);
+}
+
+// =========================================================
 // V1_70: 開いているファイル一覧（タブが多い時に見失わないための一覧パネル）
 // V1_80: 並び順を設定パネルと同じ4種類(名前順/開いた順/アクセス順/任意)から
 //        選べるようにし(_computeTabOrder/_setTabSortMode(index.html)を共通利用)、
 //        各行にチェックボックスを追加して複数タブをまとめて閉じられるようにした
+// V1_201: 「文字一覧」に加え、全画面表示のサムネイル付き「プレビュー一覧」を選べるように
+//        した(_mode='text'|'preview')。並び順・複数選択・一括操作(HD-PDF書出/バックアップ/
+//        閉じる)は両モードで共有する。
 // 依存グローバル: openFiles, currentFileIdx, _tabSortMode (index.html)
 // 依存関数: switchToFile, _computeTabOrder, _setTabSortMode, doCloseTab (index.html)
 // =========================================================
@@ -365,20 +454,56 @@ function _showOpenFilesListMenu(anchorEl){
   if(existing){existing.remove();return;}
   var menu=document.createElement('div');
   menu.id='_tabListMenu';
+  var _mode='text'; // V1_201: 'text'=文字一覧(既定・従来動作) / 'preview'=プレビュー付き全画面一覧
   // V1_104: ファイル数が多いとリストが伸び、末尾の「選択したタブを閉じる」ボタンが
   // スクロールしないと見えなかった。メニュー全体をスクロールさせるのではなく、
   // 一覧部分(listWrap)だけを内部スクロールさせるレイアウトに変更し、タイトル・並び順・
   // 全て選択・閉じるボタンは常に画面内に固定表示されるようにした
-  menu.style.cssText='position:fixed;z-index:9999;background:#1e3a5f;border:2px solid #4a9eff;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:240px;max-width:340px;max-height:70vh;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.7);';
-  var r=anchorEl.getBoundingClientRect();
-  menu.style.top=(r.bottom+6)+'px';
-  menu.style.right=(window.innerWidth-r.right)+'px';
+  // V1_201: プレビューモードはPDFページ一覧と同様に画面いっぱいに表示する
+  function applyMenuStyle(){
+    if(_mode==='preview'){
+      menu.style.cssText='position:fixed;z-index:9999;inset:0;width:100%;height:100%;background:#14263c;border:none;border-radius:0;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:none;';
+    } else {
+      menu.style.cssText='position:fixed;z-index:9999;background:#1e3a5f;border:2px solid #4a9eff;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:240px;max-width:340px;max-height:70vh;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.7);';
+      var r=anchorEl.getBoundingClientRect();
+      menu.style.top=(r.bottom+6)+'px';
+      menu.style.right=(window.innerWidth-r.right)+'px';
+    }
+  }
+  applyMenuStyle();
   function closeMenu(){if(document.getElementById('_tabListMenu'))menu.remove();}
 
+  // V1_201: タイトル行(タイトル＋プレビュー/文字一覧切替＋閉じる[プレビュー時のみ、
+  // 全画面表示では外側クリックで閉じられないため必須])
+  var headerRow=document.createElement('div');
+  headerRow.style.cssText='display:flex;align-items:center;gap:6px;flex-shrink:0;';
   var title=document.createElement('div');
-  title.style.cssText='color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;flex-shrink:0;';
+  title.style.cssText='color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;flex:1;';
   title.textContent='開いているファイル（'+openFiles.length+'件）';
-  menu.appendChild(title);
+  var modeBtn=document.createElement('button');
+  modeBtn.type='button';
+  modeBtn.style.cssText='background:none;border:1px solid #3a5578;color:#aac8e8;border-radius:8px;padding:4px 8px;font-size:11px;cursor:pointer;flex-shrink:0;';
+  var closeFullBtn=document.createElement('button');
+  closeFullBtn.type='button';
+  closeFullBtn.textContent='✕';
+  closeFullBtn.style.cssText='background:none;border:none;color:#889;font-size:20px;padding:2px 6px;cursor:pointer;flex-shrink:0;';
+  closeFullBtn.onclick=closeMenu;
+  function updateHeaderBtns(){
+    modeBtn.textContent=(_mode==='preview')?'☰ 文字一覧':'🖼 プレビュー';
+    closeFullBtn.style.display=(_mode==='preview')?'':'none';
+  }
+  modeBtn.addEventListener('click',function(){
+    _mode=(_mode==='preview')?'text':'preview';
+    applyMenuStyle();
+    updateHeaderBtns();
+    applyListBodyStyle();
+    render();
+  });
+  headerRow.appendChild(title);
+  headerRow.appendChild(modeBtn);
+  headerRow.appendChild(closeFullBtn);
+  menu.appendChild(headerRow);
+  updateHeaderBtns();
 
   // V1_80: 並び順選択（設定パネルの「タブの並び順」と同じ4択・同じ状態を共有する）
   var sortRow=document.createElement('div');
@@ -393,7 +518,7 @@ function _showOpenFilesListMenu(anchorEl){
     b.addEventListener('click',function(){
       if(typeof _setTabSortMode==='function') _setTabSortMode(opt[0]);
       updateSortBtns();
-      renderList();
+      render();
     });
     _sortBtns[opt[0]]=b;
     sortRow.appendChild(b);
@@ -429,8 +554,15 @@ function _showOpenFilesListMenu(anchorEl){
   menu.appendChild(listWrap);
 
   var listBody=document.createElement('div');
-  listBody.style.cssText='display:flex;flex-direction:column;gap:2px;';
   listWrap.appendChild(listBody);
+  // V1_201: 文字一覧(縦積みの行)とプレビュー一覧(サムネイル付きグリッド)でlistBodyの
+  // レイアウトを切り替える
+  function applyListBodyStyle(){
+    listBody.style.cssText=(_mode==='preview')
+      ?'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start;'
+      :'display:flex;flex-direction:column;gap:2px;';
+  }
+  applyListBodyStyle();
 
   // V1_182: 複数選択したファイルへの一括「HD-PDF書出」「バックアップ」ボタン。
   // どちらもファイルを閉じない(選択したタブを閉じるボタンとは独立)。
@@ -477,7 +609,7 @@ function _showOpenFilesListMenu(anchorEl){
       selected.clear();
     }
     updateCloseSelBtn();
-    renderList();
+    render();
   });
   function updateCloseSelBtn(){
     var n=selected.size;
@@ -601,12 +733,82 @@ function _showOpenFilesListMenu(anchorEl){
     });
   }
 
+  // V1_201: プレビュー一覧(サムネイル付きグリッド)。並び順・選択状態・バッジ・クリックで
+  // タブ切替という機能面はrenderList()と同じで、見た目だけをカード形式にしたもの。
+  function renderGrid(){
+    listBody.innerHTML='';
+    if(openFiles.length===0){
+      var e=document.createElement('div');
+      e.style.cssText='color:#889;font-size:13px;text-align:center;padding:8px 0;grid-column:1/-1;';
+      e.textContent='開いているファイルはありません';
+      listBody.appendChild(e);
+      return;
+    }
+    var idxs=(typeof _computeTabOrder==='function')?_computeTabOrder():openFiles.map(function(f,i){return i;});
+    var _ranks71=(typeof _getTabRecencyRanks==='function')?_getTabRecencyRanks():{recent1:-1,recent2:-1};
+    idxs.forEach(function(idx){
+      var f=openFiles[idx];
+      var isActive=(idx===currentFileIdx);
+      var isRecent1=(idx===_ranks71.recent1), isRecent2=(idx===_ranks71.recent2);
+      var card=document.createElement('div');
+      card.style.cssText='display:flex;flex-direction:column;background:#1e3a5f;border-radius:10px;overflow:hidden;cursor:pointer;border:2px solid '+(isActive?'#ff5555':'transparent')+';';
+
+      var thumbWrap=document.createElement('div');
+      thumbWrap.style.cssText='position:relative;width:100%;height:100px;background:#04203f;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+      var img=document.createElement('img');
+      img.style.cssText='max-width:100%;max-height:100%;object-fit:contain;';
+      thumbWrap.appendChild(img);
+      if(typeof _genFileThumb201==='function'){
+        _genFileThumb201(f,150,100,function(url){ if(url) img.src=url; });
+      }
+
+      var cb=document.createElement('input');
+      cb.type='checkbox';
+      cb.style.cssText='position:absolute;top:4px;left:4px;width:22px;height:22px;cursor:pointer;';
+      cb.checked=f.fileKey?selected.has(f.fileKey):false;
+      cb.addEventListener('click',function(ev){ ev.stopPropagation(); });
+      cb.addEventListener('change',function(){
+        if(!f.fileKey) return;
+        if(cb.checked) selected.add(f.fileKey); else selected.delete(f.fileKey);
+        updateCloseSelBtn();
+      });
+      thumbWrap.appendChild(cb);
+
+      var _typeInfo109=(typeof _fileTypeInfo==='function')?_fileTypeInfo(f.currentFileName||f.name):{label:'DXF',color:'#1565c0'};
+      var badge=document.createElement('span');
+      badge.textContent=_typeInfo109.label;
+      badge.style.cssText='position:absolute;top:4px;right:4px;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;background:'+_typeInfo109.color+';color:#fff;';
+      thumbWrap.appendChild(badge);
+      card.appendChild(thumbWrap);
+
+      var nameColor=isActive?'#ff5555':isRecent1?'#ffd60a':isRecent2?'#4da6ff':'#eee';
+      var nameEl=document.createElement('div');
+      nameEl.style.cssText='color:'+nameColor+';font-size:12px;font-weight:'+(isActive?'700':'400')+';padding:6px 6px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;';
+      nameEl.textContent=f.currentFileName||f.name||'---';
+      card.appendChild(nameEl);
+
+      card.addEventListener('click',function(){
+        closeMenu();
+        if(idx!==currentFileIdx&&typeof switchToFile==='function') switchToFile(idx);
+      });
+      listBody.appendChild(card);
+    });
+  }
+
+  // V1_201: 現在のモードに応じてどちらの一覧を描くかを振り分ける共通入口
+  function render(){
+    if(_mode==='preview') renderGrid(); else renderList();
+  }
+
   updateSortBtns();
   updateCloseSelBtn();
-  renderList();
+  render();
 
   document.body.appendChild(menu);
   setTimeout(function(){document.addEventListener('click',function _dc(ev){
+    // V1_201: プレビュー(全画面)表示中は外側クリックで閉じない(✕ボタンで閉じる)。
+    // 画面いっぱいのオーバーレイのため「外側」がほぼ存在せず、誤操作で閉じやすいため
+    if(_mode==='preview') return;
     if(!menu.contains(ev.target)&&ev.target!==anchorEl){closeMenu();document.removeEventListener('click',_dc);}
   });},10);
 }

@@ -229,6 +229,20 @@ tr.excel-sort-row td{font-weight:700;background:#ffd6e8;border-top:2px solid #d8
   color:var(--accent);cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   -webkit-tap-highlight-color:transparent;white-space:nowrap}
 #ipxBtn:active{background:rgba(255,255,255,.12)}
+/* V1_203: 「文字判定枠表示」トグルボタン。文字読込ピックモード(_textPickTarget)が
+   有効な間だけポップアップ表示され、押すとオレンジ色の判定枠(drawOverlay)を
+   表示/非表示できる。デフォルトは非表示(activeクラス無し)。#ipxBtnと同系のフローティング
+   ボタンだが、押し続けるものではなく画面下中央に固定してモード操作の妨げにならないようにした */
+#textHitBoxToggleBtn{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:90;
+  min-height:40px;padding:8px 16px;font-size:13px;font-weight:600;border-radius:20px;
+  border:1.5px solid rgba(255,165,0,0.85);background:rgba(10,14,20,.88);color:rgba(255,165,0,0.95);
+  cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  -webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+#textHitBoxToggleBtn.active{background:rgba(255,165,0,0.9);color:#1a1400;border-color:#ffa500}
+/* V1_203: Excel/CSV表示中は文字判定枠(canvas矩形)を描く対象が無いため、非空セルに
+   薄いオレンジのアウトラインを付けることで同等の可視化を行う。文字判定枠表示ON中
+   (body.text-hitbox-on)のみ有効。既存の検索/合計選択ハイライトとは独立して重畳できる */
+body.text-hitbox-on td.excel-hasText{outline:1.5px solid rgba(255,165,0,.85);outline-offset:-1px}
 /* V1_61: PDFページ送り。設定パネル内(.sp-section)からメイン画面のフローティング
    パネルへ移動した（旧位置がハンバーガーメニューの中で見つけにくいとの指摘のため）。
    V1_84: ユーザー依頼により右上から左上へ変更。#ipxBtnも左上(top:10px;left:10px)だが、
@@ -365,6 +379,17 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .dim-group{display:flex;align-items:center;flex-shrink:0}
 .dim-group-label{font-size:9px;color:rgba(232,168,74,0.8);letter-spacing:0.5px;line-height:1;pointer-events:none;user-select:none}
 .dim-group-btns{display:flex;align-items:center;gap:1px}
+/* V1_203: 計測ボタン(.dim-group)をヘッダー内から第2段バー(#measureBar)へ移設し、
+   ヘッダーの「計測」ボタン(#measureToggleBtn)で開閉できるようにした。iPadの画面幅
+   によってはヘッダーのボタンが全て入りきらず操作しづらいとの指摘に対し、使用頻度の
+   低い計測系ボタンだけを普段は隠しておけるようにする対応。
+   max-heightのtransitionでスライド開閉させる(高さ0⇄62pxに合わせて.topbarと同じ高さ) */
+#measureBar{max-height:0;overflow:hidden;background:var(--topbar-bg);border-bottom:1px solid var(--border);
+  transition:max-height .22s ease;flex-shrink:0}
+#measureBar.open{max-height:62px}
+#measureBar .dim-group{height:62px;box-sizing:border-box;padding:0 10px;overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;width:100%}
+#measureBar .dim-group::-webkit-scrollbar{display:none}
 /* V0_98: 文字検索パネル */
 #searchOverlay{display:none;position:fixed;inset:0;z-index:299}
 #searchOverlay.open{display:block}
@@ -477,7 +502,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #pdfThumbPanel{position:absolute;inset:0;width:100%;background:var(--bg-panel);display:flex;flex-direction:column;overflow:hidden;z-index:1}
 #pdfThumbPanel .sp-header{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 #pdfThumbPanel .sp-title{font-size:15px;font-weight:600;color:var(--text);margin-right:8px}
-#pdfThumbPanel .sp-close{background:#8B0000;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* V1_203: 「閉じる」が赤地の文字ボタンで他パネルと統一感が無いとの指摘により、
+   allSearch/openFileパネルと同じ地味な✕アイコン方式に統一した(ボタン文字も✕に変更) */
+#pdfThumbPanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;-webkit-tap-highlight-color:transparent}
 .pdf-thumb-ctrl-group{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:4px 6px}
 .pdf-thumb-ctrl-label{font-size:12px;color:var(--text-dim);margin:0 2px}
 .pdf-thumb-step{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -485,6 +512,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .pdf-thumb-ctrl-val{font-size:12px;color:var(--text);min-width:38px;text-align:center}
 .pdf-thumb-mode-btn{padding:7px 14px;border-radius:8px;border:1.5px solid #f39c12;background:transparent;color:#f39c12;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .pdf-thumb-mode-btn.active{background:#f39c12;color:#1a1200}
+/* V1_203: 幅/高さ/倍率/位置を一括で既定値に戻すリセットボタン。他の地味なボタン群と
+   馴染むよう、色付けせずグレー系の枠線のみのニュートラルなデザインにした */
+.pdf-thumb-reset-btn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text-dim);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.pdf-thumb-reset-btn:active{background:rgba(255,255,255,.1)}
 #pdfThumbGrid{flex:1;overflow-y:auto;padding:16px;display:flex;flex-wrap:wrap;gap:20px;align-content:flex-start;justify-content:flex-start}
 .pdf-thumb-cell{width:380px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;padding:8px;border-radius:8px}
 .pdf-thumb-cell:active{background:rgba(255,255,255,.06)}
@@ -660,21 +691,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="tb-sep"></div>
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg></button>
   <div class="tb-sep"></div>
-  <!-- V0_74: 計測グループ（ラベル付き） -->
-  <div class="dim-group">
-    <div class="dim-group-btns">
-      <!-- V1_45: 色丸ボタン(dimColorDot)は廃止。寸法系アイコン(svg)にはdimToolIconクラスを
-           付与し、選択中の寸法色(currentDimColor)を反映する。選択中に同じアイコンを
-           もう一度押すと色・太さの選択ポップアップが開く -->
-      <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="ll" title="2線間距離（平行な線を2本選択）"><span class="tb-tool-label">2線間</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="12" y1="7" x2="12" y2="17"/><polyline points="9 10 12 7 15 10"/><polyline points="9 14 12 17 15 14"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
-      <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
-
-    </div>
-  </div>
+  <!-- V1_203: 計測ボタン群(.dim-group)は画面いっぱい表示の妨げになりやすいため
+       ヘッダーから第2段の#measureBarへ移設した(HTML末尾、.topbarの直後を参照)。
+       ここには開閉トグルのみを置く。トグルの押下/開閉JSはindex.html下部、
+       表示制御(PDF/Excel時に強制的に隠す)はviewer.jsの_updateTopbarForPdf/
+       _updateTopbarForExcelを参照 -->
+  <button class="tb-btn" id="measureToggleBtn" title="計測ツール（水・鉛/斜め/2線間/線と点/直径/半径）の表示切替" style="border:2px solid rgba(232,168,74,0.8);">
+  <span class="tb-tool-label">計測</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg>
+</button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
   <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.95"/></svg></button>
@@ -757,6 +782,25 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">バックアップ</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 </button>
+</div>
+<!-- V1_203: 計測ボタン群の第2段バー。#measureToggleBtnで開閉する(max-height transition)。
+     内部の.dim-group/.dim-group-btns/各ボタンはヘッダー内にあった時のものをそのまま移設
+     (id/class/data-tool属性は無変更のため、既存のクリックハンドラ・active表示・
+     _updateTopbarForPdfのdisplay制御はすべてそのまま動作する) -->
+<div id="measureBar">
+  <div class="dim-group">
+    <div class="dim-group-btns">
+      <!-- V1_45: 色丸ボタン(dimColorDot)は廃止。寸法系アイコン(svg)にはdimToolIconクラスを
+           付与し、選択中の寸法色(currentDimColor)を反映する。選択中に同じアイコンを
+           もう一度押すと色・太さの選択ポップアップが開く -->
+      <button class="tb-tool-btn tool-btn" data-tool="dxdy" title="水平/鉛直寸法（自動判定）"><span class="tb-tool-label">水・鉛</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="9" x2="15" y2="9"/><line x1="3" y1="6" x2="3" y2="12"/><line x1="15" y1="6" x2="15" y2="12"/><line x1="18" y1="9" x2="18" y2="21"/><line x1="15" y1="9" x2="21" y2="9"/><line x1="15" y1="21" x2="21" y2="21"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="diag" title="斜め寸法"><span class="tb-tool-label">斜め</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="5 13 5 19 11 19"/><polyline points="13 5 19 5 19 11"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="ll" title="2線間距離（平行な線を2本選択）"><span class="tb-tool-label">2線間</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="12" y1="7" x2="12" y2="17"/><polyline points="9 10 12 7 15 10"/><polyline points="9 14 12 17 15 14"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="lp" title="線と点 距離"><span class="tb-tool-label">線と点</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><line x1="3" y1="21" x2="21" y2="3"/><circle cx="17" cy="17" r="3"/><line x1="17" y1="14" x2="12" y2="9" stroke-dasharray="2,2"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="circDim" title="直径寸法（φ）"><span class="tb-tool-label">直径</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
+    </div>
+  </div>
 </div>
 <div id="tabBarRow">
   <button id="tabScrollLeftBtn" class="tab-scroll-btn" title="左へスクロール">‹</button>
@@ -859,6 +903,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <!-- V1_48: 水平/鉛直・斜めのP1/P2、線と点の点選択中のみ表示するボタン。
        押すと線を2本選び、その交点(延長含む)を確定点として使う -->
   <button id="ipxBtn" style="display:none">2線の交点取得</button>
+  <!-- V1_203: 文字判定枠(V1_194で追加・V1_199でPDF限定機能として削除された可視化を復活)。
+       文字読込ピックモード中のみ表示され、押すとDXF/TDF/PDF/Excel/CSVいずれの表示中でも
+       文字のタップ判定範囲をオレンジで可視化できる。デフォルトは非表示(_showTextHitBoxes) -->
+  <button id="textHitBoxToggleBtn" style="display:none">文字判定枠表示</button>
 </div>
 
 <div id="settingsOverlay"></div>
@@ -866,7 +914,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V1_197</span>
+    <span id="ver-label">V1_203</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1246,8 +1294,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
         <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="down">▼</button>
         <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="right">▶</button>
       </div>
+      <!-- V1_203: 幅%/高さ%/倍率/位置(offX/offY)を一気に既定値へ戻すリセットボタン -->
+      <button id="pdfThumbResetBtn" class="pdf-thumb-reset-btn">リセット</button>
       <button id="pdfThumbModeBtn" class="pdf-thumb-mode-btn">図面番号モード</button>
-      <button class="sp-close" id="pdfThumbCloseBtn">閉じる</button>
+      <button class="sp-close" id="pdfThumbCloseBtn">✕</button>
     </div>
     <div id="pdfThumbGrid"></div>
   </div>
@@ -1276,27 +1326,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=1197"></script>
-<script src="viewer.js?v=1197"></script>
-<script src="utils.js?v=1197"></script>
-<script src="ui.js?v=1197"></script>
-<script src="dialog.js?v=1197"></script>
-<script src="storage.js?v=1197"></script>
-<script src="fonts/NotoSansJP.js?v=1197"></script>
-<script src="export.js?v=1197"></script>
-<script src="tool.js?v=1197"></script>
-<script src="verify.js?v=1197"></script>
+<script src="layer.js?v=1203"></script>
+<script src="viewer.js?v=1203"></script>
+<script src="utils.js?v=1203"></script>
+<script src="ui.js?v=1203"></script>
+<script src="dialog.js?v=1203"></script>
+<script src="storage.js?v=1203"></script>
+<script src="fonts/NotoSansJP.js?v=1203"></script>
+<script src="export.js?v=1203"></script>
+<script src="tool.js?v=1203"></script>
+<script src="verify.js?v=1203"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=1197"></script>
-<script src="stroke-text.js?v=1197"></script>
+<script src="shxGlyphs.js?v=1203"></script>
+<script src="stroke-text.js?v=1203"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=1197"></script>
+<script src="pc.js?v=1203"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=1197"></script>
+<script src="supabase-sync.js?v=1203"></script>
 <script>
-const APP_VERSION = 'V1_197';
+const APP_VERSION = 'V1_203';
 
 // =========================================================
 // グローバル状態
@@ -1692,32 +1742,43 @@ function drawOverlay(){
       octx.restore();
     });
   }
-  // V1_194: PDF表示中かつテキスト読込ピックモード時、タップ判定範囲を薄いオレンジで可視化
-  // (_tapPickTextのPDF側判定式(V1_192)と同一の幾何計算を用いて、実際のヒット範囲と完全に一致させる)
-  if(typeof pdfDoc!=='undefined'&&pdfDoc&&typeof _textPickTarget!=='undefined'&&_textPickTarget&&typeof pdfMoji!=='undefined'&&pdfMoji&&pdfMoji.length>0){
-    octx.save();
-    octx.fillStyle='rgba(255,165,0,0.28)';
-    for(var _pi194=0;_pi194<pdfMoji.length;_pi194++){
-      var _pe194=pdfMoji[_pi194];
-      if(!_pe194.text||!_pe194.text.trim()) continue;
-      var _pfs194=Math.max(6,_pe194.h*scale);
-      octx.font=_pfs194+'px sans-serif';
-      var _plines194=_pe194.text.split('\n');
-      var _pmaxW194=0;
-      for(var _li194=0;_li194<_plines194.length;_li194++){var _pw194=octx.measureText(_plines194[_li194]).width;if(_pw194>_pmaxW194)_pmaxW194=_pw194;}
-      var _pn194=_plines194.length;
-      var _ppad194=Math.max(8,_pfs194*0.35);
-      var _ptopMg194=_pfs194*1.05,_pbotMg194=_pfs194*0.45;
-      var _ptop194=-_pfs194*(_pn194-1)-_ptopMg194-_ppad194,_pbottom194=_pbotMg194+_ppad194,_pleft194=-_ppad194,_pright194=_pmaxW194+_ppad194;
-      var _pxy194=w2s(_pe194.x,_pe194.y);
-      var _pang194=(_pe194.angle||0)*Math.PI/180;
+  // V1_194で追加したPDF文字タップ判定範囲のオレンジ可視化は、V1_199でPDF文字の
+  // 回転(angle)を正しく扱えるようになり本来の当たり判定とズレる問題が解消したため、
+  // 目的(ズレの原因確認)を終えて不要となり削除したが、V1_203でユーザー依頼により復活。
+  // 今回はPDF限定ではなくDXF/TDFも対象にし、ジオメトリは_tapPickText(このファイル内、
+  // ヒットテスト本体)と完全に同一の計算式を使う(DXF/PDFでパディング等の係数が異なる点も
+  // _isDxfMoji203フラグで同様に分岐)。デフォルト非表示で、#textHitBoxToggleBtnを押した
+  // 時(_showTextHitBoxes===true)かつ文字読込ピックモード中(_textPickTarget)のみ描く
+  if(_textPickTarget&&_showTextHitBoxes){
+    var _isDxfMoji203=!!(doc&&doc.moji);
+    var _mojiArr203=_isDxfMoji203?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
+    if(_mojiArr203&&_mojiArr203.length>0){
       octx.save();
-      octx.translate(_pxy194[0],_pxy194[1]);
-      octx.rotate(-_pang194);
-      octx.fillRect(_pleft194,_ptop194,_pright194-_pleft194,_pbottom194-_ptop194);
+      octx.fillStyle='rgba(255,165,0,0.28)';
+      for(var _mi203=0;_mi203<_mojiArr203.length;_mi203++){
+        var _me203=_mojiArr203[_mi203];
+        if(!_me203.text||!_me203.text.trim()) continue;
+        var _mfs203=Math.max(6,_me203.h*scale*(_isDxfMoji203?MOJI_SIZE_MULTIPLIER:1));
+        octx.font=_mfs203+'px sans-serif';
+        var _mlines203=_me203.text.split('\n');
+        var _mmaxW203=0;
+        for(var _li203=0;_li203<_mlines203.length;_li203++){var _mw203=octx.measureText(_mlines203[_li203]).width;if(_mw203>_mmaxW203)_mmaxW203=_mw203;}
+        var _mn203=_mlines203.length;
+        var _mpad203=_isDxfMoji203?Math.max(4,_mfs203*0.15):Math.max(8,_mfs203*0.35);
+        var _mtopMg203=_isDxfMoji203?_mfs203*0.85:_mfs203*1.05;
+        var _mbotMg203=_isDxfMoji203?_mfs203*0.3:_mfs203*0.45;
+        var _mtop203=-_mfs203*(_mn203-1)-_mtopMg203-_mpad203,_mbottom203=_mbotMg203+_mpad203,_mleft203=-_mpad203,_mright203=_mmaxW203+_mpad203;
+        var _mxy203=w2s(_me203.x,_me203.y);
+        var _mang203=(_me203.angle||0)*Math.PI/180;
+        octx.save();
+        octx.translate(_mxy203[0],_mxy203[1]);
+        octx.rotate(-_mang203);
+        if(_me203.widthFactor&&Math.abs(_me203.widthFactor-1)>0.01) octx.scale(_me203.widthFactor,1);
+        octx.fillRect(_mleft203,_mtop203,_mright203-_mleft203,_mbottom203-_mtop203);
+        octx.restore();
+      }
       octx.restore();
     }
-    octx.restore();
   }
   octx.restore();
 }
@@ -2566,6 +2627,16 @@ document.getElementById('tabListBtn').addEventListener('click',function(e){
   e.stopPropagation();
   if(typeof _showOpenFilesListMenu==='function') _showOpenFilesListMenu(this);
 });
+// V1_203: 計測ボタン群(第2段バー#measureBar)の開閉トグル。押すたびに開閉し、
+// ボタン自体もopen中は.activeで強調表示する(他の.tb-btn.activeと同じ配色)。
+// 開閉状態はセッション内のみ(保存しない・再読込で毎回閉じた状態に戻る)。
+document.getElementById('measureToggleBtn').addEventListener('click',function(){
+  var bar=document.getElementById('measureBar');
+  if(!bar) return;
+  var willOpen=!bar.classList.contains('open');
+  bar.classList.toggle('open',willOpen);
+  this.classList.toggle('active',willOpen);
+});
 document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 // PDFページ
 document.getElementById('prevPage').addEventListener('click',async()=>{
@@ -2691,6 +2762,14 @@ document.querySelectorAll('.pdf-thumb-pos-step').forEach(function(btn){
     _pdfThumbSaveCfg();
     _buildPdfThumbGrid();
   });
+});
+// V1_203: 幅%/高さ%/倍率/位置(offX/offY)を一気に既定値へ戻すリセットボタン。
+// 図面番号モードのON/OFF状態(modeOn)はリセット対象に含めない(別の切替操作のため)
+document.getElementById('pdfThumbResetBtn').addEventListener('click',function(){
+  var c=_pdfThumbLoadCfg();
+  c.widthPct=10;c.heightPct=10;c.zoom=6.0;c.offXPct=0;c.offYPct=0;
+  _pdfThumbSaveCfg();_pdfThumbUpdateCtrlUI();
+  _buildPdfThumbGrid();
 });
 
 function closePdfThumbOverlay(){document.getElementById('pdfThumbOverlay').classList.remove('open');}
@@ -5872,6 +5951,22 @@ async function _markGoNext(){
 // (searchBg/allSearchBg)のタップも無効化して図面へタップが届くようにしている
 // (詳細は#searchOverlay.pickingのCSSコメント参照)
 var _textPickTarget=null; // null | 'screen' | 'all' | 'openFile' | 'excelLocal'(V1_122)
+// V1_203: 文字判定枠(タップ判定範囲のオレンジ可視化)の表示状態。V1_194でPDF限定で追加され
+// V1_199で一旦削除されたが、DXF/TDF/PDF/Excel/CSV全形式対応・デフォルト非表示・
+// ピックモード中に出る#textHitBoxToggleBtnで手動トグルする形で復活させた。
+// ピックモードを抜ける(_textPickTarget=null)たびに必ずfalseへ戻し、次回は常に非表示から始まる
+var _showTextHitBoxes=false;
+function _updateTextHitBoxBtnVisibility(){
+  var btn=document.getElementById('textHitBoxToggleBtn');
+  if(!btn) return;
+  var show=!!_textPickTarget;
+  btn.style.display=show?'':'none';
+  if(!show){
+    _showTextHitBoxes=false;
+    btn.classList.remove('active');
+    document.body.classList.remove('text-hitbox-on');
+  }
+}
 function _setTextPickMode(target){
   _textPickTarget=target;
   var ov1=document.getElementById('searchOverlay');
@@ -5893,8 +5988,12 @@ function _setTextPickMode(target){
   // 「もう一度ボタンを押す」操作自体が存在せず文言が実態と合っていなかった。
   // 全図面検索(all)・シート内検索(excelLocal)はボタンによる手動トグルが今も残っている
   // ため、その場合に限りこの案内を表示する
-  if(target) showGuide('図面上の文字をタップしてください'+((typeof pdfDoc!=='undefined'&&pdfDoc)?'（オレンジ色の部分をタップ）':'')+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0); // V1_194: PDF中はオレンジ可視化の説明を追加
+  // V1_203: 「（オレンジ色の部分をタップ）」はPDF専用・常時表示だった頃の案内文。
+  // 判定枠可視化がデフォルト非表示・全形式対応のトグル式になったため、この文言は削除し、
+  // 代わりに#textHitBoxToggleBtn自体の出現(_updateTextHitBoxBtnVisibility)で気付けるようにした
+  if(target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0);
   else hideGuide();
+  _updateTextHitBoxBtnVisibility(); // V1_203
   var b1=document.getElementById('screenTextPickBtn');
   var b2=document.getElementById('allTextPickBtn');
   var b3=document.getElementById('openFileTextPickBtn'); // V1_29
@@ -5924,6 +6023,15 @@ function _setTextPickMode(target){
   }
   if(typeof scheduleOverlay==='function') scheduleOverlay(); // V1_194: ピックモード切替時にオレンジ可視化を即反映
 }
+// V1_203: 「文字判定枠表示」トグルボタン。押すたびに_showTextHitBoxesを反転し、
+// canvas側(drawOverlay、DXF/TDF/PDF対象)とExcel/CSV側(body.text-hitbox-onクラス、
+// CSSのoutlineで表現)の両方へ即時反映する
+document.getElementById('textHitBoxToggleBtn').addEventListener('click',function(){
+  _showTextHitBoxes=!_showTextHitBoxes;
+  this.classList.toggle('active',_showTextHitBoxes);
+  document.body.classList.toggle('text-hitbox-on',_showTextHitBoxes);
+  if(typeof scheduleOverlay==='function') scheduleOverlay();
+});
 function _tapPickText(sx0,sy0){
   // V1_51: DXFのdoc.mojiが無い場合はPDFから抽出したpdfMojiを使う
   var _isDxfMoji192=!!(doc&&doc.moji); // V1_193
