@@ -218,7 +218,7 @@ tr.excel-sort-row td{font-weight:700;background:#ffd6e8;border-top:2px solid #d8
 .viewmemo .show-btn.vm-saved{background:rgba(0,212,255,0.12);border-color:#00d4ff;color:#00d4ff;font-weight:600;box-shadow:0 0 8px rgba(0,212,255,0.25)}
 .viewmemo .full-row{grid-column:1/-1;text-align:center} /* V0_74: 全体ボタン表示 */
 .viewmemo .fit-btn{background:transparent;border:1.5px solid rgba(220,230,245,0.7);color:rgba(235,242,255,0.92);opacity:1;font-weight:normal} /* V0_76: 全体ボタン専用・白系 */
-/* V1_210: 長いファイル名を記憶すると、.vm-file(grid-column:1/-1でmem-btn/show-btnの
+/* V1_214: 長いファイル名を記憶すると、.vm-file(grid-column:1/-1でmem-btn/show-btnの
    2列分に重ねて表示)がグリッドアイテムとしての既定min-width(auto=文字列の折り返し無し
    最大幅)を持ってしまい、overflow:hidden/text-overflow:ellipsisが効かずボタン列自体が
    横に広がってしまう不具合があった。min-width:0を指定してグリッド列の幅(記憶/表示ボタン
@@ -235,10 +235,10 @@ tr.excel-sort-row td{font-weight:700;background:#ffd6e8;border-top:2px solid #d8
   color:var(--accent);cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   -webkit-tap-highlight-color:transparent;white-space:nowrap}
 #ipxBtn:active{background:rgba(255,255,255,.12)}
-/* V1_210: 「文字判定枠表示」トグルボタン。文字読込ピックモード(_textPickTarget)が
+/* V1_214: 「文字判定枠表示」トグルボタン。文字読込ピックモード(_textPickTarget)が
    有効な間だけポップアップ表示され、押すとオレンジ色の判定枠(drawOverlay)を
    表示/非表示できる。デフォルトは非表示(activeクラス無し)。
-   V1_210: 画面下中央だと注釈と重なって見づらいとの指摘のため、#ipxBtn/#pdfPageCtrlと
+   V1_214: 画面下中央だと注釈と重なって見づらいとの指摘のため、#ipxBtn/#pdfPageCtrlと
    同じ「ファイルタブ下・画面左上」の位置(.stage内、position:absolute)に変更した。
    ipxBtn/pdfPageCtrlの高さ(約44～48px)を避けるためtop:64pxに下げて重なりを回避している
    (ipxBtnは計測操作中のみ・pdfPageCtrlはPDF表示中のみだが、文字判定枠ボタンはPDF表示中の
@@ -249,7 +249,7 @@ tr.excel-sort-row td{font-weight:700;background:#ffd6e8;border-top:2px solid #d8
   cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   -webkit-tap-highlight-color:transparent;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 #textHitBoxToggleBtn.active{background:rgba(255,165,0,0.9);color:#1a1400;border-color:#ffa500}
-/* V1_210: Excel/CSV表示中は文字判定枠(canvas矩形)を描く対象が無いため、非空セルに
+/* V1_214: Excel/CSV表示中は文字判定枠(canvas矩形)を描く対象が無いため、非空セルに
    薄いオレンジのアウトラインを付けることで同等の可視化を行う。文字判定枠表示ON中
    (body.text-hitbox-on)のみ有効。既存の検索/合計選択ハイライトとは独立して重畳できる */
 body.text-hitbox-on td.excel-hasText{outline:1.5px solid rgba(255,165,0,.85);outline-offset:-1px}
@@ -381,13 +381,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
    方式に統合したため廃止した（色・太さの選択は、選択中のツールアイコンをもう一度
    押すことで開くように変更） */
 /* colorOverlay モード別セクション表示制御
-   V1_210: 計測(dim)の色選択は#measureToolPopupへ移設したため.co-dim-sectionは廃止し、
+   V1_214: 計測(dim)の色選択は#measureToolPopupへ移設したため.co-dim-sectionは廃止し、
    代わりに消しゴムの範囲選択用.co-eraser-sectionを追加した */
 #colorOverlay .co-sketch-section,#colorOverlay .co-hl-section,#colorOverlay .co-eraser-section{display:none}
 #colorOverlay[data-mode="sketch"] .co-sketch-section{display:block}
 #colorOverlay[data-mode="hl"] .co-hl-section{display:block}
 #colorOverlay[data-mode="eraser"] .co-eraser-section{display:block}
-/* V1_210: 消しゴム範囲選択ボタン。ペン線幅(.lw-btn)・蛍光線幅(.hl-lw-btn)と同じ見た目・
+/* V1_214: 消しゴム範囲選択ボタン。ペン線幅(.lw-btn)・蛍光線幅(.hl-lw-btn)と同じ見た目・
    グリッド構成にし、値は画面px単位の消去半径(ERASER_RADIUS_PX)そのものを表示する */
 .co-eraser-lw{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
 .er-btn{height:40px;border-radius:8px;font-size:14px;font-weight:600;
@@ -403,7 +403,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
    で選ぶ」方式に変更した。計測ボタン(#measureToggleBtn)を押すと#measureToolPopupが
    ボタンの直下に開き、6つの計測ツールから1つ選ぶとポップアップが閉じてそのツールが
    有効になる（画面レイアウト自体は動かない）
-   V1_210: ポップアップ内にツール選択(1段目)＋計測線の色選択(2段目、.co-dim-colors、
+   V1_214: ポップアップ内にツール選択(1段目)＋計測線の色選択(2段目、.co-dim-colors、
    旧#colorOverlayの.co-dim-sectionから移設)を1つにまとめた。色を選んでもポップアップは
    閉じない(ツールを選ぶまで開いたままにできる) */
 #measureToolPopup{display:none;position:fixed;z-index:400;top:0;left:0;
@@ -411,12 +411,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   padding:10px;box-shadow:0 8px 32px rgba(0,0,0,.65);flex-direction:column;gap:8px}
 #measureToolPopup.open{display:flex}
 #measureToolPopup .co-label{margin-bottom:0}
-/* V1_210: 計測ツール6種を2段(3×2)から1段(6×1)に変更(見やすさの指摘のため) */
+/* V1_214: 計測ツール6種を2段(3×2)から1段(6×1)に変更(見やすさの指摘のため) */
 #measureToolPopup .dim-group-btns{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
-/* V1_210: 計測ボタンの枠は、選択中(いずれかの計測ツールがcurrentTool)の時だけ色付きに
+/* V1_214: 計測ボタンの枠は、選択中(いずれかの計測ツールがcurrentTool)の時だけ色付きに
    する(tool.js側でtool-activeクラスを切替)。常時色付きだと選択中かどうか分かりにくい
    との指摘のため、既定の枠(.tb-btnの1px境界線)は変更せず、色のみ切り替える
-   V1_210: 選択時の枠色を橙(茶)から、ペン/蛍光/消しゴム選択時と同じ水色glow
+   V1_214: 選択時の枠色を橙(茶)から、ペン/蛍光/消しゴム選択時と同じ水色glow
    (.tb-tool-btn.activeと同色・同背景)に統一した。colorは指定しない(アイコンは
    currentDimColor、3段目ラベルは白系のまま独立して色付けするため) */
 #measureToggleBtn.tool-active{background:rgba(0,212,255,0.22);border-color:#00d4ff}
@@ -532,7 +532,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #pdfThumbPanel{position:absolute;inset:0;width:100%;background:var(--bg-panel);display:flex;flex-direction:column;overflow:hidden;z-index:1}
 #pdfThumbPanel .sp-header{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 #pdfThumbPanel .sp-title{font-size:15px;font-weight:600;color:var(--text);margin-right:8px}
-/* V1_210: 「閉じる」が赤地の文字ボタンで他パネルと統一感が無いとの指摘により、
+/* V1_214: 「閉じる」が赤地の文字ボタンで他パネルと統一感が無いとの指摘により、
    allSearch/openFileパネルと同じ地味な✕アイコン方式に統一した(ボタン文字も✕に変更) */
 #pdfThumbPanel .sp-close{background:none;border:none;color:var(--text-dim,#6b7f99);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;-webkit-tap-highlight-color:transparent}
 .pdf-thumb-ctrl-group{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:4px 6px}
@@ -542,7 +542,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 .pdf-thumb-ctrl-val{font-size:12px;color:var(--text);min-width:38px;text-align:center}
 .pdf-thumb-mode-btn{padding:7px 14px;border-radius:8px;border:1.5px solid #f39c12;background:transparent;color:#f39c12;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .pdf-thumb-mode-btn.active{background:#f39c12;color:#1a1200}
-/* V1_210: 幅/高さ/倍率/位置を一括で既定値に戻すリセットボタン。他の地味なボタン群と
+/* V1_214: 幅/高さ/倍率/位置を一括で既定値に戻すリセットボタン。他の地味なボタン群と
    馴染むよう、色付けせずグレー系の枠線のみのニュートラルなデザインにした */
 .pdf-thumb-reset-btn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text-dim);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .pdf-thumb-reset-btn:active{background:rgba(255,255,255,.1)}
@@ -586,7 +586,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #tabBar{display:flex;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;background:#0d1117;border-bottom:1px solid #2a3040;min-height:0;max-height:44px;flex-shrink:0;flex:1;min-width:0;scrollbar-width:none} /* V1_103: PCでタブが収まりきらない時にネイティブの横スクロールバーが40pxの枠内に表示され、タブ名の文字と重なって見づらかったため、.topbar(コマンドバー)と同じ方式でスクロールバー自体を非表示にした（スクロール操作自体はドラッグ/トラックパッド/タブ一覧ボタンで引き続き可能） / V1_109: タブを種類バッジ+ファイル名の2段表示にしたことに伴い40px→44pxに拡張 */
 #tabBar::-webkit-scrollbar{display:none}
 #tabBar:empty{max-height:0;border-bottom:none}
-/* V1_210: 「☰」記号だけだと何のボタンか分かりにくいとの指摘のため、PDFページ
+/* V1_214: 「☰」記号だけだと何のボタンか分かりにくいとの指摘のため、PDFページ
    サムネイル一覧ボタン(#pdfThumbBtn)と同じグリッドアイコンを使い、「ファイル一覧」の
    文字ラベルも表示する横長デザインに変更(幅は文字量に応じて自動、高さは既存の44pxを維持) */
 #tabListBtn{display:none;width:auto;min-width:0;padding:0 12px;height:44px;align-items:center;justify-content:center;gap:6px;background:#0d1117;border:none;border-bottom:1px solid #2a3040;border-left:1px solid #2a3040;color:#b0bec5;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap;-webkit-tap-highlight-color:transparent}
@@ -645,13 +645,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   background:linear-gradient(180deg,rgba(0,212,255,.12) 0%,rgba(0,212,255,.03) 100%);
 }
 #ctb span{font-size:13px;font-weight:800;color:#00d4ff;letter-spacing:.08em}
-#cclose,#chist-btn{
+#cclose,#chist-btn,#calcPickBtn{
   background:rgba(255,255,255,.06);border:1.5px solid var(--border);color:var(--text-dim);
   font-size:13px;cursor:pointer;padding:4px 10px;border-radius:5px;font-weight:700;
   touch-action:manipulation;
 }
-#cclose:active,#chist-btn:active{background:rgba(0,212,255,.18);color:#00d4ff}
+#cclose:active,#chist-btn:active,#calcPickBtn:active{background:rgba(0,212,255,.18);color:#00d4ff}
 #chist-btn.on{border-color:#00d4ff;color:#00d4ff;background:rgba(0,212,255,.12)}
+/* V1_214: ピックモード中は他の読込ボタン(.text-pick-btn.picking等)と同じ黄色で待機中を示す */
+#calcPickBtn.picking{border-color:#ffd700;background:rgba(255,215,0,.15);color:#ffd700}
 #chist{
   display:none;flex:1;min-height:0;overflow-y:auto;
   padding:4px 11px 6px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2);
@@ -716,7 +718,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
        stroke="currentColor"なのでsvg要素自身のstyle.colorを変えるとペン先の線色が変わる
        V1_45: 色丸ボタン(sketchColorDot)は廃止。選択中に同じアイコンをもう一度押すと
        色・太さの選択ポップアップが開く -->
-  <!-- V1_210: ペンも3段表示(ペン/アイコン/現在の線幅)にした。3段目のid="lwLabel"は
+  <!-- V1_214: ペンも3段表示(ペン/アイコン/現在の線幅)にした。3段目のid="lwLabel"は
        tool.js(.lw-btn クリック時)・storage.js(復元時)に元々あった(が対応するDOM要素が
        存在せず動いていなかった)更新処理をそのまま活かすため、あえてこのidを採用した -->
   <button class="tb-tool-btn tool-btn active" data-tool="sketch" title="スケッチ"><span class="tb-tool-label">ペン</span><svg id="sketchToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg><span class="tb-tool-label" id="lwLabel">0.6</span></button>
@@ -724,10 +726,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
        fill属性が固定値のため、id(hlToolIconFill)を付与してJSから直接色を書き換える
        V1_45: 色丸ボタン(hlColorDot)は廃止。選択中に同じアイコンをもう一度押すと
        色・太さの選択ポップアップが開く
-       V1_210: 蛍光ペンも3段表示(蛍光/アイコン/現在の線幅)にした -->
+       V1_214: 蛍光ペンも3段表示(蛍光/アイコン/現在の線幅)にした -->
   <button class="tb-tool-btn tool-btn" data-tool="hl" title="蛍光ペン"><span class="tb-tool-label">蛍光</span><svg id="hlToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path id="hlToolIconFill" d="M15 3l6 6-11 11H4v-6L15 3z" fill="rgba(255,255,0,0.25)"/><line x1="11" y1="7" x2="17" y2="13"/></svg><span class="tb-tool-label" id="hlLwLabel">4</span></button>
   <div class="tb-sep"></div>
-  <!-- V1_210: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
+  <!-- V1_214: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
        (再タップで開くeraser用ポップアップ、#colorOverlayの.co-eraser-section)を新設した -->
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg><span class="tb-tool-label" id="eraserSizeLabel">20</span></button>
   <div class="tb-sep"></div>
@@ -739,12 +741,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
        (currentToolを設定する箇所)で書き換える。押下/ポップアップ開閉JSはindex.html
        下部、表示制御(PDF/Excel時に強制的に隠す)はviewer.jsの_updateTopbarForPdf/
        _updateTopbarForExcelを参照
-       V1_210: 選んでいない時も枠が常に色付きだった(下記style)のは分かりにくいとの
+       V1_214: 選んでいない時も枠が常に色付きだった(下記style)のは分かりにくいとの
        指摘のため削除し、計測ツールが選択されている間だけ.tool-activeクラスで
        枠に色を付けるようにした(tool.js側で切替)。また、計測ツール選択ポップアップ
        (#measureToolPopup)内に計測線の色選択(.co-dim-colors、旧#colorOverlayの
        .co-dim-sectionから移設)も表示できるようにした -->
-  <!-- V1_210: 定規アイコン(id="measureToolIcon")は選択中の計測線の色(currentDimColor)を
+  <!-- V1_214: 定規アイコン(id="measureToolIcon")は選択中の計測線の色(currentDimColor)を
        反映するようにした(updateToolColorDots()、.dimToolIconと同様の扱い)。3段目の
        ラベル(選択中の計測ツール名)は色分けが不要との指摘のため、他ツール(ペン等)の
        3段目ラベルと同じデフォルト色(白系)に統一(旧インラインstyleの橙色を削除) -->
@@ -836,10 +838,10 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 </button>
 </div>
-<!-- V1_210: 計測ツール選択ポップアップ。#measureToggleBtnを押すと表示され(色/太さ選択の
+<!-- V1_214: 計測ツール選択ポップアップ。#measureToggleBtnを押すと表示され(色/太さ選択の
      #colorOverlayと同系のフローティングポップアップ)、いずれかのツールを選ぶとtool.js側
      (currentToolを設定する箇所)でポップアップを閉じ、#measureCurrentLabelを更新する。
-     内部の.dim-group/.dim-group-btns/各ボタンはV1_210の第2段バーにあった時のものをそのまま
+     内部の.dim-group/.dim-group-btns/各ボタンはV1_214の第2段バーにあった時のものをそのまま
      移設(id/class/data-tool属性は無変更のため、既存のクリックハンドラ・active表示は
      すべてそのまま動作する) -->
 <div id="measureToolPopup">
@@ -857,7 +859,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="tb-tool-btn tool-btn" data-tool="radDim" title="半径寸法（R）"><span class="tb-tool-label">半径</span><svg class="dimToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text></svg></button>
     </div>
   </div>
-  <!-- V1_210: 計測線の色選択。旧#colorOverlayの.co-dim-sectionから移設(class名は
+  <!-- V1_214: 計測線の色選択。旧#colorOverlayの.co-dim-sectionから移設(class名は
        dim-color-btn/co-dim-colorsのまま無変更のため、既存のクリックハンドラ・
        active表示・保存/復元(storage.js)はすべてそのまま動作する)。ツール選択と違い、
        色を選んでもこのポップアップ自体は閉じない(続けてツールも選べるようにするため) -->
@@ -879,7 +881,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <button id="tabScrollLeftBtn" class="tab-scroll-btn" title="左へスクロール">‹</button>
   <div id="tabBar"></div>
   <button id="tabScrollRightBtn" class="tab-scroll-btn" title="右へスクロール">›</button>
-  <!-- V1_210: 「☰」記号をやめ、#pdfThumbBtnと同じグリッドアイコン+「ファイル一覧」の
+  <!-- V1_214: 「☰」記号をやめ、#pdfThumbBtnと同じグリッドアイコン+「ファイル一覧」の
        文字ラベルに変更(何のボタンか分かりにくいとの指摘のため) -->
   <button id="tabListBtn" title="開いているファイル一覧"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span>ファイル一覧</span></button>
 </div>
@@ -978,7 +980,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <!-- V1_48: 水平/鉛直・斜めのP1/P2、線と点の点選択中のみ表示するボタン。
        押すと線を2本選び、その交点(延長含む)を確定点として使う -->
   <button id="ipxBtn" style="display:none">2線の交点取得</button>
-  <!-- V1_210: 文字判定枠(V1_194で追加・V1_199でPDF限定機能として削除された可視化を復活)。
+  <!-- V1_214: 文字判定枠(V1_194で追加・V1_199でPDF限定機能として削除された可視化を復活)。
        文字読込ピックモード中のみ表示され、押すとDXF/TDF/PDF/Excel/CSVいずれの表示中でも
        文字のタップ判定範囲をオレンジで可視化できる。デフォルトは非表示(_showTextHitBoxes) -->
   <button id="textHitBoxToggleBtn" style="display:none">文字判定枠表示</button>
@@ -989,7 +991,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V1_210</span>
+    <span id="ver-label">V1_214</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1101,7 +1103,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_158: 計算機（M_Viewer V7.06仕様移植） -->
 <div id="calc">
-  <div id="ctb"><span>計算機</span><div style="display:flex;gap:6px;align-items:center"><button id="chist-btn">履歴</button><button id="cclose">閉じる</button></div></div>
+  <!-- V1_214: 画面上の数字テキストをタップして計算機へ自動入力するピックモード用ボタン。
+       押すとテキスト読込ピックモード('calc')に入り、図面/PDF/Excel上の数字テキストや
+       計測値をタップするとcurInputへ自動入力される。既存の画面検索等のピックボタンと
+       同じ_setTextPickMode/_commitPickedText機構を共有する -->
+  <div id="ctb"><span>計算機</span><div style="display:flex;gap:6px;align-items:center"><button id="calcPickBtn" title="画面の数字をタップして自動入力">読込</button><button id="chist-btn">履歴</button><button id="cclose">閉じる</button></div></div>
   <div id="chist-hd" style="display:none"><span>計算履歴</span><button id="chist-close">✕</button></div>
   <div id="chist"></div>
   <div id="cdsp"><div id="cexpr"></div><div id="cval">0</div></div>
@@ -1196,11 +1202,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="hl-lw-btn" data-lw="10">10</button>
     </div>
   </div>
-  <!-- V1_210: 寸法(計測)色選択は#measureToolPopupへ移設した(計測ツール選択と同じ
+  <!-- V1_214: 寸法(計測)色選択は#measureToolPopupへ移設した(計測ツール選択と同じ
        ポップアップにまとめて表示するため)。ここには残さない -->
   <div class="co-eraser-section">
     <div class="co-label">消しゴム範囲</div>
-    <!-- V1_210: 消しゴムの消去半径(ERASER_RADIUS_PX、画面px単位)を選べるようにした。
+    <!-- V1_214: 消しゴムの消去半径(ERASER_RADIUS_PX、画面px単位)を選べるようにした。
          既定値20は従来からのハードコード値をそのまま初期選択にしている -->
     <div class="co-eraser-lw">
       <button class="er-btn" data-er="10">10</button>
@@ -1339,19 +1345,23 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div id="pdfThumbPanel">
     <div class="sp-header">
       <span class="sp-title">ページ一覧</span>
-      <div class="pdf-thumb-ctrl-group">
+      <!-- V1_214: 幅/高さ/倍率/位置/リセットは、いずれも図面番号モード(拡大クロップ表示)
+           専用の調整ボタンであり、モードOFFの時は無関係かつ紛らわしいとの指摘のため、
+           共通クラス"pdf-thumb-mode-adjust"を付与し、_pdfThumbUpdateCtrlUI()で
+           modeOnがtrueの時だけ表示するようにした -->
+      <div class="pdf-thumb-ctrl-group pdf-thumb-mode-adjust">
         <span class="pdf-thumb-ctrl-label">幅</span>
         <button class="pdf-thumb-step" data-target="w" data-delta="-1">－</button>
         <span class="pdf-thumb-ctrl-val" id="pdfThumbWVal">10%</span>
         <button class="pdf-thumb-step" data-target="w" data-delta="1">＋</button>
       </div>
-      <div class="pdf-thumb-ctrl-group">
+      <div class="pdf-thumb-ctrl-group pdf-thumb-mode-adjust">
         <span class="pdf-thumb-ctrl-label">高さ</span>
         <button class="pdf-thumb-step" data-target="h" data-delta="-1">－</button>
         <span class="pdf-thumb-ctrl-val" id="pdfThumbHVal">10%</span>
         <button class="pdf-thumb-step" data-target="h" data-delta="1">＋</button>
       </div>
-      <div class="pdf-thumb-ctrl-group">
+      <div class="pdf-thumb-ctrl-group pdf-thumb-mode-adjust">
         <span class="pdf-thumb-ctrl-label">倍率</span>
         <button class="pdf-thumb-step" data-target="z" data-delta="-0.5">－</button>
         <span class="pdf-thumb-ctrl-val" id="pdfThumbZVal">6.0x</span>
@@ -1359,15 +1369,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       </div>
       <!-- V1_197: 図面番号モードの拡大位置(ポイント)を上下左右に移動する調整ボタン。
            既定値は従来通りデータ右下(offXPct=0,offYPct=0)のまま変更なし -->
-      <div class="pdf-thumb-ctrl-group">
+      <div class="pdf-thumb-ctrl-group pdf-thumb-mode-adjust">
         <span class="pdf-thumb-ctrl-label">位置</span>
         <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="left">◀</button>
         <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="up">▲</button>
         <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="down">▼</button>
         <button class="pdf-thumb-step pdf-thumb-pos-step" data-dir="right">▶</button>
       </div>
-      <!-- V1_210: 幅%/高さ%/倍率/位置(offX/offY)を一気に既定値へ戻すリセットボタン -->
-      <button id="pdfThumbResetBtn" class="pdf-thumb-reset-btn">リセット</button>
+      <!-- V1_214: 幅%/高さ%/倍率/位置(offX/offY)を一気に既定値へ戻すリセットボタン -->
+      <button id="pdfThumbResetBtn" class="pdf-thumb-reset-btn pdf-thumb-mode-adjust">リセット</button>
       <button id="pdfThumbModeBtn" class="pdf-thumb-mode-btn">図面番号モード</button>
       <button class="sp-close" id="pdfThumbCloseBtn">✕</button>
     </div>
@@ -1398,27 +1408,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=1210"></script>
-<script src="viewer.js?v=1210"></script>
-<script src="utils.js?v=1210"></script>
-<script src="ui.js?v=1210"></script>
-<script src="dialog.js?v=1210"></script>
-<script src="storage.js?v=1210"></script>
-<script src="fonts/NotoSansJP.js?v=1210"></script>
-<script src="export.js?v=1210"></script>
-<script src="tool.js?v=1210"></script>
-<script src="verify.js?v=1210"></script>
+<script src="layer.js?v=1214"></script>
+<script src="viewer.js?v=1214"></script>
+<script src="utils.js?v=1214"></script>
+<script src="ui.js?v=1214"></script>
+<script src="dialog.js?v=1214"></script>
+<script src="storage.js?v=1214"></script>
+<script src="fonts/NotoSansJP.js?v=1214"></script>
+<script src="export.js?v=1214"></script>
+<script src="tool.js?v=1214"></script>
+<script src="verify.js?v=1214"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=1210"></script>
-<script src="stroke-text.js?v=1210"></script>
+<script src="shxGlyphs.js?v=1214"></script>
+<script src="stroke-text.js?v=1214"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=1210"></script>
+<script src="pc.js?v=1214"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=1210"></script>
+<script src="supabase-sync.js?v=1214"></script>
 <script>
-const APP_VERSION = 'V1_210';
+const APP_VERSION = 'V1_214';
 
 // =========================================================
 // グローバル状態
@@ -1816,7 +1826,7 @@ function drawOverlay(){
   }
   // V1_194で追加したPDF文字タップ判定範囲のオレンジ可視化は、V1_199でPDF文字の
   // 回転(angle)を正しく扱えるようになり本来の当たり判定とズレる問題が解消したため、
-  // 目的(ズレの原因確認)を終えて不要となり削除したが、V1_210でユーザー依頼により復活。
+  // 目的(ズレの原因確認)を終えて不要となり削除したが、V1_214でユーザー依頼により復活。
   // 今回はPDF限定ではなくDXF/TDFも対象にし、ジオメトリは_tapPickText(このファイル内、
   // ヒットテスト本体)と完全に同一の計算式を使う(DXF/PDFでパディング等の係数が異なる点も
   // _isDxfMoji203フラグで同様に分岐)。デフォルト非表示で、#textHitBoxToggleBtnを押した
@@ -2699,7 +2709,7 @@ document.getElementById('tabListBtn').addEventListener('click',function(e){
   e.stopPropagation();
   if(typeof _showOpenFilesListMenu==='function') _showOpenFilesListMenu(this);
 });
-// V1_210: 計測ツール選択ポップアップ(#measureToolPopup)の開閉。#colorOverlayの
+// V1_214: 計測ツール選択ポップアップ(#measureToolPopup)の開閉。#colorOverlayの
 // openContextPopup()と同様に、ボタン直下に位置合わせして開く。ポップアップ内で
 // いずれかの計測ツールを選ぶとtool.js側(currentToolを設定する箇所)で自動的に閉じる
 // ため、ここでは「開く」「(閉じている状態から)開いた状態にする」「(開いている状態で
@@ -2710,7 +2720,7 @@ function _closeMeasureToolPopup(){
   if(popup) popup.classList.remove('open');
   if(btn) btn.classList.remove('active');
 }
-// V1_210: 計測系ツール名の判定は、tool.js側でconst宣言された_MEASURE_TOOL_LABELSを
+// V1_214: 計測系ツール名の判定は、tool.js側でconst宣言された_MEASURE_TOOL_LABELSを
 // 直接参照できない(スクリプトタグをまたぐconst/letは共有されないため。storage.jsで
 // 同様の理由によりハードコード配列で判定している前例と同じ対応)ため、ここでも
 // ハードコード配列で判定する
@@ -2719,7 +2729,7 @@ document.getElementById('measureToggleBtn').addEventListener('click',function(e)
   var popup=document.getElementById('measureToolPopup');
   if(!popup) return;
   if(popup.classList.contains('open')){ _closeMeasureToolPopup(); return; }
-  // V1_210: 現在のツールが計測系でない場合(ペン等から押した場合)、前回選んでいた
+  // V1_214: 現在のツールが計測系でない場合(ペン等から押した場合)、前回選んでいた
   // 計測ツール(_lastMeasureTool、tool.js側のvar)があれば、ポップアップを開かずに
   // そのツールを直接有効化する(該当ボタンをそのままクリックしたのと同じ処理に
   // 乗せることで、ガイド表示・3段目ラベル更新・保存など既存処理を再利用する)。
@@ -2729,7 +2739,7 @@ document.getElementById('measureToggleBtn').addEventListener('click',function(e)
     var lastBtn=popup.querySelector('.tool-btn[data-tool="'+_lastMeasureTool+'"]');
     if(lastBtn){ lastBtn.click(); if(e&&e.stopPropagation) e.stopPropagation(); return; }
   }
-  // V1_210: 色/太さ選択ポップアップ(#colorOverlay)が開いていれば先に閉じ、
+  // V1_214: 色/太さ選択ポップアップ(#colorOverlay)が開いていれば先に閉じ、
   // 2つのポップアップが同時に画面に残らないようにする
   var co=document.getElementById('colorOverlay');
   if(co) co.classList.remove('open');
@@ -2744,7 +2754,7 @@ document.getElementById('measureToggleBtn').addEventListener('click',function(e)
   popup.style.top=top+'px';popup.style.left=left+'px';
   if(e&&e.stopPropagation) e.stopPropagation();
 });
-// V1_210: ポップアップの外側をタップしたら閉じる(#colorOverlayの同種リスナーと同じ方式)
+// V1_214: ポップアップの外側をタップしたら閉じる(#colorOverlayの同種リスナーと同じ方式)
 document.addEventListener('click',function(e){
   var popup=document.getElementById('measureToolPopup');
   var btn=document.getElementById('measureToggleBtn');
@@ -2827,6 +2837,11 @@ function _pdfThumbUpdateCtrlUI(){
   var hv=document.getElementById('pdfThumbHVal');if(hv)hv.textContent=c.heightPct+'%';
   var zv=document.getElementById('pdfThumbZVal');if(zv)zv.textContent=c.zoom.toFixed(1)+'x';
   var mb=document.getElementById('pdfThumbModeBtn');if(mb)mb.classList.toggle('active',!!c.modeOn);
+  // V1_214: 幅/高さ/倍率/位置/リセットは図面番号モード専用の調整ボタンのため、
+  // モードONの時だけ表示する(OFFの時は最初から出ていると紛らわしいとの指摘のため)
+  document.querySelectorAll('.pdf-thumb-mode-adjust').forEach(function(el){
+    el.style.display=c.modeOn?'':'none';
+  });
 }
 // 倍率・モードON/OFFの変更時: PDFの再描画はせず(生成済みのoverviews/cropsをそのまま再利用し)
 // 各セルの表示だけを更新する(軽量な操作。クロップ画像そのものは変わらないため再描画不要)
@@ -2878,7 +2893,7 @@ document.querySelectorAll('.pdf-thumb-pos-step').forEach(function(btn){
     _buildPdfThumbGrid();
   });
 });
-// V1_210: 幅%/高さ%/倍率/位置(offX/offY)を一気に既定値へ戻すリセットボタン。
+// V1_214: 幅%/高さ%/倍率/位置(offX/offY)を一気に既定値へ戻すリセットボタン。
 // 図面番号モードのON/OFF状態(modeOn)はリセット対象に含めない(別の切替操作のため)
 document.getElementById('pdfThumbResetBtn').addEventListener('click',function(){
   var c=_pdfThumbLoadCfg();
@@ -3449,7 +3464,7 @@ function updateToolColorDots(){
   if(hif&&currentHL_Color)hif.setAttribute('fill',`rgba(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b},0.25)`);
   if(currentDimColor){
     document.querySelectorAll('.dimToolIcon').forEach(function(svg){svg.style.color=currentDimColor;});
-    // V1_210: ヘッダーの計測ボタン(#measureToggleBtn)の定規アイコンにも、選択中の
+    // V1_214: ヘッダーの計測ボタン(#measureToggleBtn)の定規アイコンにも、選択中の
     // 計測線の色(currentDimColor)を反映する。ポップアップ内の.dimToolIconと同じ扱い
     const mti=document.getElementById('measureToolIcon');
     if(mti)mti.style.color=currentDimColor;
@@ -3458,7 +3473,7 @@ function updateToolColorDots(){
 function openContextPopup(mode,anchorEl){
   const co=document.getElementById('colorOverlay');
   if(co.classList.contains('open')&&co.dataset.mode===mode){co.classList.remove('open');return;}
-  // V1_210: 計測ツール選択ポップアップ(#measureToolPopup)が開いていた場合、色/太さ
+  // V1_214: 計測ツール選択ポップアップ(#measureToolPopup)が開いていた場合、色/太さ
   // ポップアップと同時に2つ画面に残らないよう先に閉じる(既に選択中の計測ツールの
   // アイコンを再タップして色/太さを開くケースで、計測選択ポップアップが開いたまま
   // 裏に残ってしまうのを防ぐ)
@@ -5690,6 +5705,37 @@ document.getElementById('cclose').addEventListener('click',function(){
   _calcEl.classList.remove('on');
   // V1_59: ここでもborderColorを空にすると枠色（茶色）が消えてしまうため元の枠色に戻す
   var b=document.getElementById('calcBtn');if(b){b.style.background='';b.style.borderColor='#8b5a2b';b.style.color='';}
+  // V1_214: 計算機を閉じたら、数字読込ピックモード('calc')中だった場合は解除する
+  // (他の読込パネル(画面検索/検索して開く等)を閉じた時と同じ扱い)
+  if(typeof _textPickTarget!=='undefined'&&_textPickTarget==='calc'&&typeof _setTextPickMode==='function') _setTextPickMode(null);
+});
+
+// V1_214: 画面上の数字テキスト(doc.moji/pdfMoji/Excelセル/計測値)をタップして
+// 計算機へ自動入力する機能。curInput等はこのIIFE内のlet宣言でスコープが閉じている
+// ため、_commitPickedText(このファイル内、IIFE外)から呼べるようwindowへ公開する。
+// テキストから最初の数値(小数・符号含む)だけを抜き出して入力する。「新しい数字を
+// 打ち始めた」のと同じ状態にする(_afterEq/_justOpをリセット)ことで、続けて
+// 演算子や次の数字をボタンで押して計算を続けられる
+window._calcInputFromPick=function(text){
+  var m=(text||'').match(/-?\d+(\.\d+)?/);
+  if(!m) return false;
+  curInput=m[0];
+  _afterEq=false;_justOp=false;
+  if(_dispTokens.length&&_dispTokens[_dispTokens.length-1].type==='num'){
+    _dispTokens[_dispTokens.length-1].val=curInput;
+  }else{
+    _dispTokens.push({type:'num',val:curInput});
+  }
+  _dispExpr=_tokensToStr(_dispTokens);
+  _disp();
+  return true;
+};
+// V1_214: ヘッダーではなく計算機タイトルバー内のボタン。押すと画面上の数字を
+// タップして自動入力するピックモードへ入る(もう一度押すと解除、全図面検索等と同じ
+// 手動トグル方式)
+var _calcPickBtnEl211=document.getElementById('calcPickBtn');
+if(_calcPickBtnEl211) _calcPickBtnEl211.addEventListener('click',function(){
+  if(typeof _setTextPickMode==='function') _setTextPickMode(_textPickTarget==='calc'?null:'calc');
 });
 
 function _toggleCalcHist(show){
@@ -6074,8 +6120,8 @@ async function _markGoNext(){
 // 優先して処理され（詳細はtool.js側のコメント参照）、また検索パネルの暗幕
 // (searchBg/allSearchBg)のタップも無効化して図面へタップが届くようにしている
 // (詳細は#searchOverlay.pickingのCSSコメント参照)
-var _textPickTarget=null; // null | 'screen' | 'all' | 'openFile' | 'excelLocal'(V1_122)
-// V1_210: 文字判定枠(タップ判定範囲のオレンジ可視化)の表示状態。V1_194でPDF限定で追加され
+var _textPickTarget=null; // null | 'screen' | 'all' | 'openFile' | 'excelLocal'(V1_122) | 'calc'(V1_214)
+// V1_214: 文字判定枠(タップ判定範囲のオレンジ可視化)の表示状態。V1_194でPDF限定で追加され
 // V1_199で一旦削除されたが、DXF/TDF/PDF/Excel/CSV全形式対応・デフォルト非表示・
 // ピックモード中に出る#textHitBoxToggleBtnで手動トグルする形で復活させた。
 // ピックモードを抜ける(_textPickTarget=null)たびに必ずfalseへ戻し、次回は常に非表示から始まる
@@ -6112,20 +6158,22 @@ function _setTextPickMode(target){
   // 「もう一度ボタンを押す」操作自体が存在せず文言が実態と合っていなかった。
   // 全図面検索(all)・シート内検索(excelLocal)はボタンによる手動トグルが今も残っている
   // ため、その場合に限りこの案内を表示する
-  // V1_210: 「（オレンジ色の部分をタップ）」はPDF専用・常時表示だった頃の案内文。
+  // V1_214: 「（オレンジ色の部分をタップ）」はPDF専用・常時表示だった頃の案内文。
   // 判定枠可視化がデフォルト非表示・全形式対応のトグル式になったため、この文言は削除し、
   // 代わりに#textHitBoxToggleBtn自体の出現(_updateTextHitBoxBtnVisibility)で気付けるようにした
-  if(target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0);
+  if(target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal'||target==='calc')?'（もう一度ボタンを押すと中止）':''),0); // V1_214: calcもボタン手動トグルのため追加
   else hideGuide();
-  _updateTextHitBoxBtnVisibility(); // V1_210
+  _updateTextHitBoxBtnVisibility(); // V1_214
   var b1=document.getElementById('screenTextPickBtn');
   var b2=document.getElementById('allTextPickBtn');
   var b3=document.getElementById('openFileTextPickBtn'); // V1_29
   var b4=document.getElementById('excelFilterTextPickBtn'); // V1_122
+  var b5=document.getElementById('calcPickBtn'); // V1_214
   if(b1) b1.classList.toggle('picking', target==='screen');
   if(b2) b2.classList.toggle('picking', target==='all');
   if(b3) b3.classList.toggle('picking', target==='openFile');
   if(b4) b4.classList.toggle('picking', target==='excelLocal');
+  if(b5) b5.classList.toggle('picking', target==='calc');
   // V1_122: Excel/CSV表示中に検索パネル(画面検索/検索して開く/全図面検索)を開いた状態で
   // テキスト読込ピックモードに入ると、パネルが画面右側の一部を覆っているため、
   // その下に隠れた列のセルをタップできない不具合があった。ピックモード中は、開いている
@@ -6147,7 +6195,7 @@ function _setTextPickMode(target){
   }
   if(typeof scheduleOverlay==='function') scheduleOverlay(); // V1_194: ピックモード切替時にオレンジ可視化を即反映
 }
-// V1_210: 「文字判定枠表示」トグルボタン。押すたびに_showTextHitBoxesを反転し、
+// V1_214: 「文字判定枠表示」トグルボタン。押すたびに_showTextHitBoxesを反転し、
 // canvas側(drawOverlay、DXF/TDF/PDF対象)とExcel/CSV側(body.text-hitbox-onクラス、
 // CSSのoutlineで表現)の両方へ即時反映する
 document.getElementById('textHitBoxToggleBtn').addEventListener('click',function(){
@@ -6203,6 +6251,31 @@ function _tapPickText(sx0,sy0){
     }
   }
   if(!best){
+    // V1_214: 通常の文字(doc.moji/pdfMoji)で見つからなかった場合、計測値(dims、水・鉛/
+    // 斜め/2線間/線と点/直径/半径の6種の寸法テキスト)もテキスト読込の対象に含める。
+    // dimsは中央揃え・固定フォントサイズ(auto/fixedモードでズームや作成時サイズに
+    // 応じて可変)・別の角度規約で描画されており、doc.moji側の回転矩形当たり判定
+    // (widthFactor等)をそのまま流用できないため、既存の寸法テキストドラッグ判定
+        // (_dimTextHit、26px円形判定・現在ページのみ対象)と同じ考え方で別途判定する。
+    // ストローク文字認識(下記)より先に試す＝dimsは推測ではなく確定済みの数値なので
+    // 優先する
+    if(typeof dims!=='undefined' && dims && dims.length>0){
+      var _curPgDim211=(typeof _curPage==='function')?_curPage():1;
+      var _dimPickR211=26; // _dimTextHitと同じ半径
+      var _dimBest211=null,_dimBestD211=Infinity;
+      for(var _di211=dims.length-1;_di211>=0;_di211--){
+        var _dd211=dims[_di211];
+        if(_dd211.tx===undefined||_dd211.ty===undefined||!_dd211.text) continue;
+        if((_dd211.page||1)!==_curPgDim211) continue;
+        var _dp211=w2s(_dd211.tx,_dd211.ty);
+        var _ddist211=Math.hypot(sx0-_dp211[0],sy0-_dp211[1]);
+        if(_ddist211<_dimPickR211 && _ddist211<_dimBestD211){_dimBestD211=_ddist211;_dimBest211=_dd211;}
+      }
+      if(_dimBest211){
+        _commitPickedText(_dimBest211.text);
+        return;
+      }
+    }
     // V1_195: 通常の文字(TEXT/MTEXT/ATTRIB)で見つからなかった場合のみ、DXF表示中
     // (PDF・Excel表示中は対象外)に限ってストローク文字認識にフォールバックする。
     // 線分・円弧だけで描かれた文字(分解済みテキスト等)をタップ位置周辺の形状から
@@ -6247,12 +6320,19 @@ function _commitPickedText(text){
       _excelSearchText=text;
       if(typeof _applyExcelLocalSearch==='function') _applyExcelLocalSearch(false);
     }
+  } else if(target==='calc'){ // V1_214: 計算機(#calc)への数字自動入力
+    var _calcOk211=(typeof window._calcInputFromPick==='function')&&window._calcInputFromPick(text);
+    if(!_calcOk211){
+      showGuide('数値が見つかりませんでした。もう一度タップしてください',2200);
+      return;
+    }
   }
-  showGuide('「'+text+'」を検索欄に入力しました',2200);
+  showGuide((target==='calc'?'「'+text+'」を計算機に入力しました':'「'+text+'」を検索欄に入力しました'),2200); // V1_214
   setTimeout(function(){
     // V1_95: _setTextPickMode側と同様、'all'(全図面検索)・'excelLocal'以外はボタンによる
     // 手動トグルが存在しないため「（もう一度ボタンを押すと中止）」を表示しない
-    if(_textPickTarget===target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal')?'（もう一度ボタンを押すと中止）':''),0);
+    // V1_214: 'calc'もボタン手動トグルのため対象に追加
+    if(_textPickTarget===target) showGuide('図面上の文字をタップしてください'+((target==='all'||target==='excelLocal'||target==='calc')?'（もう一度ボタンを押すと中止）':''),0);
   },2200);
 }
 // V1_62: 画面検索・検索開くはパネルを開くと自動でピックモードになる(V1_58)ため

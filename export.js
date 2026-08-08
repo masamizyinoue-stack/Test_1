@@ -854,6 +854,14 @@ function importDxfviewManual(){
         verify('バックアップ復元:zip内容',{names:names});
         var dvName=names.find(function(n){return n.toLowerCase().endsWith('.dxfview');});
         if(!dvName){
+          // V1_214: 自社の.dxfviewが無い場合、旧アプリ「M_VIEWER」独自のバックアップZIP
+          // (PDF + strokes.json + meta.json)かどうかを判定する。M_VIEWERを使っていた人が
+          // このアプリに切り替えた際、手書き・蛍光ペンの書込みをそのまま取り込めるようにする
+          var mvStrokesName=names.find(function(n){return n.toLowerCase()==='strokes.json';});
+          if(mvStrokesName){
+            await _importMViewerZip214(zipObj,names,mvStrokesName);
+            return;
+          }
           alert('ZIP内に.dxfviewファイルが見つかりません。\nZIP内のファイル: '+names.join(', '));return;
         }
         // V1_177: .dxfview以外の1件を元図面(DXF/tdf)として扱う
@@ -955,6 +963,8 @@ function _applyDxfviewJson176(jsonText,_meta179){
           if(_sCnt178===0&&_dCnt178===0){
             _msg179+='\n\n※復元件数が0件です。このバックアップ作成時点で書込み内容が保存されていなかった可能性があります。';
           }
+          // V1_214: M_VIEWERバックアップ変換時の補足(消しゴム線のスキップ件数等)があれば追記する
+          if(_meta179.extraNote) _msg179+='\n\n'+_meta179.extraNote;
           alert(_msg179);
         } else {
           showGuide('書込みデータを復元しました(線・図形:'+_sCnt178+'件 寸法:'+_dCnt178+'件)',2500);
@@ -963,6 +973,129 @@ function _applyDxfviewJson176(jsonText,_meta179){
         console.warn('[dxfview import] failed',err);
         alert('.dxfview読み込みに失敗しました: '+err.message);
       }
+}
+
+// =========================================================
+// V1_214: 旧アプリ「M_VIEWER」のバックアップZIP取り込み
+// M_VIEWERの「バックアップ」機能は、元PDF + strokes.json(ページ番号ごとの
+// 手書き/蛍光ペン配列) + meta.json(ファイル名・表示ページ・拡大率等)を1つの
+// ZIPにまとめる形式。DXF Viewerの.dxfview-backup形式とは中身が異なるため、
+// strokes.jsonを検出したらこちらの専用変換処理を通す。
+//
+// 座標系: M_VIEWERのpoints([[x,y],...])はPDFの生ユーザー空間(回転前、Y上向き)の
+// まま保存されている。DXF Viewerの「ワールド座標」はpdf.jsのgetViewport()
+// (ページの/Rotateを反映した表示用フレーム)を基準にしており、/Rotateが
+// 0度のPDFでは生PDF座標と一致するが、90/180/270度回転PDFでは一致しない
+// (V1_196のHD-PDF書出し修正時に判明した既知の仕様、export.js:_hpMakeRawMapper196
+// 参照)。そのため、_hpMakeRawMapper196の逆変換(生PDF座標→ワールド座標)を
+// ページごとに用意して変換する。
+//
+// 線幅: M_VIEWER側はdrawStroke()で lineWidth(canvas px) = size * sc/3
+// (sc=PDF座標→canvas pxの倍率)としており、これは常に size/3 (PDFポイント単位)
+// という不変の物理幅を表す。DXF Viewer側はdrawAnnotation()で
+// lineWidth(device px) = s.lw * (scale/fitScale) * dpr としており、こちらは
+// s.lw/fitScale という物理幅(ワールド単位=PDFポイントと同一)を表す。
+// 両者の物理幅を一致させると lw = fitScale * size/3 となる（ページごとに
+// fitScaleを求めて変換する。複数ページで用紙サイズが異なる場合にも対応するため、
+// 実際にページを切り替えず、fit()と同じ計算式をページごとに再現する）。
+function _mvHexToRgbObj214(hex){
+  var h=(hex||'#000000').replace('#','');
+  if(h.length===3) h=h.split('').map(function(c){return c+c;}).join('');
+  var r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+  return {r:isFinite(r)?r:0, g:isFinite(g)?g:0, b:isFinite(b)?b:0};
+}
+// 生PDF座標(rx,ry)→ワールド座標(wx,wy)。_hpMakeRawMapper196(このファイル内、上部)の
+// 逆変換。vp=page.getViewport({scale:1})(/Rotate込みの表示用フレーム)
+function _mvMakeWorldMapper214(vp){
+  function pt(rx,ry){
+    var v=vp.convertToViewportPoint(rx,ry); // Y下向き・vp原点(左上)のビューポート座標
+    return {x:v[0], y:vp.height-v[1]};       // renderPdfPage()のpdfImage定義と同じ規約(Y上向き)へ
+  }
+  return {pt:pt};
+}
+// 指定ページを実際に開き直さずに、そのページのfitScale相当値を求める(fit()と同じ計算式)
+function _mvComputeFitScaleForPage214(vp){
+  var dpr=window.devicePixelRatio||1;
+  var W=cv.width/dpr, H=cv.height/dpr;
+  var dw=vp.width, dh=vp.height;
+  if(dw<1e-10||dh<1e-10) return 1;
+  var margin=0.005; // V1_172のfit()と同じ余白
+  return Math.min(W*(1-2*margin)/dw, H*(1-2*margin)/dh);
+}
+async function _importMViewerZip214(zipObj,names,mvStrokesName){
+  try{
+    if(!confirm('M_VIEWERのバックアップZIPを検出しました。PDFを開き、手書き・蛍光ペンの書込みを変換して取り込みます。よろしいですか？')) return;
+    var pdfName=names.find(function(n){return n.toLowerCase().endsWith('.pdf');});
+    if(!pdfName){
+      alert('ZIP内にPDFが見つかりません。\nZIP内のファイル: '+names.join(', '));return;
+    }
+    var mvMetaName=names.find(function(n){return n.toLowerCase()==='meta.json';});
+    var strkText=await zipObj.files[mvStrokesName].async('string');
+    var metaData=mvMetaName?JSON.parse(await zipObj.files[mvMetaName].async('string')):null;
+    var strkData=JSON.parse(strkText||'{}');
+    var pdfBuf=await zipObj.files[pdfName].async('arraybuffer');
+
+    // 同名だが内容が異なる古いタブが開いていれば閉じる(既存の.dxfview復元と同じ対応)
+    if(typeof openFiles!=='undefined'&&typeof _fileKey==='function'){
+      var _fkNew214=_fileKey(pdfName,pdfBuf.byteLength);
+      var _staleIdx214=openFiles.findIndex(function(x){
+        return (x.currentFileName||x.name)===pdfName && x.fileKey!==_fkNew214;
+      });
+      if(_staleIdx214>=0&&typeof doCloseTab==='function') doCloseTab(_staleIdx214);
+    }
+    if(typeof openDxfFromDb!=='function'){ alert('図面を開く機能が読み込まれていません');return; }
+    // メタの表示ページがあればそのページで開く(無ければ1ページ目)
+    var startPage=(metaData&&metaData.curPage>=1)?metaData.curPage:1;
+    await openDxfFromDb(pdfName,pdfBuf,null,null,startPage);
+    if(!pdfDoc){ alert('PDFの読み込みに失敗しました');return; }
+
+    // ページごとにワールド座標変換・fitScaleを計算(初回参照時にキャッシュ)
+    var _pageCtxCache={};
+    async function getPageCtx(pageNum){
+      if(_pageCtxCache[pageNum]) return _pageCtxCache[pageNum];
+      var page=await pdfDoc.getPage(pageNum);
+      var vp=page.getViewport({scale:1});
+      var ctx={mapper:_mvMakeWorldMapper214(vp),fitScale:_mvComputeFitScaleForPage214(vp)};
+      _pageCtxCache[pageNum]=ctx;
+      return ctx;
+    }
+
+    var convertedStrokes=[];
+    var eraserSkipped=0, pageSkipped=0;
+    var pageKeys=Object.keys(strkData||{});
+    for(var pki=0;pki<pageKeys.length;pki++){
+      var pageNum=parseInt(pageKeys[pki],10);
+      if(!pageNum||pageNum<1||pageNum>pdfDoc.numPages){ pageSkipped+=((strkData[pageKeys[pki]]||[]).length); continue; }
+      var arr=strkData[pageKeys[pki]]||[];
+      var pctx;
+      try{ pctx=await getPageCtx(pageNum); }catch(pe214){ pageSkipped+=arr.length; continue; }
+      for(var si214=0;si214<arr.length;si214++){
+        var s=arr[si214];
+        if(!s||!s.points||s.points.length<2) continue;
+        if(s.type==='eraser'){ eraserSkipped++; continue; } // 消しゴム線はDXF Viewerの描画方式では再現不可のためスキップ
+        if(s.type!=='pen'&&s.type!=='hl') continue; // v16のtext/shape等は対象外
+        var pts214=s.points.map(function(p){ return pctx.mapper.pt(p[0],p[1]); });
+        var sizeNum=(typeof s.size==='number'&&s.size>0)?s.size:3;
+        var lw214=pctx.fitScale*(sizeNum/3);
+        var strokeObj={pts:pts214,color:_mvHexToRgbObj214(s.color),lw:lw214,page:pageNum};
+        if(s.type==='hl') strokeObj.hl=true;
+        convertedStrokes.push(strokeObj);
+      }
+    }
+
+    var payload214={
+      format:'dxfview-backup',version:1,
+      strokes:convertedStrokes,dims:[],
+      savedViews:[null,null,null,null,null],hiddenLayers:[]
+    };
+    var noteParts=[];
+    if(eraserSkipped>0) noteParts.push('※消しゴム線'+eraserSkipped+'件は、このアプリの描画方式では再現できないためスキップしました');
+    if(pageSkipped>0) noteParts.push('※対象ページが見つからない書込み'+pageSkipped+'件をスキップしました');
+    _applyDxfviewJson176(JSON.stringify(payload214),{drawName:pdfName,drawOpened:true,extraNote:noteParts.join('\n')});
+  }catch(err){
+    console.warn('[M_VIEWER import] failed',err);
+    alert('M_VIEWERバックアップの取り込みに失敗しました: '+err.message);
+  }
 }
 document.getElementById('importDxfviewBtn').addEventListener('click',importDxfviewManual);
 

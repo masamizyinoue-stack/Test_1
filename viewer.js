@@ -202,6 +202,13 @@ var _interacting=false;
 var _interactionIdleTimer=null;
 var INTERACTION_IDLE_MS=150; // 操作停止とみなすまでの無操作時間(ms)
 var SMALL_ARC_SKIP_PX=4; // 操作中、この画面上半径(px)未満の円/円弧の描画を省略
+// V1_212: 「点(POINT要素)がいっぱいある図面を全体表示すると、画面が点だらけで
+// 見づらい」との指摘のため、全体表示付近の低倍率では点の描画自体を省略し、
+// ある程度拡大した時だけ点が判断できれば良いという方針にした。fitScale(全体表示時の
+// scale、fit()で更新)を基準に、そのPOINT_HIDE_ZOOM_RATIO倍以上ズームインするまでは
+// 点を表示しない。絶対値のscaleではなくfitScale比にすることで、ファイルごとに
+// 単位(mm/m等)や図面サイズが異なっても「全体表示付近かどうか」を正しく判定できる
+var POINT_HIDE_ZOOM_RATIO=2;
 function _beginInteraction(){
   _interacting=true;
   if(_interactionIdleTimer) clearTimeout(_interactionIdleTimer);
@@ -1040,7 +1047,10 @@ function draw(){
   ctx.setLineDash([]);
   // Points（ビューポートカリング）
   // V1_102: 操作中は点要素の描画も省略し、操作停止後に復元する
-  if(!_interacting) for(const e of doc.ten){
+  // V1_212: 全体表示付近の低倍率(fitScaleのPOINT_HIDE_ZOOM_RATIO倍未満)では、
+  // 点が多い図面だと画面いっぱいに点が密集して主張しすぎるため、そもそも描画しない。
+  // 拡大して判断したい時だけ表示されれば良いという方針
+  if(!_interacting && scale>=fitScale*POINT_HIDE_ZOOM_RATIO) for(const e of doc.ten){
     if(hiddenLayers.has(e.layer)) continue;
     const sxt=e.x*scale+tx,syt=-e.y*scale+ty;
     if(sxt<-mg||sxt>W+mg||syt<-mg||syt>H+mg) continue;
