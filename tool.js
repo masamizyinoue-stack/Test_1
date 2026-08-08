@@ -726,10 +726,17 @@ var _MEASURE_TOOL_ICON_INNER={
   circDim:'<circle cx="12" cy="12" r="8"/><line x1="4" y1="12" x2="20" y2="12"/>',
   radDim:'<circle cx="12" cy="12" r="8"/><line x1="12" y1="12" x2="20" y2="12"/><text x="14" y="11" font-size="5" fill="currentColor" stroke="none">R</text>'
 };
+// V1_227: 「計測ボタンの3段目ラベル(#measureCurrentLabel)は、ペン等へ切り替えた後も
+// 前回選んでいた計測ツール名(例:水・鉛)が表示されたままなのに、アイコンだけ定規に
+// 戻ってしまい、ラベルとアイコンの表示が食い違う」との指摘への対応。ラベルは
+// 新たに計測ツールが選ばれた時にしか更新されず、ペン等へ切り替えても文言はそのまま
+// 残る仕様(_lastMeasureTool、V1_210)になっているため、アイコン側もcurrentToolが
+// 計測ツールでない場合はラベルと同じ基準(_lastMeasureTool)を参照するようにし、
+// 一度も計測ツールを使っていない場合にのみ定規アイコンへフォールバックする
 function _syncMeasureToggleBtnIcon(){
   var el=document.getElementById('measureToolIcon');
   if(!el) return;
-  el.innerHTML=_MEASURE_TOOL_ICON_INNER[currentTool]||_MEASURE_RULER_ICON_INNER;
+  el.innerHTML=_MEASURE_TOOL_ICON_INNER[currentTool]||_MEASURE_TOOL_ICON_INNER[_lastMeasureTool]||_MEASURE_RULER_ICON_INNER;
 }
 document.querySelectorAll('.tool-btn').forEach(btn=>{
   btn.addEventListener('click',(e)=>{

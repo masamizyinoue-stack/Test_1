@@ -1658,6 +1658,12 @@ function _updateTopbarForPdf(isPdf){
   // V1_205: PDF表示に切り替わったタイミングで計測ツール選択ポップアップが開いていれば
   // 強制的に閉じる(ボタンが隠れたままポップアップだけ表示され続ける状態を防ぐ)
   if(isPdf&&typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
+  // V1_225: 「2線の交点取得」ボタン(#ipxBtn)がIPX.active(交点ピック操作の途中)の
+  // 状態のままPDFに切り替わった場合の保険。ボタンの表示自体は_ipxIsPointPhasePending()
+  // 側のpdfDoc判定で隠れるが、IPX.activeのフラグそのものは残ってしまい、DXFへ戻さず
+  // 別のDXFを開いた際に「交点計測を中止」表示から始まってしまう等の不整合を避けるため、
+  // ここで明示的にキャンセルしておく
+  if(isPdf&&window.IPX&&IPX.active&&typeof ipxCancel==='function') ipxCancel();
   if(bwBtn) bwBtn.style.display=isPdf?'none':'';
 }
 // V1_115: ソート/固定行列ボタンの押下状態(active表示)・タップ待ちガイド文言・

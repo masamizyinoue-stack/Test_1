@@ -549,8 +549,16 @@ function _showOpenFilesListMenu(anchorEl){
   closeFullBtn.textContent='✕';
   closeFullBtn.style.cssText='background:none;border:none;color:#889;font-size:20px;padding:2px 6px;cursor:pointer;flex-shrink:0;';
   closeFullBtn.onclick=closeMenu;
+  // V1_224: デザイン統一。従来はモード切替中でもボタンの見た目(枠線・背景)が一切変化せず
+  // 文字だけが入れ替わっていたため「今どちらのモードか」が分かりにくかった。ペン/蛍光ペン等の
+  // 標準ツールボタンや図面番号モードボタン(V1_224で統一済み)と同じ「選択中はシアン
+  // (rgba(0,212,255,.22)+枠線#00d4ff)」の表現に合わせ、プレビュー表示中は同じシアンで
+  // 強調表示するようにした
   function updateHeaderBtns(){
     modeBtn.textContent=(_mode==='preview')?'☰ 文字一覧':'🖼 プレビュー';
+    modeBtn.style.background=(_mode==='preview')?'rgba(0,212,255,0.22)':'none';
+    modeBtn.style.borderColor=(_mode==='preview')?'#00d4ff':'#3a5578';
+    modeBtn.style.color=(_mode==='preview')?'#00d4ff':'#aac8e8';
     closeFullBtn.style.display=(_mode==='preview')?'':'none';
   }
   modeBtn.addEventListener('click',function(){
@@ -584,11 +592,14 @@ function _showOpenFilesListMenu(anchorEl){
     _sortBtns[opt[0]]=b;
     sortRow.appendChild(b);
   });
+  // V1_224: デザイン統一。選択中の並び順チップも、同じポップアップ内の他のトグル
+  // (プレビュー切替・お気に入りのみ表示)と同じシアン表現に揃えた
   function updateSortBtns(){
     _sortOptions.forEach(function(opt){
       var active=(typeof _tabSortMode!=='undefined')&&_tabSortMode===opt[0];
-      _sortBtns[opt[0]].style.background=active?'#4a9eff':'none';
-      _sortBtns[opt[0]].style.color=active?'#04203f':'#aac8e8';
+      _sortBtns[opt[0]].style.background=active?'rgba(0,212,255,0.22)':'none';
+      _sortBtns[opt[0]].style.borderColor=active?'#00d4ff':'#3a5578';
+      _sortBtns[opt[0]].style.color=active?'#00d4ff':'#aac8e8';
       _sortBtns[opt[0]].style.fontWeight=active?'700':'400';
     });
   }
@@ -603,10 +614,14 @@ function _showOpenFilesListMenu(anchorEl){
   var favOnlyBtn=document.createElement('button');
   favOnlyBtn.type='button';
   favOnlyBtn.style.cssText='font-size:11px;padding:4px 10px;border-radius:12px;border:1px solid #3a5578;cursor:pointer;background:none;color:#aac8e8;';
+  // V1_224: デザイン統一。従来はON時に独自の青塗り(#4a9eff)+濃紺文字だったが、同じ
+  // ポップアップ内のプレビュー切替ボタン(モードボタン、V1_224で統一済み)や図面番号モード
+  // ボタン等、アプリ全体の「選択中」表現(シアンrgba(0,212,255,.22)+枠線#00d4ff)に揃えた
   function updateFavOnlyBtn(){
     favOnlyBtn.textContent=_favOnly217?'★ お気に入りのみ表示中':'☆ お気に入りのみ表示';
-    favOnlyBtn.style.background=_favOnly217?'#4a9eff':'none';
-    favOnlyBtn.style.color=_favOnly217?'#04203f':'#aac8e8';
+    favOnlyBtn.style.background=_favOnly217?'rgba(0,212,255,0.22)':'none';
+    favOnlyBtn.style.borderColor=_favOnly217?'#00d4ff':'#3a5578';
+    favOnlyBtn.style.color=_favOnly217?'#00d4ff':'#aac8e8';
     favOnlyBtn.style.fontWeight=_favOnly217?'700':'400';
   }
   favOnlyBtn.addEventListener('click',function(){
