@@ -11,15 +11,26 @@ function _showMemMenu(idx,anchorBtn){
   if(existing){existing.remove();return;}
   var menu=document.createElement('div');
   menu.id='_memMenu';
-  menu.style.cssText='position:fixed;z-index:9999;background:#1e3a5f;border:2px solid #4a9eff;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,.7);';
-  var r=anchorBtn.getBoundingClientRect();
-  menu.style.top=(r.bottom+6)+'px';
-  menu.style.left=Math.max(4,r.left-60)+'px';
+  // V1_232: 「メニューが画面からはみ出る・記憶VIEWボタンに被る」不具合の修正。
+  // アンカー(.vbm)は画面右端固定の記憶VIEWポップアップ(#vbmPop)内にあるため、旧来の
+  // 「アンカーの下・少し左」という位置決めでは画面右端をはみ出し、かつポップアップ本体
+  // とも重なっていた。実際のメニューサイズを計測した上で、常にアンカーの「左側」に
+  // 開き(ポップアップと重ならない)、縦位置はアンカーを中心に画面内へクランプする
+  menu.style.cssText='position:fixed;z-index:9999;background:#1e3a5f;border:2px solid #4a9eff;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,.7);visibility:hidden;';
   menu.innerHTML='<div style="color:#aac8e8;font-size:12px;font-weight:bold;text-align:center;margin-bottom:4px;">記憶'+(idx+1)+'</div>'
     +'<button id="_memOvr" style="background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">上書き保存</button>'
     +'<button id="_memRst" style="background:#8B0000;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">記憶リセット</button>'
     +'<button id="_memCnl" style="background:#333;color:#aaa;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;">キャンセル</button>';
   document.body.appendChild(menu);
+  var r=anchorBtn.getBoundingClientRect();
+  var mw=menu.offsetWidth||180,mh=menu.offsetHeight||160;
+  var left=r.left-mw-10; // 基本はアンカー(記憶VIEWポップアップ)の左側に開く
+  if(left<4) left=Math.max(4,Math.min(r.left,window.innerWidth-mw-4));
+  var top=r.top+(r.height/2)-(mh/2);
+  top=Math.max(4,Math.min(top,window.innerHeight-mh-4));
+  menu.style.left=left+'px';
+  menu.style.top=top+'px';
+  menu.style.visibility='';
   function closeMenu(){if(document.getElementById('_memMenu'))menu.remove();}
   document.getElementById('_memOvr').onclick=function(){
     // V0_160: savedViewsはファイル横断のグローバル項目。上書き保存時も現在ファイルの

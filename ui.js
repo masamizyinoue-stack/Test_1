@@ -1,7 +1,7 @@
 // ui.js — UI状態管理関数
 // DXF Viewer V0_63
 // 依存グローバル: savedViews (var宣言)
-// DOM依存: snap-hint, undoBtn, redoBtn, .vbm(V1_231: .mem-btn/.show-btnから変更)
+// DOM依存: snap-hint, undoBtn, redoBtn, .vbm(V1_232: .mem-btn/.show-btnから変更)
 
 // =========================================================
 // ガイドメッセージ
@@ -26,7 +26,7 @@ function hideGuide(){
 // =========================================================
 // ビュー記憶ボタン状態更新
 // =========================================================
-// V1_231: 記憶/表示の2ボタン(.mem-btn/.show-btn)方式から、M_Viewer_V7.09仕様の
+// V1_232: 記憶/表示の2ボタン(.mem-btn/.show-btn)方式から、M_Viewer_V7.09仕様の
 // 1〜5単一ボタン(.vbm)方式へ変更。関数名・呼び出し箇所(storage.js等)は変更せず、
 // 内部の対象DOM/表示内容だけを新しいボタンに合わせて書き換えた
 function updateViewmemoState(i){
