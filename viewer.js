@@ -1580,15 +1580,27 @@ function extractAllExcelTexts(wb){
 // 現在のexcelWb/excelSheetIdxをもとに #excelView 内のシートタブ・テーブルを再構築する。
 // excelWbがnullの場合は#excelViewを隠しcanvasを元に戻すだけの役割も兼ねる
 // （PDF/DXF側に戻る際は excelWb=null にしてから本関数を呼ぶだけでよい）
-// V1_107: Excel/CSV表示中は#viewmemo内の記憶・表示ボタン(mem-btn/show-btn/vm-file)を隠す。
+// V1_107: Excel/CSV表示中はヘッダーの「記憶VIEW」「全体」ボタンを隠す。
 // V1_121: 「全体」ボタン(#fitBtn、DXF/PDFのズームを画面に合わせる機能)はExcel/CSVの
 // セル表示には適用できないため、Excel/CSV表示中は非表示にする（マーク送り自体は
 // DXF/PDFの文字読込マーク機能のため、そちらは従来通り対象外のまま変更しない）
+// V1_231: 記憶VIEW/全体ボタンがヘッダー(#vbmToggleBtn/#fitBtn)へ移動したのに合わせ、
+// 対象要素を変更。isExcel=falseの場合は_updateVbmFitBtnVisibility()に委ねる
+// (DXF/PDFのどちらを開いているか判定して表示・非表示を決める共通ロジックのため)
 function _updateViewmemoForExcel(isExcel){
-  var els=document.querySelectorAll('#viewmemo .mem-btn, #viewmemo .show-btn, #viewmemo .vm-file');
-  els.forEach(function(el){ el.style.display=isExcel?'none':''; });
+  var vb=document.getElementById('vbmToggleBtn');
   var fitBtn=document.getElementById('fitBtn');
-  if(fitBtn) fitBtn.style.display=isExcel?'none':'';
+  if(isExcel){
+    if(vb) vb.style.display='none';
+    if(fitBtn) fitBtn.style.display='none';
+    var pop=document.getElementById('vbmPop');
+    if(pop&&pop.classList.contains('on')){
+      pop.classList.remove('on');
+      if(typeof _vbmToggleBtnUI==='function') _vbmToggleBtnUI(false);
+    }
+  } else if(typeof _updateVbmFitBtnVisibility==='function'){
+    _updateVbmFitBtnVisibility();
+  }
 }
 // V1_110: 文字列が数値として扱えるか判定する（桁区切りカンマ許容）。
 // V1_111: ソート比較(_excelCompareVal)と集計行(件数・合計)の両方で共通利用するため関数化した
