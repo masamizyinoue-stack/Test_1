@@ -733,10 +733,20 @@ var _MEASURE_TOOL_ICON_INNER={
 // 残る仕様(_lastMeasureTool、V1_210)になっているため、アイコン側もcurrentToolが
 // 計測ツールでない場合はラベルと同じ基準(_lastMeasureTool)を参照するようにし、
 // 一度も計測ツールを使っていない場合にのみ定規アイコンへフォールバックする
+// V1_236: 「アプリ再起動時に計測ボタンが『未選択』のままなのに、アイコンは水・鉛など
+// 選択中ツールの形になっていて文字とアイコンが食い違う」との指摘への対応。原因は
+// storage.jsの復元処理(2箇所)がcurrentTool/_lastMeasureToolを復元した後、この関数を
+// 呼んでアイコンだけは同期していたが、#measureCurrentLabelのテキストは上のtool-btn
+// クリックハンドラ内(currentTool新規選択時のみ)でしか更新されず、復元時には一切
+// 呼ばれていなかったため、ラベルがHTML初期値の「未選択」のまま残っていた。
+// アイコンとラベルを同じ関数・同じ判定基準(currentTool→_lastMeasureToolの順で
+// フォールバック)でまとめて更新することで、以後どちらか一方だけが更新されて
+// 食い違う事態が起きないようにした
 function _syncMeasureToggleBtnIcon(){
   var el=document.getElementById('measureToolIcon');
-  if(!el) return;
-  el.innerHTML=_MEASURE_TOOL_ICON_INNER[currentTool]||_MEASURE_TOOL_ICON_INNER[_lastMeasureTool]||_MEASURE_RULER_ICON_INNER;
+  if(el) el.innerHTML=_MEASURE_TOOL_ICON_INNER[currentTool]||_MEASURE_TOOL_ICON_INNER[_lastMeasureTool]||_MEASURE_RULER_ICON_INNER;
+  var _mtLabel236=document.getElementById('measureCurrentLabel');
+  if(_mtLabel236) _mtLabel236.textContent=_MEASURE_TOOL_LABELS[currentTool]||_MEASURE_TOOL_LABELS[_lastMeasureTool]||'未選択';
 }
 document.querySelectorAll('.tool-btn').forEach(btn=>{
   btn.addEventListener('click',(e)=>{
