@@ -1358,7 +1358,7 @@ async function _pdfPageTextItems(page,viewport){
     });
     var arr=[];
     var cur=null;
-    // V1_233: 「画面検索でLG1が実際は1個しか無いのに4件ヒットする」不具合の修正。
+    // V1_234: 「画面検索でLG1が実際は1個しか無いのに4件ヒットする」不具合の修正。
     // 原因は、このPDFを出力したCAD側が文字を太く見せるため、同じ文字列を全く同じ
     // 位置に複数回(疑似太字。今回のデータでは4回)重ね描きしていたこと。pdf.jsの
     // getTextContent()は重ね描きされた分だけ別々のテキスト要素として返してくるため、
@@ -1602,7 +1602,7 @@ function extractAllExcelTexts(wb){
 // V1_121: 「全体」ボタン(#fitBtn、DXF/PDFのズームを画面に合わせる機能)はExcel/CSVの
 // セル表示には適用できないため、Excel/CSV表示中は非表示にする（マーク送り自体は
 // DXF/PDFの文字読込マーク機能のため、そちらは従来通り対象外のまま変更しない）
-// V1_233: 記憶VIEW/全体ボタンがヘッダー(#vbmToggleBtn/#fitBtn)へ移動したのに合わせ、
+// V1_234: 記憶VIEW/全体ボタンがヘッダー(#vbmToggleBtn/#fitBtn)へ移動したのに合わせ、
 // 対象要素を変更。isExcel=falseの場合は_updateVbmFitBtnVisibility()に委ねる
 // (DXF/PDFのどちらを開いているか判定して表示・非表示を決める共通ロジックのため)
 function _updateViewmemoForExcel(isExcel){

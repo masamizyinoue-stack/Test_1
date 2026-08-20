@@ -11,7 +11,7 @@ function _showMemMenu(idx,anchorBtn){
   if(existing){existing.remove();return;}
   var menu=document.createElement('div');
   menu.id='_memMenu';
-  // V1_233: 「メニューが画面からはみ出る・記憶VIEWボタンに被る」不具合の修正。
+  // V1_234: 「メニューが画面からはみ出る・記憶VIEWボタンに被る」不具合の修正。
   // アンカー(.vbm)は画面右端固定の記憶VIEWポップアップ(#vbmPop)内にあるため、旧来の
   // 「アンカーの下・少し左」という位置決めでは画面右端をはみ出し、かつポップアップ本体
   // とも重なっていた。実際のメニューサイズを計測した上で、常にアンカーの「左側」に
@@ -381,18 +381,62 @@ function _showIndexProfileListMenu(anchorEl){
 // 依存グローバル: cv, ctx, doc, hiddenLayers, tx, ty, scale, fitScale, pdfImage, images (viewer.js)
 // 依存関数: fit, draw (viewer.js)
 var _fileThumbCache201={};
+// V1_234: サムネイル(ctx)へ、そのページの寸法・挿入画像・手書きストローク(書き込み)を
+// ベース図面の上に重ねて描画する共通処理。呼び出し時点でグローバルのscale/tx/ty/dims/
+// images/strokes/pdfPageNumが、このサムネイルを描く対象のページの値になっている前提
+// (呼び出し元がfit();draw();の直後、またはそれに相当する設定を行った直後に呼ぶこと)。
+// draw()はctx.restore()で変形行列を単位行列に戻して終わるため、w2s()前提のdrawDimEntity/
+// 画像描画は自前でscale(dpr,dpr)を掛け直す。ストローク(drawAnnotation)は#ac同様CTM=identity
+// 前提のため、変形をかけ直さず(単位行列のまま)呼び出す
+function _drawWritingsOnThumb234(ctxTarget,dpr,curPg){
+  ctxTarget.save();ctxTarget.scale(dpr,dpr);
+  for(var _di=0;_di<dims.length;_di++){
+    var _d=dims[_di];
+    if((_d.page||1)!==curPg) continue;
+    try{ drawDimEntity(ctxTarget,_d); }catch(e){}
+  }
+  for(var _ii=0;_ii<images.length;_ii++){
+    var _im=images[_ii];
+    if((_im.page||1)!==curPg) continue;
+    try{ var _pw=w2s(_im.wx,_im.wy); ctxTarget.drawImage(_im.img,_pw[0],_pw[1],_im.ww*scale,_im.wh*scale); }catch(e){}
+  }
+  ctxTarget.restore();
+  if(typeof drawAnnotation==='function'){ try{ drawAnnotation(ctxTarget,null,true); }catch(e){} }
+}
 function _genPdfThumb201(f,W,H,cb){
   try{
     if(!f.pdfDoc){cb(null);return;}
     var pnum=f.pdfPageNum||1;
     f.pdfDoc.getPage(pnum).then(function(page){
-      var vp1=page.getViewport({scale:1});
-      var rs=Math.min(3,Math.max(0.1,(W*2)/vp1.width));
-      var vp=page.getViewport({scale:rs});
-      var c=document.createElement('canvas');
-      c.width=Math.round(vp.width);c.height=Math.round(vp.height);
-      return page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise.then(function(){
-        cb(c.toDataURL());
+      var vp=page.getViewport({scale:PDF_BASE_SCALE});
+      var offscreen=document.createElement('canvas');
+      offscreen.width=Math.round(vp.width);offscreen.height=Math.round(vp.height);
+      return page.render({canvasContext:offscreen.getContext('2d'),viewport:vp}).promise.then(function(){
+        // V1_234: 「PDFのプレビューにも書き込み(寸法・ストローク)を表示してほしい」への対応。
+        // 従来はpdf.jsの素のページ画像だけを描いていたが、DXFサムネイル(_genDxfThumb201)と
+        // 同様にcv/ctx/pdfImage等を一時的に差し替えてfit();draw();を呼ぶことで、実際の
+        // 画面表示(renderPdfPage)と同じ土俵でscale/tx/tyを算出し、その上にdims/images/
+        // strokesを重ね描きできるようにした
+        var dpr=window.devicePixelRatio||1;
+        var c=document.createElement('canvas');
+        c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);
+        var _svCv=cv,_svCtx=ctx,_svDoc=doc,_svHidden=hiddenLayers,_svPdfImg=pdfImage,_svImages=images;
+        var _svTx=tx,_svTy=ty,_svScale=scale,_svFit=fitScale;
+        var _svStrokes=strokes,_svDims=dims,_svPdfDoc=(typeof pdfDoc!=='undefined'?pdfDoc:undefined),_svPn=(typeof pdfPageNum!=='undefined'?pdfPageNum:undefined);
+        try{
+          cv=c;ctx=c.getContext('2d');
+          doc=null;hiddenLayers=new Set();
+          pdfImage={img:offscreen,wx:0,wy:vp.height/PDF_BASE_SCALE,ww:vp.width/PDF_BASE_SCALE,wh:vp.height/PDF_BASE_SCALE};
+          images=f.images||[];strokes=f.strokes||[];dims=f.dims||[];
+          pdfDoc=f.pdfDoc;pdfPageNum=pnum; // _curPage()がこのサムネイルのページ番号を返すようにする
+          fit();draw();
+          _drawWritingsOnThumb234(ctx,dpr,pnum);
+          cb(c.toDataURL());
+        }finally{
+          cv=_svCv;ctx=_svCtx;doc=_svDoc;hiddenLayers=_svHidden;pdfImage=_svPdfImg;images=_svImages;
+          tx=_svTx;ty=_svTy;scale=_svScale;fitScale=_svFit;
+          strokes=_svStrokes;dims=_svDims;pdfDoc=_svPdfDoc;pdfPageNum=_svPn;
+        }
       });
     }).catch(function(){cb(null);});
   }catch(e){cb(null);}
@@ -405,15 +449,19 @@ function _genDxfThumb201(f,W,H,cb){
     c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);
     var _svCv=cv,_svCtx=ctx,_svDoc=doc,_svHidden=hiddenLayers,_svPdfImg=pdfImage,_svImages=images;
     var _svTx=tx,_svTy=ty,_svScale=scale,_svFit=fitScale;
+    var _svStrokes=strokes,_svDims=dims; // V1_234: 書き込み(寸法・挿入画像・手書きストローク)もプレビューに反映する
     try{
       cv=c;ctx=c.getContext('2d');
       doc=f.doc;hiddenLayers=new Set(f.hiddenLayersArr||[]);
-      pdfImage=null;images=[];
+      pdfImage=null;
+      images=f.images||[];strokes=f.strokes||[];dims=f.dims||[];
       fit();draw();
+      _drawWritingsOnThumb234(ctx,dpr,1); // DXFは常に1ページ扱い
       cb(c.toDataURL());
     }finally{
       cv=_svCv;ctx=_svCtx;doc=_svDoc;hiddenLayers=_svHidden;pdfImage=_svPdfImg;images=_svImages;
       tx=_svTx;ty=_svTy;scale=_svScale;fitScale=_svFit;
+      strokes=_svStrokes;dims=_svDims;
     }
   }catch(e){cb(null);}
 }
