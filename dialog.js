@@ -11,7 +11,7 @@ function _showMemMenu(idx,anchorBtn){
   if(existing){existing.remove();return;}
   var menu=document.createElement('div');
   menu.id='_memMenu';
-  // V1_232: 「メニューが画面からはみ出る・記憶VIEWボタンに被る」不具合の修正。
+  // V1_233: 「メニューが画面からはみ出る・記憶VIEWボタンに被る」不具合の修正。
   // アンカー(.vbm)は画面右端固定の記憶VIEWポップアップ(#vbmPop)内にあるため、旧来の
   // 「アンカーの下・少し左」という位置決めでは画面右端をはみ出し、かつポップアップ本体
   // とも重なっていた。実際のメニューサイズを計測した上で、常にアンカーの「左側」に

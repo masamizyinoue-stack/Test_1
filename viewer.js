@@ -1358,8 +1358,26 @@ async function _pdfPageTextItems(page,viewport){
     });
     var arr=[];
     var cur=null;
+    // V1_233: 「画面検索でLG1が実際は1個しか無いのに4件ヒットする」不具合の修正。
+    // 原因は、このPDFを出力したCAD側が文字を太く見せるため、同じ文字列を全く同じ
+    // 位置に複数回(疑似太字。今回のデータでは4回)重ね描きしていたこと。pdf.jsの
+    // getTextContent()は重ね描きされた分だけ別々のテキスト要素として返してくるため、
+    // 単語結合(既存のsameH/sameAngle/sameRow/closeGap判定)を経てもなお、同じ単語が
+    // 座標まで完全に同じ状態で複数個arrに積まれ、画面検索・全図面検索のヒット件数が
+    // 実際の表示個数より多く数えられてしまっていた。単語を確定する直前に、直前に
+    // 確定済みの単語とテキスト・位置(x,y)・角度がほぼ完全に一致するかを調べ、一致
+    // すれば重ね描きとみなして追加しない(先に確定した1個だけを残す)ようにした
     function flush(){
-      if(cur) arr.push({text:cur.text,x:cur.x,y:cur.y,h:cur.h,angle:cur.angle,widthFactor:1});
+      if(cur){
+        var dup=false;
+        var last=arr[arr.length-1];
+        if(last&&last.text===cur.text){
+          var posTol=Math.max(cur.h,last.h,1)*0.2; // フォント高さの2割程度を同一位置とみなす許容誤差
+          var dAng=Math.abs(((cur.angle-last.angle)%360+540)%360-180);
+          if(Math.abs(cur.x-last.x)<posTol&&Math.abs(cur.y-last.y)<posTol&&dAng<3) dup=true;
+        }
+        if(!dup) arr.push({text:cur.text,x:cur.x,y:cur.y,h:cur.h,angle:cur.angle,widthFactor:1});
+      }
       cur=null;
     }
     raw.forEach(function(it){
@@ -1584,7 +1602,7 @@ function extractAllExcelTexts(wb){
 // V1_121: 「全体」ボタン(#fitBtn、DXF/PDFのズームを画面に合わせる機能)はExcel/CSVの
 // セル表示には適用できないため、Excel/CSV表示中は非表示にする（マーク送り自体は
 // DXF/PDFの文字読込マーク機能のため、そちらは従来通り対象外のまま変更しない）
-// V1_232: 記憶VIEW/全体ボタンがヘッダー(#vbmToggleBtn/#fitBtn)へ移動したのに合わせ、
+// V1_233: 記憶VIEW/全体ボタンがヘッダー(#vbmToggleBtn/#fitBtn)へ移動したのに合わせ、
 // 対象要素を変更。isExcel=falseの場合は_updateVbmFitBtnVisibility()に委ねる
 // (DXF/PDFのどちらを開いているか判定して表示・非表示を決める共通ロジックのため)
 function _updateViewmemoForExcel(isExcel){
