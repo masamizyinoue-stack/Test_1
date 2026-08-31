@@ -1093,7 +1093,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_01</span>
+    <span id="ver-label">V2_02</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1500,7 +1500,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
      もしDXFが開けない場合は直ちにV1_08（accept属性なし）へ戻すこと -->
 <!-- V1_173: 実寸法師(.tdf)読込対応のため、既存のaccept指定に".tdf"を追記した
      （前述の経緯により.dxf側の並び・application/octet-streamのフォールバックは変更していない） -->
-<input type="file" id="file" accept=".dxf,.tdf,application/octet-stream" hidden>
+<!-- V2_02: 複数選択して一括で開けるようmultipleを追加。accept属性・並び順は
+     上記iOS対応の経緯があるため一切変更していない -->
+<input type="file" id="file" accept=".dxf,.tdf,application/octet-stream" multiple hidden>
 <input type="file" id="folderInput" webkitdirectory accept=".dxf,.tdf" hidden>
 <!-- V1_112: 検索結果1件だけインデックスを更新するための単一ファイル選択用input -->
 <input type="file" id="singleReindexInput" accept=".dxf,.tdf,.pdf,.xlsx,.xls,.csv" hidden>
@@ -1510,27 +1512,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=201"></script>
-<script src="viewer.js?v=201"></script>
-<script src="utils.js?v=201"></script>
-<script src="ui.js?v=201"></script>
-<script src="dialog.js?v=201"></script>
-<script src="storage.js?v=201"></script>
-<script src="fonts/NotoSansJP.js?v=201"></script>
-<script src="export.js?v=201"></script>
-<script src="tool.js?v=201"></script>
-<script src="verify.js?v=201"></script>
+<script src="layer.js?v=202"></script>
+<script src="viewer.js?v=202"></script>
+<script src="utils.js?v=202"></script>
+<script src="ui.js?v=202"></script>
+<script src="dialog.js?v=202"></script>
+<script src="storage.js?v=202"></script>
+<script src="fonts/NotoSansJP.js?v=202"></script>
+<script src="export.js?v=202"></script>
+<script src="tool.js?v=202"></script>
+<script src="verify.js?v=202"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=201"></script>
-<script src="stroke-text.js?v=201"></script>
+<script src="shxGlyphs.js?v=202"></script>
+<script src="stroke-text.js?v=202"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=201"></script>
+<script src="pc.js?v=202"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=201"></script>
+<script src="supabase-sync.js?v=202"></script>
 <script>
-const APP_VERSION = 'V2_01';
+const APP_VERSION = 'V2_02';
 
 // =========================================================
 // グローバル状態
@@ -2072,8 +2074,13 @@ document.getElementById('screenGuideCloseBtn').addEventListener('click',()=>{
 // 上書きしてしまう競合状態(race condition)がありえた。ファイルを開いている間は
 // タブ切替・タブを閉じる操作をブロックする共通フラグを追加した
 var _isOpeningFileBusy=false;
-fileInput.addEventListener('change',async e=>{
-  const f=e.target.files[0];if(!f)return;
+// V2_02: 複数選択して一括で開く対応。1ファイル分の処理は従来のまま一切変更せず
+// _openOneFile202として関数化し、外側のchangeハンドラでファイル配列をループして
+// 順次(直列で)呼び出す方式にした。既存の重複チェック・busyフラグ・非同期処理・
+// タブ登録ロジックはこの関数の中に無変更のまま残っているため、単一ファイル選択時の
+// 挙動は完全に従来通りとなる
+async function _openOneFile202(f, e){
+  if(!f)return;
   // V0_148: 同名ファイルの二重オープン防止（気付かず2つ開いて別々に書き込む事故を防ぐ）
   // 状態を一切変更する前にチェックし、既に開いていればそのタブへ切り替えるだけ
   {var _dupIdx=openFiles.findIndex(function(x){return (x.currentFileName||x.name)===f.name;});
@@ -2218,6 +2225,19 @@ fileInput.addEventListener('change',async e=>{
   updateFileNavUI();// V0_112
   verify('fileInput.change:done');
   }finally{_isOpeningFileBusy=false;e.target.value='';} // V1_40
+}
+// V2_02: 複数ファイル選択時は_openOneFile202を1件ずつawaitして直列実行する。
+// 直列にすることで、既存のbusyフラグ・タブ登録処理が想定する「1件ずつ完了してから
+// 次を開始する」前提を崩さずに複数ファイルへ対応できる。ファイルの配列は
+// e.target.filesから最初にコピーしておくため、ループ途中で_openOneFile202が
+// e.target.value=''を呼んでも後続ファイルの読み込みには影響しない
+fileInput.addEventListener('change',async e=>{
+  const _files202=Array.from(e.target.files||[]);
+  if(_files202.length===0){e.target.value='';return;}
+  for(let _i202=0;_i202<_files202.length;_i202++){
+    if(_files202.length>1) showGuide('ファイルを開いています('+(_i202+1)+'/'+_files202.length+') '+_files202[_i202].name,1200);
+    await _openOneFile202(_files202[_i202], e);
+  }
 });
 
 // V0_93: マルチファイル管理 ─────────────────────────────────────
