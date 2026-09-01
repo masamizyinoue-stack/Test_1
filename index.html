@@ -1093,7 +1093,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_02</span>
+    <span id="ver-label">V2_03</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1512,27 +1512,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=202"></script>
-<script src="viewer.js?v=202"></script>
-<script src="utils.js?v=202"></script>
-<script src="ui.js?v=202"></script>
-<script src="dialog.js?v=202"></script>
-<script src="storage.js?v=202"></script>
-<script src="fonts/NotoSansJP.js?v=202"></script>
-<script src="export.js?v=202"></script>
-<script src="tool.js?v=202"></script>
-<script src="verify.js?v=202"></script>
+<script src="layer.js?v=203"></script>
+<script src="viewer.js?v=203"></script>
+<script src="utils.js?v=203"></script>
+<script src="ui.js?v=203"></script>
+<script src="dialog.js?v=203"></script>
+<script src="storage.js?v=203"></script>
+<script src="fonts/NotoSansJP.js?v=203"></script>
+<script src="export.js?v=203"></script>
+<script src="tool.js?v=203"></script>
+<script src="verify.js?v=203"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=202"></script>
-<script src="stroke-text.js?v=202"></script>
+<script src="shxGlyphs.js?v=203"></script>
+<script src="stroke-text.js?v=203"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=202"></script>
+<script src="pc.js?v=203"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=202"></script>
+<script src="supabase-sync.js?v=203"></script>
 <script>
-const APP_VERSION = 'V2_02';
+const APP_VERSION = 'V2_03';
 
 // =========================================================
 // グローバル状態
@@ -2079,7 +2079,18 @@ var _isOpeningFileBusy=false;
 // 順次(直列で)呼び出す方式にした。既存の重複チェック・busyフラグ・非同期処理・
 // タブ登録ロジックはこの関数の中に無変更のまま残っているため、単一ファイル選択時の
 // 挙動は完全に従来通りとなる
-async function _openOneFile202(f, e){
+// V2_03: 「複数ファイルを一括で開くと、タブ名と実際に表示される内容が食い違う」との
+// 報告への対応。原因として最も可能性が高いのは、複数ファイルをループで開く際、
+// 1件ごとの_openOneFile202呼び出しが完了するたび(finally節)に_isOpeningFileBusyが
+// 一旦falseに戻り、次のファイルの処理が始まるまでのわずかな間、タブクリック
+// (switchToFile)やタブを閉じる操作がガードされずに実行できてしまうこと。この隙に
+// タブを操作されると、まだ処理中の別ファイルを開く処理が「その時点でたまたま
+// アクティブだったタブ」に対して表示状態などを書き込んでしまい、タブと中身の対応が
+// 崩れる可能性がある。第3引数_busyManagedByCallerにtrueを渡すと、この関数自身は
+// _isOpeningFileBusyの開始/終了管理を行わず、外側(複数ファイル用のループ)が処理
+// 全体を通して一括管理する。単一ファイル選択時(省略時)は従来通りこの関数が自分で
+// busyを管理し、挙動は完全に無変更のまま
+async function _openOneFile202(f, e, _busyManagedByCaller){
   if(!f)return;
   // V0_148: 同名ファイルの二重オープン防止（気付かず2つ開いて別々に書き込む事故を防ぐ）
   // 状態を一切変更する前にチェックし、既に開いていればそのタブへ切り替えるだけ
@@ -2091,8 +2102,10 @@ async function _openOneFile202(f, e){
     e.target.value='';
     return;
   }}
-  if(_isOpeningFileBusy){e.target.value='';return;} // V1_40: 多重実行防止
-  _isOpeningFileBusy=true;
+  if(!_busyManagedByCaller){
+    if(_isOpeningFileBusy){e.target.value='';return;} // V1_40: 多重実行防止
+    _isOpeningFileBusy=true;
+  }
   try{
   verify('fileInput.change:start');
   resetToolStates(true); // V0_139: ファイル切替時に計測ツール状態をリセット / V1_234: 計測ツールは選択維持
@@ -2224,20 +2237,37 @@ async function _openOneFile202(f, e){
   if(typeof _diApplyStateFromFile==='function') _diApplyStateFromFile(); // V1_162: 新規に開いたファイルはインセット未設定(非表示)にする
   updateFileNavUI();// V0_112
   verify('fileInput.change:done');
-  }finally{_isOpeningFileBusy=false;e.target.value='';} // V1_40
+  }finally{ if(!_busyManagedByCaller){_isOpeningFileBusy=false;} e.target.value=''; } // V1_40 / V2_03
 }
 // V2_02: 複数ファイル選択時は_openOneFile202を1件ずつawaitして直列実行する。
 // 直列にすることで、既存のbusyフラグ・タブ登録処理が想定する「1件ずつ完了してから
 // 次を開始する」前提を崩さずに複数ファイルへ対応できる。ファイルの配列は
 // e.target.filesから最初にコピーしておくため、ループ途中で_openOneFile202が
 // e.target.value=''を呼んでも後続ファイルの読み込みには影響しない
+// V2_03: 2件以上選択した場合は、ループ全体を通して_isOpeningFileBusyをtrueに保つ
+// (_openOneFile202へbusyManagedByCaller=trueを渡し、内部での開始/終了管理をスキップさせる)。
+// これにより、複数ファイルを開いている間はタブクリック・タブを閉じる操作が最後まで
+// 無効化され、処理途中でタブ操作されることによる状態の食い違いを防ぐ。1件のみの
+// 選択時は従来通り_openOneFile202が自分でbusyを管理する(挙動は完全に無変更)
 fileInput.addEventListener('change',async e=>{
   const _files202=Array.from(e.target.files||[]);
   if(_files202.length===0){e.target.value='';return;}
-  for(let _i202=0;_i202<_files202.length;_i202++){
-    if(_files202.length>1) showGuide('ファイルを開いています('+(_i202+1)+'/'+_files202.length+') '+_files202[_i202].name,1200);
-    await _openOneFile202(_files202[_i202], e);
+  if(_files202.length===1){
+    await _openOneFile202(_files202[0], e);
+    return;
   }
+  if(_isOpeningFileBusy){e.target.value='';return;}
+  _isOpeningFileBusy=true;
+  try{
+    for(let _i202=0;_i202<_files202.length;_i202++){
+      showGuide('ファイルを開いています('+(_i202+1)+'/'+_files202.length+') '+_files202[_i202].name,1200);
+      // V2_03: 1件の読込失敗(想定外の例外)でループ全体が止まり、後続ファイルが
+      // 開かれなくなるのを防ぐ。DXF分岐が想定内で投げるエラーは従来通りalert()で
+      // 通知されるため、ここでは主にPDF/Excel分岐の未捕捉例外を想定した保険
+      try{ await _openOneFile202(_files202[_i202], e, true); }
+      catch(err202){ console.warn('[複数ファイルを開く] '+_files202[_i202].name+' の読込に失敗しました',err202); }
+    }
+  } finally { _isOpeningFileBusy=false; e.target.value=''; }
 });
 
 // V0_93: マルチファイル管理 ─────────────────────────────────────
