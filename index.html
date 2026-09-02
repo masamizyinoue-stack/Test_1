@@ -1093,7 +1093,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_03</span>
+    <span id="ver-label">V2_05</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1512,27 +1512,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=203"></script>
-<script src="viewer.js?v=203"></script>
-<script src="utils.js?v=203"></script>
-<script src="ui.js?v=203"></script>
-<script src="dialog.js?v=203"></script>
-<script src="storage.js?v=203"></script>
-<script src="fonts/NotoSansJP.js?v=203"></script>
-<script src="export.js?v=203"></script>
-<script src="tool.js?v=203"></script>
-<script src="verify.js?v=203"></script>
+<script src="layer.js?v=205"></script>
+<script src="viewer.js?v=205"></script>
+<script src="utils.js?v=205"></script>
+<script src="ui.js?v=205"></script>
+<script src="dialog.js?v=205"></script>
+<script src="storage.js?v=205"></script>
+<script src="fonts/NotoSansJP.js?v=205"></script>
+<script src="export.js?v=205"></script>
+<script src="tool.js?v=205"></script>
+<script src="verify.js?v=205"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=203"></script>
-<script src="stroke-text.js?v=203"></script>
+<script src="shxGlyphs.js?v=205"></script>
+<script src="stroke-text.js?v=205"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=203"></script>
+<script src="pc.js?v=205"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=203"></script>
+<script src="supabase-sync.js?v=205"></script>
 <script>
-const APP_VERSION = 'V2_03';
+const APP_VERSION = 'V2_05';
 
 // =========================================================
 // グローバル状態
@@ -2094,7 +2094,17 @@ async function _openOneFile202(f, e, _busyManagedByCaller){
   if(!f)return;
   // V0_148: 同名ファイルの二重オープン防止（気付かず2つ開いて別々に書き込む事故を防ぐ）
   // 状態を一切変更する前にチェックし、既に開いていればそのタブへ切り替えるだけ
-  {var _dupIdx=openFiles.findIndex(function(x){return (x.currentFileName||x.name)===f.name;});
+  // V2_04: 「複数選択で開くと、タブ名と実際の中身が食い違う」との再報告を受け調査した結果、
+  // 同名だが別工事の内容が違う図面(例:物件が違うだけの同じ部材符号のKBG-01.dxf)を、
+  // 1回の複数選択に含めて開いていたことが判明した。ユーザーへの確認の結果、「同じ
+  // ファイル名でもファイルサイズが違えば別タブとして開けるようにしてほしい」との要望
+  // だったため、同名判定を「ファイル名だけ」から「ファイル名とサイズの組み合わせ
+  // (fileKey)が完全に一致する場合のみ」に変更した。これにより、名前が同じでもサイズが
+  // 違う(=内容が異なる別ファイルとみなせる)場合は、この防止処理の対象から外れ、
+  // この後の共通処理で正しく新規タブとして登録される。名前・サイズとも完全に一致する
+  // 場合(=本当に同じファイルの重複オープン)は、従来通りブロックして既存タブへ切り替える
+  {var _fk148=_fileKey(f.name,f.size);
+  var _dupIdx=openFiles.findIndex(function(x){return x.fileKey===_fk148;});
   if(_dupIdx>=0){
     if(_dupIdx!==currentFileIdx) switchToFile(_dupIdx);
     document.body.classList.remove('settings-open');
@@ -2115,6 +2125,16 @@ async function _openOneFile202(f, e, _busyManagedByCaller){
   if(currentFileIdx>=0&&currentFileIdx<openFiles.length){var _pf140fi=openFiles[currentFileIdx];_pf140fi.tx=tx;_pf140fi.ty=ty;_pf140fi.scale=scale;_pf140fi.fitScale=fitScale;_pf140fi.hiddenLayersArr=Array.from(hiddenLayers);_pf140fi.pdfDoc=pdfDoc;_pf140fi.pdfImage=pdfImage;_pf140fi.pdfPageNum=(typeof pdfPageNum!=='undefined'?pdfPageNum:1);}
   currentFileName=f.name;
   const buf=await f.arrayBuffer();
+  // V2_05: 複数ファイルを一括で開くと、選んだファイルとは別のファイルの内容が
+  // 開かれてしまう(名前は正しいがdocの中身が別ファイルのものになる)との報告があった。
+  // 再現テストでは単純な直列処理では再現できておらず、原因はブラウザ側のFile読込の
+  // タイミングに起因する可能性が高いと判断し、確実に検出できるよう、読み込んだ
+  // バイナリの実サイズがFileオブジェクト自身が申告するサイズ(f.size)と一致するかを
+  // 検証する。既存の処理・表示は一切変更せず、不一致の場合のみ警告を出す
+  if(typeof buf!=='undefined'&&buf&&buf.byteLength!==f.size){
+    console.warn('[V2_05] ファイル読込サイズ不一致の疑い: '+f.name+' 期待='+f.size+'byte 実際='+buf.byteLength+'byte');
+    showGuide('「'+f.name+'」の読込中に不整合を検知しました。内容をご確認ください',4000);
+  }
   doc=null;pdfDoc=null;pdfImage=null;pdfMoji=[]; // V1_51
   excelWb=null;renderExcelView(); // V1_76: 前のタブがExcelだった場合の表示を先に隠す
   document.getElementById('pdfPageCtrl').style.display='none';
@@ -2261,6 +2281,12 @@ fileInput.addEventListener('change',async e=>{
   try{
     for(let _i202=0;_i202<_files202.length;_i202++){
       showGuide('ファイルを開いています('+(_i202+1)+'/'+_files202.length+') '+_files202[_i202].name,1200);
+      // V2_05: 「選んだ複数ファイルの中の、別のファイルの内容で開かれる」との報告を受け、
+      // 念のための安全策として、各ファイルの読込開始前に必ず1フレーム分待つ。
+      // これにより、前のファイルの読込・描画関連の非同期処理(rAF等)が確実に一段落
+      // してから次のファイルの読込(f.arrayBuffer())を開始するようにし、ブラウザ側の
+      // 内部状態が競合する余地を減らす
+      if(_i202>0) await new Promise(function(r){ if(typeof requestAnimationFrame==='function') requestAnimationFrame(function(){requestAnimationFrame(r);}); else setTimeout(r,16); });
       // V2_03: 1件の読込失敗(想定外の例外)でループ全体が止まり、後続ファイルが
       // 開かれなくなるのを防ぐ。DXF分岐が想定内で投げるエラーは従来通りalert()で
       // 通知されるため、ここでは主にPDF/Excel分岐の未捕捉例外を想定した保険
