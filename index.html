@@ -1093,7 +1093,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_05</span>
+    <span id="ver-label">V2_06</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1512,27 +1512,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=205"></script>
-<script src="viewer.js?v=205"></script>
-<script src="utils.js?v=205"></script>
-<script src="ui.js?v=205"></script>
-<script src="dialog.js?v=205"></script>
-<script src="storage.js?v=205"></script>
-<script src="fonts/NotoSansJP.js?v=205"></script>
-<script src="export.js?v=205"></script>
-<script src="tool.js?v=205"></script>
-<script src="verify.js?v=205"></script>
+<script src="layer.js?v=206"></script>
+<script src="viewer.js?v=206"></script>
+<script src="utils.js?v=206"></script>
+<script src="ui.js?v=206"></script>
+<script src="dialog.js?v=206"></script>
+<script src="storage.js?v=206"></script>
+<script src="fonts/NotoSansJP.js?v=206"></script>
+<script src="export.js?v=206"></script>
+<script src="tool.js?v=206"></script>
+<script src="verify.js?v=206"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=205"></script>
-<script src="stroke-text.js?v=205"></script>
+<script src="shxGlyphs.js?v=206"></script>
+<script src="stroke-text.js?v=206"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=205"></script>
+<script src="pc.js?v=206"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=205"></script>
+<script src="supabase-sync.js?v=206"></script>
 <script>
-const APP_VERSION = 'V2_05';
+const APP_VERSION = 'V2_06';
 
 // =========================================================
 // グローバル状態
@@ -2278,6 +2278,22 @@ fileInput.addEventListener('change',async e=>{
   }
   if(_isOpeningFileBusy){e.target.value='';return;}
   _isOpeningFileBusy=true;
+  // V2_06: 「Nを開くと、直前に開いたN-1のタブ名がNに書き換わる」という規則的な
+  // 症状から根本原因を特定した。scheduleSave()はclearTimeout+setTimeout(doSave,800)
+  // による800ms遅延のデバウンス保存で、doSave()内には
+  // 「openFiles[currentFileIdx].currentFileName = (グローバル変数)currentFileName」
+  // という同期処理がある(storage.js)。複数ファイルを連続して開く途中、あるファイルの
+  // オープン時にセットされた800ms後の保存タイマーが、次のファイルの読込中
+  // (=currentFileIdxはまだ前のファイルのタブを指しているが、currentFileNameは既に
+  // 次のファイルの名前に変わっている、というズレが生じる一瞬)に発火してしまうと、
+  // doSave()が前のファイルのタブへ次のファイルの名前を誤って書き込んでしまう。
+  // これが「直前のタブ名が次に開いたファイル名に変わる」現象の正体だった。
+  // 対策として、複数ファイルを連続オープンしている間はscheduleSave自体を一時的に
+  // no-op化し、doSave()がこの区間で実行されないようにする。storage.js自体は
+  // 一切変更せず、全ファイルの処理が完了した後にscheduleSaveを元に戻し、最後に
+  // 一度だけ呼んで最終状態を正しく保存する
+  var _origScheduleSave206=window.scheduleSave;
+  window.scheduleSave=function(){};
   try{
     for(let _i202=0;_i202<_files202.length;_i202++){
       showGuide('ファイルを開いています('+(_i202+1)+'/'+_files202.length+') '+_files202[_i202].name,1200);
@@ -2293,7 +2309,11 @@ fileInput.addEventListener('change',async e=>{
       try{ await _openOneFile202(_files202[_i202], e, true); }
       catch(err202){ console.warn('[複数ファイルを開く] '+_files202[_i202].name+' の読込に失敗しました',err202); }
     }
-  } finally { _isOpeningFileBusy=false; e.target.value=''; }
+  } finally {
+    window.scheduleSave=_origScheduleSave206;
+    _isOpeningFileBusy=false; e.target.value='';
+    scheduleSave(); // V2_06: 抑制していた間の保存を、最終状態でまとめて1回実行する
+  }
 });
 
 // V0_93: マルチファイル管理 ─────────────────────────────────────
