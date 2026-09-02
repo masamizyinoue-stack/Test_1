@@ -1093,7 +1093,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_10</span>
+    <span id="ver-label">V2_15</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1512,27 +1512,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=210"></script>
-<script src="viewer.js?v=210"></script>
-<script src="utils.js?v=210"></script>
-<script src="ui.js?v=210"></script>
-<script src="dialog.js?v=210"></script>
-<script src="storage.js?v=210"></script>
-<script src="fonts/NotoSansJP.js?v=210"></script>
-<script src="export.js?v=210"></script>
-<script src="tool.js?v=210"></script>
-<script src="verify.js?v=210"></script>
+<script src="layer.js?v=215"></script>
+<script src="viewer.js?v=215"></script>
+<script src="utils.js?v=215"></script>
+<script src="ui.js?v=215"></script>
+<script src="dialog.js?v=215"></script>
+<script src="storage.js?v=215"></script>
+<script src="fonts/NotoSansJP.js?v=215"></script>
+<script src="export.js?v=215"></script>
+<script src="tool.js?v=215"></script>
+<script src="verify.js?v=215"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=210"></script>
-<script src="stroke-text.js?v=210"></script>
+<script src="shxGlyphs.js?v=215"></script>
+<script src="stroke-text.js?v=215"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=210"></script>
+<script src="pc.js?v=215"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=210"></script>
+<script src="supabase-sync.js?v=215"></script>
 <script>
-const APP_VERSION = 'V2_10';
+const APP_VERSION = 'V2_15';
 
 // =========================================================
 // グローバル状態
@@ -4675,26 +4675,49 @@ function drawLPSnapMarker(ctx2,sx,sy,type){
 }
 
 // ─ 寸法構築 ─────────────────────────────────────────
+// V2_12: 「2線間」(buildLLDim)と表現をそろえるため、「線と点」の寸法線・補助線の
+// 構築方法を変更した。footは常にptからlineへの実際の垂線の足(pArrowに依存しない)。
+// V2_15: 数値ラベルの位置だけpArrowに応じてスライドするようにした。
+// V2_15: V2_12/V2_15では寸法線自体(foot-pt)を固定していたが、ユーザーから
+// 「寸法線・数値を左右(line方向)に動かしたい」との要望を受けた。距離の値は常に
+// 実際の垂線の長さ(footとptから計算、pArrowに依存しない)を保ったまま、表示上の
+// 寸法線の位置(d1,d2)は、pArrowをline方向に投影したoffset分だけ、foot・ptの両方を
+// line方向へ平行移動して決める。pt側の補助線は、offsetがほぼゼロ(=pArrowが実質pt付近を
+// 指している、添付画像のケース)なら不要とし、pt自体から離れた位置に寸法線を
+// 動かした場合にのみ、pt自身から補助線を追加する。
+// V2_15: line側の補助線判定を、実際のfoot(pArrowに依存しない、常に同じ)基準から、
+// オフセット後の表示位置(d1)がlineの範囲内かどうかの基準に変更。footが元々line範囲内
+// でも、寸法線をline方向へスライドさせてd1がlineの端点を超えたら、はみ出した側の
+// 端点からd1まで補助線を出す(2線間=buildLLDimと同じ考え方)。
 function buildLinePtDim(line,pt,pArrow){
   var sd=parseFloat(document.getElementById('scaleDenom').value)||1;
   var dx=line.x2-line.x1,dy=line.y2-line.y1;
   var lineLen=Math.hypot(dx,dy);
   if(lineLen<1e-9) return null;
   var lux=dx/lineLen,luy=dy/lineLen;
-  var foot=computeFoot(line,pt);
+  var t=((pt.x-line.x1)*dx+(pt.y-line.y1)*dy)/(lineLen*lineLen);
+  var foot={x:line.x1+t*dx,y:line.y1+t*dy};
   var perpX=pt.x-foot.x,perpY=pt.y-foot.y;
-  var dist=Math.hypot(perpX,perpY);
+  var dist=Math.hypot(perpX,perpY); // 実際の垂直距離(常にこの値を表示する)
   if(dist<1e-9) return null;
   var ux=perpX/dist,uy=perpY/dist;
+  var TOLR=1e-6;
   var offset=(pArrow.x-foot.x)*lux+(pArrow.y-foot.y)*luy;
-  var d1={x:foot.x+lux*offset,y:foot.y+luy*offset};
-  var d2={x:pt.x  +lux*offset,y:pt.y  +luy*offset};
-  var ext=8/scale,sig=offset>=0?1:-1;
-  var lines=[
-    {x1:foot.x,y1:foot.y,x2:d1.x+lux*sig*ext,y2:d1.y+luy*sig*ext},
-    {x1:pt.x,  y1:pt.y,  x2:d2.x+lux*sig*ext,y2:d2.y+luy*sig*ext},
-    {x1:d1.x,  y1:d1.y,  x2:d2.x,             y2:d2.y}
-  ];
+  var d1={x:foot.x+lux*offset,y:foot.y+luy*offset}; // 表示上の寸法線位置(line側)
+  var d2={x:pt.x  +lux*offset,y:pt.y  +luy*offset}; // 表示上の寸法線位置(pt側)
+  var lines=[{x1:d1.x,y1:d1.y,x2:d2.x,y2:d2.y}]; // 寸法線本体
+  // line側: オフセット後の表示位置d1がlineの範囲内かどうかで判定(V2_15)。
+  // 範囲外ならはみ出した側の端点からd1まで補助線を伸ばす
+  var tOff=t+offset/lineLen;
+  if(tOff<-TOLR||tOff>1+TOLR){
+    var end=(tOff<0)?{x:line.x1,y:line.y1}:{x:line.x2,y:line.y2};
+    lines.push({x1:end.x,y1:end.y,x2:d1.x,y2:d1.y});
+  }
+  // pt側: offsetがほぼゼロ(寸法位置が点の位置にある)なら補助線なし。
+  // 点を左右に動かした場合のみ、pt自体からd2まで補助線を足す
+  if(Math.abs(offset)>TOLR){
+    lines.push({x1:pt.x,y1:pt.y,x2:d2.x,y2:d2.y});
+  }
   var screenAng=Math.atan2(-uy,ux);
   var arrows=[
     {x:d1.x,y:d1.y,angle:screenAng+Math.PI},
@@ -4995,25 +5018,24 @@ function buildLLDim(line1,line2,pArrow){
   var foot2={x:foot1.x+nx*offN,y:foot1.y+ny*offN};
   // foot2が実際のline2の範囲内にあるかどうかを、line2のローカル座標で判定
   var t2=((foot2.x-line2.x1)*dx2+(foot2.y-line2.y1)*dy2)/(len2*len2);
-  var ext=8/scale,TOLR=1e-6;
+  var TOLR=1e-6;
   var lines=[{x1:foot1.x,y1:foot1.y,x2:foot2.x,y2:foot2.y}]; // 寸法線本体
   // line1側: 範囲内なら補助線なし。範囲外(延長線上)なら、はみ出した側の端点から
   // 補助線を伸ばす（範囲外の判定はクランプ前のt1rawで行う）。
-  // V2_10: 「端点→foot1(line1自身の延長線上、常に元の線と同じ角度)」と
-  // 「foot1→寸法線を少し超えた位置(短い橋渡し)」の2区間に分けて描画する
+  // V2_10: 「端点→foot1(line1自身の延長線上、常に元の線と同じ角度)」までとし、
+  // V2_11: 矢印(寸法線の端)から先へ余計に飛び出す見た目になるとの指摘を受け、
+  // 「寸法線を少し超えた位置までの短い橋渡し」は廃止し、foot1でぴったり止める
   if(t1raw<-TOLR||t1raw>1+TOLR){
     var end1=(t1raw<0)?{x:line1.x1,y:line1.y1}:{x:line1.x2,y:line1.y2};
     lines.push({x1:end1.x,y1:end1.y,x2:foot1.x,y2:foot1.y});
-    lines.push({x1:foot1.x,y1:foot1.y,x2:foot1.x-nx*sig*ext,y2:foot1.y-ny*sig*ext});
   }
   // line2側も同様に、独立して判定する。foot2b(line2自身の延長線上でfoot2に対応する
-  // 点)を経由させることで、line2の傾きに沿った自然な部分と、寸法線への短い接続部分
-  // (line1・line2のわずかな傾き差の分だけ)を分離する
+  // 点)を経由させることで、line2の傾きに沿った自然な部分だけを描画し、foot2b付近で
+  // ぴったり止める(V2_11: 寸法線を超える飛び出しは廃止)
   if(t2<-TOLR||t2>1+TOLR){
     var end2=(t2<0)?{x:line2.x1,y:line2.y1}:{x:line2.x2,y:line2.y2};
     var foot2b={x:line2.x1+t2*dx2,y:line2.y1+t2*dy2};
     lines.push({x1:end2.x,y1:end2.y,x2:foot2b.x,y2:foot2b.y});
-    lines.push({x1:foot2b.x,y1:foot2b.y,x2:foot2.x+nx*sig*ext,y2:foot2.y+ny*sig*ext});
   }
   var screenAng=Math.atan2(-ny*sig,nx*sig); // foot1→foot2方向(=寸法線方向)の角度
   var arrows=[
