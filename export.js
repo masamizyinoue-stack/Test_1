@@ -825,6 +825,69 @@ async function exportDxfviewManualBatch183(indices){
 }
 
 // =========================================================
+// V2_23: 全書込みデータ一括バックアップ(設定パネル)
+// dxfViewerDxfviewDB(dv)に保存されている全レコード(タブを閉じて既にopenFilesに
+// 存在しないファイルの分も含む)をまとめて1つのZIPに書き出す。既存のヘッダー
+// 「バックアップ」ボタン/複数選択一括バックアップ(exportDxfviewManualBatch183)は
+// いずれも「現在タブとして開いているファイル」のみが対象で、既に閉じてしまった
+// ファイルの書込みまでは保護できなかったための追加。
+// dvストアはreadonlyでgetAll()するだけで、既存の保存・復元処理には一切触れない。
+// 元DXF/PDF本体は含めない(容量が大きくなりすぎるため。本体はiPad「ファイル」App側に
+// 別途あるので、書込み履歴だけ保護すれば十分という前提)。
+// =========================================================
+async function exportAllDvBackup223(){
+  try{
+    if(typeof JSZip==='undefined'){
+      if(typeof showGuide==='function') showGuide('ZIP機能が読み込まれていません',2000);
+      return;
+    }
+    var recs=await new Promise(function(resolve){
+      try{
+        var r=indexedDB.open('dxfViewerDxfviewDB',1);
+        r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dv')) e.target.result.createObjectStore('dv',{keyPath:'fk'}); };
+        r.onsuccess=function(e){
+          try{
+            var db=e.target.result;
+            if(!db.objectStoreNames.contains('dv')){ resolve([]); return; }
+            var tx=db.transaction('dv','readonly');
+            var gr=tx.objectStore('dv').getAll();
+            gr.onsuccess=function(){resolve(gr.result||[]);};
+            gr.onerror=function(){resolve([]);};
+          }catch(er){resolve([]);}
+        };
+        r.onerror=function(){resolve([]);};
+      }catch(e){resolve([]);}
+    });
+    if(!recs||recs.length===0){
+      if(typeof showGuide==='function') showGuide('保存されている書込みデータがありません',2000);
+      return;
+    }
+    var zip223=new JSZip();
+    var usedNames223={};
+    recs.forEach(function(rec){
+      var base223=String(rec.fileName||rec.fk||'file').replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|]/g,'_');
+      var name223=base223+'.dxfview';
+      var n223=usedNames223[base223];
+      if(n223){ usedNames223[base223]=n223+1; name223=base223+'_'+(n223+1)+'.dxfview'; }
+      else usedNames223[base223]=1;
+      var payload223=Object.assign({},rec,{appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),exportedAt:new Date().toISOString()});
+      zip223.file(name223, JSON.stringify(payload223));
+    });
+    if(typeof showGuide==='function') showGuide('ZIP作成中…('+recs.length+'件)',2000);
+    var blob223=await zip223.generateAsync({type:'blob'});
+    var dateStr223=new Date().toISOString().slice(0,10).replace(/-/g,'');
+    var fname223='全書込みデータ_'+recs.length+'件_'+dateStr223+'.zip';
+    await _saveBlobWithFallback183(blob223, fname223, '全書込みデータ(ZIP)');
+    if(typeof showGuide==='function') showGuide('全書込みデータをZIPに保存しました('+recs.length+'件)',2500);
+  }catch(e){
+    console.warn('[all dv backup] failed',e);
+    if(typeof showGuide==='function') showGuide('一括バックアップに失敗しました',2000);
+  }
+}
+{var _allDvBtn223=document.getElementById('allDvBackupBtn');
+if(_allDvBtn223) _allDvBtn223.addEventListener('click',exportAllDvBackup223);}
+
+// =========================================================
 // V0_136: バックアップ復元（設定パネルボタン、旧名称:書込復元）
 // .dxfview ファイルを選択して strokes / dims / savedViews / hiddenLayers を復元
 // V1_176: 元DXFと.dxfviewをまとめたZIP(V1_176以降のバックアップ)にも対応。
