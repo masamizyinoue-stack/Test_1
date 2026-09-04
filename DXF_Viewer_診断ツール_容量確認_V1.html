@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DXF Viewer 容量診断ツール</title>
+<style>
+  body{font-family:-apple-system,sans-serif;background:#0d1117;color:#e6edf3;padding:16px;margin:0;}
+  h1{font-size:18px;color:#00d4ff;margin:0 0 4px;}
+  .sub{font-size:12px;color:#8b949e;margin-bottom:16px;}
+  .card{background:#161c26;border:1px solid #2a3a4a;border-radius:10px;padding:14px;margin-bottom:12px;}
+  .card h2{font-size:14px;margin:0 0 8px;color:#fff;}
+  .row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+  .row:last-child{border-bottom:none;}
+  .row .lbl{color:#bcd6e0;}
+  .row .val{font-weight:700;color:#00d4ff;font-variant-numeric:tabular-nums;}
+  .row .val.warn{color:#ffb347;}
+  .row .val.bad{color:#ff6b6b;}
+  .total{font-size:16px;font-weight:800;color:#fff;text-align:right;margin-top:6px;padding-top:8px;border-top:1px solid #2a3a4a;}
+  .total .val{color:#00ff7f;}
+  button{background:#00a8d4;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;}
+  button:active{background:#0088ac;}
+  #status{font-size:12px;color:#8b949e;margin-top:10px;white-space:pre-wrap;}
+  .note{font-size:11px;color:#8b949e;line-height:1.6;margin-top:16px;}
+</style>
+</head>
+<body>
+<h1>DXF Viewer 容量診断ツール</h1>
+<div class="sub">このページを開いているURL(オリジン)のIndexedDB/localStorageの使用状況を確認します。<br>DXF Viewer本体には一切変更を加えません(読み取りのみ)。</div>
+
+<button id="runBtn">診断を実行</button>
+<div id="status">「診断を実行」を押してください。</div>
+
+<div id="result"></div>
+
+<div class="note">
+確認対象: dxfViewerFilesDB(ファイル本体) / dxfViewerDxfviewDB(書込み履歴) / dxfViewerBackupDB(自動バックアップ世代) / dxfViewerDB(検索インデックス) / dxfViewerSettingsDB(設定) / localStorage<br>
+※ このページと同じオリジン(URL)のデータのみ見えます。テスト用アプリのデータを見たい場合は、テスト用アプリと同じ場所にこのファイルを置いてそのURLで開いてください。
+</div>
+
+<script>
+function fmtBytes(n){
+  if(n<1024) return n+' B';
+  if(n<1024*1024) return (n/1024).toFixed(1)+' KB';
+  return (n/1024/1024).toFixed(2)+' MB';
+}
+
+// 値の概算バイト数を計算(ArrayBuffer/Blob/文字列/オブジェクトを想定)
+function approxSize(val){
+  try{
+    if(val==null) return 0;
+    if(val instanceof ArrayBuffer) return val.byteLength;
+    if(ArrayBuffer.isView(val)) return val.byteLength;
+    if(val instanceof Blob) return val.size;
+    if(typeof val==='string') return val.length*2;
+    // オブジェクト内のArrayBuffer/Blobフィールドも拾う(bufプロパティ等)
+    var total=0;
+    if(typeof val==='object'){
+      for(var k in val){
+        if(!Object.prototype.hasOwnProperty.call(val,k)) continue;
+        var v=val[k];
+        if(v instanceof ArrayBuffer) total+=v.byteLength;
+        else if(ArrayBuffer.isView(v)) total+=v.byteLength;
+        else if(v instanceof Blob) total+=v.size;
+      }
+    }
+    // フォールバック: JSON化できる部分だけ文字数で概算(ArrayBuffer等は除外されるため
+    // 上のtotalに加算。JSON.stringifyがArrayBufferを無視/失敗する場合はcatchで0扱い)
+    try{
+      var s=JSON.stringify(val,function(k,v){
+        if(v instanceof ArrayBuffer||ArrayBuffer.isView(v)) return undefined;
+        return v;
+      });
+      if(s) total+=s.length;
+    }catch(e){}
+    return total;
+  }catch(e){ return 0; }
+}
+
+function openDb(name){
+  return new Promise(function(resolve){
+    try{
+      var req=indexedDB.open(name);
+      req.onsuccess=function(e){resolve({ok:true,db:e.target.result})};
+      req.onerror=function(){resolve({ok:false,reason:'open失敗(DB自体が存在しない可能性)'})};
+      req.onupgradeneeded=function(e){
+        // 存在しないDBを開こうとすると新規作成されてしまうため、
+        // その場合は「元々存在しなかった」とみなして空扱いにする
+        e.target.transaction.abort();
+      };
+      req.onblocked=function(){resolve({ok:false,reason:'開けません(他タブで使用中?)'})};
+    }catch(e){resolve({ok:false,reason:String(e)})}
+  });
+}
+
+function scanStore(db,storeName){
+  return new Promise(function(resolve){
+    try{
+      if(!db.objectStoreNames.contains(storeName)){resolve({exists:false,count:0,bytes:0});return;}
+      var tx=db.transaction(storeName,'readonly');
+      var store=tx.objectStore(storeName);
+      var countReq=store.count();
+      var count=0,bytes=0;
+      countReq.onsuccess=function(){count=countReq.result;};
+      var cursorReq=store.openCursor();
+      cursorReq.onsuccess=function(e){
+        var cursor=e.target.result;
+        if(cursor){
+          bytes+=approxSize(cursor.value);
+          cursor.continue();
+        }
+      };
+      tx.oncomplete=function(){resolve({exists:true,count:count,bytes:bytes});};
+      tx.onerror=function(){resolve({exists:true,count:count,bytes:bytes,error:true});};
+    }catch(e){resolve({exists:false,count:0,bytes:0,error:String(e)});}
+  });
+}
+
+async function scanDb(name,stores){
+  var r=await openDb(name);
+  if(!r.ok) return {name:name,ok:false,reason:r.reason,stores:{}};
+  var out={name:name,ok:true,stores:{}};
+  for(var i=0;i<stores.length;i++){
+    out.stores[stores[i]]=await scanStore(r.db,stores[i]);
+  }
+  try{r.db.close();}catch(e){}
+  return out;
+}
+
+function localStorageInfo(){
+  var items=[],total=0;
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    var v=localStorage.getItem(k)||'';
+    var bytes=(k.length+v.length)*2;
+    total+=bytes;
+    items.push({key:k,bytes:bytes});
+  }
+  items.sort(function(a,b){return b.bytes-a.bytes;});
+  return {items:items,total:total};
+}
+
+document.getElementById('runBtn').addEventListener('click',async function(){
+  var statusEl=document.getElementById('status');
+  var resultEl=document.getElementById('result');
+  resultEl.innerHTML='';
+  statusEl.textContent='診断中です、しばらくお待ちください…(件数が多いと数秒かかります)';
+
+  var targets=[
+    {name:'dxfViewerFilesDB',label:'ファイル本体(dxfFiles)',stores:['dxfFiles']},
+    {name:'dxfViewerDxfviewDB',label:'書込み履歴(dv)',stores:['dv']},
+    {name:'dxfViewerBackupDB',label:'自動バックアップ世代(backups)',stores:['backups']},
+    {name:'dxfViewerDB',label:'検索インデックス(dxfIndex系)',stores:['dxfIndex','dxfIndexProfiles','dxfIndexProfileRecords']},
+    {name:'dxfViewerSettingsDB',label:'設定(s)',stores:['s']}
+  ];
+
+  var grandTotal=0;
+  for(var t of targets){
+    var r=await scanDb(t.name,t.stores);
+    var card=document.createElement('div');
+    card.className='card';
+    var html='<h2>'+t.label+' <span style="color:#8b949e;font-weight:400;font-size:11px">('+t.name+')</span></h2>';
+    if(!r.ok){
+      html+='<div class="row"><span class="lbl">状態</span><span class="val">未作成 / アクセス不可</span></div>';
+    }else{
+      var dbTotal=0;
+      for(var sn in r.stores){
+        var s=r.stores[sn];
+        if(!s.exists){
+          html+='<div class="row"><span class="lbl">'+sn+'</span><span class="val">(ストアなし)</span></div>';
+          continue;
+        }
+        dbTotal+=s.bytes;
+        var cls=s.bytes>5*1024*1024?'bad':(s.bytes>1*1024*1024?'warn':'');
+        html+='<div class="row"><span class="lbl">'+sn+' : '+s.count+'件</span><span class="val '+cls+'">'+fmtBytes(s.bytes)+'</span></div>';
+      }
+      grandTotal+=dbTotal;
+      html+='<div class="total">小計 <span class="val">'+fmtBytes(dbTotal)+'</span></div>';
+    }
+    card.innerHTML=html;
+    resultEl.appendChild(card);
+  }
+
+  // localStorage
+  var ls=localStorageInfo();
+  var lsCard=document.createElement('div');
+  lsCard.className='card';
+  var lsHtml='<h2>localStorage</h2>';
+  ls.items.forEach(function(it){
+    lsHtml+='<div class="row"><span class="lbl">'+it.key+'</span><span class="val">'+fmtBytes(it.bytes)+'</span></div>';
+  });
+  lsHtml+='<div class="total">小計 <span class="val">'+fmtBytes(ls.total)+'</span></div>';
+  lsCard.innerHTML=lsHtml;
+  resultEl.appendChild(lsCard);
+  grandTotal+=ls.total;
+
+  var grandCard=document.createElement('div');
+  grandCard.className='card';
+  grandCard.innerHTML='<div class="total" style="font-size:20px">合計 <span class="val">'+fmtBytes(grandTotal)+'</span></div>';
+  resultEl.appendChild(grandCard);
+
+  statusEl.textContent='診断完了。オリジン: '+location.origin+location.pathname;
+});
+</script>
+</body>
+</html>
