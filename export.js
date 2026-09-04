@@ -866,17 +866,24 @@ async function exportAllDvBackup223(){
     var usedNames223={};
     recs.forEach(function(rec){
       var base223=String(rec.fileName||rec.fk||'file').replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|]/g,'_');
-      var name223=base223+'.dxfview';
-      var n223=usedNames223[base223];
-      if(n223){ usedNames223[base223]=n223+1; name223=base223+'_'+(n223+1)+'.dxfview'; }
-      else usedNames223[base223]=1;
+      // V2_25: 「ファイル名_サイズ(KB整数)」形式に変更(例:1C-03(X4Y1)_915.dxfview)。
+      // fileSizeはバイト単位で保存されているため1024で割って整数に丸める
+      var sizeKB225=Math.round((rec.fileSize||0)/1024);
+      var baseWithSize225=base223+'_'+sizeKB225;
+      var name223=baseWithSize225+'.dxfview';
+      var n223=usedNames223[baseWithSize225];
+      if(n223){ usedNames223[baseWithSize225]=n223+1; name223=baseWithSize225+'_'+(n223+1)+'.dxfview'; }
+      else usedNames223[baseWithSize225]=1;
       var payload223=Object.assign({},rec,{appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),exportedAt:new Date().toISOString()});
       zip223.file(name223, JSON.stringify(payload223));
     });
     if(typeof showGuide==='function') showGuide('ZIP作成中…('+recs.length+'件)',2000);
     var blob223=await zip223.generateAsync({type:'blob'});
-    var dateStr223=new Date().toISOString().slice(0,10).replace(/-/g,'');
-    var fname223='全書込みデータ_'+recs.length+'件_'+dateStr223+'.zip';
+    // V2_25: ZIPファイル名を「YYMMDD_全書込みデータ_N件」形式に変更(例:260904_全書込みデータ_283件)。
+    // 西暦は下2桁から始める
+    var d225=new Date();
+    var dateStr223=String(d225.getFullYear()).slice(-2)+String(d225.getMonth()+1).padStart(2,'0')+String(d225.getDate()).padStart(2,'0');
+    var fname223=dateStr223+'_全書込みデータ_'+recs.length+'件.zip';
     await _saveBlobWithFallback183(blob223, fname223, '全書込みデータ(ZIP)');
     if(typeof showGuide==='function') showGuide('全書込みデータをZIPに保存しました('+recs.length+'件)',2500);
   }catch(e){
