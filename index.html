@@ -918,15 +918,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <span class="tb-tool-label">HD-PDF書出</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 </button>
-  <!-- V2_30: 従来のヘッダー「バックアップ」(writeBackupBtn、現在開いている1ファイル分
-       のみが対象)は廃止。代わりに設定パネルにあった「全書込みデータの一括バックアップ」
-       (タブを閉じたファイルも含む全書込み履歴が対象、id="allDvBackupBtn"の機能)を
-       ここへ移動し「全書込バックアップ」に改名した。全ファイル対象のグローバル機能の
-       ため、ファイルを開いているかどうかに関わらず常時表示する -->
-  <button class="tb-btn" id="allDvBackupBtn" title="タブを閉じたファイルも含め、この端末に保存されている全ての書込み履歴をまとめてZIPに書き出します（元DXF/PDF本体は含まれません）" style="border:2px solid #fff">
-  <span class="tb-tool-label">全バックアップ</span>
+  <!-- V2_34: 「現在開いている1ファイルだけ」を対象にしたバックアップ(旧writeBackupBtn
+       と同じ機能=exportDxfviewManual)を、ヘッダーに復活させたいとの依頼への対応。
+       表示条件も旧writeBackupBtnと同じ(DXF/PDFを開いている時のみ、_updateWriteBackupBtnVisibility
+       /viewer.jsのExcel非表示処理の対象をこのidに変更して復活させた) -->
+  <button class="tb-btn" id="fileBackupBtn234" title="現在開いているファイルの本体データと書込みデータを1つのZIPにまとめてバックアップ保存" style="border:2px solid #fff">
+  <span class="tb-tool-label">ファイル<br>Backup</span>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
 </button>
+  <!-- V2_35: 「全書込Backup」(id="allDvBackupBtn")は設定パネル(開発者用ボタンの
+       上)へ移動したため、ここからは削除 -->
   <!-- V1_238: 「計算機ボタンをヘッダーの一番右に配置移動して。また、移動すると左が
        『バックアップ』ボタンになりますが、この間に仕切りを入れて間隔をあけて」との
        依頼への対応。計算機ボタン自体は元の位置(検索群の手前)から移動しただけで、
@@ -1115,7 +1116,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_33</span>
+    <span id="ver-label">V2_35</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1161,6 +1162,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
        指摘への対応。ラジオボタン自体(tabSortName等のid)はdialog.js/index.htmlの他の
        JSから参照されていないことを確認済み(並び順の変更はファイル一覧側のsortRowが
        担い、_tabSortModeの読み取り専用参照のみ) -->
+  <!-- V2_35: 「全書込Backup」(タブを閉じたファイルも含む全ての書込み履歴をZIPに
+       書き出す機能、旧ヘッダー配置)を開発者用ボタンの上へ移動。全ファイル対象の
+       グローバル機能のため、開発者用ボタンを押さなくても常時表示する -->
+  <div class="sp-section">
+    <button id="allDvBackupBtn" class="sp-action-btn" title="タブを閉じたファイルも含め、この端末に保存されている全ての書込み履歴をまとめてZIPに書き出します（元DXF/PDF本体は含まれません）">全書込Backup</button>
+  </div>
   <!-- V2_28: 「開発者用ボタン」を新設。押すまで縮尺分母以降の項目(縮尺分母・レイヤ設定・
        バックアップ復元・クラウド関連・容量診断・一括バックアップ・本体データ削除等)を
        すべて隠す。普段の現場作業では使わない設定項目が並んでいて分かりにくいとの
@@ -1224,8 +1231,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="diagRunBtn" class="sp-action-btn">診断を実行</button>
     <div class="info-box" id="diagResultBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;margin-top:8px;min-height:24px;line-height:1.7;white-space:pre-wrap">「診断を実行」を押してください</div>
   </div>
-  <!-- V2_30: 「全書込みデータの一括バックアップ」はヘッダー(id="allDvBackupBtn"、
-       「全書込バックアップ」)へ移動したため、設定パネルからは削除 -->
+  <!-- V2_30: 「全書込みデータの一括バックアップ」は一時ヘッダーへ移動していたが、
+       V2_35で開発者用ボタンの上(このsp-section群より前)へ再度移動済み -->
   <!-- V2_27: 開いていないファイルの本体データを一括削除。書込み履歴・自動バックアップ・
        検索インデックスは対象外(本体のみ削除)。実行前に対象件数・容量を表示して確認を取る。
        なおV2_27以降、タブを閉じた時点で該当ファイルの本体は自動的に削除されるようになった
@@ -1548,27 +1555,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=233"></script>
-<script src="viewer.js?v=233"></script>
-<script src="utils.js?v=233"></script>
-<script src="ui.js?v=233"></script>
-<script src="dialog.js?v=233"></script>
-<script src="storage.js?v=233"></script>
-<script src="fonts/NotoSansJP.js?v=233"></script>
-<script src="export.js?v=233"></script>
-<script src="tool.js?v=233"></script>
-<script src="verify.js?v=233"></script>
+<script src="layer.js?v=235"></script>
+<script src="viewer.js?v=235"></script>
+<script src="utils.js?v=235"></script>
+<script src="ui.js?v=235"></script>
+<script src="dialog.js?v=235"></script>
+<script src="storage.js?v=235"></script>
+<script src="fonts/NotoSansJP.js?v=235"></script>
+<script src="export.js?v=235"></script>
+<script src="tool.js?v=235"></script>
+<script src="verify.js?v=235"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=233"></script>
-<script src="stroke-text.js?v=233"></script>
+<script src="shxGlyphs.js?v=235"></script>
+<script src="stroke-text.js?v=235"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=233"></script>
+<script src="pc.js?v=235"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=233"></script>
+<script src="supabase-sync.js?v=235"></script>
 <script>
-const APP_VERSION = 'V2_33';
+const APP_VERSION = 'V2_35';
 
 // =========================================================
 // グローバル状態
@@ -2669,7 +2676,7 @@ function _updateTdfWarnBanner(){
 // から生バイトを取得するだけ)、復元(importDxfviewManual→openDxfFromDb)も拡張子で
 // DXF/PDFを自動判定する実装のため、表示条件をここで広げるだけで両方向とも対応できる
 function _updateWriteBackupBtnVisibility(){
-  var btn=document.getElementById('writeBackupBtn');
+  var btn=document.getElementById('fileBackupBtn234'); // V2_34: 「ファイルBackup」ボタン(旧writeBackupBtn)として復活
   if(!btn) return;
   var isDxf=(currentFileName||'').toLowerCase().endsWith('.dxf');
   var isPdf191=(currentFileName||'').toLowerCase().endsWith('.pdf');

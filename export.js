@@ -679,9 +679,11 @@ async function exportDxfviewManual(){
     return false; // V0_145: 保存失敗時は閉じない（データ消失防止）
   }
 }
-// V2_30: ヘッダー「バックアップ」ボタン(writeBackupBtn)は廃止したため、ここでの
-// クリック登録も削除。exportDxfviewManual自体は「バックアップして閉じる」等
-// 他の呼び出し元があるため関数定義はそのまま残す
+// V2_30: ヘッダー「バックアップ」ボタン(writeBackupBtn)は廃止。
+// V2_34: 「現在開いている1ファイルだけ」を対象にしたバックアップとして、
+// 新しいid「fileBackupBtn234」(ラベル:ファイルBackup)で復活させる
+{var _fileBackupBtn234=document.getElementById('fileBackupBtn234');
+if(_fileBackupBtn234) _fileBackupBtn234.addEventListener('click',exportDxfviewManual);}
 
 // =========================================================
 // V1_183: 複数ファイル一括書出(HD-PDF書出/バックアップ)用の共通保存処理。
