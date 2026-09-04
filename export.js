@@ -888,6 +888,89 @@ async function exportAllDvBackup223(){
 if(_allDvBtn223) _allDvBtn223.addEventListener('click',exportAllDvBackup223);}
 
 // =========================================================
+// V2_24: 開いていないファイルの本体データ一括削除(設定パネル)
+// dxfViewerFilesDB(dxfFiles)に保存されているファイル本体のうち、現在どのタブにも
+// 開かれていない(openFilesに存在しない)ものだけをまとめて削除する。
+// V2_24以降、タブを閉じた時点で該当ファイルの本体は自動的に削除されるように
+// なった(index.htmlのdoCloseTab参照)ため、このボタンは主にV2_23以前から
+// 溜まっている過去分をまとめて整理するためのもの。
+// 書込み履歴(dv)・自動バックアップ(backups)・検索インデックスには一切触れない
+// (本体のみ削除。同じファイルをもう一度開けば書込み履歴は自動的に復元される)。
+// 削除前に対象件数・合計容量を表示し、確認を取ってから実行する。
+// =========================================================
+async function purgeUnopenedFileBodies224(){
+  try{
+    var scan=await new Promise(function(resolve){
+      try{
+        var r=indexedDB.open('dxfViewerFilesDB',1);
+        r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dxfFiles')) e.target.result.createObjectStore('dxfFiles',{keyPath:'name'}); };
+        r.onsuccess=function(e){
+          try{
+            var db=e.target.result;
+            if(!db.objectStoreNames.contains('dxfFiles')){ resolve({db:db,list:[]}); return; }
+            var tx=db.transaction('dxfFiles','readonly');
+            var store=tx.objectStore('dxfFiles');
+            var out=[];
+            var req=store.openCursor();
+            req.onsuccess=function(ev){
+              var cur=ev.target.result;
+              if(cur){
+                var v=cur.value;
+                var sz=0;
+                try{ sz=(v&&v.buf&&v.buf.byteLength)||0; }catch(e2){}
+                out.push({name:v&&v.name,size:sz});
+                cur.continue();
+              } else {
+                resolve({db:db,list:out});
+              }
+            };
+            req.onerror=function(){ resolve({db:db,list:out}); };
+          }catch(er){ resolve({db:null,list:[]}); }
+        };
+        r.onerror=function(){ resolve({db:null,list:[]}); };
+      }catch(e){ resolve({db:null,list:[]}); }
+    });
+    if(!scan.list||scan.list.length===0){
+      if(typeof showGuide==='function') showGuide('保存されているファイル本体がありません',2000);
+      return;
+    }
+    var openKeys224={};
+    if(typeof openFiles!=='undefined') openFiles.forEach(function(f){ if(f.fileKey) openKeys224[f.fileKey]=true; });
+    var targets=scan.list.filter(function(r){ return r.name && !openKeys224[r.name]; });
+    if(targets.length===0){
+      if(typeof showGuide==='function') showGuide('削除対象(今開いていないファイル)がありません',2500);
+      return;
+    }
+    var totalBytes=targets.reduce(function(a,r){return a+(r.size||0);},0);
+    var mb=(totalBytes/1024/1024).toFixed(1);
+    if(!confirm('今開いていないファイルの本体データ '+targets.length+'件('+mb+'MB)を削除します。\n書込み履歴・自動バックアップは削除されません。\nよろしいですか？')){
+      return;
+    }
+    var db=scan.db;
+    if(!db){
+      if(typeof showGuide==='function') showGuide('削除に失敗しました',2000);
+      return;
+    }
+    await new Promise(function(resolve){
+      try{
+        var tx=db.transaction('dxfFiles','readwrite');
+        var store=tx.objectStore('dxfFiles');
+        targets.forEach(function(r){ try{ store.delete(r.name); }catch(e){} });
+        tx.oncomplete=function(){ resolve(); };
+        tx.onerror=function(){ resolve(); };
+      }catch(e){ resolve(); }
+    });
+    try{ db.close(); }catch(e){}
+    if(typeof showGuide==='function') showGuide('本体データを削除しました('+targets.length+'件、'+mb+'MB)',3000);
+  }catch(e){
+    console.warn('[purge file bodies] failed',e);
+    if(typeof showGuide==='function') showGuide('一括削除に失敗しました',2000);
+  }
+}
+{var _purgeBtn224=document.getElementById('purgeUnopenedBtn224');
+if(_purgeBtn224) _purgeBtn224.addEventListener('click',purgeUnopenedFileBodies224);}
+
+// =========================================================
 // V0_136: バックアップ復元（設定パネルボタン、旧名称:書込復元）
 // .dxfview ファイルを選択して strokes / dims / savedViews / hiddenLayers を復元
 // V1_176: 元DXFと.dxfviewをまとめたZIP(V1_176以降のバックアップ)にも対応。

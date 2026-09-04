@@ -733,7 +733,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #cbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:9px}
 .cb{height:52px;border-radius:11px;font-size:30px;font-weight:600;cursor:pointer;-webkit-user-select:none;user-select:none;transition:transform .08s;border:1.5px solid;line-height:1;touch-action:manipulation}
 .cb:active{transform:scale(.93)}
-/* V2_23: 計算機ボタンを押した際、押下が分かりやすいよう一瞬明るく光らせる。
+/* V2_24: 計算機ボタンを押した際、押下が分かりやすいよう一瞬明るく光らせる。
    ボタンごとの色分け(cbn/cbo/cbeq/cbf)を維持したままfilter:brightnessで光らせるため、
    個別の背景色を上書きする必要がない */
 @keyframes cbFlash{
@@ -1101,7 +1101,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_23</span>
+    <span id="ver-label">V2_24</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1209,7 +1209,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <!-- V0_154: 開発者モードを削除 -->
   <!-- V0_143: 下部のバージョン表示（旧#ver-label）は削除。表示はsp-header内の上部spanに一本化 -->
-  <!-- V2_23: 容量診断(IndexedDB/localStorageの使用状況確認)。別ファイルの診断ツールを
+  <!-- V2_24: 容量診断(IndexedDB/localStorageの使用状況確認)。別ファイルの診断ツールを
        別URLで開く必要があり使いにくいとの指摘を受け、設定パネル最下部に組み込んだ。
        読み取り専用で、既存のDXFデータ・保存処理には一切書き込みも変更も行わない -->
   <div class="sp-section">
@@ -1218,7 +1218,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button id="diagRunBtn" class="sp-action-btn">診断を実行</button>
     <div class="info-box" id="diagResultBox" style="font-size:12px;color:#888;background:#0a0c10;border:1px solid #2a3040;border-radius:8px;padding:8px;margin-top:8px;min-height:24px;line-height:1.7;white-space:pre-wrap">「診断を実行」を押してください</div>
   </div>
-  <!-- V2_23: タブを閉じたファイルも含め、この端末に保存されている全ての書込み履歴
+  <!-- V2_24: タブを閉じたファイルも含め、この端末に保存されている全ての書込み履歴
        (dxfViewerDxfviewDB)をまとめてZIPに書き出す機能。既存のヘッダー「バックアップ」
        ボタン・ファイル一覧の複数選択一括バックアップは「現在タブとして開いている
        ファイル」のみが対象で、既に閉じたファイルの書込みは保護できなかったための追加。
@@ -1228,6 +1228,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <div class="sp-label">全書込みデータの一括バックアップ</div>
     <div style="font-size:11px;color:#666;margin-bottom:6px;line-height:1.5">タブを閉じたファイルも含め、この端末に保存されている全ての書込み履歴をまとめてZIPに書き出します（元DXF/PDF本体は含まれません。読み取りのみ、既存データの削除は行いません）</div>
     <button id="allDvBackupBtn" class="sp-action-btn">全書込みデータをZIP書き出し</button>
+  </div>
+  <!-- V2_24: 開いていないファイルの本体データを一括削除。書込み履歴・自動バックアップ・
+       検索インデックスは対象外(本体のみ削除)。実行前に対象件数・容量を表示して確認を取る。
+       なおV2_24以降、タブを閉じた時点で該当ファイルの本体は自動的に削除されるようになった
+       ため(index.htmlのdoCloseTab参照)、このボタンは主にV2_24以前から溜まっている
+       過去分をまとめて整理するためのもの -->
+  <div class="sp-section">
+    <div class="sp-label">開いていないファイルの本体データを削除</div>
+    <div style="font-size:11px;color:#666;margin-bottom:6px;line-height:1.5">今どのタブにも開かれていないファイルの元データ(DXF/PDF本体)だけをまとめて削除し、容量を減らします。書込み履歴・自動バックアップは削除されません（元データを消しても、同じファイルをもう一度開けば書込みは自動的に復元されます）</div>
+    <button id="purgeUnopenedBtn224" class="sp-action-btn">本体データを一括削除</button>
   </div>
 </div>
 
@@ -1540,27 +1550,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=223"></script>
-<script src="viewer.js?v=223"></script>
-<script src="utils.js?v=223"></script>
-<script src="ui.js?v=223"></script>
-<script src="dialog.js?v=223"></script>
-<script src="storage.js?v=223"></script>
-<script src="fonts/NotoSansJP.js?v=223"></script>
-<script src="export.js?v=223"></script>
-<script src="tool.js?v=223"></script>
-<script src="verify.js?v=223"></script>
+<script src="layer.js?v=224"></script>
+<script src="viewer.js?v=224"></script>
+<script src="utils.js?v=224"></script>
+<script src="ui.js?v=224"></script>
+<script src="dialog.js?v=224"></script>
+<script src="storage.js?v=224"></script>
+<script src="fonts/NotoSansJP.js?v=224"></script>
+<script src="export.js?v=224"></script>
+<script src="tool.js?v=224"></script>
+<script src="verify.js?v=224"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=223"></script>
-<script src="stroke-text.js?v=223"></script>
+<script src="shxGlyphs.js?v=224"></script>
+<script src="stroke-text.js?v=224"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=223"></script>
+<script src="pc.js?v=224"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=223"></script>
+<script src="supabase-sync.js?v=224"></script>
 <script>
-const APP_VERSION = 'V2_23';
+const APP_VERSION = 'V2_24';
 
 // =========================================================
 // グローバル状態
@@ -2847,6 +2857,28 @@ function doCloseTab(idx){
   var _closedFk160=openFiles[idx]?openFiles[idx].fileKey:null;
   openFiles.splice(idx,1);
   if(typeof openFilesBufs!=='undefined') openFilesBufs.splice(idx,1); // V0_138: インデックスずれ修正
+  // V2_24: マーク(旧称:お気に入り、dialog.jsの_favToggle217)は「今開いている
+  // ファイルを見つけやすくする一時的な目印」に位置づけを変更したため、タブを
+  // 閉じたらそのファイルのマークも一緒に消す。従来はSafari内に保存された時点の
+  // 古いコピーを「再度開く」ことができる仕組みも兼ねていたが、iPad本体側で図面が
+  // 更新されていても気づけない危険があるため、その仕組みごと廃止した
+  if(_closedFk160&&typeof _favLoadAll217==='function'&&typeof _favSaveAll217==='function'){
+    try{
+      var _favMap223=_favLoadAll217();
+      if(_favMap223[_closedFk160]){ delete _favMap223[_closedFk160]; _favSaveAll217(_favMap223); }
+    }catch(e){}
+  }
+  // V2_24: 閉じたファイルの本体データ(dxfViewerFilesDB)も、他のタブでまだ
+  // 同じfileKeyが開かれていない場合に限り自動的に削除する。書込み履歴(dv)・
+  // 自動バックアップ(backups)には一切触れない(本体のみ削除。同じファイルを
+  // もう一度開けば、書込み履歴は今まで通り自動的に復元される)。
+  // 「他のタブでまだ開かれていないか」を確認するのは、fileKeyベースの重複判定
+  // (V2_04)により通常は同じfileKeyのタブは1つにまとまるはずだが、万一の
+  // 多重オープンに備えた安全策
+  if(_closedFk160&&typeof _lsIdbDelete==='function'){
+    var _stillOpen224=openFiles.some(function(f){return f.fileKey===_closedFk160;});
+    if(!_stillOpen224) _lsIdbDelete(_closedFk160);
+  }
   if(_closedFk160&&typeof savedViews!=='undefined'){
     var _svCleared160=false;
     for(var _si160=0;_si160<savedViews.length;_si160++){
@@ -2957,7 +2989,7 @@ document.getElementById('sbAuthClearBtn').addEventListener('click',()=>{
   showGuide('クラウド同期の登録を解除しました',2000);
 });
 document.getElementById('settingsClose').addEventListener('click',()=>document.body.classList.remove('settings-open'));
-// V2_23: アプリ容量診断(設定パネル最下部)。IndexedDB各DB・localStorageの使用状況を
+// V2_24: アプリ容量診断(設定パネル最下部)。IndexedDB各DB・localStorageの使用状況を
 // 読み取り専用で確認する。既存のdoSave/tryRestore等の保存・復元処理には一切触れず、
 // 完全に独立した関数群として追加する(既存グローバル変数・関数名との衝突を避けるため
 // 全て_diag21プレフィックスを付ける)
@@ -4844,7 +4876,7 @@ function buildLinePtDim(line,pt,pArrow){
   var d1={x:foot.x+lux*offset,y:foot.y+luy*offset}; // 表示上の寸法線位置(line側)
   var d2={x:pt.x  +lux*offset,y:pt.y  +luy*offset}; // 表示上の寸法線位置(pt側)
   var lines=[{x1:d1.x,y1:d1.y,x2:d2.x,y2:d2.y}]; // 寸法線本体
-  // line側: オフセット後の表示位置d1がlineの範囲内かどうかで判定(V2_23)。
+  // line側: オフセット後の表示位置d1がlineの範囲内かどうかで判定(V2_24)。
   // 範囲外ならはみ出した側の端点からd1まで補助線を伸ばす
   var tOff=t+offset/lineLen;
   if(tOff<-TOLR||tOff>1+TOLR){
@@ -4853,7 +4885,7 @@ function buildLinePtDim(line,pt,pArrow){
   }
   // pt側: offsetがほぼゼロ(寸法位置が点の位置にある)なら補助線なし。
   // 点を左右に動かした場合のみ、pt自体からd2まで補助線を足す
-  // V2_23: offsetはワールド座標の絶対値(mm相当)で、pArrowはスナップなしのタッチ位置
+  // V2_24: offsetはワールド座標の絶対値(mm相当)で、pArrowはスナップなしのタッチ位置
   // (s2w変換のみ)からそのまま作られるため、TOLR=1e-6mmという閾値ではタッチ操作で
   // 到達できる精度を大きく下回り、「点の位置を指定しても常にoffsetありと判定されて
   // 補助線が消えない」という不具合があった。画面上で数ピクセル相当のワールド距離を
@@ -5800,7 +5832,7 @@ window.resetSW=resetSW;
 
 // ─ サブ窓ボタン ────────────────────────────────────────────
 function _swUpdateBtnUI(on){
-  // V2_23: このIIFE内のローカル関数のままではwindow._swUpdateBtnUIとして
+  // V2_24: このIIFE内のローカル関数のままではwindow._swUpdateBtnUIとして
   // 外部(resetToolStates/tool.js)から参照できず、「typeof _swUpdateBtnUI==='function'」
   // による呼び出しガードが常にfalseになり、ボタンの見た目リセットが無視されていた
   // (SW.active自体はresetSW()でfalseに戻るが見た目だけ選択中のまま残るバグの真因)。
@@ -6554,7 +6586,7 @@ decEl.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefaul
 
 document.querySelectorAll('.cb').forEach(function(btn){
   btn.addEventListener('click',function(){
-    // V2_23: 押したボタンが一瞬光るフィードバック。連打時も毎回再生されるよう、
+    // V2_24: 押したボタンが一瞬光るフィードバック。連打時も毎回再生されるよう、
     // 一度クラスを外してリフローさせてから付け直す
     btn.classList.remove('cb-flash');
     void btn.offsetWidth;
