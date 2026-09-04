@@ -679,7 +679,9 @@ async function exportDxfviewManual(){
     return false; // V0_145: 保存失敗時は閉じない（データ消失防止）
   }
 }
-document.getElementById('writeBackupBtn').addEventListener('click',exportDxfviewManual);
+// V2_30: ヘッダー「バックアップ」ボタン(writeBackupBtn)は廃止したため、ここでの
+// クリック登録も削除。exportDxfviewManual自体は「バックアップして閉じる」等
+// 他の呼び出し元があるため関数定義はそのまま残す
 
 // =========================================================
 // V1_183: 複数ファイル一括書出(HD-PDF書出/バックアップ)用の共通保存処理。
@@ -976,6 +978,131 @@ async function purgeUnopenedFileBodies224(){
 }
 {var _purgeBtn224=document.getElementById('purgeUnopenedBtn224');
 if(_purgeBtn224) _purgeBtn224.addEventListener('click',purgeUnopenedFileBodies224);}
+
+// =========================================================
+// V2_32: 全バックアップ復元。
+// 「全バックアップ」(exportAllDvBackup223)で作った、複数ファイル分の書込み履歴が
+// まとまったZIPを1つまたは複数選択して復元する。既存の「バックアップ復元」
+// (importDxfviewManual)は1ファイル分(元図面+その.dxfview)専用で、全バックアップの
+// ZIP(元図面を含まず、.dxfviewが多数入っている)を渡すと最初の1件しか反映されず
+// 残りが無視されてしまう不具合があったための追加(既存の「バックアップ復元」自体は
+// 変更しない)。
+//
+// 【想定用途】Safariが一定期間より古いデータを消してしまう場合に備え、定期的に
+// 取っていた「全バックアップ」ZIP(例:1年前・今日)を全部まとめて読み込み、
+// 抜け漏れなく書込み履歴を集約したい、というもの。
+//
+// 【マージ方針】
+// 各ZIP内の.dxfviewは、dvストアのレコード(fk,fileName,fileSize,savedAt,dims,strokes等)
+// をそのままJSON化したもの(exportAllDvBackup223参照)。同じfk(ファイル名+サイズ)の
+// レコードが、複数のZIP・現在端末に既にあるデータの間で重複していた場合、
+// savedAt(保存日時)が最も新しいものだけを残す。内容が完全に同じであれば結果的に
+// どれを採用しても同じなので「全く同じデータは消して1つにする」動作にもなるし、
+// 現在端末のデータより古い内容で誤って上書きされることもない(常に一番新しいものが残る)。
+// 既存のIndexedDB(dv)の内容を書き足す/更新するだけで、ファイル本体・自動バックアップ・
+// 検索インデックスには一切触れない。異なるfkのレコードは全て保持されるため、
+// 実質的に複数回分のバックアップに含まれる全ファイルの書込み履歴が集約される。
+// =========================================================
+function _dvGetAll232(){
+  return new Promise(function(resolve){
+    try{
+      var r=indexedDB.open('dxfViewerDxfviewDB',1);
+      r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dv')) e.target.result.createObjectStore('dv',{keyPath:'fk'}); };
+      r.onsuccess=function(e){
+        try{
+          var db=e.target.result;
+          if(!db.objectStoreNames.contains('dv')){ resolve([]); return; }
+          var tx=db.transaction('dv','readonly');
+          var gr=tx.objectStore('dv').getAll();
+          gr.onsuccess=function(){resolve(gr.result||[]);};
+          gr.onerror=function(){resolve([]);};
+        }catch(er){resolve([]);}
+      };
+      r.onerror=function(){resolve([]);};
+    }catch(e){resolve([]);}
+  });
+}
+function _dvPutAll232(recs){
+  return new Promise(function(resolve,reject){
+    try{
+      var r=indexedDB.open('dxfViewerDxfviewDB',1);
+      r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dv')) e.target.result.createObjectStore('dv',{keyPath:'fk'}); };
+      r.onsuccess=function(e){
+        var db=e.target.result;
+        var tx=db.transaction('dv','readwrite');
+        recs.forEach(function(rec){ tx.objectStore('dv').put(rec); });
+        tx.oncomplete=function(){resolve();};
+        tx.onerror=function(ev){reject(ev.target.error);};
+      };
+      r.onerror=function(e){reject(e.target.error);};
+    }catch(e){reject(e);}
+  });
+}
+async function importAllDvBackup232(){
+  if(typeof JSZip==='undefined'){
+    if(typeof showGuide==='function') showGuide('ZIP機能が読み込まれていません',2000);
+    return;
+  }
+  var input=document.createElement('input');
+  input.type='file';
+  input.accept='.zip';
+  input.multiple=true;
+  input.onchange=async function(e){
+    var files=Array.from(e.target.files||[]);
+    if(files.length===0) return;
+    if(!confirm(files.length+'個のZIPを読み込み、書込み履歴をまとめて復元します。同じファイルのデータが複数ある場合は、保存日時が新しい方を残します。よろしいですか？'))return;
+    if(typeof showGuide==='function') showGuide('復元中…',2000);
+    try{
+      // 現在端末にあるデータも比較対象に含める(古いバックアップで誤って上書きしない)
+      var allRecs=await _dvGetAll232();
+      var zipFileCount=0, zipRecCount=0;
+      for(var fi=0; fi<files.length; fi++){
+        var f=files[fi];
+        if(!f.name.toLowerCase().endsWith('.zip')) continue;
+        try{
+          var zipObj=await JSZip.loadAsync(f);
+          var names=Object.keys(zipObj.files);
+          for(var ni=0; ni<names.length; ni++){
+            var nm=names[ni];
+            if(!nm.toLowerCase().endsWith('.dxfview')) continue;
+            var txt=await zipObj.files[nm].async('string');
+            try{
+              var rec=JSON.parse(txt);
+              if(rec&&rec.fk){ allRecs.push(rec); zipRecCount++; }
+            }catch(pe){ console.warn('[all dv restore] parse error',nm,pe); }
+          }
+          zipFileCount++;
+        }catch(ze){
+          console.warn('[all dv restore] zip read error',f.name,ze);
+          alert('『'+f.name+'』の読み込みに失敗しました。他のZIPの処理は続けます。');
+        }
+      }
+      if(zipFileCount===0){
+        alert('有効なZIPファイルがありませんでした');
+        return;
+      }
+      // fk(ファイル名+サイズ)ごとにグループ化し、savedAtが最も新しいものだけ残す
+      var byFk={};
+      allRecs.forEach(function(rec){
+        var cur=byFk[rec.fk];
+        if(!cur){ byFk[rec.fk]=rec; return; }
+        var curT=Date.parse(cur.savedAt||0)||0;
+        var newT=Date.parse(rec.savedAt||0)||0;
+        if(newT>curT) byFk[rec.fk]=rec;
+      });
+      var mergedRecs=Object.keys(byFk).map(function(k){return byFk[k];});
+      await _dvPutAll232(mergedRecs);
+      if(typeof showGuide==='function') showGuide('全バックアップ復元が完了しました('+zipFileCount+'個のZIP、'+zipRecCount+'件読込→'+mergedRecs.length+'件に統合)',3500);
+      if(typeof verify==='function') verify('全バックアップ復元',{zipFileCount:zipFileCount,zipRecCount:zipRecCount,mergedCount:mergedRecs.length});
+    }catch(err){
+      console.warn('[all dv restore] failed',err);
+      alert('全バックアップ復元に失敗しました: '+err.message);
+    }
+  };
+  input.click();
+}
+{var _allDvRestoreBtn232=document.getElementById('allDvRestoreBtn232');
+if(_allDvRestoreBtn232) _allDvRestoreBtn232.addEventListener('click',importAllDvBackup232);}
 
 // =========================================================
 // V0_136: バックアップ復元（設定パネルボタン、旧名称:書込復元）
