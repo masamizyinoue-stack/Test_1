@@ -620,7 +620,10 @@ function _showOpenFilesListMenu(anchorEl){
   // V1_80: 並び順選択（設定パネルの「タブの並び順」と同じ4択・同じ状態を共有する）
   var sortRow=document.createElement('div');
   sortRow.style.cssText='display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 6px;justify-content:center;flex-shrink:0;';
-  var _sortOptions=[['name','名前順'],['opened','開いた順'],['access','アクセス順'],['manual','任意'],['type','種類順']]; // V1_104: 種類順(DXF/PDF/エクセル)を追加
+  // V2_37: 「任意」(ドラッグ並び替え)を中止し、「マーク優先」(マーク済みファイルを
+  // 左側に優先表示)に置き換えた。ドラッグ並び替え自体のコード(_tabItemPointerDown等)
+  // は後方互換のため残しているが、この選択肢が無くなったことで通常は呼ばれなくなる
+  var _sortOptions=[['name','名前順'],['opened','開いた順'],['access','アクセス順'],['markFirst','マーク優先'],['type','種類順']]; // V1_104: 種類順(DXF/PDF/エクセル)を追加
   var _sortBtns={};
   _sortOptions.forEach(function(opt){
     var b=document.createElement('button');
