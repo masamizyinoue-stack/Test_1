@@ -311,7 +311,7 @@ async function _runPdfExport(_dlgSel){
       pdfComp=document.createElement('canvas'); pdfComp.width=CW; pdfComp.height=CH;
       _rComp=pdfComp;
       const pctx=pdfComp.getContext('2d');
-      pctx.fillStyle=(bwMode||(typeof colorLightBg!=='undefined'&&colorLightBg))?'#fff':'#1e2430'; // V2_48: カラー(背景白)も白背景扱いに
+      pctx.fillStyle=bwMode?'#fff':'#1e2430';
       pctx.fillRect(0,0,CW,CH);
 
       // ①' 蛍光ペンのみ先行描画（V1_170: DXF/文字より下に敷くことで、印刷時に黒文字が
@@ -679,11 +679,7 @@ async function exportDxfviewManual(){
     return false; // V0_145: 保存失敗時は閉じない（データ消失防止）
   }
 }
-// V2_30: ヘッダー「バックアップ」ボタン(writeBackupBtn)は廃止。
-// V2_34: 「現在開いている1ファイルだけ」を対象にしたバックアップとして、
-// 新しいid「fileBackupBtn234」(ラベル:ファイルBackup)で復活させる
-{var _fileBackupBtn234=document.getElementById('fileBackupBtn234');
-if(_fileBackupBtn234) _fileBackupBtn234.addEventListener('click',exportDxfviewManual);}
+document.getElementById('writeBackupBtn').addEventListener('click',exportDxfviewManual);
 
 // =========================================================
 // V1_183: 複数ファイル一括書出(HD-PDF書出/バックアップ)用の共通保存処理。
@@ -827,284 +823,6 @@ async function exportDxfviewManualBatch183(indices){
   if(typeof _abMarkSaved==='function') _abMarkSaved();
   return {count:included, skipped:skipped};
 }
-
-// =========================================================
-// V2_23: 全書込みデータ一括バックアップ(設定パネル)
-// dxfViewerDxfviewDB(dv)に保存されている全レコード(タブを閉じて既にopenFilesに
-// 存在しないファイルの分も含む)をまとめて1つのZIPに書き出す。既存のヘッダー
-// 「バックアップ」ボタン/複数選択一括バックアップ(exportDxfviewManualBatch183)は
-// いずれも「現在タブとして開いているファイル」のみが対象で、既に閉じてしまった
-// ファイルの書込みまでは保護できなかったための追加。
-// dvストアはreadonlyでgetAll()するだけで、既存の保存・復元処理には一切触れない。
-// 元DXF/PDF本体は含めない(容量が大きくなりすぎるため。本体はiPad「ファイル」App側に
-// 別途あるので、書込み履歴だけ保護すれば十分という前提)。
-// =========================================================
-async function exportAllDvBackup223(){
-  try{
-    if(typeof JSZip==='undefined'){
-      if(typeof showGuide==='function') showGuide('ZIP機能が読み込まれていません',2000);
-      return;
-    }
-    var recs=await new Promise(function(resolve){
-      try{
-        var r=indexedDB.open('dxfViewerDxfviewDB',1);
-        r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dv')) e.target.result.createObjectStore('dv',{keyPath:'fk'}); };
-        r.onsuccess=function(e){
-          try{
-            var db=e.target.result;
-            if(!db.objectStoreNames.contains('dv')){ resolve([]); return; }
-            var tx=db.transaction('dv','readonly');
-            var gr=tx.objectStore('dv').getAll();
-            gr.onsuccess=function(){resolve(gr.result||[]);};
-            gr.onerror=function(){resolve([]);};
-          }catch(er){resolve([]);}
-        };
-        r.onerror=function(){resolve([]);};
-      }catch(e){resolve([]);}
-    });
-    if(!recs||recs.length===0){
-      if(typeof showGuide==='function') showGuide('保存されている書込みデータがありません',2000);
-      return;
-    }
-    var zip223=new JSZip();
-    var usedNames223={};
-    recs.forEach(function(rec){
-      var base223=String(rec.fileName||rec.fk||'file').replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|]/g,'_');
-      // V2_25: 「ファイル名_サイズ(KB整数)」形式に変更(例:1C-03(X4Y1)_915.dxfview)。
-      // fileSizeはバイト単位で保存されているため1024で割って整数に丸める
-      var sizeKB225=Math.round((rec.fileSize||0)/1024);
-      var baseWithSize225=base223+'_'+sizeKB225;
-      var name223=baseWithSize225+'.dxfview';
-      var n223=usedNames223[baseWithSize225];
-      if(n223){ usedNames223[baseWithSize225]=n223+1; name223=baseWithSize225+'_'+(n223+1)+'.dxfview'; }
-      else usedNames223[baseWithSize225]=1;
-      var payload223=Object.assign({},rec,{appVersion:(typeof APP_VERSION!=='undefined'?APP_VERSION:''),exportedAt:new Date().toISOString()});
-      zip223.file(name223, JSON.stringify(payload223));
-    });
-    if(typeof showGuide==='function') showGuide('ZIP作成中…('+recs.length+'件)',2000);
-    var blob223=await zip223.generateAsync({type:'blob'});
-    // V2_25: ZIPファイル名を「YYMMDD_全書込みデータ_N件」形式に変更(例:260904_全書込みデータ_283件)。
-    // 西暦は下2桁から始める
-    var d225=new Date();
-    var dateStr223=String(d225.getFullYear()).slice(-2)+String(d225.getMonth()+1).padStart(2,'0')+String(d225.getDate()).padStart(2,'0');
-    var fname223=dateStr223+'_全書込みデータ_'+recs.length+'件.zip';
-    await _saveBlobWithFallback183(blob223, fname223, '全書込みデータ(ZIP)');
-    if(typeof showGuide==='function') showGuide('全書込みデータをZIPに保存しました('+recs.length+'件)',2500);
-  }catch(e){
-    console.warn('[all dv backup] failed',e);
-    if(typeof showGuide==='function') showGuide('一括バックアップに失敗しました',2000);
-  }
-}
-{var _allDvBtn223=document.getElementById('allDvBackupBtn');
-if(_allDvBtn223) _allDvBtn223.addEventListener('click',exportAllDvBackup223);}
-
-// =========================================================
-// V2_24: 開いていないファイルの本体データ一括削除(設定パネル)
-// dxfViewerFilesDB(dxfFiles)に保存されているファイル本体のうち、現在どのタブにも
-// 開かれていない(openFilesに存在しない)ものだけをまとめて削除する。
-// V2_24以降、タブを閉じた時点で該当ファイルの本体は自動的に削除されるように
-// なった(index.htmlのdoCloseTab参照)ため、このボタンは主にV2_23以前から
-// 溜まっている過去分をまとめて整理するためのもの。
-// 書込み履歴(dv)・自動バックアップ(backups)・検索インデックスには一切触れない
-// (本体のみ削除。同じファイルをもう一度開けば書込み履歴は自動的に復元される)。
-// 削除前に対象件数・合計容量を表示し、確認を取ってから実行する。
-// =========================================================
-async function purgeUnopenedFileBodies224(){
-  try{
-    var scan=await new Promise(function(resolve){
-      try{
-        var r=indexedDB.open('dxfViewerFilesDB',1);
-        r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dxfFiles')) e.target.result.createObjectStore('dxfFiles',{keyPath:'name'}); };
-        r.onsuccess=function(e){
-          try{
-            var db=e.target.result;
-            if(!db.objectStoreNames.contains('dxfFiles')){ resolve({db:db,list:[]}); return; }
-            var tx=db.transaction('dxfFiles','readonly');
-            var store=tx.objectStore('dxfFiles');
-            var out=[];
-            var req=store.openCursor();
-            req.onsuccess=function(ev){
-              var cur=ev.target.result;
-              if(cur){
-                var v=cur.value;
-                var sz=0;
-                try{ sz=(v&&v.buf&&v.buf.byteLength)||0; }catch(e2){}
-                out.push({name:v&&v.name,size:sz});
-                cur.continue();
-              } else {
-                resolve({db:db,list:out});
-              }
-            };
-            req.onerror=function(){ resolve({db:db,list:out}); };
-          }catch(er){ resolve({db:null,list:[]}); }
-        };
-        r.onerror=function(){ resolve({db:null,list:[]}); };
-      }catch(e){ resolve({db:null,list:[]}); }
-    });
-    if(!scan.list||scan.list.length===0){
-      if(typeof showGuide==='function') showGuide('保存されているファイル本体がありません',2000);
-      return;
-    }
-    var openKeys224={};
-    if(typeof openFiles!=='undefined') openFiles.forEach(function(f){ if(f.fileKey) openKeys224[f.fileKey]=true; });
-    var targets=scan.list.filter(function(r){ return r.name && !openKeys224[r.name]; });
-    if(targets.length===0){
-      if(typeof showGuide==='function') showGuide('削除対象(今開いていないファイル)がありません',2500);
-      return;
-    }
-    var totalBytes=targets.reduce(function(a,r){return a+(r.size||0);},0);
-    var mb=(totalBytes/1024/1024).toFixed(1);
-    if(!confirm('今開いていないファイルの本体データ '+targets.length+'件('+mb+'MB)を削除します。\n書込み履歴・自動バックアップは削除されません。\nよろしいですか？')){
-      return;
-    }
-    var db=scan.db;
-    if(!db){
-      if(typeof showGuide==='function') showGuide('削除に失敗しました',2000);
-      return;
-    }
-    await new Promise(function(resolve){
-      try{
-        var tx=db.transaction('dxfFiles','readwrite');
-        var store=tx.objectStore('dxfFiles');
-        targets.forEach(function(r){ try{ store.delete(r.name); }catch(e){} });
-        tx.oncomplete=function(){ resolve(); };
-        tx.onerror=function(){ resolve(); };
-      }catch(e){ resolve(); }
-    });
-    try{ db.close(); }catch(e){}
-    if(typeof showGuide==='function') showGuide('本体データを削除しました('+targets.length+'件、'+mb+'MB)',3000);
-  }catch(e){
-    console.warn('[purge file bodies] failed',e);
-    if(typeof showGuide==='function') showGuide('一括削除に失敗しました',2000);
-  }
-}
-{var _purgeBtn224=document.getElementById('purgeUnopenedBtn224');
-if(_purgeBtn224) _purgeBtn224.addEventListener('click',purgeUnopenedFileBodies224);}
-
-// =========================================================
-// V2_32: 全バックアップ復元。
-// 「全バックアップ」(exportAllDvBackup223)で作った、複数ファイル分の書込み履歴が
-// まとまったZIPを1つまたは複数選択して復元する。既存の「バックアップ復元」
-// (importDxfviewManual)は1ファイル分(元図面+その.dxfview)専用で、全バックアップの
-// ZIP(元図面を含まず、.dxfviewが多数入っている)を渡すと最初の1件しか反映されず
-// 残りが無視されてしまう不具合があったための追加(既存の「バックアップ復元」自体は
-// 変更しない)。
-//
-// 【想定用途】Safariが一定期間より古いデータを消してしまう場合に備え、定期的に
-// 取っていた「全バックアップ」ZIP(例:1年前・今日)を全部まとめて読み込み、
-// 抜け漏れなく書込み履歴を集約したい、というもの。
-//
-// 【マージ方針】
-// 各ZIP内の.dxfviewは、dvストアのレコード(fk,fileName,fileSize,savedAt,dims,strokes等)
-// をそのままJSON化したもの(exportAllDvBackup223参照)。同じfk(ファイル名+サイズ)の
-// レコードが、複数のZIP・現在端末に既にあるデータの間で重複していた場合、
-// savedAt(保存日時)が最も新しいものだけを残す。内容が完全に同じであれば結果的に
-// どれを採用しても同じなので「全く同じデータは消して1つにする」動作にもなるし、
-// 現在端末のデータより古い内容で誤って上書きされることもない(常に一番新しいものが残る)。
-// 既存のIndexedDB(dv)の内容を書き足す/更新するだけで、ファイル本体・自動バックアップ・
-// 検索インデックスには一切触れない。異なるfkのレコードは全て保持されるため、
-// 実質的に複数回分のバックアップに含まれる全ファイルの書込み履歴が集約される。
-// =========================================================
-function _dvGetAll232(){
-  return new Promise(function(resolve){
-    try{
-      var r=indexedDB.open('dxfViewerDxfviewDB',1);
-      r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dv')) e.target.result.createObjectStore('dv',{keyPath:'fk'}); };
-      r.onsuccess=function(e){
-        try{
-          var db=e.target.result;
-          if(!db.objectStoreNames.contains('dv')){ resolve([]); return; }
-          var tx=db.transaction('dv','readonly');
-          var gr=tx.objectStore('dv').getAll();
-          gr.onsuccess=function(){resolve(gr.result||[]);};
-          gr.onerror=function(){resolve([]);};
-        }catch(er){resolve([]);}
-      };
-      r.onerror=function(){resolve([]);};
-    }catch(e){resolve([]);}
-  });
-}
-function _dvPutAll232(recs){
-  return new Promise(function(resolve,reject){
-    try{
-      var r=indexedDB.open('dxfViewerDxfviewDB',1);
-      r.onupgradeneeded=function(e){ if(!e.target.result.objectStoreNames.contains('dv')) e.target.result.createObjectStore('dv',{keyPath:'fk'}); };
-      r.onsuccess=function(e){
-        var db=e.target.result;
-        var tx=db.transaction('dv','readwrite');
-        recs.forEach(function(rec){ tx.objectStore('dv').put(rec); });
-        tx.oncomplete=function(){resolve();};
-        tx.onerror=function(ev){reject(ev.target.error);};
-      };
-      r.onerror=function(e){reject(e.target.error);};
-    }catch(e){reject(e);}
-  });
-}
-async function importAllDvBackup232(){
-  if(typeof JSZip==='undefined'){
-    if(typeof showGuide==='function') showGuide('ZIP機能が読み込まれていません',2000);
-    return;
-  }
-  var input=document.createElement('input');
-  input.type='file';
-  input.accept='.zip';
-  input.multiple=true;
-  input.onchange=async function(e){
-    var files=Array.from(e.target.files||[]);
-    if(files.length===0) return;
-    if(!confirm(files.length+'個のZIPを読み込み、書込み履歴をまとめて復元します。同じファイルのデータが複数ある場合は、保存日時が新しい方を残します。よろしいですか？'))return;
-    if(typeof showGuide==='function') showGuide('復元中…',2000);
-    try{
-      // 現在端末にあるデータも比較対象に含める(古いバックアップで誤って上書きしない)
-      var allRecs=await _dvGetAll232();
-      var zipFileCount=0, zipRecCount=0;
-      for(var fi=0; fi<files.length; fi++){
-        var f=files[fi];
-        if(!f.name.toLowerCase().endsWith('.zip')) continue;
-        try{
-          var zipObj=await JSZip.loadAsync(f);
-          var names=Object.keys(zipObj.files);
-          for(var ni=0; ni<names.length; ni++){
-            var nm=names[ni];
-            if(!nm.toLowerCase().endsWith('.dxfview')) continue;
-            var txt=await zipObj.files[nm].async('string');
-            try{
-              var rec=JSON.parse(txt);
-              if(rec&&rec.fk){ allRecs.push(rec); zipRecCount++; }
-            }catch(pe){ console.warn('[all dv restore] parse error',nm,pe); }
-          }
-          zipFileCount++;
-        }catch(ze){
-          console.warn('[all dv restore] zip read error',f.name,ze);
-          alert('『'+f.name+'』の読み込みに失敗しました。他のZIPの処理は続けます。');
-        }
-      }
-      if(zipFileCount===0){
-        alert('有効なZIPファイルがありませんでした');
-        return;
-      }
-      // fk(ファイル名+サイズ)ごとにグループ化し、savedAtが最も新しいものだけ残す
-      var byFk={};
-      allRecs.forEach(function(rec){
-        var cur=byFk[rec.fk];
-        if(!cur){ byFk[rec.fk]=rec; return; }
-        var curT=Date.parse(cur.savedAt||0)||0;
-        var newT=Date.parse(rec.savedAt||0)||0;
-        if(newT>curT) byFk[rec.fk]=rec;
-      });
-      var mergedRecs=Object.keys(byFk).map(function(k){return byFk[k];});
-      await _dvPutAll232(mergedRecs);
-      if(typeof showGuide==='function') showGuide('全バックアップ復元が完了しました('+zipFileCount+'個のZIP、'+zipRecCount+'件読込→'+mergedRecs.length+'件に統合)',3500);
-      if(typeof verify==='function') verify('全バックアップ復元',{zipFileCount:zipFileCount,zipRecCount:zipRecCount,mergedCount:mergedRecs.length});
-    }catch(err){
-      console.warn('[all dv restore] failed',err);
-      alert('全バックアップ復元に失敗しました: '+err.message);
-    }
-  };
-  input.click();
-}
-{var _allDvRestoreBtn232=document.getElementById('allDvRestoreBtn232');
-if(_allDvRestoreBtn232) _allDvRestoreBtn232.addEventListener('click',importAllDvBackup232);}
 
 // =========================================================
 // V0_136: バックアップ復元（設定パネルボタン、旧名称:書込復元）
@@ -1671,7 +1389,7 @@ function _hpPdfAdvance(w,angleDeg){
 // V1_183: _collectInto182(配列)を渡すと、個別保存(pdf.save)を行わず
 // {fname,blob}をこの配列にpushして終わる「収集モード」で動作する。
 // 複数ファイル一括書出(exportHybridPDFBatch183)から使う。理由は下記参照
-async function exportHybridPDF(_collectInto182,rangeRect238){
+async function exportHybridPDF(_collectInto182){
   const btn=document.getElementById('hybridPDFBtn');
   btn.disabled=true;
   if(!_collectInto182) showGuide('HD-PDFを生成中...');
@@ -1682,36 +1400,19 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     // ── 1. バウンディングボックス（現行PDFと同じロジック）──
     var _hMnX=Infinity,_hMnY=Infinity,_hMxX=-Infinity,_hMxY=-Infinity;
     function _hExp(x,y){if(!isFinite(x)||!isFinite(y))return;if(x<_hMnX)_hMnX=x;if(y<_hMnY)_hMnY=y;if(x>_hMxX)_hMxX=x;if(y>_hMxY)_hMxY=y;}
-    // V2_43: 「範囲指定書出しの線が太すぎる(全体書出と同じ太さにしたい)」との要望
-    // により、線幅・手書き太さ・寸法線太さの基準スケールとして「データ全体を用紙に
-    // 収めた場合の倍率」が必要になった。そのためrangeRect238の有無に関わらず、
-    // 常にデータ全体のバウンディングボックス(_allMnX等)も計算しておく
-    var _allMnX=Infinity,_allMnY=Infinity,_allMxX=-Infinity,_allMxY=-Infinity;
-    function _allExp(x,y){if(!isFinite(x)||!isFinite(y))return;if(x<_allMnX)_allMnX=x;if(y<_allMnY)_allMnY=y;if(x>_allMxX)_allMxX=x;if(y>_allMxY)_allMxY=y;}
     if(doc){
-      for(const e of doc.sen){_allExp(e.x1,e.y1);_allExp(e.x2,e.y2);}
-      for(const e of doc.enko){const r=e.rx||e.r||0;_allExp(e.cx-r,e.cy-r);_allExp(e.cx+r,e.cy+r);}
-      for(const e of (doc.ten||[])){_allExp(e.x,e.y);}
-      for(const e of (doc.moji||[])){_allExp(e.x,e.y);}
-      for(const e of (doc.solid||[])){for(const p of e.pts)_allExp(p.x,p.y);}
+      for(const e of doc.sen){_hExp(e.x1,e.y1);_hExp(e.x2,e.y2);}
+      for(const e of doc.enko){const r=e.rx||e.r||0;_hExp(e.cx-r,e.cy-r);_hExp(e.cx+r,e.cy+r);}
+      for(const e of (doc.ten||[])){_hExp(e.x,e.y);}
+      for(const e of (doc.moji||[])){_hExp(e.x,e.y);}
+      for(const e of (doc.solid||[])){for(const p of e.pts)_hExp(p.x,p.y);}
     }
-    if(typeof pdfImage!=='undefined'&&pdfImage){_allExp(pdfImage.wx,pdfImage.wy);_allExp(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
-    for(const img of (typeof images!=='undefined'?images:[])){_allExp(img.wx,img.wy);_allExp(img.wx+img.ww,img.wy-img.wh);}
-    for(const s of strokes)for(const p of s.pts)_allExp(p.x,p.y);
+    if(typeof pdfImage!=='undefined'&&pdfImage){_hExp(pdfImage.wx,pdfImage.wy);_hExp(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
+    for(const img of (typeof images!=='undefined'?images:[])){_hExp(img.wx,img.wy);_hExp(img.wx+img.ww,img.wy-img.wh);}
+    for(const s of strokes)for(const p of s.pts)_hExp(p.x,p.y);
     for(const d of dims){
-      for(const l of(d.lines||[])){_allExp(l.x1,l.y1);_allExp(l.x2,l.y2);}
-      if(d.tx!=null&&d.ty!=null)_allExp(d.tx,d.ty);
-    }
-
-    // V2_38: 「範囲指定書出」の場合、ユーザーがドラッグで指定した矩形(rangeRect238=
-    // {x1,y1,x2,y2}、ワールド座標)をそのままバウンディングボックスとして使う。
-    // 「全体書出」は_allMnX等(上で計算したデータ全体の値)をそのまま使うので、
-    // 計算結果はV2_42までと完全に同一(数式・走査ロジックは一切変更していない)
-    if(rangeRect238){
-      _hMnX=rangeRect238.x1; _hMnY=rangeRect238.y1;
-      _hMxX=rangeRect238.x2; _hMxY=rangeRect238.y2;
-    }else{
-      _hMnX=_allMnX; _hMnY=_allMnY; _hMxX=_allMxX; _hMxY=_allMxY;
+      for(const l of(d.lines||[])){_hExp(l.x1,l.y1);_hExp(l.x2,l.y2);}
+      if(d.tx!=null&&d.ty!=null)_hExp(d.tx,d.ty);
     }
     if(!isFinite(_hMnX)){showGuide('描画データがありません',2000);return true;} // V1_169: 閉じる連携用(データなし=出力不要なので閉じる処理は継続)
 
@@ -1727,60 +1428,25 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     const aspect=extW/extH;
     // V1_153: 「A4版ではなくA3版にして」との要望により、長辺を297mm(A4)→420mm(A3)に変更
     const PDF_LONG_MM=420;
+    const pageMM_W=aspect>=1?PDF_LONG_MM:Math.round(PDF_LONG_MM*aspect);
+    const pageMM_H=aspect>=1?Math.round(PDF_LONG_MM/aspect):PDF_LONG_MM;
 
-    // V2_43: 線幅・手書き太さ・寸法線太さの基準スケール。「データ全体を用紙(A3長辺
-    // 420mm基準)に収めた場合の倍率」を常に使うことで、範囲指定書出でも全体書出と
-    // 同じ物理的な太さ(用紙上のmm数)になるようにする。全体書出時はこの値が
-    // pdfScale*_sx(通常の実効倍率)と完全に一致するため、_lwScale242を使っても
-    // 使わなくても全体書出の結果は変わらない
-    let _lwScale242=1;
-    if(isFinite(_allMnX)){
-      const allEW=_allMxX-_allMnX, allEH=_allMxY-_allMnY;
-      const allExtW=allEW*(1+2*PAD), allExtH=allEH*(1+2*PAD);
-      const allAspect=allExtW/allExtH;
-      _lwScale242 = allAspect>=1 ? PDF_LONG_MM/allExtW : PDF_LONG_MM/allExtH;
-    }
+    // V1_155: DXF線・円弧・文字・書き込み(手書き・寸法)を全てベクター描画するため、
+    // 実際に大きなCanvasを作成する必要が無くなった。LONG_PXは「画面表示相当の
+    // 線幅・文字サイズになるようスケール計算するための参照値」としてのみ使用し、
+    // メモリ見積り・実測アロケーションテストは不要になったため削除した
+    const LONG_PX=6500;
+    const CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);
+    const CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;
+    const pdfScale=Math.min(CW/extW, CH/extH);
 
-    // V2_40修正: _sx/_syはページサイズ決定ブロックの外(このexportHybridPDF関数の
-    // 後方、線幅・文字サイズ計算など多数箇所)で参照されるため、if/elseのブロック内で
-    // constにすると関数スコープから見えずReferenceErrorになる(全体書出でも発生する
-    // 致命的バグだった)。関数トップレベルのvarにして両分岐から代入できるようにした
-    var pageMM_W, pageMM_H, pdfScale, w2mx, w2my, _sx=1, _sy=1;
-    if(rangeRect238){
-      // V2_40: 「範囲指定書出」は用紙を常にA3(297×420mm)固定にする。従来の「全体書出」は
-      // 用紙自体を内容のアスペクト比に合わせて可変にしていたが、範囲指定時はユーザーが
-      // 選んだ矩形のアスペクト比がまちまちのため、A3固定を望まれた。用紙とコンテンツの
-      // アスペクト比が一致しないことがあるので、内容を歪ませず等倍スケールのまま
-      // 用紙内に収まる最大サイズで中央配置し、余白ができる形にする(レターボックス)
-      const A3_SHORT=297, A3_LONG=420;
-      pageMM_W = aspect>=1 ? A3_LONG : A3_SHORT;
-      pageMM_H = aspect>=1 ? A3_SHORT : A3_LONG;
-      pdfScale = Math.min(pageMM_W/extW, pageMM_H/extH);
-      const usedW=extW*pdfScale, usedH=extH*pdfScale;
-      const offX=(pageMM_W-usedW)/2, offY=(pageMM_H-usedH)/2;
-      w2mx = wx => (wx-extMinX)*pdfScale + offX;
-      w2my = wy => pageMM_H - offY - (wy-extMinY)*pdfScale;
-    }else{
-      pageMM_W=aspect>=1?PDF_LONG_MM:Math.round(PDF_LONG_MM*aspect);
-      pageMM_H=aspect>=1?Math.round(PDF_LONG_MM/aspect):PDF_LONG_MM;
-
-      // V1_155: DXF線・円弧・文字・書き込み(手書き・寸法)を全てベクター描画するため、
-      // 実際に大きなCanvasを作成する必要が無くなった。LONG_PXは「画面表示相当の
-      // 線幅・文字サイズになるようスケール計算するための参照値」としてのみ使用し、
-      // メモリ見積り・実測アロケーションテストは不要になったため削除した
-      const LONG_PX=6500;
-      const CW=aspect>=1?LONG_PX:Math.round(LONG_PX*aspect);
-      const CH=aspect>=1?Math.round(LONG_PX/aspect):LONG_PX;
-      pdfScale=Math.min(CW/extW, CH/extH);
-
-      // ── 3. 座標変換 ──
-      const tx_p = -extMinX * pdfScale;
-      const ty_p =  CH + extMinY * pdfScale;
-      _sx = pageMM_W / CW;
-      _sy = pageMM_H / CH;
-      w2mx = wx => ( wx * pdfScale + tx_p) * _sx;
-      w2my = wy => (-wy * pdfScale + ty_p) * _sy;
-    }
+    // ── 3. 座標変換 ──
+    const tx_p = -extMinX * pdfScale;
+    const ty_p =  CH + extMinY * pdfScale;
+    const _sx = pageMM_W / CW;
+    const _sy = pageMM_H / CH;
+    const w2mx = wx => ( wx * pdfScale + tx_p) * _sx;
+    const w2my = wy => (-wy * pdfScale + ty_p) * _sy;
 
     // ── 5. jsPDF 生成 ──
     if(typeof window.jspdf==='undefined'){showGuide('jsPDFが読み込まれていません',2000);return false;} // V1_169: 閉じる連携用(出力失敗時は閉じない)
@@ -1791,16 +1457,6 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     // 白背景
     pdf.setFillColor(255,255,255);
     pdf.rect(0,0,pageMM_W,pageMM_H,'F');
-
-    // V2_39: V2_38で追加した「ページ全体でのclip()」処理が原因で、全体書出・
-    // 範囲指定書出のどちらもPDFに何も表示されなくなる重大な不具合が発生したため
-    // 削除した(jsPDF 2.5.1のclip/discardPathの組み合わせが想定通りに動作せず、
-    // 以降の全描画がクリップ領域の外に扱われてしまっていたとみられる)。
-    // 「範囲指定書出時、境界をまたぐ線がページ外に少しはみ出て見える可能性がある」
-    // という副作用よりも「そもそも何も出力されない」方が重大な問題のため、
-    // このクリップ処理自体を撤去し、V2_37以前の(常に正常に表示されていた)
-    // 描画方式に戻す。範囲外の見た目の対策は別途、必要であれば要素の事前
-    // フィルタリング等、別の安全な方法で検討する。
 
     // 色設定ヘルパー（e.color は {r,g,b} オブジェクト。白背景用に近白色は黒に変換）
     function _setPdfColor(col){
@@ -1813,22 +1469,8 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     }
 
     // 線幅ヘルパー（現行canvas算出式と同じ: max(0.8, lw*scale*1.4) px → mm変換）
-    // V2_43: 範囲指定書出時は、範囲を拡大表示するpdfScaleの代わりに_lwScale242
-    // (全体書出相当のスケール)を使い、全体書出と同じ物理的な太さに揃える
-    // V2_44: 「DXFの線が異様に太い」バグを修正。下限値0.8は本来「全体書出の
-    // 仮想キャンバス(LONG_PX=6500px)上でのpx単位」を意図した値で、全体書出では
-    // Math.max(0.8, ...)の後に_sx(px→mm変換, 通常0.06程度)を掛けるため実質約0.05mm
-    // 相当になっていた。しかし範囲指定書出(A3固定)は仮想キャンバスを経由せず
-    // _sx=1固定のため、0.8がそのまま「0.8mm」という極太の下限として使われて
-    // しまっていた(これが「異様に太い」の直接の原因)。範囲指定書出時は、0.8px
-    // 相当を全体書出と同じ比率でmmに換算した値(_minLwMM244)を下限として使う
-    const _minLwMM244 = 0.8*(PDF_LONG_MM/6500);
     function _lwMM(lw){
-      if(rangeRect238){
-        return Math.max(0.1, Math.max(_minLwMM244,(lw||0)*_lwScale242*1.4));
-      }else{
-        return Math.max(0.1, Math.max(0.8,(lw||0)*pdfScale*1.4)*_sx); // 全体書出: 計算式は一切変更していない
-      }
+      return Math.max(0.1, Math.max(0.8,(lw||0)*pdfScale*1.4)*_sx);
     }
 
     // V1_153: 線種(点線・一点鎖線等)のダッシュパターンをmm単位に変換するヘルパー。
@@ -1836,8 +1478,7 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     // いるが、旧HD-PDF実装(V0_123〜V0_153)にはこの処理が無く、全て実線になっていた
     function _dashMM(dashArr){
       if(!dashArr||dashArr.length===0) return [];
-      const sc=rangeRect238?_lwScale242:pdfScale; // V2_43
-      return dashArr.map(function(d){ return Math.max(0.05, d*sc*_sx); });
+      return dashArr.map(function(d){ return Math.max(0.05, d*pdfScale*_sx); });
     }
 
     // V1_170: 手書き（ペン・蛍光ペン）ベクター描画をfilterModeで絞り込めるよう関数化。
@@ -1854,11 +1495,6 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
         if((s.page||1)!==_curPg155) continue;
         if(filterMode==='hl'&&!s.hl) continue;
         if(filterMode==='pen'&&s.hl) continue;
-        if(rangeRect238){ // V2_41
-          let sMnX=Infinity,sMnY=Infinity,sMxX=-Infinity,sMxY=-Infinity;
-          for(const p of s.pts){if(p.x<sMnX)sMnX=p.x;if(p.y<sMnY)sMnY=p.y;if(p.x>sMxX)sMxX=p.x;if(p.y>sMxY)sMxY=p.y;}
-          if(!_inRange241(sMnX,sMnY,sMxX,sMxY)) continue;
-        }
         const n=s.pts.length;
         const col=s.color||{r:0,g:0,b:0};
         // V1_189: 「HD-PDFの蛍光ペンが画面より細くなる」との指摘により修正。
@@ -1868,97 +1504,41 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
         // (図面全体をLONG_PXへ収めるための固定スケールpdfScale)で計算しているため、
         // 太さだけscale基準のままだと現在のズーム状態次第で細くなったり太くなったりして
         // いた。DXF線の太さ(_lwMM)と同じくpdfScale基準に統一する。
-        const _strokeSc242=rangeRect238?_lwScale242:pdfScale; // V2_43: 範囲指定書出は全体書出相当スケールで太さを揃える
-        const lwPx=s.hl?(s.lw*(_strokeSc242/lwRef155)):Math.max(1,s.lw*(_strokeSc242/lwRef155));
+        const lwPx=s.hl?(s.lw*(pdfScale/lwRef155)):Math.max(1,s.lw*(pdfScale/lwRef155));
         pdf.setDrawColor(col.r,col.g,col.b);
         pdf.setLineWidth(Math.max(0.05,lwPx*_sx));
         pdf.setLineCap('round'); pdf.setLineJoin('round');
         if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':0.45}));
-        if(rangeRect238){
-          // V2_42: 範囲指定書出時は境界で正確にクリップするため、ベジェ曲線ではなく
-          // 隣接する2点ずつを直線分割してクリップ描画する(滑らかさより範囲の
-          // 正確さを優先する。全体書出時は下のelse節で従来通りベジェ曲線を描く)
-          for(let i=0;i<n-1;i++){
-            const cl=_clipLine242(s.pts[i].x,s.pts[i].y,s.pts[i+1].x,s.pts[i+1].y,rangeRect238);
-            if(cl) pdf.line(w2mx(cl[0]),w2my(cl[1]),w2mx(cl[2]),w2my(cl[3]));
-          }
+        const P=s.pts.map(p=>[w2mx(p.x),w2my(p.y)]);
+        if(n===2){
+          pdf.line(P[0][0],P[0][1],P[1][0],P[1][1]);
         }else{
-          const P=s.pts.map(p=>[w2mx(p.x),w2my(p.y)]);
-          if(n===2){
-            pdf.line(P[0][0],P[0][1],P[1][0],P[1][1]);
-          }else{
-            let curX=(P[0][0]+P[1][0])/2, curY=(P[0][1]+P[1][1])/2;
-            const startX=curX, startY=curY;
-            const segs=[];
-            for(let i=1;i<n-1;i++){
-              const Qx=P[i][0], Qy=P[i][1];
-              const P2x=(P[i][0]+P[i+1][0])/2, P2y=(P[i][1]+P[i+1][1])/2;
-              const C1x=curX+2/3*(Qx-curX), C1y=curY+2/3*(Qy-curY);
-              const C2x=P2x+2/3*(Qx-P2x), C2y=P2y+2/3*(Qy-P2y);
-              segs.push([C1x-curX,C1y-curY,C2x-curX,C2y-curY,P2x-curX,P2y-curY]);
-              curX=P2x; curY=P2y;
-            }
-            segs.push([P[n-1][0]-curX, P[n-1][1]-curY]);
-            pdf.lines(segs,startX,startY,[1,1],'S',false);
+          let curX=(P[0][0]+P[1][0])/2, curY=(P[0][1]+P[1][1])/2;
+          const startX=curX, startY=curY;
+          const segs=[];
+          for(let i=1;i<n-1;i++){
+            const Qx=P[i][0], Qy=P[i][1];
+            const P2x=(P[i][0]+P[i+1][0])/2, P2y=(P[i][1]+P[i+1][1])/2;
+            const C1x=curX+2/3*(Qx-curX), C1y=curY+2/3*(Qy-curY);
+            const C2x=P2x+2/3*(Qx-P2x), C2y=P2y+2/3*(Qy-P2y);
+            segs.push([C1x-curX,C1y-curY,C2x-curX,C2y-curY,P2x-curX,P2y-curY]);
+            curX=P2x; curY=P2y;
           }
+          segs.push([P[n-1][0]-curX, P[n-1][1]-curY]);
+          pdf.lines(segs,startX,startY,[1,1],'S',false);
         }
         if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':1}));
       }
-    }
-
-    // V2_41: 「範囲指定書出」時、指定矩形(rangeRect238)と全く重ならない要素は
-    // 描画しないようにする(要素単位のフィルタリング)。境界をまたぐ要素は
-    // 従来通りそのまま描画される(はみ出て見える可能性はV2_39から許容している方針)。
-    // AABB(バウンディングボックス)交差判定のみの簡易版で、線分の一部だけを
-    // 切り取るような厳密なクリップは行わない(V2_38のjsPDF clip()導入時に
-    // 重大な描画不具合が出た経緯があるため、安全な方法に限定する)。
-    function _inRange241(minX,minY,maxX,maxY){
-      if(!rangeRect238) return true;
-      return minX<=rangeRect238.x2 && maxX>=rangeRect238.x1 && minY<=rangeRect238.y2 && maxY>=rangeRect238.y1;
-    }
-
-    // V2_42: 「境界をまたぐ要素は境界内だけ書き出したい」との要望により、線分を
-    // 指定矩形(rangeRect238、x1<=x2,y1<=y2前提)で正確に切り取るヘルパーを追加。
-    // Liang-Barskyアルゴリズム(標準的な線分クリッピング手法)。完全に範囲外ならnullを
-    // 返す。DXF線・円弧(36分割線分近似)・手書き線・寸法線はこれで境界ぴったりに
-    // 切り取れるが、文字(DXF文字・寸法値)は行単位でしか描画できず分割不可能なため、
-    // 引き続き基準点が範囲内かどうかで全体描画/非描画を判定する(V2_41のまま)。
-    function _clipLine242(x1,y1,x2,y2,rect){
-      let t0=0, t1=1;
-      const dx=x2-x1, dy=y2-y1;
-      const p=[-dx, dx, -dy, dy];
-      const q=[x1-rect.x1, rect.x2-x1, y1-rect.y1, rect.y2-y1];
-      for(let i=0;i<4;i++){
-        if(p[i]===0){
-          if(q[i]<0) return null;
-        }else{
-          const r=q[i]/p[i];
-          if(p[i]<0){
-            if(r>t1) return null;
-            if(r>t0) t0=r;
-          }else{
-            if(r<t0) return null;
-            if(r<t1) t1=r;
-          }
-        }
-      }
-      return [x1+t0*dx, y1+t0*dy, x1+t1*dx, y1+t1*dy];
     }
 
     // ── 6. DXF線分（sen）ベクター描画 ──
     if(doc&&doc.sen){
       for(const e of doc.sen){
         if(hiddenLayers.has(e.layer)) continue;
-        let lx1=e.x1, ly1=e.y1, lx2=e.x2, ly2=e.y2;
-        if(rangeRect238){
-          const cl=_clipLine242(lx1,ly1,lx2,ly2,rangeRect238);
-          if(!cl) continue;
-          lx1=cl[0];ly1=cl[1];lx2=cl[2];ly2=cl[3];
-        }
         _setPdfColor(e.color);
         pdf.setLineWidth(_lwMM(e.lw));
         pdf.setLineDashPattern(_dashMM(e.dash),0); // V1_153
-        pdf.line(w2mx(lx1),w2my(ly1),w2mx(lx2),w2my(ly2));
+        pdf.line(w2mx(e.x1),w2my(e.y1),w2mx(e.x2),w2my(e.y2));
       }
     }
 
@@ -1966,44 +1546,28 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     if(doc&&doc.enko){
       for(const e of doc.enko){
         if(hiddenLayers.has(e.layer)) continue;
-        const r=e.rx||e.r||0; if(r<=0) continue;
-        if(!_inRange241(e.cx-r,e.cy-r,e.cx+r,e.cy+r)) continue;
         _setPdfColor(e.color);
         pdf.setLineWidth(_lwMM(e.lw));
         pdf.setLineDashPattern(_dashMM(e.dash),0); // V1_153
+        const r=e.rx||e.r||0; if(r<=0) continue;
         const a1=e.a1!=null?e.a1:0, a2=e.a2!=null?e.a2:360;
         const cxmm=w2mx(e.cx), cymm=w2my(e.cy);
         const rMM=r*pdfScale*_sx;
-        if(a1===0&&a2===360&&!rangeRect238){
-          // 真円(全体書出時のみ): 従来通りjsPDF circle()。この分岐の計算式は
-          // V2_42でも一切変更していない
+        if(a1===0&&a2===360){
+          // 真円: jsPDF circle()
           pdf.circle(cxmm,cymm,rMM,'S');
         }else{
-          // 円弧、または範囲指定書出時の真円: 36分割線分近似（DXF角度: X軸正から反時計回り）
+          // 円弧: 36分割線分近似（DXF角度: X軸正から反時計回り）
           const rad1=a1*Math.PI/180;
           let rad2=a2*Math.PI/180;
-          if(rad2<=rad1) rad2+=2*Math.PI; // 折り返しアーク対応(a1=0,a2=360の場合も自動的にrad2=2πになる)
+          if(rad2<=rad1) rad2+=2*Math.PI; // 折り返しアーク対応
           const N=36;
-          if(rangeRect238){
-            // V2_42: 範囲指定書出時は境界で正確にクリップするため、ワールド座標で
-            // 各微小線分を計算してからクリップし、その後mm座標へ変換する
-            let wx0=e.cx+r*Math.cos(rad1), wy0=e.cy+r*Math.sin(rad1);
-            for(let i=1;i<=N;i++){
-              const a=rad1+(rad2-rad1)*i/N;
-              const wx1=e.cx+r*Math.cos(a), wy1=e.cy+r*Math.sin(a);
-              const cl=_clipLine242(wx0,wy0,wx1,wy1,rangeRect238);
-              if(cl) pdf.line(w2mx(cl[0]),w2my(cl[1]),w2mx(cl[2]),w2my(cl[3]));
-              wx0=wx1; wy0=wy1;
-            }
-          }else{
-            // 全体書出時: 従来通りmm座標で直接計算(計算式は一切変更していない)
-            let px0=cxmm+rMM*Math.cos(rad1), py0=cymm-rMM*Math.sin(rad1);
-            for(let i=1;i<=N;i++){
-              const a=rad1+(rad2-rad1)*i/N;
-              const px1=cxmm+rMM*Math.cos(a), py1=cymm-rMM*Math.sin(a);
-              pdf.line(px0,py0,px1,py1);
-              px0=px1; py0=py1;
-            }
+          let px0=cxmm+rMM*Math.cos(rad1), py0=cymm-rMM*Math.sin(rad1);
+          for(let i=1;i<=N;i++){
+            const a=rad1+(rad2-rad1)*i/N;
+            const px1=cxmm+rMM*Math.cos(a), py1=cymm-rMM*Math.sin(a);
+            pdf.line(px0,py0,px1,py1);
+            px0=px1; py0=py1;
           }
         }
       }
@@ -2026,7 +1590,6 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
       for(const e of doc.moji){
         if(hiddenLayers.has(e.layer)) continue;
         if(!e.text||!e.text.trim()) continue;
-        if(!_inRange241(e.x,e.y,e.x,e.y)) continue; // V2_41
         const xmm=w2mx(e.x);
         const ymm=w2my(e.y);
         // V1_153: V1_152の「最低6px相当」クランプは、6という数値がCanvas(CW)側の
@@ -2148,41 +1711,20 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
       const _curPg155b=_curPage();
       for(const d of dims){
         if((d.page||1)!==_curPg155b) continue;
-        if(rangeRect238){ // V2_41
-          let dMnX=Infinity,dMnY=Infinity,dMxX=-Infinity,dMxY=-Infinity;
-          for(const l of (d.lines||[])){
-            if(l.x1<dMnX)dMnX=l.x1; if(l.y1<dMnY)dMnY=l.y1; if(l.x1>dMxX)dMxX=l.x1; if(l.y1>dMxY)dMxY=l.y1;
-            if(l.x2<dMnX)dMnX=l.x2; if(l.y2<dMnY)dMnY=l.y2; if(l.x2>dMxX)dMxX=l.x2; if(l.y2>dMxY)dMxY=l.y2;
-          }
-          if(d.tx!=null&&d.ty!=null){if(d.tx<dMnX)dMnX=d.tx;if(d.ty<dMnY)dMnY=d.ty;if(d.tx>dMxX)dMxX=d.tx;if(d.ty>dMxY)dMxY=d.ty;}
-          if(isFinite(dMnX) && !_inRange241(dMnX,dMnY,dMxX,dMxY)) continue;
-        }
         const [dr,dg,db]=_hpHexColor(d.color);
         pdf.setDrawColor(dr,dg,db); pdf.setFillColor(dr,dg,db); pdf.setTextColor(dr,dg,db);
         // V1_156: 画面表示(dimensionTextMode='fixed')の比率(17px基準)をmmへ換算
         const worldH=d.worldFontH||(17/(scale||1));
-        const fsMM=Math.max(DIM_MIN_TEXT_MM, worldH*pdfScale*_sx*1.5); // 文字サイズ(表示用、変更なし)
-        // V2_43: 「範囲指定書出しの線が太すぎる」との要望により、寸法線・矢印・
-        // センターマークの太さ/サイズは、範囲指定書出時のみ全体書出相当の
-        // スケール(_lwScale242)を基準にする。文字サイズ(fsMM)・文字との間隔(gapMM)
-        // は従来通り拡大表示のまま(全体書出時はlwBaseMM===fsMMとなり計算結果は不変)
-        const _dimLwSc242=rangeRect238?_lwScale242:pdfScale;
-        const lwBaseMM=Math.max(DIM_MIN_TEXT_MM, worldH*_dimLwSc242*_sx*1.5);
-        const lineMM=Math.max(0.05, lwBaseMM/17);
-        const arrowLenMM=lwBaseMM*(10/(17*1.5));
-        const arrowWMM=lwBaseMM*(4/(17*1.5));
+        const fsMM=Math.max(DIM_MIN_TEXT_MM, worldH*pdfScale*_sx*1.5);
+        const lineMM=Math.max(0.05, fsMM/17);
+        const arrowLenMM=fsMM*(10/(17*1.5));
+        const arrowWMM=fsMM*(4/(17*1.5));
         const gapMM=fsMM*(8/(17*1.5));
-        const centerMarkMM=lwBaseMM*(8/(17*1.5));
+        const centerMarkMM=fsMM*(8/(17*1.5));
         pdf.setLineWidth(lineMM);
         pdf.setLineCap('butt'); pdf.setLineJoin('miter');
         for(const l of (d.lines||[])){
-          if(rangeRect238){
-            // V2_42: 寸法線も境界で正確にクリップする
-            const cl=_clipLine242(l.x1,l.y1,l.x2,l.y2,rangeRect238);
-            if(cl) pdf.line(w2mx(cl[0]),w2my(cl[1]),w2mx(cl[2]),w2my(cl[3]));
-          }else{
-            pdf.line(w2mx(l.x1),w2my(l.y1),w2mx(l.x2),w2my(l.y2));
-          }
+          pdf.line(w2mx(l.x1),w2my(l.y1),w2mx(l.x2),w2my(l.y2));
         }
         for(const a of (d.arrows||[])){
           const axmm=w2mx(a.x), aymm=w2my(a.y);
@@ -2237,8 +1779,7 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     }
 
     // ── 10. 保存 ──
-    // V2_38: 範囲指定書出の場合はファイル名で区別できるようにする
-    const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+(rangeRect238?'_hd_範囲':'_hd')+'.pdf';
+    const fname=(currentFileName||'drawing').replace(/\.[^.]+$/,'')+'_hd.pdf';
     if(_collectInto182){
       // V1_183: 収集モード。個別に保存せずBlobを呼び出し元へ渡す
       // (iOS Safari等は1回のユーザー操作につき1回しか保存/共有を許可しないため、
@@ -2532,25 +2073,5 @@ document.getElementById('hybridPDFBtn').addEventListener('click',function(){
     }
     return;
   }
-  // V2_38: DXFの場合、「全体書出」か「範囲指定書出」かを選べるようにする。
-  // ダイアログ関数が無い場合は従来通り全体書出のみ行う(フォールバック、既存動作維持)
-  if(typeof _showHdPdfScopeDialog238==='function'){
-    _showHdPdfScopeDialog238(document.getElementById('hybridPDFBtn'),function(scope){
-      if(scope==='range'){
-        if(!doc&&!(typeof pdfImage!=='undefined'&&pdfImage)){showGuide('図面がありません',1500);return;}
-        if(typeof resetToolStates==='function') resetToolStates();
-        if(typeof resetSW==='function') resetSW();
-        if(window.SW){
-          window.SW.active=true;
-          window.SW.purpose='hdpdf';
-        }
-        document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
-        showGuide('HD-PDF範囲指定：出力したい範囲を対角にドラッグしてください',0);
-      } else {
-        exportHybridPDF();
-      }
-    });
-  } else {
-    exportHybridPDF();
-  }
+  exportHybridPDF();
 });
