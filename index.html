@@ -1116,7 +1116,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_48</span>
+    <span id="ver-label">V2_49</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1555,27 +1555,27 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=248"></script>
-<script src="viewer.js?v=248"></script>
-<script src="utils.js?v=248"></script>
-<script src="ui.js?v=248"></script>
-<script src="dialog.js?v=248"></script>
-<script src="storage.js?v=248"></script>
-<script src="fonts/NotoSansJP.js?v=248"></script>
-<script src="export.js?v=248"></script>
-<script src="tool.js?v=248"></script>
-<script src="verify.js?v=248"></script>
+<script src="layer.js?v=249"></script>
+<script src="viewer.js?v=249"></script>
+<script src="utils.js?v=249"></script>
+<script src="ui.js?v=249"></script>
+<script src="dialog.js?v=249"></script>
+<script src="storage.js?v=249"></script>
+<script src="fonts/NotoSansJP.js?v=249"></script>
+<script src="export.js?v=249"></script>
+<script src="tool.js?v=249"></script>
+<script src="verify.js?v=249"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=248"></script>
-<script src="stroke-text.js?v=248"></script>
+<script src="shxGlyphs.js?v=249"></script>
+<script src="stroke-text.js?v=249"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=248"></script>
+<script src="pc.js?v=249"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=248"></script>
+<script src="supabase-sync.js?v=249"></script>
 <script>
-const APP_VERSION = 'V2_48';
+const APP_VERSION = 'V2_49';
 
 // =========================================================
 // グローバル状態
@@ -3141,7 +3141,7 @@ window.addEventListener('pagehide',function(){if(currentFileName)doSave();}); //
 window.addEventListener('beforeunload',function(){if(currentFileName)doSave();}); // V0_135: beforeunload追加（強制終了対策）// V0_144: ガード追加（ファイル未読込時にdoSaveすると復元前の保存データを空で上書きし消失するため）
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
-// V2_48: 画面ボタンを「白黒→カラー(背景黒)→カラー(背景白)」の3状態切替に拡張。
+// V2_49: 画面ボタンを「白黒→カラー(背景黒)→カラー(背景白)」の3状態切替に拡張。
 // 状態はbwMode/colorLightBgの組み合わせで表す(白黒=bwMode:true、
 // カラー背景黒=bwMode:false&colorLightBg:false、カラー背景白=bwMode:false&colorLightBg:true)
 function updateBwToggleBtn(){
@@ -3152,7 +3152,7 @@ function updateBwToggleBtn(){
   var idxClear=document.getElementById('allSearchClearBtn');
   // V1_234: 「全体」ボタンはヘッダー(#fitBtn、固定色のtb-btn)へ移動したため、
   // キャンバス背景色に応じた黒/白の枠・文字の切替は不要になり削除した
-  // V0_109 / V2_48: 画面(canvas)背景が白になるのはbwMode(白黒)とcolorLightBg
+  // V0_109 / V2_49: 画面(canvas)背景が白になるのはbwMode(白黒)とcolorLightBg
   // (カラー背景白)のどちらの時も同じなので、フォルダ検索✕・インデックスをクリアの
   // 色もこの2状態でまとめて黒にする
   var isWhiteCanvas=bwMode||colorLightBg;
@@ -6159,7 +6159,7 @@ function createSubWindow(rectWorld){
 
   var body=document.createElement('div');
   // V1_60: メイン画面同様、PDF表示中は白/黒背景切替(bwMode)の影響を受けず常に濃色背景にする
-  body.style.cssText='position:relative;flex:1;overflow:hidden;background:'+(((bwMode||colorLightBg)&&!pdfImage)?'#ffffff':'#1e2430')+';'; // V2_48: カラー(背景白)も白背景扱いに
+  body.style.cssText='position:relative;flex:1;overflow:hidden;background:'+(((bwMode||colorLightBg)&&!pdfImage)?'#ffffff':'#1e2430')+';'; // V2_49: カラー(背景白)も白背景扱いに
 
   var cvEl=document.createElement('canvas');
   var acEl=document.createElement('canvas');
@@ -6714,7 +6714,7 @@ window._renderAllSubWindows=function(){
    _justOp   : 演算子押下直後フラグ（次の数字で入力リセット） */
 let leftVal='',pendingOp='',curInput='0';
 let _afterEq=false,_justOp=false;
-let _lastOp='',_lastOperand=''; // V2_48: 「=」連続押しの定数計算用(直前に実際に使った演算子・右辺値)
+let _lastOp='',_lastOperand=''; // V2_49: 「=」連続押しの定数計算用(直前に実際に使った演算子・右辺値)
 let _dispExpr=''; // 式表示用。=後も保持し新規入力開始時にクリア
 let _dispTokens=[]; // 表示用トークン（内部計算から分離）
 
@@ -6858,7 +6858,7 @@ document.querySelectorAll('.cb').forEach(function(btn){
 
       if(fn==='C'){
         leftVal='';pendingOp='';curInput='0';_afterEq=false;_justOp=false;
-        _lastOp='';_lastOperand=''; // V2_48: 定数計算の記憶もクリア
+        _lastOp='';_lastOperand=''; // V2_49: 定数計算の記憶もクリア
         _dispExpr='';_dispTokens=[];
       }else if(fn==='⌫'){
         if(!_afterEq&&!_justOp) curInput=curInput.length>1?curInput.slice(0,-1):'0';
@@ -6873,7 +6873,7 @@ document.querySelectorAll('.cb').forEach(function(btn){
         curInput=parseFloat(Math.pow(cur,2).toFixed(d)).toString();
       }else if(fn==='='){
         if(pendingOp&&leftVal!==''){
-          // V2_48: 定数計算用に、今回実際に使った演算子・右辺値を記憶しておく
+          // V2_49: 定数計算用に、今回実際に使った演算子・右辺値を記憶しておく
           _lastOp=pendingOp;_lastOperand=curInput;
           var toks=_dispTokens.slice();
           if(toks.length&&toks[toks.length-1].type==='op')
@@ -6886,7 +6886,7 @@ document.querySelectorAll('.cb').forEach(function(btn){
           _dispExpr=dispForHist+' =';
           _dispTokens=[];
         }else if(_afterEq&&_lastOp){
-          // V2_48: 「=」を演算子を挟まず連続で押した場合、直前の演算子・右辺値を
+          // V2_49: 「=」を演算子を挟まず連続で押した場合、直前の演算子・右辺値を
           // 使って同じ計算を繰り返す(一般的な電卓の定数計算)
           var toks2=[{type:'num',val:curInput},{type:'op',val:_lastOp},{type:'num',val:_lastOperand}];
           var dispForHist2=_tokensToStr(toks2);
@@ -7544,7 +7544,7 @@ function _idbTx(mode,cb){
 // されたファイルかをレコードに持たせる（folder引数省略時は個別に開いたファイル
 // 扱いとして''を入れる）
 function _idbSave(name,buf,texts,folder){
-  _dxfIdxCache=null; // V2_48: 内容が変わるので検索キャッシュを破棄
+  _dxfIdxCache=null; // V2_49: 内容が変わるので検索キャッシュを破棄
   _idbTx('readwrite',function(err,tx){
     if(err)return;
     var req=tx.objectStore(_IDB_STORE).put({name:name,buf:buf,texts:texts,ts:Date.now(),folder:folder||''});
@@ -7611,7 +7611,7 @@ function _idbGetAll(cb){
   });
 }
 function _idbClear(){
-  _dxfIdxCache=null; // V2_48: 内容が変わるので検索キャッシュを破棄
+  _dxfIdxCache=null; // V2_49: 内容が変わるので検索キャッシュを破棄
   _idbTx('readwrite',function(err,tx){
     if(err)return;
     tx.objectStore(_IDB_STORE).clear();
@@ -7719,7 +7719,7 @@ function _idbLoadProfile(name,cb){
             var store=tx.objectStore(_IDB_STORE);
             store.clear();
             (prof.records||[]).forEach(function(r){store.put(r);});
-            tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_48: 検索キャッシュ破棄
+            tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_49: 検索キャッシュ破棄
             tx.onerror=function(e3){cb&&cb(e3.target.error);};
           } else {
             // V1_75: 新形式。dxfIndexProfileRecordsからカーソルで1件ずつ読み出し、
@@ -7736,7 +7736,7 @@ function _idbLoadProfile(name,cb){
                 cur.continue();
               }
             };
-            tx2.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_48: 検索キャッシュ破棄
+            tx2.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_49: 検索キャッシュ破棄
             tx2.onerror=function(e4){cb&&cb(e4.target.error);};
           }
         }catch(e4){cb&&cb(e4);}
@@ -7798,7 +7798,7 @@ function _idbLoadProfiles(names,cb){
             }
           }
           loadNext();
-          tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_48: 検索キャッシュ破棄
+          tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_49: 検索キャッシュ破棄
           tx.onerror=function(e3){cb&&cb(e3.target.error);};
         }catch(e4){cb&&cb(e4);}
       }
@@ -7843,7 +7843,7 @@ function _idbGetOne(name,cb){
 // bufも一時的にデシリアライズされるが、そのレコード自体を保持しないため（v.bufへ
 // 参照を残さない）、V1_23で修正した「全ファイルのbufを同時に保持し続けて重い・
 // 落ちる」問題を再発させない
-// V2_48: 「検索して開く」「全図面検索」とも、パネルを開くたび・1文字入力するたびに
+// V2_49: 「検索して開く」「全図面検索」とも、パネルを開くたび・1文字入力するたびに
 // 本関数を呼んでいたため（openFileSearchInputは150msデバウンス、allSearchInputは
 // デバウンス無し）、キーワード入力中に毎回dxfIndexストア全件のカーソル走査が発生し、
 // インデックス件数が多いフォルダほど入力のたびに固まって感じられる一因になっていた。
@@ -7865,7 +7865,7 @@ function _idbGetAllNameTexts(cb){
         out.push({name:v.name,texts:v.texts||[],ts:v.ts||0,folder:v.folder||''}); // V1_75: doAllSearch()をgetAll()から移行するためfolderも追加
         cursor.continue();
       } else {
-        _dxfIdxCache=out; // V2_48: 次回以降はこの結果を使い回す（更新操作側でnullに戻す）
+        _dxfIdxCache=out; // V2_49: 次回以降はこの結果を使い回す（更新操作側でnullに戻す）
         cb(out);
       }
     };
