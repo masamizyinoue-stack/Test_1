@@ -1,6 +1,31 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<script>
+// V2_54: 「V2_54でも(むしろ)遅い」との報告を受けた調査用。ネットワーク起因(ホスティング先の
+// 応答速度)を実測で切り分けるため、他の全スクリプトより前に置く独立コード。他の関数・変数には
+// 一切依存せず、ページの全リソース読込完了後(window.load)に、各ファイルの実際の読込時間を
+// 計測してalertで表示する。原因特定後にこの計測コードごと削除する
+window.addEventListener('load',function(){
+  setTimeout(function(){
+    try{
+      var nav=performance.getEntriesByType('navigation')[0];
+      var res=performance.getEntriesByType('resource').slice().sort(function(a,b){return b.duration-a.duration;});
+      var lines=[];
+      lines.push('ページ全体(load完了まで): '+Math.round(performance.now())+'ms');
+      if(nav) lines.push('  内訳: TTFB '+Math.round(nav.responseStart)+'ms / HTML受信完了 '+Math.round(nav.responseEnd)+'ms / DOM構築完了 '+Math.round(nav.domContentLoadedEventEnd)+'ms');
+      lines.push('--- 読込が遅いファイル上位10件 ---');
+      for(var i=0;i<Math.min(10,res.length);i++){
+        var r=res[i];
+        var shortName=r.name.split('/').pop().split('?')[0];
+        lines.push(shortName+': '+Math.round(r.duration)+'ms (転送'+Math.round((r.transferSize||0)/1024)+'KB)');
+      }
+      lines.push('合計リソース数: '+res.length+'件');
+      alert(lines.join('\n'));
+    }catch(e){alert('[V2_54計測エラー] '+e.message);}
+  },300);
+});
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>DXF View v1</title>
@@ -1116,7 +1141,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="sp-header">
     <span class="sp-title">設定</span>
     <!-- V0_143: バージョン表示はここに一本化。id="ver-label"でJSがAPP_VERSIONを自動反映（下部の重複表示は削除済み） -->
-    <span id="ver-label">V2_53</span>
+    <span id="ver-label">V2_54</span>
     <button class="sp-close" id="settingsClose">✕</button>
   </div>
   <button id="openFileBtnMain">
@@ -1555,13 +1580,13 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 
 <!-- V0_148.1: 全ローカルJSに ?v= を付与（バージョンアップ時にSafari/PWAが旧JSキャッシュを使い
      新HTMLと混在して計測不能等が起きるバグの修正。以後のバージョンアップでは必ずv=も更新すること） -->
-<script src="layer.js?v=253"></script>
-<script src="viewer.js?v=253"></script>
-<script src="utils.js?v=253"></script>
-<script src="ui.js?v=253"></script>
-<script src="dialog.js?v=253"></script>
-<script src="storage.js?v=253"></script>
-<!-- V2_53: 「ページを開いてすぐファイルを開くと遅い(特にネットワークが遅いホスティング先で顕著)」
+<script src="layer.js?v=254"></script>
+<script src="viewer.js?v=254"></script>
+<script src="utils.js?v=254"></script>
+<script src="ui.js?v=254"></script>
+<script src="dialog.js?v=254"></script>
+<script src="storage.js?v=254"></script>
+<!-- V2_54: 「ページを開いてすぐファイルを開くと遅い(特にネットワークが遅いホスティング先で顕著)」
      の対応。このNotoSansJP.js(約3MB、HD-PDF書出でのみ使用するフォントデータ)を他の全スクリプトより
      前で同期読み込みしていたため、ダウンロードが遅い環境ではこのファイル1つのせいで、後続の
      export.js/tool.js/verify.js/shxGlyphs.js/stroke-text.js/pc.js/supabase-sync.jsや、
@@ -1571,21 +1596,21 @@ body.settings-open #settingsPanel{transform:translateX(0)}
      仕組みが既にあり、通常のファイル表示(DXF/PDFを開くだけ)では一切使われないため、
      ここでの先読みは不要と判断し削除した。HD-PDF書出機能自体は_loadJPFont()により
      初回書出時に読み込まれるため変更なし(exportPdfMergedHybrid190側は元々_loadJPFont()を
-     呼んでいなかったため、こちらもV2_53で呼ぶよう修正済み。export.js側のコメント参照) -->
-<script src="export.js?v=253"></script>
-<script src="tool.js?v=253"></script>
-<script src="verify.js?v=253"></script>
+     呼んでいなかったため、こちらもV2_54で呼ぶよう修正済み。export.js側のコメント参照) -->
+<script src="export.js?v=254"></script>
+<script src="tool.js?v=254"></script>
+<script src="verify.js?v=254"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
-<script src="shxGlyphs.js?v=253"></script>
-<script src="stroke-text.js?v=253"></script>
+<script src="shxGlyphs.js?v=254"></script>
+<script src="stroke-text.js?v=254"></script>
 <!-- V1_78: PC(マウス・キーボード)向けの追加機能。iPadのタッチ/Apple Pencil操作には
      影響しない「追加のみ」の実装（詳細はpc.js冒頭コメント参照） -->
-<script src="pc.js?v=253"></script>
+<script src="pc.js?v=254"></script>
 <!-- V1_01: 図面ごとの注記(strokes/dims)をSupabaseへ自動保存・自動復元するための追加 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-sync.js?v=253"></script>
+<script src="supabase-sync.js?v=254"></script>
 <script>
-const APP_VERSION = 'V2_53';
+const APP_VERSION = 'V2_54';
 
 // =========================================================
 // グローバル状態
@@ -2214,7 +2239,7 @@ async function _openOneFile202(f, e, _busyManagedByCaller){
     // V1_57: PDF自身のfileKeyに紐づく書込みデータ(dxfViewerDxfviewDB)があれば復元する
     // （従来DXF分岐にはあったが、PDF分岐には無く、同じPDFを開き直しても書込みが
     // 復元されなかった）
-    // V2_53: 「ファイルを開くのが遅い」の対応。ここは従来、ファイルを開くたびに
+    // V2_54: 「ファイルを開くのが遅い」の対応。ここは従来、ファイルを開くたびに
     // indexedDB.open('dxfViewerDxfviewDB',1)で新規接続を開いており、storage.js側で
     // 既に接続キャッシュ化された_dvOpenIdb()(同じDBを指す)を使わず、毎回フルの
     // 接続確立(onupgradeneeded判定含む)コストがかかっていた。他の2箇所(DXF分岐・
@@ -2279,7 +2304,7 @@ async function _openOneFile202(f, e, _busyManagedByCaller){
       _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
       // V0_133: dxfViewerDxfviewDB(fileKey単位)から書き込みデータを復元
       // ※SAVE_KEY復元は廃止（異ファイル間でデータが混入するバグを修正）
-      // V2_53: PDF分岐と同じ理由でindexedDB.open()の都度接続をやめ、_dvOpenIdb()
+      // V2_54: PDF分岐と同じ理由でindexedDB.open()の都度接続をやめ、_dvOpenIdb()
       // (storage.js、接続キャッシュ済み)を使うよう統一
       {var _fkR=_fileKey(f.name,f.size);
       var _dvR=await new Promise(function(resolve){
@@ -3165,7 +3190,7 @@ window.addEventListener('pagehide',function(){if(currentFileName)doSave();}); //
 window.addEventListener('beforeunload',function(){if(currentFileName)doSave();}); // V0_135: beforeunload追加（強制終了対策）// V0_144: ガード追加（ファイル未読込時にdoSaveすると復元前の保存データを空で上書きし消失するため）
 document.getElementById('settingsOverlay').addEventListener('click',()=>document.body.classList.remove('settings-open'));
 // layerBtn/layerClose/layerModal イベントリスナー → layer.js
-// V2_53: 画面ボタンを「白黒→カラー(背景黒)→カラー(背景白)」の3状態切替に拡張。
+// V2_54: 画面ボタンを「白黒→カラー(背景黒)→カラー(背景白)」の3状態切替に拡張。
 // 状態はbwMode/colorLightBgの組み合わせで表す(白黒=bwMode:true、
 // カラー背景黒=bwMode:false&colorLightBg:false、カラー背景白=bwMode:false&colorLightBg:true)
 function updateBwToggleBtn(){
@@ -3176,7 +3201,7 @@ function updateBwToggleBtn(){
   var idxClear=document.getElementById('allSearchClearBtn');
   // V1_234: 「全体」ボタンはヘッダー(#fitBtn、固定色のtb-btn)へ移動したため、
   // キャンバス背景色に応じた黒/白の枠・文字の切替は不要になり削除した
-  // V0_109 / V2_53: 画面(canvas)背景が白になるのはbwMode(白黒)とcolorLightBg
+  // V0_109 / V2_54: 画面(canvas)背景が白になるのはbwMode(白黒)とcolorLightBg
   // (カラー背景白)のどちらの時も同じなので、フォルダ検索✕・インデックスをクリアの
   // 色もこの2状態でまとめて黒にする
   var isWhiteCanvas=bwMode||colorLightBg;
@@ -6183,7 +6208,7 @@ function createSubWindow(rectWorld){
 
   var body=document.createElement('div');
   // V1_60: メイン画面同様、PDF表示中は白/黒背景切替(bwMode)の影響を受けず常に濃色背景にする
-  body.style.cssText='position:relative;flex:1;overflow:hidden;background:'+(((bwMode||colorLightBg)&&!pdfImage)?'#ffffff':'#1e2430')+';'; // V2_53: カラー(背景白)も白背景扱いに
+  body.style.cssText='position:relative;flex:1;overflow:hidden;background:'+(((bwMode||colorLightBg)&&!pdfImage)?'#ffffff':'#1e2430')+';'; // V2_54: カラー(背景白)も白背景扱いに
 
   var cvEl=document.createElement('canvas');
   var acEl=document.createElement('canvas');
@@ -6738,7 +6763,7 @@ window._renderAllSubWindows=function(){
    _justOp   : 演算子押下直後フラグ（次の数字で入力リセット） */
 let leftVal='',pendingOp='',curInput='0';
 let _afterEq=false,_justOp=false;
-let _lastOp='',_lastOperand=''; // V2_53: 「=」連続押しの定数計算用(直前に実際に使った演算子・右辺値)
+let _lastOp='',_lastOperand=''; // V2_54: 「=」連続押しの定数計算用(直前に実際に使った演算子・右辺値)
 let _dispExpr=''; // 式表示用。=後も保持し新規入力開始時にクリア
 let _dispTokens=[]; // 表示用トークン（内部計算から分離）
 
@@ -6882,7 +6907,7 @@ document.querySelectorAll('.cb').forEach(function(btn){
 
       if(fn==='C'){
         leftVal='';pendingOp='';curInput='0';_afterEq=false;_justOp=false;
-        _lastOp='';_lastOperand=''; // V2_53: 定数計算の記憶もクリア
+        _lastOp='';_lastOperand=''; // V2_54: 定数計算の記憶もクリア
         _dispExpr='';_dispTokens=[];
       }else if(fn==='⌫'){
         if(!_afterEq&&!_justOp) curInput=curInput.length>1?curInput.slice(0,-1):'0';
@@ -6897,7 +6922,7 @@ document.querySelectorAll('.cb').forEach(function(btn){
         curInput=parseFloat(Math.pow(cur,2).toFixed(d)).toString();
       }else if(fn==='='){
         if(pendingOp&&leftVal!==''){
-          // V2_53: 定数計算用に、今回実際に使った演算子・右辺値を記憶しておく
+          // V2_54: 定数計算用に、今回実際に使った演算子・右辺値を記憶しておく
           _lastOp=pendingOp;_lastOperand=curInput;
           var toks=_dispTokens.slice();
           if(toks.length&&toks[toks.length-1].type==='op')
@@ -6910,7 +6935,7 @@ document.querySelectorAll('.cb').forEach(function(btn){
           _dispExpr=dispForHist+' =';
           _dispTokens=[];
         }else if(_afterEq&&_lastOp){
-          // V2_53: 「=」を演算子を挟まず連続で押した場合、直前の演算子・右辺値を
+          // V2_54: 「=」を演算子を挟まず連続で押した場合、直前の演算子・右辺値を
           // 使って同じ計算を繰り返す(一般的な電卓の定数計算)
           var toks2=[{type:'num',val:curInput},{type:'op',val:_lastOp},{type:'num',val:_lastOperand}];
           var dispForHist2=_tokensToStr(toks2);
@@ -7568,7 +7593,7 @@ function _idbTx(mode,cb){
 // されたファイルかをレコードに持たせる（folder引数省略時は個別に開いたファイル
 // 扱いとして''を入れる）
 function _idbSave(name,buf,texts,folder){
-  _dxfIdxCache=null; // V2_53: 内容が変わるので検索キャッシュを破棄
+  _dxfIdxCache=null; // V2_54: 内容が変わるので検索キャッシュを破棄
   _idbTx('readwrite',function(err,tx){
     if(err)return;
     var req=tx.objectStore(_IDB_STORE).put({name:name,buf:buf,texts:texts,ts:Date.now(),folder:folder||''});
@@ -7635,7 +7660,7 @@ function _idbGetAll(cb){
   });
 }
 function _idbClear(){
-  _dxfIdxCache=null; // V2_53: 内容が変わるので検索キャッシュを破棄
+  _dxfIdxCache=null; // V2_54: 内容が変わるので検索キャッシュを破棄
   _idbTx('readwrite',function(err,tx){
     if(err)return;
     tx.objectStore(_IDB_STORE).clear();
@@ -7743,7 +7768,7 @@ function _idbLoadProfile(name,cb){
             var store=tx.objectStore(_IDB_STORE);
             store.clear();
             (prof.records||[]).forEach(function(r){store.put(r);});
-            tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_53: 検索キャッシュ破棄
+            tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_54: 検索キャッシュ破棄
             tx.onerror=function(e3){cb&&cb(e3.target.error);};
           } else {
             // V1_75: 新形式。dxfIndexProfileRecordsからカーソルで1件ずつ読み出し、
@@ -7760,7 +7785,7 @@ function _idbLoadProfile(name,cb){
                 cur.continue();
               }
             };
-            tx2.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_53: 検索キャッシュ破棄
+            tx2.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_54: 検索キャッシュ破棄
             tx2.onerror=function(e4){cb&&cb(e4.target.error);};
           }
         }catch(e4){cb&&cb(e4);}
@@ -7822,7 +7847,7 @@ function _idbLoadProfiles(names,cb){
             }
           }
           loadNext();
-          tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_53: 検索キャッシュ破棄
+          tx.oncomplete=function(){_dxfIdxCache=null;cb&&cb(null);}; // V2_54: 検索キャッシュ破棄
           tx.onerror=function(e3){cb&&cb(e3.target.error);};
         }catch(e4){cb&&cb(e4);}
       }
@@ -7867,7 +7892,7 @@ function _idbGetOne(name,cb){
 // bufも一時的にデシリアライズされるが、そのレコード自体を保持しないため（v.bufへ
 // 参照を残さない）、V1_23で修正した「全ファイルのbufを同時に保持し続けて重い・
 // 落ちる」問題を再発させない
-// V2_53: 「検索して開く」「全図面検索」とも、パネルを開くたび・1文字入力するたびに
+// V2_54: 「検索して開く」「全図面検索」とも、パネルを開くたび・1文字入力するたびに
 // 本関数を呼んでいたため（openFileSearchInputは150msデバウンス、allSearchInputは
 // デバウンス無し）、キーワード入力中に毎回dxfIndexストア全件のカーソル走査が発生し、
 // インデックス件数が多いフォルダほど入力のたびに固まって感じられる一因になっていた。
@@ -7889,7 +7914,7 @@ function _idbGetAllNameTexts(cb){
         out.push({name:v.name,texts:v.texts||[],ts:v.ts||0,folder:v.folder||''}); // V1_75: doAllSearch()をgetAll()から移行するためfolderも追加
         cursor.continue();
       } else {
-        _dxfIdxCache=out; // V2_53: 次回以降はこの結果を使い回す（更新操作側でnullに戻す）
+        _dxfIdxCache=out; // V2_54: 次回以降はこの結果を使い回す（更新操作側でnullに戻す）
         cb(out);
       }
     };
@@ -8081,7 +8106,7 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
     } else {
       // ⑦ 新規タブ: まず空初期化、次にIDB復元を試みる（F-1）
       hiddenLayers.clear(); strokes=[]; dims=[]; images=[]; // V0_160: savedViewsはグローバルのためリセットしない
-      // V2_53: 他2箇所と同じ理由でindexedDB.open()の都度接続をやめ、_dvOpenIdb()
+      // V2_54: 他2箇所と同じ理由でindexedDB.open()の都度接続をやめ、_dvOpenIdb()
       // (storage.js、接続キャッシュ済み)を使うよう統一
       var _dvR=await new Promise(function(resolve){
         _dvOpenIdb(function(err,db){
