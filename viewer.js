@@ -913,7 +913,19 @@ function convertOne(P,si,layerMap,ltypeMap,blockMap,depth){
           return {x:ix+lx*sx*cos-ly*sy*sin,y:iy+lx*sx*sin+ly*sy*cos};
         }
         for(const e of block.ents){
-          const ne=JSON.parse(JSON.stringify(e));
+          // V2_51: 「小さいDXFファイルでも開くのに数秒かかる」件の対応。INSERTは
+          // 参照先BLOCKの全エンティティをこの座標変換のために複製する必要があるが、
+          // 従来はJSON.parse(JSON.stringify(e))でディープクローンしていた。ネストした
+          // BLOCK(部品の中に部品、最大12階層)を多数箇所に配置する図面(ボルト・溶接
+          // 記号等の繰返しが多い鉄骨図面で典型的)では、この複製が数千〜数万回発生し、
+          // JSONの文字列化+再パースは1件ずつは軽くても積み重なると顕著に遅い。
+          // ここで変換後に書き換えるのはx1/y1/x2/y2/cx/cy/rx/ry/r/tilt/x/y/pts(solidのみ、
+          // 常にmap()で新しい配列に差し替えるため元配列は書き換わらない)だけで、color/dash
+          // 等のネストしたプロパティ自体を書き換える箇所は無い(colorはconvertOneで
+          // エンティティ毎に新規生成される・dashも同様で他所から書き換えられることも無い)。
+          // そのため実体としてはトップレベルのプロパティだけ複製すれば十分で、
+          // Object.assignによる浅いコピーで安全に高速化できる
+          const ne=Object.assign({},e);
           if(ne.type==='sen'){
             const p1=transform(ne.x1,ne.y1),p2=transform(ne.x2,ne.y2);
             ne.x1=p1.x;ne.y1=p1.y;ne.x2=p2.x;ne.y2=p2.y;
@@ -932,7 +944,9 @@ function convertOne(P,si,layerMap,ltypeMap,blockMap,depth){
   } else if(type==='DIMENSION'){
     const bname=gv(2,'')||'';
     if(bname&&blockMap[bname]&&depth<12){
-      for(const e of blockMap[bname].ents) result.push(JSON.parse(JSON.stringify(e)));
+      // V2_51: INSERTと同じ理由で浅いコピーに変更(このブロックでは座標変換すら
+      // 行わないため、複製自体は元々別インスタンス化のためだけの目的だった)
+      for(const e of blockMap[bname].ents) result.push(Object.assign({},e));
     }
   }
   return result;
