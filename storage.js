@@ -25,7 +25,13 @@ const _LS_IDB_NAME='dxfViewerFilesDB';
 const _LS_IDB_VER=1;
 const _LS_IDB_STORE='dxfFiles';
 
+// V2_46: doSave()のたび（約800msデバウンスで高頻度）に呼ばれるが、従来は毎回
+// indexedDB.open()で新規接続を開き、一度もclose()していなかった。_dvAutoSave()で
+// 実際にクラッシュを引き起こしたのと同じ「未クローズ接続が溜まる」パターンのため、
+// _dvOpenIdb()と同じ対策（接続キャッシュ＋onclose検知による自動再接続）を適用した
+var _lsIdbConn=null;
 function _lsIdbOpen(cb){
+  if(_lsIdbConn){cb(null,_lsIdbConn);return;}
   var req=indexedDB.open(_LS_IDB_NAME,_LS_IDB_VER);
   req.onupgradeneeded=function(e){
     var db=e.target.result;
@@ -33,7 +39,11 @@ function _lsIdbOpen(cb){
     if(!db.objectStoreNames.contains(_LS_IDB_STORE))
       db.createObjectStore(_LS_IDB_STORE,{keyPath:'name'});
   };
-  req.onsuccess=function(e){cb(null,e.target.result);};
+  req.onsuccess=function(e){
+    _lsIdbConn=e.target.result;
+    _lsIdbConn.onclose=function(){_lsIdbConn=null;};
+    cb(null,_lsIdbConn);
+  };
   req.onerror=function(e){cb(e.target.error,null);};
 }
 
@@ -43,6 +53,21 @@ function _lsIdbPut(name,buf){
     if(err)return;
     var tx=db.transaction(_LS_IDB_STORE,'readwrite');
     tx.objectStore(_LS_IDB_STORE).put({name:name,buf:buf,ts:Date.now()});
+  });
+}
+
+// V2_24: ファイル本体(dxfFiles)を明示的に削除する。タブを閉じた時の自動削除
+// (index.htmlのdoCloseTab)、設定パネルの一括削除機能から使う独立した追加関数。
+// 既存のput/get処理(自動保存・復元)には一切影響しない
+function _lsIdbDelete(name,cb){
+  _lsIdbOpen(function(err,db){
+    if(err){ if(cb)cb(err); return; }
+    try{
+      var tx=db.transaction(_LS_IDB_STORE,'readwrite');
+      tx.objectStore(_LS_IDB_STORE).delete(name);
+      tx.oncomplete=function(){ if(cb)cb(null); };
+      tx.onerror=function(e){ if(cb)cb(e.target.error); };
+    }catch(e){ if(cb)cb(e); }
   });
 }
 
@@ -117,7 +142,7 @@ function doSave(){
     const _insetSv162=(typeof currentFileIdx!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx])?(openFiles[currentFileIdx].insetState||null):null;
     localStorage.setItem(SAVE_KEY,JSON.stringify({
       strokes,dims,savedViews,tx,ty,scale,fitScale,
-      bwMode,scaleDenom:sd,hiddenLayers:[...hiddenLayers],
+      bwMode,colorLightBg:(typeof colorLightBg!=='undefined'?colorLightBg:false),scaleDenom:sd,hiddenLayers:[...hiddenLayers], // V2_48: カラー(背景白)状態も保存
       currentTool,currentColor,currentLW,currentFileName,fileSize:currentFileSize,
       fileKey:(typeof _fileKey==='function'?_fileKey(currentFileName,currentFileSize):null),
       currentHL_Color,currentHL_LW,currentDimColor,
@@ -328,6 +353,7 @@ async function tryRestore(){
           if(_raw2){
             const _d2=JSON.parse(_raw2);
             bwMode=!!_d2.bwMode;
+            colorLightBg=!!_d2.colorLightBg; // V2_48: カラー(背景白)状態を復元
             currentTool=_d2.currentTool||'sketch';
             if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
             if(currentTool==='circDim'||currentTool==='radDim'||currentTool==='lp'||currentTool==='lineLen')currentTool='sketch'; // V0_148.1: DIM/LP系は状態機械(active)を復元できずボタン表示と実動作が食い違うためsketchに正規化 / V1_240: 線の長さも同様の理由でここに追加
@@ -432,6 +458,7 @@ async function tryRestore(){
     tx=d.tx||0;ty=d.ty||0;scale=d.scale||1;
     if(d.fitScale) fitScale=d.fitScale;
     bwMode=!!d.bwMode;
+    colorLightBg=!!d.colorLightBg; // V2_48: カラー(背景白)状態を復元
     if(d.hiddenLayers)hiddenLayers=new Set(d.hiddenLayers);
     currentTool=d.currentTool||'sketch';
     if(currentTool==='dx'||currentTool==='dy')currentTool='dxdy';
@@ -515,7 +542,12 @@ const _BK_IDB_STORE='backups';
 const _BK_COOLDOWN=60000; // 60秒
 const _BK_KEEP=5;         // ファイルごとに保持する世代数
 
+// V2_46: 60秒クールダウンごとに呼ばれるが、従来は毎回indexedDB.open()で新規接続を
+// 開き、一度もclose()していなかった。_dvOpenIdb()と同じ対策（接続キャッシュ＋
+// onclose検知による自動再接続）を適用した
+var _bkIdbConn=null;
 function _bkIdbOpen(cb){
+  if(_bkIdbConn){cb(null,_bkIdbConn);return;}
   var req=indexedDB.open(_BK_IDB_NAME,_BK_IDB_VER);
   req.onupgradeneeded=function(e){
     var db=e.target.result;
@@ -525,7 +557,11 @@ function _bkIdbOpen(cb){
       store.createIndex('ts','ts',{unique:false});
     }
   };
-  req.onsuccess=function(e){cb(null,e.target.result);};
+  req.onsuccess=function(e){
+    _bkIdbConn=e.target.result;
+    _bkIdbConn.onclose=function(){_bkIdbConn=null;};
+    cb(null,_bkIdbConn);
+  };
   req.onerror=function(e){cb(e.target.error,null);};
 }
 
