@@ -21,6 +21,10 @@ var currentFileName='';
 var tx=0,ty=0,scale=1;
 var fitScale=1;       // V0_83: 全体表示時のscaleを記録（drawAnnotation lineWidth基準用）
 var bwMode=true;  // false=黒背景
+// V2_48: 画面ボタンを「白黒→カラー(背景黒)→カラー(背景白)」の3状態に拡張するための
+// 追加フラグ。bwMode=falseの時だけ意味を持ち、trueなら「カラー表示だが背景は白」。
+// bwMode=true(白黒)の時は常にfalse扱いとする(白黒モードの意味は変えていない)
+var colorLightBg=false;
 var dimensionTextMode='fixed'; // 'auto' | 'fixed'  寸法文字サイズモード（V0_154: 「サイズ指定」(manual)は廃止）
 var DIM_TEXT_MIN_PX=11;  // autoモード: 最小スクリーンpx
 var DIM_TEXT_MAX_PX=30;  // autoモード: 最大スクリーンpx
@@ -964,7 +968,16 @@ function zoomAt(cx,cy,factor){tx=(tx-cx)*factor+cx;ty=(ty-cy)*factor+cy;scale*=f
 function rgbCss(c,darkBg){
   if(bwMode) return '#000';
   if(darkBg&&c.r<20&&c.g<20&&c.b<20) return '#ffffff';
-  if(!darkBg&&c.r>235&&c.g>235&&c.b>235) return '#000000';
+  // V2_48: 「カラー(背景白)」で白い線が見えなくなる件の対応。従来は(r,g,b)全てが
+  // 235超という「ほぼ純白」しか黒へ変換しておらず、ACI9(192,192,192)やグレー系
+  // 250番台(228等)のような「白っぽいがやや暗いグレー」は変換されず、白背景上で
+  // 非常に見えにくいままだった。彩度(最大値と最小値の差)が小さい=グレー系の色に限り、
+  // 明るさの基準を150まで緩めて黒に変換するようにした。彩度のある色(赤・黄・シアン等)は
+  // 従来通り変換しない(意図的に使い分けている色を誤って黒くしないため)
+  if(!darkBg){
+    const mx=Math.max(c.r,c.g,c.b),mn=Math.min(c.r,c.g,c.b);
+    if(mx>=150&&(mx-mn)<=40) return '#000000';
+  }
   return `rgb(${c.r},${c.g},${c.b})`;
 }
 
@@ -1059,11 +1072,14 @@ function draw(){
   ctx.save();
   ctx.scale(dpr,dpr);
   const W=cv.width/dpr, H=cv.height/dpr;
-  const darkBg=!bwMode;
+  // V2_48: 「カラー(背景白)」モード(colorLightBg)追加に伴い、背景が白になるのは
+  // bwMode(白黒)だけでなくcolorLightBgの時も含めるよう拡張。どちらでもない場合
+  // (カラー・背景黒)のみdarkBg=trueとする
+  const darkBg=!bwMode&&!colorLightBg;
   // V1_60: PDF表示時は白/黒背景切替(bwMode)の影響を受けず常に濃色背景にする。
   // PDF自体が白いページとして描画されるため、白背景モードのままだとページの
   // 余白と背景が同化して「余白が無限」に見えてしまっていた
-  ctx.fillStyle=(bwMode&&!pdfImage)?'#ffffff':'#1e2430';
+  ctx.fillStyle=((bwMode||colorLightBg)&&!pdfImage)?'#ffffff':'#1e2430';
   ctx.fillRect(0,0,W,H);
   if(!doc&&!pdfImage){ctx.restore();return;}
   if(pdfImage){

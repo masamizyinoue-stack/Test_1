@@ -311,7 +311,7 @@ async function _runPdfExport(_dlgSel){
       pdfComp=document.createElement('canvas'); pdfComp.width=CW; pdfComp.height=CH;
       _rComp=pdfComp;
       const pctx=pdfComp.getContext('2d');
-      pctx.fillStyle=bwMode?'#fff':'#1e2430';
+      pctx.fillStyle=(bwMode||(typeof colorLightBg!=='undefined'&&colorLightBg))?'#fff':'#1e2430'; // V2_48: カラー(背景白)も白背景扱いに
       pctx.fillRect(0,0,CW,CH);
 
       // ①' 蛍光ペンのみ先行描画（V1_170: DXF/文字より下に敷くことで、印刷時に黒文字が
