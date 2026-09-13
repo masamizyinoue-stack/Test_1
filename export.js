@@ -1131,10 +1131,17 @@ function importDxfviewManual(){
         showGuide('ZIP機能が読み込まれていません',2000);return;
       }
       JSZip.loadAsync(file).then(async function(zipObj){
-        var names=Object.keys(zipObj.files);
+        // V2_58: フォルダ区切り(まとめてバックアップのサブフォルダ)・ディレクトリ自体の
+        // エントリ(JSZipはfolder()で作った場合"xxx/"という名前のエントリを含む)を
+        // 誤って元図面として扱わないよう、まずディレクトリエントリを除外する
+        var names=Object.keys(zipObj.files).filter(function(n){
+          var zf=zipObj.files[n];
+          return !(zf&&zf.dir)&&!n.endsWith('/');
+        });
         // V1_179: 原因切り分けのため、ZIP内の実際のファイル一覧を必ず記録しておく
         verify('バックアップ復元:zip内容',{names:names});
-        var dvName=names.find(function(n){return n.toLowerCase().endsWith('.dxfview');});
+        var dvNames=names.filter(function(n){return n.toLowerCase().endsWith('.dxfview');});
+        var dvName=dvNames[0];
         if(!dvName){
           // V1_214: 自社の.dxfviewが無い場合、旧アプリ「M_VIEWER」独自のバックアップZIP
           // (PDF + strokes.json + meta.json)かどうかを判定する。M_VIEWERを使っていた人が
@@ -1146,8 +1153,22 @@ function importDxfviewManual(){
           }
           alert('ZIP内に.dxfviewファイルが見つかりません。\nZIP内のファイル: '+names.join(', '));return;
         }
-        // V1_177: .dxfview以外の1件を元図面(DXF/tdf)として扱う
-        var drawName=names.find(function(n){return n!==dvName;});
+        // V2_58: 「全書込Backup」「まとめてバックアップ」等、.dxfviewが複数入っている
+        // ZIP(1ファイル専用のこのボタン向けではない)を誤って渡された場合、以前は
+        // 2件目の.dxfviewを元図面だと誤認して開こうとし、パース失敗により
+        // 「何も書いてない図面が開く」ように見える不具合があった。ここで検知し、
+        // 正しいボタン(全バックアップ復元)へ案内して処理を中断する
+        if(dvNames.length>1){
+          alert('このZIPには書込みデータ(.dxfview)が'+dvNames.length+'件含まれています。\n'+
+            'この「バックアップ復元」は1ファイル分専用です。\n'+
+            '複数ファイル分をまとめて復元する場合は「全バックアップ復元」ボタンをご使用ください。');
+          return;
+        }
+        // V1_177: .dxfview以外の1件を元図面(DXF/PDF/tdf/Excel)として扱う。
+        // V2_58: 拡張子不明のファイル(旧不具合ではディレクトリエントリ)を誤って
+        // 元図面として開こうとしないよう、既知の図面拡張子のものだけを対象にする
+        var _drawExtRe58=/\.(dxf|pdf|tdf|xlsx|xls|csv)$/i;
+        var drawName=names.find(function(n){return n!==dvName&&_drawExtRe58.test(n);});
         var dvText=await zipObj.files[dvName].async('string');
         var _drawOpened179=false;
         if(drawName){
