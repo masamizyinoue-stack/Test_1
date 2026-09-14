@@ -224,7 +224,12 @@ tr.excel-sort-row td{font-weight:700;background:#ffd6e8;border-top:2px solid #d8
   padding:10px 8px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   box-shadow:0 8px 32px rgba(0,0,0,.65)}
 #vbmPop.on{display:flex}
-.vbm-lbl{font-size:9px;color:#aac8e8;font-weight:800;letter-spacing:.06em;text-align:center;line-height:1.25;white-space:nowrap}
+/* V2_60: 「記憶VIEW」ラベル部分を掴んでポップアップ枠自体を任意の位置へ移動できるようにする。
+   ラベルだけをドラッグハンドルにすることで、スロットボタン(1〜5)・CLRボタンの
+   タップ/長押し(_showMemMenu)は従来どおり影響を受けない */
+.vbm-lbl{font-size:9px;color:#aac8e8;font-weight:800;letter-spacing:.06em;text-align:center;line-height:1.25;white-space:nowrap;
+  cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;padding:2px 4px;border-radius:4px}
+.vbm-lbl:active{cursor:grabbing;background:rgba(0,212,255,.12)}
 .vbm{width:42px;height:38px;border-radius:8px;border:1.5px solid rgba(140,160,180,0.4);
   background:transparent;color:rgba(170,190,210,0.7);font-size:14px;font-weight:700;
   cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;
@@ -1572,7 +1577,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
      ここでの先読みは不要と判断し削除した。HD-PDF書出機能自体は_loadJPFont()により
      初回書出時に読み込まれるため変更なし(exportPdfMergedHybrid190側は元々_loadJPFont()を
      呼んでいなかったため、こちらもV2_57で呼ぶよう修正済み。export.js側のコメント参照) -->
-<script src="export.js?v=258"></script>
+<script src="export.js?v=260"></script>
 <script src="tool.js?v=257"></script>
 <script src="verify.js?v=257"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
@@ -1585,7 +1590,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_58';
+const APP_VERSION = 'V2_60';
 
 // =========================================================
 // グローバル状態
@@ -4058,6 +4063,68 @@ function _vbmToggleBtnUI(on){
   if(_vbTgl&&_vbPop) _vbTgl.addEventListener('click',function(){
     var on=_vbPop.classList.toggle('on');
     _vbmToggleBtnUI(on);
+  });
+})();
+
+// =========================================================
+// V2_60: 記憶VIEWポップアップ(#vbmPop)を任意の位置に移動できるようにする。
+// 「記憶ビューのポップアップ枠を任意で移動出来る様にして」との依頼への対応。
+// ラベル(.vbm-lbl)だけをドラッグハンドルにし、スロットボタン(1〜5)・CLRボタンの
+// タップ/長押しメニュー(_showMemMenu)には一切触れない。
+// 位置はlocalStorageに保存し、次回起動時も同じ位置から開くようにする。
+// =========================================================
+(function(){
+  var _pop260=document.getElementById('vbmPop');
+  var _handle260=_pop260&&_pop260.querySelector('.vbm-lbl');
+  if(!_pop260||!_handle260)return;
+  var _POSKEY260='dxfViewerVbmPopPos';
+  // 前回位置の復元（無ければCSS既定値=右上のまま）
+  try{
+    var _saved260=JSON.parse(localStorage.getItem(_POSKEY260)||'null');
+    if(_saved260&&typeof _saved260.left==='number'&&typeof _saved260.top==='number'){
+      _pop260.style.left=_saved260.left+'px';
+      _pop260.style.top=_saved260.top+'px';
+      _pop260.style.right='auto';
+    }
+  }catch(e){}
+  var _drag260=null; // {dx,dy}: pointerdown位置とポップアップ左上の差分
+  function _clamp260(v,max){return Math.max(0,Math.min(max,v));}
+  _handle260.addEventListener('pointerdown',function(ev){
+    var r=_pop260.getBoundingClientRect();
+    // right指定のままだとleft/topでの移動と競合するため、ドラッグ開始時に
+    // 現在の実測位置をleft/topへ固定してからrightを解除する
+    _pop260.style.left=r.left+'px';
+    _pop260.style.top=r.top+'px';
+    _pop260.style.right='auto';
+    _drag260={dx:ev.clientX-r.left,dy:ev.clientY-r.top};
+    try{_handle260.setPointerCapture(ev.pointerId);}catch(e){}
+    ev.preventDefault();
+  });
+  _handle260.addEventListener('pointermove',function(ev){
+    if(!_drag260)return;
+    var r=_pop260.getBoundingClientRect();
+    var maxL=window.innerWidth-r.width, maxT=window.innerHeight-r.height;
+    var nl=_clamp260(ev.clientX-_drag260.dx,maxL>0?maxL:0);
+    var nt=_clamp260(ev.clientY-_drag260.dy,maxT>0?maxT:0);
+    _pop260.style.left=nl+'px';
+    _pop260.style.top=nt+'px';
+  });
+  function _dragEnd260(ev){
+    if(!_drag260)return;
+    _drag260=null;
+    try{_handle260.releasePointerCapture(ev.pointerId);}catch(e){}
+    var r=_pop260.getBoundingClientRect();
+    try{localStorage.setItem(_POSKEY260,JSON.stringify({left:r.left,top:r.top}));}catch(e){}
+  }
+  _handle260.addEventListener('pointerup',_dragEnd260);
+  _handle260.addEventListener('pointercancel',_dragEnd260);
+  // 画面回転・リサイズ時に画面外へはみ出さないよう補正
+  window.addEventListener('resize',function(){
+    var r=_pop260.getBoundingClientRect();
+    if(r.left===0&&r.top===0)return; // CSS既定(right指定)のままなら何もしない
+    var maxL=window.innerWidth-r.width, maxT=window.innerHeight-r.height;
+    _pop260.style.left=_clamp260(r.left,maxL>0?maxL:0)+'px';
+    _pop260.style.top=_clamp260(r.top,maxT>0?maxT:0)+'px';
   });
 })();
 
