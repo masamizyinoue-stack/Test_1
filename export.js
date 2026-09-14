@@ -1066,6 +1066,78 @@ function _normalizeDvRec261(rec){
   }
   return null;
 }
+// V2_62: 「ZIP内の全図面を無条件に開くのは良くない、ファイル名を指定して選んで
+// 復元したい」との要望への対応。drawPairs261(元図面が同梱されている候補)を
+// チェックボックス一覧で表示し、ユーザーが選んだものだけを開く。
+// キャンセル時はnullを返す(その場合は書込みデータの統合のみ行い、図面は開かない)
+function _showRestoreFilePicker262(pairs){
+  return new Promise(function(resolve){
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.82);'+
+      'display:flex;align-items:center;justify-content:center;';
+    var box=document.createElement('div');
+    box.style.cssText='background:#1e2530;border:1.5px solid rgba(0,212,255,.4);border-radius:16px;'+
+      'padding:18px 18px 14px;max-width:420px;width:90%;max-height:80vh;display:flex;flex-direction:column;'+
+      'box-shadow:0 8px 32px rgba(0,0,0,.65);color:#eee;';
+    var title=document.createElement('div');
+    title.textContent='開く図面を選択('+pairs.length+'件見つかりました)';
+    title.style.cssText='font-size:15px;font-weight:700;margin-bottom:4px;';
+    var sub=document.createElement('div');
+    sub.textContent='選んだ図面だけを新しいタブとして開き、書込みを復元します。書込み履歴自体は選択に関わらずすべて統合されます。';
+    sub.style.cssText='font-size:12px;color:#aac8e8;line-height:1.5;margin-bottom:10px;';
+    var listWrap=document.createElement('div');
+    listWrap.style.cssText='overflow-y:auto;flex:1;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px;margin-bottom:12px;';
+    var cbs=[];
+    pairs.forEach(function(p,i){
+      var row=document.createElement('label');
+      row.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 4px;font-size:13px;'+
+        'border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer;';
+      var cb=document.createElement('input');
+      cb.type='checkbox';
+      cb.style.cssText='width:20px;height:20px;flex-shrink:0;';
+      var span=document.createElement('span');
+      span.textContent=p.drawName.split('/').pop();
+      row.appendChild(cb);row.appendChild(span);
+      listWrap.appendChild(row);
+      cbs.push(cb);
+    });
+    var btnRow0=document.createElement('div');
+    btnRow0.style.cssText='display:flex;gap:8px;margin-bottom:10px;';
+    var allBtn=document.createElement('button');
+    allBtn.textContent='全て選択';
+    var noneBtn=document.createElement('button');
+    noneBtn.textContent='全て解除';
+    [allBtn,noneBtn].forEach(function(b){
+      b.type='button';
+      b.style.cssText='flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,.25);'+
+        'background:transparent;color:#eee;font-size:12px;cursor:pointer;';
+    });
+    allBtn.onclick=function(){cbs.forEach(function(cb){cb.checked=true;});};
+    noneBtn.onclick=function(){cbs.forEach(function(cb){cb.checked=false;});};
+    btnRow0.appendChild(allBtn);btnRow0.appendChild(noneBtn);
+    var btnRow=document.createElement('div');
+    btnRow.style.cssText='display:flex;gap:8px;';
+    var okBtn=document.createElement('button');
+    okBtn.textContent='復元';
+    okBtn.style.cssText='flex:2;padding:11px;border-radius:9px;border:none;background:#00838f;color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
+    var cancelBtn=document.createElement('button');
+    cancelBtn.textContent='キャンセル(図面は開かない)';
+    cancelBtn.style.cssText='flex:1;padding:11px;border-radius:9px;border:none;background:#333;color:#ccc;font-size:12px;cursor:pointer;';
+    okBtn.onclick=function(){
+      var picked=pairs.filter(function(p,i){return cbs[i].checked;});
+      document.body.removeChild(ov);
+      resolve(picked);
+    };
+    cancelBtn.onclick=function(){
+      document.body.removeChild(ov);
+      resolve(null);
+    };
+    btnRow.appendChild(okBtn);btnRow.appendChild(cancelBtn);
+    box.appendChild(title);box.appendChild(sub);box.appendChild(listWrap);box.appendChild(btnRow0);box.appendChild(btnRow);
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+  });
+}
 async function importAllDvBackup232(){
   if(typeof JSZip==='undefined'){
     if(typeof showGuide==='function') showGuide('ZIP機能が読み込まれていません',2000);
@@ -1078,7 +1150,7 @@ async function importAllDvBackup232(){
   input.onchange=async function(e){
     var files=Array.from(e.target.files||[]);
     if(files.length===0) return;
-    if(!confirm(files.length+'個のZIPを読み込み、書込み履歴をまとめて復元します。元図面が同梱されているファイルは新しいタブとして開きます。同じファイルのデータが複数ある場合は、保存日時が新しい方を残します。よろしいですか？'))return;
+    if(!confirm(files.length+'個のZIPを読み込み、書込み履歴をまとめて復元します。元図面が同梱されている場合は、開く図面を後で選択できます。同じファイルのデータが複数ある場合は、保存日時が新しい方を残します。よろしいですか？'))return;
     if(typeof showGuide==='function') showGuide('復元中…',2000);
     var _drawExtRe261=/\.(dxf|pdf|tdf|xlsx|xls|csv)$/i;
     try{
@@ -1141,11 +1213,19 @@ async function importAllDvBackup232(){
       });
       var mergedRecs=Object.keys(byFk).map(function(k){return byFk[k];});
       await _dvPutAll232(mergedRecs);
+      // V2_62: 「同梱されている図面を無条件に全部開くのは良くない」との指摘への対応。
+      // 複数件見つかった場合は、開く図面をチェックボックスで選ばせる。1件だけなら
+      // 選ぶまでもないため従来通りそのまま開く
+      var toOpen261=drawPairs261;
+      if(drawPairs261.length>1){
+        var picked262=await _showRestoreFilePicker262(drawPairs261);
+        toOpen261=picked262||[]; // キャンセル時は1件も開かない(書込みデータの統合のみ)
+      }
       // V2_61: 元図面が同梱されていたものは、バックアップ復元ボタンと同じ手順
       // (二重オープン防止→開く→書込み適用)で順番に新しいタブとして開く
       var openedCount261=0, failedCount261=0;
-      for(var pi261=0; pi261<drawPairs261.length; pi261++){
-        var pair=drawPairs261[pi261];
+      for(var pi261=0; pi261<toOpen261.length; pi261++){
+        var pair=toOpen261[pi261];
         try{
           var drawBuf261=await pair.zipObj.files[pair.drawName].async('arraybuffer');
           var _shortName261=pair.drawName.split('/').pop();
@@ -1168,8 +1248,9 @@ async function importAllDvBackup232(){
       var _msg261='全バックアップ復元が完了しました\n'+
         'ZIP: '+zipFileCount+'個 / 書込みデータ: '+zipRecCount+'件読込→'+mergedRecs.length+'件に統合';
       if(drawPairs261.length>0){
-        _msg261+='\n元図面あり: '+openedCount261+'件を新しいタブで開きました';
+        _msg261+='\n元図面あり: '+drawPairs261.length+'件中 '+openedCount261+'件を新しいタブで開きました';
         if(failedCount261>0) _msg261+='('+failedCount261+'件は開けませんでした)';
+        if(toOpen261.length===0) _msg261+='\n(図面は開かず、書込みデータの統合のみ行いました)';
       }
       alert(_msg261);
       if(typeof verify==='function') verify('全バックアップ復元',{zipFileCount:zipFileCount,zipRecCount:zipRecCount,mergedCount:mergedRecs.length,openedCount:openedCount261,failedCount:failedCount261});
