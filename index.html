@@ -1199,7 +1199,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
          1つまたは複数選択し、書込み履歴をまとめて復元する。同じファイルのデータが
          複数のZIP・現在端末のデータ間で重複していた場合は保存日時が新しい方だけ残す
          ため、古い内容で誤って上書きされることはない -->
-    <button id="allDvRestoreBtn232" class="sp-action-btn" style="margin-top:8px" title="『全バックアップ』のZIPを1つまたは複数選択し、書込み履歴をまとめて復元します。同じファイルのデータが複数ある場合は保存日時が新しい方を残すため、現在のデータより古い内容で上書きされることはありません">全バックアップ復元</button>
+    <button id="allDvRestoreBtn232" class="sp-action-btn" style="margin-top:8px" title="『全バックアップ』『複数選択でのまとめてバックアップ』いずれのZIPも1つまたは複数選択して復元できます。元図面が同梱されている場合は新しいタブとして開いた上で書込みも復元します。同じファイルのデータが複数ある場合は保存日時が新しい方を残すため、現在のデータより古い内容で上書きされることはありません">全バックアップ復元</button>
     <div style="font-size:11px;color:#666;margin-top:6px;line-height:1.5">複数の『全バックアップ』ZIP(例:1年前と今日)をまとめて選択できます。同じファイルの書込みが複数見つかった場合は、保存日時が新しい方だけを残します</div>
   </div>
   <div class="sp-section"> <!-- V1_03: クラウド保存状況（Supabaseの保存件数・使用サイズ） -->
@@ -1577,7 +1577,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
      ここでの先読みは不要と判断し削除した。HD-PDF書出機能自体は_loadJPFont()により
      初回書出時に読み込まれるため変更なし(exportPdfMergedHybrid190側は元々_loadJPFont()を
      呼んでいなかったため、こちらもV2_57で呼ぶよう修正済み。export.js側のコメント参照) -->
-<script src="export.js?v=260"></script>
+<script src="export.js?v=261"></script>
 <script src="tool.js?v=257"></script>
 <script src="verify.js?v=257"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
@@ -1590,7 +1590,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_60';
+const APP_VERSION = 'V2_61';
 
 // =========================================================
 // グローバル状態
