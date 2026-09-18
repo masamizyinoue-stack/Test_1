@@ -444,7 +444,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #measureToolPopup .co-label{margin-bottom:0}
 /* V1_214: 計測ツール6種を2段(3×2)から1段(6×1)に変更(見やすさの指摘のため) */
 /* V1_240: 「線の長さ」追加により7種になったため1段(7×1)に変更 */
-#measureToolPopup .dim-group-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:8px} /* V2_63: 8個になったため4列×2行に変更 */
+#measureToolPopup .dim-group-btns{display:grid;grid-template-columns:repeat(8,1fr);gap:8px} /* V2_67: 「2段になっているのを1段に戻して」との依頼により8列×1行に変更 */
 /* V1_214: 計測ボタンの枠は、選択中(いずれかの計測ツールがcurrentTool)の時だけ色付きに
    する(tool.js側でtool-activeクラスを切替)。常時色付きだと選択中かどうか分かりにくい
    との指摘のため、既定の枠(.tb-btnの1px境界線)は変更せず、色のみ切り替える
@@ -1595,7 +1595,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_66';
+const APP_VERSION = 'V2_67';
 
 // =========================================================
 // グローバル状態
