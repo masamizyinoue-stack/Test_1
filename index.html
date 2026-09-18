@@ -1595,7 +1595,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_67';
+const APP_VERSION = 'V2_68';
 
 // =========================================================
 // グローバル状態
@@ -1621,6 +1621,11 @@ var _markNavList=null;
 var _markNavIdx=-1;
 var _excelMatchCounts=null;
 var _excelMatchIdx=-1;
+// V2_68: 「全図面検索」結果の複数ファイルを「次へ」で跨いで巡回するための状態。
+// _allSearchQueue=[{name,folder}, ...] 検索結果一覧のファイル順。_allSearchQueueIdxは
+// そのうち現在開いているファイルの位置(0-based)。-1/nullは全図面検索経由で開いていない状態
+var _allSearchQueue=null;
+var _allSearchQueueIdx=-1;
 var strokes=[];
 let images=[];
 var savedViews=[null,null,null,null,null]; // V0_76: 5スロットに拡張
@@ -2211,7 +2216,7 @@ async function _openOneFile202(f, e, _busyManagedByCaller){
     // （四方の余白が異常に広い）不具合の原因になっていた
     hiddenLayers.clear();strokes=[];dims=[];images=[];[0,1,2,3,4].forEach(i=>updateViewmemoState(i));
     // V0_131/V1_51: ファイル切替時にマーク自動クリア（従来DXF側にしか無かった処理をPDFにも適用）
-    _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
+    _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;_allSearchQueue=null;_allSearchQueueIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
     await loadPDF(buf);{const nd2=document.getElementById('noDrawingMsg');if(nd2)nd2.style.display='none';}
     if(typeof _updateTopbarForPdf==='function') _updateTopbarForPdf(true); // V1_116: 直前のrenderExcelView()呼び出し時点ではpdfDoc未設定だったため、loadPDF完了後に改めて反映する
     // V1_55: PDF分岐だけcurrentFileSizeが一度も設定されておらず、前に開いていた
@@ -2285,7 +2290,7 @@ async function _openOneFile202(f, e, _busyManagedByCaller){
     // V1_76: Excel(.xlsx/.xls/.csv)はシンプルな表形式表示＋テキスト読込のみ対応。
     // 座標系を持たないため、DXF/PDFと異なり手書き・寸法計測(strokes/dims)は対象外とする
     hiddenLayers.clear();strokes=[];dims=[];images=[];[0,1,2,3,4].forEach(i=>updateViewmemoState(i));
-    _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
+    _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;_allSearchQueue=null;_allSearchQueueIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
     currentFileSize=f.size;
     var _excelOk176=loadExcel(buf,f.name.toLowerCase().endsWith('.csv')); // V1_106: CSVは文字コード自動判定させる
     if(_excelOk176){
@@ -2303,7 +2308,7 @@ async function _openOneFile202(f, e, _busyManagedByCaller){
       currentFileSize=f.size; // V0_103
       hiddenLayers.clear();strokes=[];dims=[];images=[];[0,1,2,3,4].forEach(i=>updateViewmemoState(i)); // V0_160: savedViewsはファイル横断のグローバル項目のためここではリセットしない
       // V0_131: ファイル切替時にマーク自動クリア
-      _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
+      _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;_allSearchQueue=null;_allSearchQueueIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
       // V0_133: dxfViewerDxfviewDB(fileKey単位)から書き込みデータを復元
       // ※SAVE_KEY復元は廃止（異ファイル間でデータが混入するバグを修正）
       // V2_57: PDF分岐と同じ理由でindexedDB.open()の都度接続をやめ、_dvOpenIdb()
@@ -2519,7 +2524,7 @@ function switchToFile(idx){
   if(idx<0||idx>=openFiles.length) return;
   verify('switchToFile:before',{from:currentFileIdx,to:idx});
   // V0_131: タブ切替時にマーク自動クリア
-  _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
+  _searchMarks=[];_markKeyword=null;_searchHighlight=null;_markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;_allSearchQueue=null;_allSearchQueueIdx=-1;(function(){var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');if(typeof _updateMarkCountLabel==='function')_updateMarkCountLabel(-1,0);})();
   resetToolStates(true); // V0_139: タブ切替時に計測ツール状態をリセット / V1_234: 計測ツールは選択維持
   // V0_140: ビュー状態のみ同期（strokes/dimsは参照エイリアスで既に同期済み）
   if(currentFileIdx>=0&&currentFileIdx<openFiles.length){
@@ -7551,12 +7556,33 @@ function _excelBuildMatchCounts(keyword){
   return counts;
 }
 
+// V2_68: 「全図面検索」から開いた場合、現在のファイル内の一致を最後まで巡回したら
+// 折り返す代わりに次ファイルへ進めるかどうかを判定するヘルパー
+function _allSearchQueueHasNext(){
+  return !!(_allSearchQueue&&_allSearchQueueIdx>=0&&_allSearchQueueIdx+1<_allSearchQueue.length);
+}
+// V2_68: 全図面検索キューの次ファイルを開き、続けてその中の最初の一致箇所までジャンプする
+async function _advanceAllSearchQueue(){
+  if(!_allSearchQueueHasNext()) return;
+  _allSearchQueueIdx++;
+  var nxt=_allSearchQueue[_allSearchQueueIdx];
+  var kw=_markKeyword;
+  var full=await new Promise(function(resolve){_idbGetOne(nxt.name,resolve);});
+  if(!full){showGuide('読み込みに失敗しました',2000);return;}
+  await openDxfFromDb(nxt.name,full.buf,kw,nxt.folder,undefined,undefined,{queue:_allSearchQueue,idx:_allSearchQueueIdx});
+  await _markGoNext(true); // skipQueue=true: 開いた直後の折り返し判定は不要、最初の一致へ進めるだけ
+}
 // 「次へ」ボタン押下時のメイン処理。DXF/PDF/Excelでそれぞれ次の一致箇所へ移動する
-async function _markGoNext(){
+// V2_68: skipQueue=trueは_advanceAllSearchQueue()からの呼び出し時のみ使用し、
+// ファイル切替直後の二重跨ぎを防ぐ
+async function _markGoNext(skipQueue){
   if(pdfDoc){
     // PDF: 全ページ分の一致リスト(_markNavList)を巡回。ページが変わる場合は
     // そのページへ切り替えてから、画像描画完了(renderPdfPage内)を待ってジャンプする
     if(!_markNavList||_markNavList.length===0) return;
+    // V2_68: 全図面検索経由で、このファイル内最後の一致まで来ていて、かつキューに次の
+    // ファイルがあれば、そこへ折り返す代わりに次ファイルへ進む
+    if(!skipQueue&&_markNavIdx>=_markNavList.length-1&&_allSearchQueueHasNext()){ await _advanceAllSearchQueue(); return; }
     _markNavIdx=(_markNavIdx+1)%_markNavList.length;
     var m=_markNavList[_markNavIdx];
     if(m.page!==pdfPageNum){
@@ -7573,6 +7599,7 @@ async function _markGoNext(){
     if(!_excelMatchCounts||_excelMatchCounts.length===0) return;
     var total=_excelMatchCounts.reduce(function(a,b){return a+b;},0);
     if(total===0) return;
+    if(!skipQueue&&_excelMatchIdx>=total-1&&_allSearchQueueHasNext()){ await _advanceAllSearchQueue(); return; }
     _excelMatchIdx=(_excelMatchIdx+1)%total;
     var remain=_excelMatchIdx,sheetIdx=0;
     for(var i=0;i<_excelMatchCounts.length;i++){
@@ -7591,6 +7618,7 @@ async function _markGoNext(){
     // DXF: doc.mojiは常に全件読み込まれているため、_searchMarks自体が既に
     // 全一致リストになっている。単純に巡回するだけでよい
     if(!_searchMarks||_searchMarks.length===0) return;
+    if(!skipQueue&&_markNavIdx>=_searchMarks.length-1&&_allSearchQueueHasNext()){ await _advanceAllSearchQueue(); return; }
     _markNavIdx=(_markNavIdx+1)%_searchMarks.length;
     jumpToSearchResult(_searchMarks[_markNavIdx]);
     _updateMarkCountLabel(_markNavIdx,_searchMarks.length);
@@ -8305,6 +8333,21 @@ function openAllSearchPanel(){
   if(inp.value.trim()) doAllSearch();
   setTimeout(function(){inp.focus();},120);
 }
+// V2_68: 「1図面が複数ページ(PDF)/複数シート(Excel)に一致した場合、次へを何度も押さず
+// 直接そのページ/シートへ飛べるようにしたい」との要望対応。matched配列(1ファイル分の
+// 一致テキスト一覧)を、一致したページ番号・シート番号ごとにグループ化する。ページ/シート
+// の概念が無いDXFの場合は常に1グループになる（従来と同じ挙動のまま）
+function _groupMatchedByLocation(matched){
+  var map={},order=[];
+  matched.forEach(function(t){
+    var pg=(t&&typeof t==='object'&&t.page)?t.page:undefined;
+    var sh=(t&&typeof t==='object'&&t.sheet!==undefined)?t.sheet:undefined;
+    var key='p'+(pg!==undefined?pg:'')+'_s'+(sh!==undefined?sh:'');
+    if(!map[key]){map[key]={page:pg,sheet:sh,items:[]};order.push(key);}
+    map[key].items.push(t);
+  });
+  return order.map(function(k){return map[k];});
+}
 var _allSearchGen=0; // V0_103: 重複防止用世代カウンタ
 function doAllSearch(){
   var gen=++_allSearchGen;
@@ -8342,10 +8385,16 @@ function doAllSearch(){
       list.appendChild(d);
       return;
     }
-    hits.forEach(function(h){
+    // V2_68: 「次へ」で全図面検索結果の複数ファイルを跨いで巡回できるよう、結果一覧の
+    // ファイル順そのままを巡回用リストとして保持する（ページ/シート単位ではなくファイル単位。
+    // 1ファイル内の複数ページ/シートの巡回は既存の_markNavList/_excelMatchCounts任せでよい）
+    var _queue68=hits.map(function(h){return {name:h.name,folder:h.folder};});
+    hits.forEach(function(h,hIdx){
+      var groups=_groupMatchedByLocation(h.matched);
+      var multi=groups.length>1;
       var el=document.createElement('div');el.className='asr-item';
       var info=document.createElement('div');info.className='asr-info';
-      var fn=document.createElement('div');fn.className='asr-fname';fn.textContent=h.name;
+      var fn=document.createElement('div');fn.className='asr-fname';fn.textContent=h.name+(multi?'（'+groups.length+'箇所）':'');
       var ht=document.createElement('div');ht.className='asr-hit';
       ht.textContent=h.matched.slice(0,4).map(_idxTextOf).join(' / ')+(h.matched.length>4?' …':'');
       info.appendChild(fn);info.appendChild(ht);
@@ -8359,10 +8408,28 @@ function doAllSearch(){
       el.addEventListener('click',function(){ // V1_75: タップ時にその1件分だけbufを取得
         _idbGetOne(h.name,function(full){
           if(!full){showGuide('読み込みに失敗しました',2000);return;}
-          openDxfFromDb(h.name,full.buf,kw,h.folder,h.page,h.sheet); // V0_104 / V1_70: folder伝達 / V1_88: page・sheet伝達
+          openDxfFromDb(h.name,full.buf,kw,h.folder,h.page,h.sheet,{queue:_queue68,idx:hIdx}); // V0_104 / V1_70: folder伝達 / V1_88: page・sheet伝達 / V2_68: 次へ用キュー伝達
         });
       });
       list.appendChild(el);
+      // V2_68: 1図面が複数ページ/シートに一致した場合、それぞれへ直接ジャンプできる
+      // サブ行を追加表示する（1箇所のみの図面は従来どおりサブ行なし）
+      if(multi){
+        groups.forEach(function(g){
+          var sel=document.createElement('div');sel.className='asr-item asr-subitem';
+          sel.style.cssText='padding:6px 16px 6px 32px;cursor:pointer;font-size:12px;color:var(--text-dim,#6b7f99);border-top:1px solid var(--border,#e2e8f0)';
+          var loc=(g.page?g.page+'ページ':'')+(g.sheet!==undefined?'シート'+(g.sheet+1):'');
+          sel.textContent='└ '+loc+'（'+g.items.length+'件）: '+g.items.slice(0,2).map(_idxTextOf).join(' / ');
+          sel.addEventListener('click',function(ev){
+            ev.stopPropagation();
+            _idbGetOne(h.name,function(full){
+              if(!full){showGuide('読み込みに失敗しました',2000);return;}
+              openDxfFromDb(h.name,full.buf,kw,h.folder,g.page,g.sheet,{queue:_queue68,idx:hIdx});
+            });
+          });
+          list.appendChild(sel);
+        });
+      }
     });
   });
 }
@@ -8370,7 +8437,7 @@ function doAllSearch(){
 // ・F-1: 新規タブ時にIDB(dxfViewerDxfviewDB)からstrokes/dimsを復元
 // ・F-2: 既存タブ時はstrokes/dims/images/savedViewsを上書きせず保持
 // ・F-3: findIndexをfileKeyベースに変更（同名異サイズ問題を修正）
-async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: folder引数追加（開いているファイル一覧での表示用、任意） / V1_88: page(PDF)・sheet(Excel)引数追加（検索一致箇所への直接ジャンプ用、任意）
+async function openDxfFromDb(name,buf,keyword,folder,page,sheet,queueInfo){ // V1_70: folder引数追加（開いているファイル一覧での表示用、任意） / V1_88: page(PDF)・sheet(Excel)引数追加（検索一致箇所への直接ジャンプ用、任意） / V2_68: queueInfo={queue,idx}引数追加（全図面検索結果を「次へ」で複数ファイルに跨って巡回するための状態、任意）
   // V1_40: fileInput側と同じ「ファイルを開いている最中はタブ切替・新規オープンを
   // ブロックする」フラグ。検索結果を連続タップした場合や、読込中にタブを
   // 切替えた場合に、非同期処理完了時に別タブのdoc/strokes/dimsを誤って
@@ -8419,6 +8486,9 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet){ // V1_70: fold
     // V1_91: 「次へ」ナビゲーション用の状態をリセットしてから、キーワードがあれば
     // 全ページ(PDF)・全シート(Excel)分の一致情報を事前に計算しておく
     _markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1;
+    // V2_68: 全図面検索から開いた場合はqueueInfoを受け取り「次へ」で他ファイルへ跨げるようにする。
+    // それ以外（通常のファイルを開く等）からの呼び出しでは毎回nullで上書きし、古い巡回状態を残さない
+    _allSearchQueue=queueInfo?queueInfo.queue:null; _allSearchQueueIdx=queueInfo?queueInfo.idx:-1;
     if(keyword){
       if(_isPdf151){
         _markNavList=await _pdfBuildFullMatchList(keyword);
@@ -8717,6 +8787,7 @@ document.getElementById('markClearX').addEventListener('click',function(e){
   _searchMarks=[];_markKeyword=null;
   _searchHighlight=null; // V0_131: 画面検索マークもクリア
   _markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1; // V1_91
+  _allSearchQueue=null;_allSearchQueueIdx=-1; // V2_68
   document.getElementById('markPopup').classList.remove('visible');
   _updateMarkCountLabel(-1,0);
   scheduleOverlay();
