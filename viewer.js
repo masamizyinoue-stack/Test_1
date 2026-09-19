@@ -1008,7 +1008,10 @@ function rgbCss(c,darkBg){
     // 赤・青・マゼンタ等はこの式では輝度が低く出るため対象外(従来通り)。
     const lum=0.299*c.r+0.587*c.g+0.114*c.b;
     if(lum>=140){
-      const f=105/lum;
+      // V2_79: 「黄色の分、白背景の時もう少しだけ明るくして」との要望対応。
+      // 暗くする目標輝度を105→118に少しだけ引き上げ、見やすさは保ったまま
+      // 従来より少し明るめの黄色になるようにした
+      const f=118/lum;
       return `rgb(${Math.round(c.r*f)},${Math.round(c.g*f)},${Math.round(c.b*f)})`;
     }
   }
