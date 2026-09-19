@@ -38,6 +38,31 @@ var _lastMeasureTool=null;
 // マウスのmousedownハンドラはこれをtrueにしないため既定値falseのままとなり、
 // V2_80のsetTimeout遅延フォーカス(マウス特有のフォーカス競合対策)の挙動を維持する。
 var _textInputTouchOrigin=false;
+// V2_93: 文字ツールをタッチ(指/Apple Pencil)でタップした際、実際に入力枠を開いて
+// focus()するのを touchstart ではなく touchend(=タップの指/ペンが離れた瞬間)まで
+// 遅らせるための保留情報。{sx,sy,isPenInput} または null。
+// 【根本原因メモ(V2_93)】
+//  ・問題1(指タップで入力枠自体が出ない): 従来、指タップで文字ツールを開始できる分岐は
+//    inputMode==='freehand'(手書きモード)の場合に限定されていた。しかしinputModeの
+//    既定値は'pen'(viewer.js冒頭でvar inputMode='pen')であり、ユーザーが明示的に
+//    「手書きモード」に切り替えない限り、文字ツール選択中でも指タッチはtouchstartの
+//    最後のelse分岐(1本指パン)に落ちてしまい、handlePointerDown自体が一切呼ばれて
+//    いなかった。Apple Pencil側は最初からinputModeに関係なく常に処理される分岐
+//    だったため「ペンだけ動く」ように見えていた。
+//  ・問題2(枠は出てもキーボードが出ない): V2_92では.focus()をtouchstartの同期
+//    コールスタック内で呼ぶよう修正したが、iOS/iPadOS Safariでは「touchstart」自体は
+//    キーボード表示を伴う正式なユーザー操作(タップ確定)とみなされず、.focus()は
+//    touchend(またはclick)由来でないとソフトウェアキーボードが開かないという制約が
+//    別にあった。そのため入力枠(display:blockへの切替)自体はtouchstartで成功しても、
+//    キーボードは出ず、再度その枠をタップ(=新しいtouchstart+touchendの組=実質click)
+//    して初めてキーボードが表示されていた。
+//  この2点を踏まえ、V2_93では (a) 文字ツールの指タップをinputModeに関係なく常に
+//  受け付け、(b) 実際にhandlePointerDown(→_openTextInputAt→focus())を呼ぶタイミングを
+//  touchstartからtouchend(指/ペンのリフト)へ遅らせることで、タップの正式な確定
+//  タイミングでfocus()が呼ばれるようにした。位置は指/ペンを置いた瞬間(touchstart)の
+//  座標を使用し、途中で2本指ジェスチャーに発展した場合(_gestureSessionActive)は
+//  文字入力を開かずキャンセルする(パン/ピンチ操作は従来通り優先)。
+var _textToolPendingOpen92=null;
 // V1_46: 手書きモードで指計測時、指に隠れないようカーソルを上にずらすオフセット量(px)
 var FINGER_CURSOR_OFFSET_Y=60;
 
@@ -514,10 +539,12 @@ ov.addEventListener('touchstart',e=>{
         window.LLEN.handleDown(sx,sy);
       } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
         window.ANG.handleDown(sx,sy);
+      } else if(currentTool==='text'){
+        // V2_93: 文字ツールはここ(touchstart=ペンが触れた瞬間)ではまだ入力枠を開かず、
+        // 位置だけ記憶してtouchend(ペンが離れた瞬間)で開く。理由は_textToolPendingOpen92
+        // 宣言部のコメントを参照(iOSでtouchstart起点のfocus()はキーボードが出ないため)。
+        _textToolPendingOpen92={sx:sx,sy:sy,isPenInput:true};
       } else {
-        // V2_92: Apple Pencilタップで文字入力ツールを開く場合も、タッチ由来の
-        // 同期フォーカスを行うためフラグを立てておく(_openTextInputAt側で消費)
-        if(currentTool==='text') _textInputTouchOrigin=true;
         handlePointerDown(sx,sy,true);
       }
     }
@@ -542,6 +569,7 @@ ov.addEventListener('touchstart',e=>{
     if(window.LL) window.LL.penDown=false;
     if(window.LLEN) window.LLEN.penDown=false; // V1_240: 線の長さ
     if(window.ANG) window.ANG.penDown=false; // V2_63: 角度
+    _textToolPendingOpen92=null; // V2_93: 1本指タップ保留中に2本目が触れたら2本指ジェスチャー優先でキャンセル
     mouseDown=false;panning=false;
     // V1_101: 2本指が揃った時点で「このタッチセッションはジェスチャー(ピンチ/パン)
     // である」ことを示すセッション全体フラグを立てる。従来(V1_99/V1_100)の
@@ -569,20 +597,28 @@ ov.addEventListener('touchstart',e=>{
       panning=true;
       _panAnchorX=null;_panAnchorY=null; // V1_101: 移動距離判定の起点をパン開始のたびにリセット
       _tapStartTime=Date.now();_tapStartX=sx;_tapStartY=sy;
+    } else if(currentTool==='text'){
+      // V2_93: 文字ツールは「手書きモード(inputMode==='freehand')」かどうかに関係なく、
+      // 指タップで常にテキスト入力を開始できるようにする。
+      // 【問題1の根本原因】従来はこの分岐が inputMode==='freehand' 限定の
+      // 下のelse-if内にあり、既定値である inputMode==='pen'(ペンモード)の場合は
+      // ここへ到達せず一番下のelse(1本指パン)に落ちて、指タップではhandlePointerDown
+      // (延いては_openTextInputAt)が一切呼ばれていなかった。
+      // 実際に入力枠を開く処理(handlePointerDown呼び出し)はここでは行わず、位置だけ
+      // 記憶してtouchend(指が離れた瞬間)まで遅らせる。理由は_textToolPendingOpen92
+      // 宣言部のコメント(iOSのfocus()タイミング制約)を参照。
+      panning=false;
+      _textToolPendingOpen92={sx:sx,sy:sy,isPenInput:false};
     } else if(inputMode==='freehand'&&_fingerMeasureActive()){
       panning=false;
       const fy=sy-FINGER_CURSOR_OFFSET_Y;
       _fingerMeasureDown(sx,fy);
       lastMX=sx;lastMY=fy;
     } else if(inputMode==='freehand'
-        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'||currentTool==='lasso'||(window.SW&&window.SW.active))){
+        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='lasso'||(window.SW&&window.SW.active))){
       // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
-      // V2_80: 手書きモード + 文字入力ツール → 指タップでも入力ボックスを開けるようにする
       // V0_152.2: 手書きモード + サブ窓作成中(SW.active) → 指1本で対角ドラッグできるように追加
       panning=false;
-      // V2_92: 指タップで文字入力ツールを開く場合、タッチ由来の同期フォーカスを行うため
-      // フラグを立てておく(_openTextInputAt側で消費)
-      if(currentTool==='text') _textInputTouchOrigin=true;
       handlePointerDown(sx,sy,false); // currentTool===sketch/hl/サブ窓作成中 なので描画(操作)開始
     } else {
       // ペンモード or 手書きモード+非描画ツール: パンのみ（既存動作）
@@ -675,7 +711,14 @@ ov.addEventListener('touchend',e=>{
   const liftedStylus=changed.filter(t=>t.touchType==='stylus');
   // Apple Pencilが離れた
   if(liftedStylus.length>0&&isPen&&mouseDown){
-    if(window.DIM&&window.DIM.active){
+    if(_textToolPendingOpen92){
+      // V2_93: 文字ツールはペンが離れた「今」初めて入力枠を開き、この同期コールスタック内で
+      // focus()する(タップの正式な確定タイミング=touchendでないとiOSでキーボードが
+      // 表示されないため)。_textInputTouchOrigin経由で_openTextInputAt側に同期focusを指示する。
+      var _tp92pen=_textToolPendingOpen92;_textToolPendingOpen92=null;
+      _textInputTouchOrigin=true;
+      handlePointerDown(_tp92pen.sx,_tp92pen.sy,true);
+    } else if(window.DIM&&window.DIM.active){
       window.DIM.handleUp(lastMX,lastMY);
 
     } else if(window.LP&&window.LP.active){
@@ -703,6 +746,22 @@ ov.addEventListener('touchend',e=>{
   }
   // 全タッチ終了
   if(remaining.length===0){
+    // V2_93: 文字ツールの指タップ保留があれば最優先で処理する。指が離れた「今」
+    // 初めて入力枠を開きfocus()する(タップの正式な確定タイミング=touchendでないと
+    // iOSでキーボードが表示されないため)。ただし保留中に2本指ジェスチャーへ発展
+    // していた場合(_gestureSessionActive、または2本目が触れた時点でtouchstart側が
+    // 既に_textToolPendingOpen92をnullにしている)は、パン/ピンチ操作を優先し
+    // 文字入力は開かない。
+    if(_textToolPendingOpen92){
+      var _tp92fin=_textToolPendingOpen92;_textToolPendingOpen92=null;
+      if(!_gestureSessionActive){
+        _textInputTouchOrigin=true;
+        handlePointerDown(_tp92fin.sx,_tp92fin.sy,false);
+      }
+      _tapStartTime=0;_gestureSessionActive=false;_panAnchorX=null;_panAnchorY=null;
+      panning=false;mouseDown=false;pinchDist=null;pinchMid=null;
+      return;
+    }
     // V1_101: V1_99/V1_100の時間ベースの猶予(0.3秒→0.8秒)でも実機で誤操作が
     // 続いたため、時間で区切る方式をやめ、_gestureSessionActive(このタッチ
     // セッション中に一度でも2本指以上・または一定距離以上のパン移動があったか)
@@ -794,6 +853,31 @@ ov.addEventListener('touchend',e=>{
     _panAnchorX=null;_panAnchorY=null;
   }
 },{passive:false});
+
+// V2_94: touchcancel対応。従来touchstart/touchmove/touchendの3つしか`ov`に登録して
+// おらず、touchcancel(iPadでは画面端からのシステムジェスチャー(コントロールセンター/
+// アプリスイッチャー/Dock表示等)や着信・通知、Apple Pencilのダブルタップ操作切替など、
+// 「指を意図的に離していないのにOS側が一方的にタッチシーケンスを打ち切る」場面で
+// touchendの代わりに発火する)を一切処理していなかった。これが発生すると
+// mouseDown/panning/isPen/_textToolPendingOpen92等の状態がtrueや値ありのまま
+// 固まってしまい、特に文字ツールでは「保留中だった_textToolPendingOpen92がtouchendで
+// 開かれる機会を永久に失い、以後そのタップは無かったことになる（ユーザーからは
+// “タップしても入力欄が出ない”ように見える）」という不具合の原因になり得る
+// （他ツールでも同様にpanning等が残留し、次の操作に予期せぬ影響を与え得る）。
+// touchendの「全タッチ終了」時の状態クリア処理と同じ変数群を、確定処理(コミット)は
+// 一切行わずにリセットするだけの安全な形でtouchcancelにも適用する。
+ov.addEventListener('touchcancel',e=>{
+  const remaining=Array.from(e.touches);
+  if(remaining.length>0) return; // 残っている指がある間はキャンセル扱いにしない(他の指は継続)
+  // 文字ツールの保留は「タップが確定しなかった」ものとして破棄する(開かない)
+  _textToolPendingOpen92=null;
+  // スケッチ/蛍光ペンの描画中データも中断された入力なので破棄する(中途半端な線が
+  // 残らないよう、確定(handlePointerUp)はせずpts配列ごと捨てる)
+  if(sketching){sketching=false;sketchPts=[];scheduleOverlay();}
+  mouseDown=false;isPen=false;panning=false;
+  pinchDist=null;pinchMid=null;
+  _gestureSessionActive=false;_panAnchorX=null;_panAnchorY=null;_tapStartTime=0;
+},{passive:true});
 
 // ポインタ予測イベント: V0_13で廃止（描画品質改善のため）
 // getPredictedEventsはスケッチ追従を悪化させるため削除。将来の参照用としてコメントで残す。
@@ -888,6 +972,11 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     }
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
+    // V2_94: 文字ツール以外へ切り替えた際、指/ペンタップ保留中の_textToolPendingOpen92が
+    // 残っていると、以後見当違いのタイミング(別ツール選択後のtouchend)で文字入力枠が
+    // 開いてしまう可能性があるため必ず破棄する。_textInputTouchOrigin(消費型フラグ)も
+    // 前回タップの残留が次回に影響しないよう同時にリセットする
+    if(currentTool!=='text'){ _textToolPendingOpen92=null; _textInputTouchOrigin=false; }
     // V1_205: 計測ツールが新たに選択されたら、計測ボタンの3段目ラベルを更新し、
     // 計測ツール選択ポップアップ(#measureToolPopup)を閉じる
     if(_MEASURE_TOOL_LABELS[currentTool]){
