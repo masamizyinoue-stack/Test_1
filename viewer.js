@@ -977,6 +977,20 @@ function zoomAt(cx,cy,factor){tx=(tx-cx)*factor+cx;ty=(ty-cy)*factor+cy;scale*=f
 function rgbCss(c,darkBg){
   if(bwMode) return '#000';
   if(darkBg&&c.r<20&&c.g<20&&c.b<20) return '#ffffff';
+  // V2_78: 「DXF開いて黒背景の時、灰色がだいぶ見えにくい。もっと白っぽい色にして」
+  // との要望対応。V2_77で正式なACI配色表に差し替えた結果、ACI8(65,65,65)等の
+  // 暗いグレーが実際のAutoCADの値通りになったが、本アプリの濃紺背景(#1e2430)上では
+  // 暗すぎて見えにくくなっていた。彩度がほぼ無い純粋なグレー系(r/g/bの差が小さい)で、
+  // かつ暗め(明るさ140未満)の色に限り、同じグレーの濃淡を保ったまま全体を底上げして
+  // 見やすくする。彩度のある色(暗い赤・暗い緑等の意図的な濃色)は対象外とし、
+  // 従来通りの色味を保つ
+  if(darkBg){
+    const mx=Math.max(c.r,c.g,c.b),mn=Math.min(c.r,c.g,c.b);
+    if(mx>=20&&mx<140&&(mx-mn)<=15){
+      const f=170/mx;
+      return `rgb(${Math.min(255,Math.round(c.r*f))},${Math.min(255,Math.round(c.g*f))},${Math.min(255,Math.round(c.b*f))})`;
+    }
+  }
   // V2_48: 「カラー(背景白)」で白い線が見えなくなる件の対応。従来は(r,g,b)全てが
   // 235超という「ほぼ純白」しか黒へ変換しておらず、ACI9(192,192,192)やグレー系
   // 250番台(228等)のような「白っぽいがやや暗いグレー」は変換されず、白背景上で
