@@ -508,7 +508,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 /* V1_91: 「次へ」ボタン・件数表示・✕(マーク解除)。markPopup自体はもうクリック対象では
    なく、内部の各要素にそれぞれ役割を持たせる */
 #markCountLabel{font-size:11px;color:#ffe487;}
-#markNextBtn{display:none;font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid rgba(255,215,0,.6);background:rgba(255,215,0,.12);color:#ffd700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+#markNextBtn{display:none;min-height:auto;min-width:auto;font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid rgba(255,215,0,.6);background:rgba(255,215,0,.12);color:#ffd700;cursor:pointer;-webkit-tap-highlight-color:transparent;} /* V2_69: .viewmemo buttonのmin-height:48px/min-width:52pxを打ち消す（idの方が優先されるため明示指定） */
 #markNextBtn:active{background:rgba(255,215,0,.28);}
 #markClearX{cursor:pointer;padding:2px 4px;}
 .asr-fname{font-size:13px;font-weight:600;color:#7cb8f5}
@@ -1397,7 +1397,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div id="searchBg"></div>
   <div id="searchPanel">
     <div class="sp-header">
-      <span class="sp-title">文字検索</span>
+      <span class="sp-title" id="searchSpTitle">文字検索</span>
       <button class="sp-close" id="searchClose">✕</button>
     </div>
     <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
@@ -1595,7 +1595,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_68';
+const APP_VERSION = 'V2_77';
 
 // =========================================================
 // グローバル状態
@@ -7443,23 +7443,83 @@ function buildSearchIndex(){
   }
 }
 
+// V2_70: 「画面検索」はPDFの場合、従来は現在表示中の1ページ分(pdfMoji)しか検索対象に
+// できなかった。「PDFを開いた時は画面検索→ページ検索として、そのデータのページ全体が
+// 検索できるようにしてほしい」との要望により、PDFが開かれている間はopenScreenSearch()で
+// 全ページ分のテキストを事前にまとめて索引化し、doSearch()もそちらを検索対象にする。
+// キー(pdfDoc参照)が変わらない限り再構築しない簡易キャッシュ
+var _pdfAllPagesIdx=null;
+var _pdfAllPagesIdxBuilding=false;
+var _pdfAllPagesIdxDocRef=null;
+async function _buildPdfAllPagesIdxIfNeeded(){
+  if(!pdfDoc) return;
+  if(_pdfAllPagesIdxDocRef===pdfDoc&&_pdfAllPagesIdx) return; // 同じPDFなら構築済みを使う
+  var docRef=pdfDoc;
+  _pdfAllPagesIdxBuilding=true;
+  var built=[];
+  try{
+    for(var i=1;i<=docRef.numPages;i++){
+      if(pdfDoc!==docRef) return; // 構築中に別ファイルへ切り替わったら古い結果は反映しない
+      var page=await docRef.getPage(i);
+      var vp=page.getViewport({scale:PDF_BASE_SCALE});
+      var items=await _pdfPageTextItems(page,vp);
+      items.forEach(function(m){
+        var t=(m.text||'').trim();
+        if(t) built.push({text:t,x:m.x,y:m.y,h:m.h||1,page:i});
+      });
+    }
+    if(pdfDoc===docRef){ _pdfAllPagesIdx=built; _pdfAllPagesIdxDocRef=docRef; }
+  }catch(e){ console.warn('[ページ検索: 全ページ索引作成]',e); }
+  finally{ if(pdfDoc===docRef) _pdfAllPagesIdxBuilding=false; }
+}
+
 function doSearch(){
   var kw=_normalizeForSearch((document.getElementById('searchInput').value||'').trim());
   var list=document.getElementById('searchResultList');
   var countEl=document.getElementById('searchCount');
   list.innerHTML='';
-  if(!kw){countEl.textContent=_searchIdx.length>0?_searchIdx.length+'件の文字をインデックス済':'';return;}
-  if(_searchIdx.length===0){
-    countEl.textContent='インデックスが空です（DXFを再読込してください）';
+  // V2_70: PDFを開いている間は「ページ検索」として全ページ分の索引(_pdfAllPagesIdx)を
+  // 検索対象にする。DXF等はこれまでと同じ現在の索引(_searchIdx)のまま
+  var isPdfAll=!!pdfDoc;
+  var idxSrc=isPdfAll?(_pdfAllPagesIdx||[]):_searchIdx;
+  if(isPdfAll&&_pdfAllPagesIdxBuilding&&idxSrc.length===0){
+    countEl.textContent='索引を作成中です…しばらくお待ちください';
     return;
   }
-  var results=_searchIdx.filter(function(m){return _normalizeForSearch(m.text).includes(kw);});
-  countEl.textContent='検索結果: '+results.length+'件';
-  results.slice(0,200).forEach(function(item){
+  if(!kw){
+    countEl.textContent=idxSrc.length>0?(idxSrc.length+'件の文字をインデックス済'+(isPdfAll?'（全'+pdfDoc.numPages+'ページ）':'')):'';
+    return;
+  }
+  if(idxSrc.length===0){
+    countEl.textContent='インデックスが空です（'+(isPdfAll?'PDF':'DXF')+'を再読込してください）';
+    return;
+  }
+  var results=idxSrc.filter(function(m){return _normalizeForSearch(m.text).includes(kw);});
+  countEl.textContent='検索結果: '+results.length+'件'+(isPdfAll?'（全'+pdfDoc.numPages+'ページ中）':'');
+  results.slice(0,200).forEach(function(item,idx){
     var li=document.createElement('div');
     li.className='search-result-item';
-    li.textContent=item.text;
-    li.addEventListener('click',function(){jumpToSearchResult(item);});
+    if(isPdfAll){
+      // V2_70: 「右にページ数の選択肢が出て、ヒット文字がどんな文言か部分的に表示」
+      // との要望どおり、一致テキスト(左)＋ページ番号バッジ(右)の1行にする
+      li.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';
+      var txt=document.createElement('span');
+      txt.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0';
+      txt.textContent=item.text;
+      var pg=document.createElement('span');
+      pg.style.cssText='flex-shrink:0;font-size:12px;color:var(--accent,#00d4ff);border:1px solid var(--accent,#00d4ff);border-radius:10px;padding:2px 9px;';
+      pg.textContent=item.page+'ページ';
+      li.appendChild(txt);li.appendChild(pg);
+      li.addEventListener('click',function(){
+        // V2_76: パネルを開いたままにするため、選択中の行が分かるよう強調表示する
+        Array.prototype.forEach.call(list.querySelectorAll('.search-result-item'),function(x){x.style.background='';});
+        li.style.background='rgba(0,212,255,.18)';
+        _jumpToPdfAllSearchResult(results,idx,kw);
+      });
+    } else {
+      li.textContent=item.text;
+      li.addEventListener('click',function(){jumpToSearchResult(item);});
+    }
     list.appendChild(li);
   });
   if(results.length>200){
@@ -7468,6 +7528,72 @@ function doSearch(){
     more.textContent='… 他'+(results.length-200)+'件（絞り込んでください）';
     list.appendChild(more);
   }
+}
+
+// V2_70: 「ページ検索」の結果をタップした時の処理。対象ページが現在表示中と異なれば
+// 切り替えてから該当箇所へジャンプする（_markGoNext()のPDF分岐と同じ手順）。
+// 続けて「次へ」で全ページ分の他の一致箇所も巡回できるよう、_markNavList/_markNavIdxに
+// この検索結果をそのまま流用する
+async function _jumpToPdfAllSearchResult(results,idx,kw){
+  var item=results[idx];
+  if(!item) return;
+  // V2_76: 「色々探したいので、右のポップアップ(検索結果パネル)は消さずに、ヒットした
+  // ページへどんどん飛べるようにしてほしい」との要望対応。従来はここで検索パネル
+  // (#searchOverlay)を閉じていたため、1件選ぶごとにパネルが消え、他の候補へ続けて
+  // 移動できなかった。パネルは閉じずに開いたままにし、続けて他の結果をタップできる
+  // ようにする（閉じるのは✕ボタンや暗幕タップなど、これまで通りのユーザー操作のみ）
+  _markKeyword=kw;
+  _markNavList=results.slice();
+  _markNavIdx=idx;
+  _allSearchQueue=null;_allSearchQueueIdx=-1; // V2_70: 全図面検索経由のキューではないため無効化
+  if(item.page!==pdfPageNum){
+    // V2_74: 「ページ検索でそのページにジャンプしない」不具合を修正。他のページ切替箇所
+    // (prevPage/nextPage等)は全てrenderPdfPage()を呼ぶ前にグローバル変数pdfPageNumを
+    // 更新しているが、ここではその代入が漏れていた。pdfPageNumが古いページ番号のまま
+    // だと、renderPdfPage()自体は指定ページ(item.page)を正しく描画するものの、直後に
+    // 発生する高解像度再レンダリング(_pdfCheckAndRefresh→_pdfRenderVisibleTile)が
+    // 「現在のページ」としてpdfPageNum(古い値)を参照して古いページを取得し直し、
+    // pdfImageを古いページの内容で上書きしてしまうため、ジャンプした直後に元のページへ
+    // 戻ったように見えていた
+    pdfPageNum=item.page;
+    await renderPdfPage(item.page);
+    _rebuildSearchMarksForCurrentPage();
+  }
+  var _pi74=document.getElementById('pageInfo');
+  if(_pi74) _pi74.textContent=pdfPageNum+'/'+pdfDoc.numPages;
+  jumpToSearchResult(item);
+  _updateMarkCountLabel(_markNavIdx,_markNavList.length);
+  // V2_73: 「ページ検索でジャンプすると右のポップアップ(マーク件数/次へ)が消える。
+  // ✕ボタンでのみ消えるようにしてほしい」との要望対応。従来jumpToSearchResult()内の
+  // ハイライト点滅(2.4秒)が終わるまでポップアップ表示(.visible)が付与されず、その間
+  // 「消えている」ように見えていたため、ここで即座に表示状態にする。以後は✕ボタン
+  // (markClearX)を押すか、別ファイルを開く/タブを切替するまで表示され続ける
+  _showMarkPopupForce();
+}
+// V2_75: 「ページ検索でページを選んでも右のポップアップがやっぱり消える」との再報告対応。
+// コード上はV2_73/V2_74で.visible付与のタイミングを直しており、このセッション内の
+// 自動テスト(ヘッドレスブラウザ)では表示が消えない事を複数パターンで確認済みだったため、
+// 実機(iPad Safari)特有の再描画不具合(backdrop-filterを使う要素はdisplay切替直後に
+// 一瞬だけ透明のまま固まって見えることがある既知の挙動)を疑い、.visible付与後に
+// 強制的にレイアウト再計算(reflow)を発生させ、さらに次フレーム/300ms後にも再度
+// 付与し直すことで確実に描画されるようにする
+var _markPopupClosedAt=0; // V2_75: ✕ボタンで閉じた時刻。この後の遅延再表示を抑止する
+function _showMarkPopupForce(){
+  var mp=document.getElementById('markPopup');
+  if(!mp) return;
+  var t0=Date.now();
+  mp.classList.add('visible');
+  void mp.offsetHeight; // 強制reflow（iPad Safariのbackdrop-filter要素が表示直後
+                         // 一瞬透明のまま固まって見える既知の描画不具合への対策）
+  requestAnimationFrame(function(){
+    if(_markPopupClosedAt>t0) return; // 表示直後に✕で閉じられていたら再表示しない
+    mp.classList.add('visible');
+    void mp.offsetHeight;
+  });
+  setTimeout(function(){
+    if(_markPopupClosedAt>t0) return;
+    mp.classList.add('visible');
+  },300);
 }
 
 function jumpToSearchResult(item){
@@ -7485,7 +7611,7 @@ function jumpToSearchResult(item){
     cnt++;
     _searchHighlight=(cnt%2===0)?null:item;
     scheduleOverlay();
-    if(cnt>=6){clearInterval(iv);_searchHighlight=item;scheduleOverlay();var _mp2=document.getElementById('markPopup');if(_mp2)_mp2.classList.add('visible');} // V0_131
+    if(cnt>=6){clearInterval(iv);_searchHighlight=item;scheduleOverlay();_showMarkPopupForce();} // V0_131 / V2_75
   },400);
 }
 
@@ -7497,7 +7623,12 @@ function _updateMarkCountLabel(idx,total){
   var lbl=document.getElementById('markCountLabel');
   var btn=document.getElementById('markNextBtn');
   if(lbl) lbl.textContent=total>0?(' '+(idx>=0?(idx+1)+'/':'')+total+'件'):'';
-  if(btn) btn.style.display=total>1?'':'none'; // 一致が1件以下なら「次へ」は無意味なので隠す
+  // V2_69: 従来はtotal>1の際にstyle.display=''(インライン指定を解除)としていたが、
+  // #markNextBtn{display:none}(id指定)が.viewmemo button{display:flex}(class指定)より
+  // 優先されるため、インライン指定を解除するとCSS側のdisplay:noneに戻ってしまい、
+  // 一致件数が2件以上でも「次へ」ボタンが常に非表示になる不具合があった。
+  // 明示的に'inline-block'を指定することで確実に表示されるようにした
+  if(btn) btn.style.display=total>1?'inline-block':'none';
 }
 
 // DXF/PDF共通。現在のpdfMoji(またはdoc.moji)から_markKeywordに一致する要素を
@@ -7586,11 +7717,15 @@ async function _markGoNext(skipQueue){
     _markNavIdx=(_markNavIdx+1)%_markNavList.length;
     var m=_markNavList[_markNavIdx];
     if(m.page!==pdfPageNum){
+      // V2_74: ページ検索と同じ理由(renderPdfPage前にpdfPageNumを更新していないと、
+      // 直後の高解像度再レンダリングが古いページを取得し直して上書きしてしまう)で、
+      // 「次へ」でページを跨ぐ場合もここでpdfPageNumを更新するよう修正
+      pdfPageNum=m.page;
       await renderPdfPage(m.page);
       _rebuildSearchMarksForCurrentPage();
-      var _pi=document.getElementById('pageInfo');
-      if(_pi) _pi.textContent=pdfPageNum+'/'+pdfDoc.numPages;
     }
+    var _pi=document.getElementById('pageInfo');
+    if(_pi) _pi.textContent=pdfPageNum+'/'+pdfDoc.numPages;
     jumpToSearchResult(m);
     _updateMarkCountLabel(_markNavIdx,_markNavList.length);
   } else if(excelWb){
@@ -7874,9 +8009,22 @@ function openScreenSearch(){ // V0_159: 画面検索（旧searchBtnクリック�
   // 暗幕へのタップ・スクロール捕捉を無効化するクラスを付与する
   _so121.classList.toggle('excel-bg-pass',!!excelWb);
   _so121.classList.add('open');
-  // インデックス件数をプレースホルダーに表示
   var inp=document.getElementById('searchInput');
-  inp.placeholder=_searchIdx.length>0?'キーワードを入力… ('+_searchIdx.length+'件の文字)':'文字なし（DXFを確認）';
+  var titleEl=document.getElementById('searchSpTitle');
+  // V2_70: PDFの場合は現在の1ページだけでなく全ページを検索対象にする「ページ検索」に切り替える
+  if(pdfDoc){
+    if(titleEl) titleEl.textContent='ページ検索';
+    inp.placeholder='全'+pdfDoc.numPages+'ページを検索中…';
+    _buildPdfAllPagesIdxIfNeeded().then(function(){
+      if(!pdfDoc) return; // 構築完了までの間にファイルが閉じられた場合
+      inp.placeholder=(_pdfAllPagesIdx?_pdfAllPagesIdx.length:0)+'件の文字（全'+pdfDoc.numPages+'ページ）';
+      if(inp.value.trim()) doSearch();
+    });
+  } else {
+    if(titleEl) titleEl.textContent='文字検索';
+    // インデックス件数をプレースホルダーに表示
+    inp.placeholder=_searchIdx.length>0?'キーワードを入力… ('+_searchIdx.length+'件の文字)':'文字なし（DXFを確認）';
+  }
   // 既存のキーワードがあれば再検索
   if(inp.value.trim()) doSearch();
   setTimeout(function(){inp.focus();},120);
@@ -8607,7 +8755,7 @@ async function openDxfFromDb(name,buf,keyword,folder,page,sheet,queueInfo){ // V
     // PDF全ページ・Excel全シート分を含む_totalForLabelで判定するよう修正。
     // 修正前はExcelの場合_searchMarks.length===0のままとなり、セルはハイライトされ
     // 件数も計算済みなのにポップアップ本体(.visible)が表示されない不具合があった）
-    var _mp=document.getElementById('markPopup');if(_mp){if(_totalForLabel>0)_mp.classList.add('visible');else _mp.classList.remove('visible');}
+    if(_totalForLabel>0){_showMarkPopupForce();}else{var _mp=document.getElementById('markPopup');if(_mp)_mp.classList.remove('visible');}
   }catch(err){alert('図面を開けません: '+err.message);}finally{_isOpeningFileBusy=false;} // V1_40
 }
 // V1_22: 「ファイルを開く」フォルダインデックス検索パネル（全図面検索(V0_100〜)と同じ
@@ -8789,6 +8937,7 @@ document.getElementById('markClearX').addEventListener('click',function(e){
   _markNavList=null;_markNavIdx=-1;_excelMatchCounts=null;_excelMatchIdx=-1; // V1_91
   _allSearchQueue=null;_allSearchQueueIdx=-1; // V2_68
   document.getElementById('markPopup').classList.remove('visible');
+  _markPopupClosedAt=Date.now(); // V2_75: _showMarkPopupForceの遅延再表示を抑止するため
   _updateMarkCountLabel(-1,0);
   scheduleOverlay();
   if(typeof _applyExcelSearchHighlight==='function') _applyExcelSearchHighlight(false); // V1_91: Excelのハイライトも解除
