@@ -1101,6 +1101,12 @@ function rafLoop(){
   if(needOverlay){drawOverlay();needOverlay=false;}
   // V0_150: サブ窓 - メイン表示が更新されるたびにサブ窓も自動的に再描画（双方向リアルタイム同期）
   if(typeof window._renderAllSubWindows==='function') window._renderAllSubWindows();
+  // V2_88: 文字入力ボックスが開いている間、パン・ズームで再描画されるたびに
+  // 画面上の位置・文字サイズを追従させる(tool.js)
+  if(typeof _syncTextInputBoxPosition88==='function') _syncTextInputBoxPosition88();
+  // V2_90: なげわ(lasso)ツールの選択中アクションバーも同様に、パン・ズームの
+  // たびにバウンディングボックスの位置へ追従させる(tool.js)
+  if(typeof _syncLassoActionBar90==='function') _syncLassoActionBar90();
 }
 
 function draw(){

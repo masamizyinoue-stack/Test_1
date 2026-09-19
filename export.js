@@ -2119,16 +2119,18 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
         pdf.setTextColor(col.r,col.g,col.b);
         pdf.setFontSize(fsMM*(72/25.4));
         const lines=_hpFixChars(s.text).split('\n');
+        // V2_91: 文字入力ツール(isText)は画面表示(index.html)が半角英数字も含め
+        // 全文字Noto Sans JPで統一描画しているため、PDF書出しもそれに揃える。
+        // doc.moji(DXF自体の文字)側は幅補正(_hpRatio)のためASCII/JP分割
+        // (_hpSplitRuns/_hpSetRunFont併用)が設計上必要な別処理であり、
+        // isText側のこの分岐だけを常にNotoSansJP単一フォントに変更する
+        // (pdf-lib合体パスの_hpDrawTextStrokesPdfLib190と同じ挙動)
+        _hpSetRunFont(pdf,'jp');
         for(let i=0;i<lines.length;i++){
           const ln=lines[i];
           if(!ln.trim()) continue;
-          const runs=_hpSplitRuns(ln);
-          let curX=xmm, curY=ymm+fsMM*1.2*i; // V2_87: top基準なので下の行ほど+方向(行間は画面側と同じ1.2倍)
-          for(const run of runs){
-            _hpSetRunFont(pdf,run.font);
-            try{ pdf.text(run.text,curX,curY,{baseline:'top'}); }catch(te81){}
-            curX+=pdf.getTextWidth(run.text);
-          }
+          const curX=xmm, curY=ymm+fsMM*1.2*i; // V2_87: top基準なので下の行ほど+方向(行間は画面側と同じ1.2倍)
+          try{ pdf.text(ln,curX,curY,{baseline:'top'}); }catch(te81){}
         }
       }
       pdf.setTextColor(0,0,0);

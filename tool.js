@@ -19,10 +19,25 @@
 
 // ERASER_RADIUS_PX: var宣言でグローバル公開（drawOverlayがHTMLから参照するため）
 var ERASER_RADIUS_PX=20;
+// V2_90: なげわ(lasso)ツールの状態。var宣言でグローバル公開（index.htmlのdrawOverlayが
+// 参照するため）。drawing=描画中／pts=描画中の頂点列／selected=選択済みstrokes配列
+// (strokes配列内の要素そのものへの参照)／bbox=選択範囲のワールド座標バウンディング
+// ボックス／dragging=バウンディングボックス内ドラッグでの移動中／dragStart=移動開始時
+// のワールド座標／dragOrig=移動開始時点の各ストローク座標のコピー(差分計算用)
+var lassoState={drawing:false,pts:[],selected:[],bbox:null,dragging:false,dragStart:null,dragOrig:null};
 // V1_210: ペン等の他ツールから計測ボタンを1回押した時に、前回選んでいた計測ツールを
 // 直接復元できるようにするため記憶する。var宣言でグローバル公開(index.html側の
 // #measureToggleBtnクリックハンドラが参照するため)
 var _lastMeasureTool=null;
+// V2_92: 文字入力ツールをタッチ操作(指/Apple Pencilタップ)で開いた場合、iOS/iPadOSでは
+// 「.focus()呼び出しがタップのユーザージェスチャー呼び出しスタック内で同期的に行われないと
+// ソフトウェアキーボードが表示されない」という制約があるため、この呼び出しが
+// タッチ由来かどうかを_openTextInputAtへ伝える一時フラグ。各touchstartハンドラ内で
+// currentTool==='text'の場合にtrueへ設定してからhandlePointerDownを呼び、
+// _openTextInputAt側で読み取った直後にfalseへ戻す(消費型)。
+// マウスのmousedownハンドラはこれをtrueにしないため既定値falseのままとなり、
+// V2_80のsetTimeout遅延フォーカス(マウス特有のフォーカス競合対策)の挙動を維持する。
+var _textInputTouchOrigin=false;
 // V1_46: 手書きモードで指計測時、指に隠れないようカーソルを上にずらすオフセット量(px)
 var FINGER_CURSOR_OFFSET_Y=60;
 
@@ -233,6 +248,11 @@ function handlePointerDown(sx,sy,isPenInput){
   if(currentTool==='text'){
     _openTextInputAt(wx,wy,sx,sy);return;
   }
+  // V2_90: なげわ(lasso)ツール。選択中バウンディングボックス内なら移動開始、
+  // それ以外なら選択解除して新規に囲み線の描画を開始する
+  if(currentTool==='lasso'){
+    _lassoPointerDown(wx,wy);return;
+  }
   // スケッチ/蛍光ペン: ペンは常に描画（マウス時はsketch/hlツール時のみ）
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     sketchPts=[{x:wx,y:wy}];sketching=true;scheduleOverlay();return;
@@ -276,6 +296,11 @@ function handlePointerMove(sx,sy,isPenInput){
   if(currentTool==='eraser'){
     eraserPos={x:wx,y:wy};if(mouseDown)eraseAt(wx,wy);scheduleOverlay();return;
   }
+  // V2_90: なげわ(lasso)ツール。描画中は囲み線を延長、移動中は選択範囲を平行移動
+  if(currentTool==='lasso'){
+    if(mouseDown) _lassoPointerMove(wx,wy);
+    return;
+  }
   // スケッチ/蛍光ペン描画
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     if(sketching){sketchPts.push({x:wx,y:wy});scheduleOverlay();}return;
@@ -316,6 +341,10 @@ function handlePointerUp(sx,sy,isPenInput){
     }
   }
   if(currentTool==='eraser'){eraserPos=null;scheduleOverlay();scheduleSave();return;}
+  // V2_90: なげわ(lasso)ツール。描画中なら囲み線を確定して選択、移動中なら保存して終了
+  if(currentTool==='lasso'){
+    _lassoPointerUp();return;
+  }
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     if(sketching&&sketchPts.length>1){
       snapshot();
@@ -485,7 +514,12 @@ ov.addEventListener('touchstart',e=>{
         window.LLEN.handleDown(sx,sy);
       } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
         window.ANG.handleDown(sx,sy);
-      } else { handlePointerDown(sx,sy,true); }
+      } else {
+        // V2_92: Apple Pencilタップで文字入力ツールを開く場合も、タッチ由来の
+        // 同期フォーカスを行うためフラグを立てておく(_openTextInputAt側で消費)
+        if(currentTool==='text') _textInputTouchOrigin=true;
+        handlePointerDown(sx,sy,true);
+      }
     }
   } else if(fingers.length>=2){
     // 2本指: ピンチズーム+パン
@@ -530,7 +564,7 @@ ov.addEventListener('touchstart',e=>{
     // に委ねる。サブ窓作成のドラッグ操作(SW.active)は対象外とし従来通り動作する
     if(typeof _textPickTarget!=='undefined'&&_textPickTarget
         &&inputMode==='freehand'&&!(window.SW&&window.SW.active)
-        &&(_fingerMeasureActive()||currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser')){
+        &&(_fingerMeasureActive()||currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='lasso')){
       if(sketching){sketching=false;sketchPts=[];}
       panning=true;
       _panAnchorX=null;_panAnchorY=null; // V1_101: 移動距離判定の起点をパン開始のたびにリセット
@@ -541,11 +575,14 @@ ov.addEventListener('touchstart',e=>{
       _fingerMeasureDown(sx,fy);
       lastMX=sx;lastMY=fy;
     } else if(inputMode==='freehand'
-        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'||(window.SW&&window.SW.active))){
+        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'||currentTool==='lasso'||(window.SW&&window.SW.active))){
       // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
       // V2_80: 手書きモード + 文字入力ツール → 指タップでも入力ボックスを開けるようにする
       // V0_152.2: 手書きモード + サブ窓作成中(SW.active) → 指1本で対角ドラッグできるように追加
       panning=false;
+      // V2_92: 指タップで文字入力ツールを開く場合、タッチ由来の同期フォーカスを行うため
+      // フラグを立てておく(_openTextInputAt側で消費)
+      if(currentTool==='text') _textInputTouchOrigin=true;
       handlePointerDown(sx,sy,false); // currentTool===sketch/hl/サブ窓作成中 なので描画(操作)開始
     } else {
       // ペンモード or 手書きモード+非描画ツール: パンのみ（既存動作）
@@ -601,7 +638,7 @@ ov.addEventListener('touchmove',e=>{
     const sx=t.clientX-r.left,sy=t.clientY-r.top-FINGER_CURSOR_OFFSET_Y;
     _fingerMeasureMove(sx,sy);
     lastMX=sx;lastMY=sy;
-  } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
+  } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&(currentTool==='eraser'||currentTool==='lasso'))||(window.SW&&window.SW.active))){
     // V0_79: 手書きモード 指1本描画中 / V0_152.2: サブ窓作成の対角ドラッグ中も含む
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
@@ -679,7 +716,7 @@ ov.addEventListener('touchend',e=>{
     }
     // V0_79: 手書きモードで指描画中だった場合はストロークを確定
     // V0_152.2: サブ窓作成の対角ドラッグ中(指を離して矩形確定)も含む
-    if(!_gestureSessionActive&&!isPen&&(sketching||(inputMode==='freehand'&&currentTool==='eraser')||(window.SW&&window.SW.active))){
+    if(!_gestureSessionActive&&!isPen&&(sketching||(inputMode==='freehand'&&(currentTool==='eraser'||currentTool==='lasso'))||(window.SW&&window.SW.active))){
       handlePointerUp(lastMX,lastMY,false);
     }
     // V1_18: ダブルタップ全体表示（V0_80で誤操作防止のため一旦廃止したが再要望により復活）。
@@ -868,6 +905,9 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     if(_measureBtn207) _measureBtn207.classList.toggle('tool-active',!!_MEASURE_TOOL_LABELS[currentTool]);
     _syncMeasureToggleBtnIcon(); // V1_219: 計測ボタンのアイコンを選択中ツールの形状に同期
     if(window.IPX&&window.IPX.active&&typeof ipxCancel==='function')ipxCancel(); // V1_48: ツール切替時は交点ピックを中止
+    // V2_90: 他ツールへ切り替えたら、なげわ(lasso)の選択状態(バウンディングボックス・
+    // アクションバー含む)は必ずクリアする
+    if(currentTool!=='lasso'&&typeof _lassoClearSelection==='function') _lassoClearSelection();
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
     // V2_84: 文字ツール選択時点でフォントの読込を先行開始しておく(実際に
@@ -881,12 +921,13 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
       'hl':'蛍光ペン：Apple Pencilまたはマウスでハイライト',
       'eraser':'消去したい線をなぞってください',
       'text':'図面をタップして文字を入力', // V2_80
+      'lasso':'囲みたい範囲を線で囲んでください', // V2_90
       'dxdy':'1点目を選択してください',
       'diag':'1点目を選択してください',
       'circDim':'円の円周にペンを近づける→離して確定→位置を指定',
       'radDim':'円または円弧を選択→離して確定→半径線の位置を指定'
     };
-    if(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'){
+    if(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'||currentTool==='lasso'){
       showGuide(guideMap[currentTool]||'', 2000);
     } else if(guideMap[currentTool]){
       showGuide(guideMap[currentTool]);
@@ -1027,6 +1068,43 @@ function _ensureCanvasJPFont84(){
     }catch(e){ console.warn('[文字入力] フォント読込失敗',e); }
   })();
 }
+// V2_85: 「タップして出来る入力枠の大きさが、選んでいる文字の大きさを反映して
+// いない」との指摘に対応。従来はcurrentLW*20+8という入力欄専用の簡易式で、
+// 実際に図面へ描画される文字サイズ(index.htmlの_tFontPx80、現在のズーム
+// (scale/lwRef)にも比例する)と対応しておらず、ズーム状態によっては見た目の
+// 大きさが一致しなかった。同じ式(dprを除いたCSS px相当。_tFontPx80は
+// canvas実ピクセル(devicePixelRatio倍)基準のため、CSS pxの入力欄に合わせて
+// dpr分を割った値になる)に統一し、確定後に実際に描かれる大きさとほぼ一致する
+// ようにした
+function _textInputFontPx85(){
+  var _lwRef85=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:scale;
+  return Math.max(10,Math.min(160,Math.round((currentLW||0.6)*20*(scale/_lwRef85))));
+}
+// V2_88: 「文字入力枠を出して画面を拡縮すると文字枠は拡縮についていかないから、
+// 入力しにくい」との指摘に対応。開いた時点の画面座標(sx,sy)に固定したままだと、
+// その後パン・ズームしても図面側の位置とずれてしまう。入力中に配置先のワールド
+// 座標(_textInputWX88/WY88)を保持しておき、毎フレーム(viewer.jsのrafLoopから
+// 呼ばれる_syncTextInputBoxPosition88)w2s()で現在の画面座標へ変換し直すことで、
+// パン・ズーム中も常に配置先の真上に追従させる。文字サイズも同時にズームへ
+// 追従させる
+var _textInputWX88=0, _textInputWY88=0;
+function _syncTextInputBoxPosition88(){
+  if(!_textInputActive) return;
+  var box=document.getElementById('textInputBox');
+  var inp=document.getElementById('textInputField');
+  if(!box||!inp||typeof w2s!=='function'||typeof ov==='undefined') return;
+  var r=ov.getBoundingClientRect();
+  var p=w2s(_textInputWX88,_textInputWY88);
+  box.style.left=(r.left+p[0])+'px';
+  box.style.top=(r.top+p[1])+'px';
+  var fontPx=_textInputFontPx85();
+  if(inp.style.fontSize!==fontPx+'px'){
+    inp.style.fontSize=fontPx+'px';
+    inp.style.lineHeight=(fontPx*1.2)+'px';
+    inp.style.height='auto';
+    inp.style.height=inp.scrollHeight+'px';
+  }
+}
 function _openTextInputAt(wx,wy,sx,sy){
   if(_textInputActive) return; // 二重に開かない
   var box=document.getElementById('textInputBox');
@@ -1034,17 +1112,9 @@ function _openTextInputAt(wx,wy,sx,sy){
   if(!box||!inp) return;
   _ensureCanvasJPFont84();
   _textInputActive=true;
+  _textInputWX88=wx; _textInputWY88=wy; // V2_88
   var r=ov.getBoundingClientRect();
-  // V2_85: 「タップして出来る入力枠の大きさが、選んでいる文字の大きさを反映して
-  // いない」との指摘に対応。従来はcurrentLW*20+8という入力欄専用の簡易式で、
-  // 実際に図面へ描画される文字サイズ(index.htmlの_tFontPx80、現在のズーム
-  // (scale/lwRef)にも比例する)と対応しておらず、ズーム状態によっては見た目の
-  // 大きさが一致しなかった。同じ式(dprを除いたCSS px相当。_tFontPx80は
-  // canvas実ピクセル(devicePixelRatio倍)基準のため、CSS pxの入力欄に合わせて
-  // dpr分を割った値になる)に統一し、確定後に実際に描かれる大きさとほぼ一致する
-  // ようにした
-  var _lwRef85=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:scale;
-  var fontPx=Math.max(10,Math.min(160,Math.round((currentLW||0.6)*20*(scale/_lwRef85))));
+  var fontPx=_textInputFontPx85();
   inp.value='';
   inp.style.fontSize=fontPx+'px';
   inp.style.lineHeight=(fontPx*1.2)+'px'; // V2_87: 画面描画の行間(1.2倍)と揃える
@@ -1093,13 +1163,7 @@ function _openTextInputAt(wx,wy,sx,sy){
   }
   function onInput(){ autoResize(); }
   function onBlur(){ commit(); }
-  // V2_80: タップ(mousedown)の中で即座にinput.focus()すると、そのクリック確定処理
-  // (mouseup/click)に伴うブラウザの既定のフォーカス解決によって、直後に強制的に
-  // フォーカスが外れてしまう(結果、onBlur→commit()が即発火して1文字も打つ前に
-  // 入力ボックスが閉じてしまう)ことがある。フォーカス移動とblurリスナーの登録を
-  // 次のイベントループへ1回遅らせることで、このタップ確定に伴う「紛れのblur」が
-  // 収まった後にリスナーを付けられるようにし、意図しない即時クローズを防ぐ
-  setTimeout(function(){
+  function _attachFocusAndListeners(){
     if(!_textInputActive) return; // 遅延の間にEscape等で既に閉じられていた場合は何もしない
     inp.focus();
     inp.addEventListener('keydown',onKey);
@@ -1110,10 +1174,246 @@ function _openTextInputAt(wx,wy,sx,sy){
       inp.removeEventListener('input',onInput);
       inp.removeEventListener('blur',onBlur);
     };
-  },0);
+  }
+  // V2_92: このオープンがタッチ操作(指/Apple Pencilタップ)由来かどうかを読み取り、
+  // フラグは直後にリセットする(消費型。次回のオープンに持ち越さないため)
+  var _isTouchTap92=_textInputTouchOrigin;
+  _textInputTouchOrigin=false;
+  if(_isTouchTap92){
+    // V2_92: iOS/iPadOSでは「.focus()呼び出しがタップのユーザージェスチャー呼び出し
+    // スタック内で同期的に行われないとソフトウェアキーボードが表示されない」という
+    // 制約があるため、タッチ操作由来の場合はsetTimeoutを使わずこの場で即座にfocus()する。
+    // V2_80のsetTimeout遅延が必要だった理由(下記)である「mousedownの既定のフォーカス
+    // 解決による意図しないフォーカス喪失」は、touchstart側で常にe.preventDefault()して
+    // おり合成マウスイベント(mousedown/mouseup/click)自体が発生しないため、この
+    // タッチ経由の呼び出しでは再発しない
+    _attachFocusAndListeners();
+  } else {
+    // V2_80: タップ(mousedown)の中で即座にinput.focus()すると、そのクリック確定処理
+    // (mouseup/click)に伴うブラウザの既定のフォーカス解決によって、直後に強制的に
+    // フォーカスが外れてしまう(結果、onBlur→commit()が即発火して1文字も打つ前に
+    // 入力ボックスが閉じてしまう)ことがある。フォーカス移動とblurリスナーの登録を
+    // 次のイベントループへ1回遅らせることで、このタップ確定に伴う「紛れのblur」が
+    // 収まった後にリスナーを付けられるようにし、意図しない即時クローズを防ぐ
+    // (マウス操作の場合のみこの経路を通る。V2_92でタッチ操作は上のsync経路に分離した)
+    setTimeout(_attachFocusAndListeners,0);
+  }
 }
 function _closeTextInput(){
   var box=document.getElementById('textInputBox');
   if(box){ if(box._cleanup80){box._cleanup80();box._cleanup80=null;} box.style.display='none'; }
   _textInputActive=false;
 }
+
+// =========================================================
+// V2_90: なげわ(lasso)ツール
+// =========================================================
+// 依存: strokes, currentTool, snapshot, scheduleOverlay, doSave, _curPage, verify,
+//       openFiles, currentFileIdx, w2s, ov, scale (いずれも既存グローバル)
+// 設計メモ:
+//   ・resize/rotateは今回のスコープ外。move(平行移動)とdelete(削除)のみ対応。
+//   ・currentTool==='select'(画像選択ツール)とは分岐条件・状態(lassoState)ともに
+//     完全に独立しており、衝突しない(事前にcurrentTool==='select'の全箇所を確認済み:
+//     tool.js内、画像(images配列)専用の分岐のみで、strokes配列は一切触っていない)。
+//   ・strokes配列の要素は s.isText===true(文字, 座標はs.x/s.y) と s.pts配列を持つ
+//     もの(ペン/蛍光ペン, 座標は各pts[i].x/y)の2種類があり、必ず両方を考慮する。
+
+// 点がポリゴン内にあるか(レイキャスティング法)
+function _pointInPolygon(x,y,poly){
+  var inside=false;
+  for(var i=0,j=poly.length-1;i<poly.length;j=i++){
+    var xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    var intersect=((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi);
+    if(intersect) inside=!inside;
+  }
+  return inside;
+}
+// 点がバウンディングボックス内にあるか(ワールド座標)
+function _pointInBBox(x,y,b){
+  return !!b && x>=b.minX&&x<=b.maxX&&y>=b.minY&&y<=b.maxY;
+}
+
+// ポインタダウン: バウンディングボックス内→移動開始、それ以外→新規の囲み描画開始
+function _lassoPointerDown(wx,wy){
+  if(lassoState.selected&&lassoState.selected.length>0&&lassoState.bbox&&_pointInBBox(wx,wy,lassoState.bbox)){
+    snapshot(); // V2_90: 移動前にundoチェックポイント
+    lassoState.dragging=true;
+    lassoState.dragStart={wx:wx,wy:wy};
+    lassoState.dragOrig=lassoState.selected.map(function(s){
+      return s.isText?{s:s,x:s.x,y:s.y}:{s:s,pts:(s.pts||[]).map(function(p){return{x:p.x,y:p.y};})};
+    });
+    return;
+  }
+  // バウンディングボックス外のタップ: 既存の選択を解除して新規の囲み線を開始
+  _lassoClearSelection();
+  lassoState.drawing=true;
+  lassoState.pts=[{x:wx,y:wy}];
+  scheduleOverlay();
+}
+// ポインタムーブ: 描画中は囲み線を延長、移動中は選択ストロークを平行移動
+function _lassoPointerMove(wx,wy){
+  if(lassoState.dragging&&lassoState.dragOrig){
+    var dx=wx-lassoState.dragStart.wx, dy=wy-lassoState.dragStart.wy;
+    for(var i=0;i<lassoState.dragOrig.length;i++){
+      var o=lassoState.dragOrig[i];
+      if(o.s.isText){ o.s.x=o.x+dx; o.s.y=o.y+dy; }
+      else if(o.s.pts&&o.pts){
+        // V2_90: 重要 — 既存のpoint要素(o.s.pts[j])のx/yを直接書き換えてはいけない。
+        // snapshot()が作るundo履歴(_cloneStroke80)はpts配列自体は複製するが、配列の
+        // 各要素(点オブジェクト)は複製せず参照を共有しているため、直接書き換えると
+        // undo履歴側の座標まで一緒に変わってしまいundoが効かなくなる。必ず新しい
+        // オブジェクトで置き換える(配列要素の差し替え)ことで、履歴側の古いオブジェクト
+        // は変更されないようにする
+        var newPts=new Array(o.pts.length);
+        for(var j=0;j<o.pts.length;j++){
+          newPts[j]={x:o.pts[j].x+dx,y:o.pts[j].y+dy};
+        }
+        o.s.pts=newPts;
+      }
+    }
+    _lassoRecomputeBBox();
+    scheduleOverlay();
+    return;
+  }
+  if(lassoState.drawing){
+    lassoState.pts.push({x:wx,y:wy});
+    scheduleOverlay();
+  }
+}
+// ポインタアップ: 描画中なら選択確定、移動中なら保存して終了
+function _lassoPointerUp(){
+  if(lassoState.dragging){
+    lassoState.dragging=false;lassoState.dragStart=null;lassoState.dragOrig=null;
+    if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx]){
+      openFiles[currentFileIdx].strokes=strokes; // 参照は変わらないが既存パターンに合わせて明示同期
+    }
+    if(typeof verify==='function')verify('なげわ移動',{len:lassoState.selected.length});
+    scheduleOverlay();doSave();
+    return;
+  }
+  if(lassoState.drawing){
+    lassoState.drawing=false;
+    _lassoFinishSelection();
+  }
+}
+// 描画完了した囲み線から、現在ページのstrokesのうち内部に頂点を持つものを選択する
+function _lassoFinishSelection(){
+  var poly=lassoState.pts;
+  lassoState.pts=[];
+  if(!poly||poly.length<3){ lassoState.selected=[];lassoState.bbox=null;_lassoHideActionBar();scheduleOverlay();return; }
+  var cur=(typeof _curPage==='function')?_curPage():1;
+  var sel=[];
+  for(var i=0;i<strokes.length;i++){
+    var s=strokes[i];
+    if((s.page||1)!==cur) continue;
+    if(s.isText){
+      if(s.x!=null&&s.y!=null&&_pointInPolygon(s.x,s.y,poly)) sel.push(s);
+    } else if(s.pts){
+      for(var j=0;j<s.pts.length;j++){
+        if(_pointInPolygon(s.pts[j].x,s.pts[j].y,poly)){ sel.push(s); break; }
+      }
+    }
+  }
+  lassoState.selected=sel;
+  if(sel.length>0){
+    _lassoRecomputeBBox();
+    _lassoShowActionBar();
+    if(typeof verify==='function')verify('なげわ選択',{len:sel.length});
+  } else {
+    lassoState.bbox=null;
+    _lassoHideActionBar();
+  }
+  scheduleOverlay();
+}
+// 選択中ストロークのワールド座標バウンディングボックスを再計算する
+function _lassoRecomputeBBox(){
+  var sel=lassoState.selected;
+  if(!sel||sel.length===0){ lassoState.bbox=null; return; }
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(var i=0;i<sel.length;i++){
+    var s=sel[i];
+    if(s.isText){
+      if(s.x<minX)minX=s.x; if(s.x>maxX)maxX=s.x;
+      if(s.y<minY)minY=s.y; if(s.y>maxY)maxY=s.y;
+    } else if(s.pts){
+      for(var j=0;j<s.pts.length;j++){
+        var p=s.pts[j];
+        if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+        if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+      }
+    }
+  }
+  if(minX===Infinity){ lassoState.bbox=null; return; }
+  // 文字(1点)や細い線でも操作しやすいよう最低限の余白を付ける(ワールド座標系)
+  var wpad=Math.max((maxX-minX)*0.04,10/((typeof scale!=='undefined'&&scale)||1));
+  var hpad=Math.max((maxY-minY)*0.04,10/((typeof scale!=='undefined'&&scale)||1));
+  lassoState.bbox={minX:minX-wpad,minY:minY-hpad,maxX:maxX+wpad,maxY:maxY+hpad};
+}
+// 選択・描画途中の状態を全てクリアし、アクションバーも隠す
+function _lassoClearSelection(){
+  lassoState.selected=[];
+  lassoState.bbox=null;
+  lassoState.drawing=false;
+  lassoState.pts=[];
+  lassoState.dragging=false;
+  lassoState.dragStart=null;
+  lassoState.dragOrig=null;
+  _lassoHideActionBar();
+  if(typeof scheduleOverlay==='function') scheduleOverlay();
+}
+// 選択中の全ストロークをstrokes配列から削除する(インデックスの大きい順にsplice)
+function _lassoDeleteSelected(){
+  if(!lassoState.selected||lassoState.selected.length===0) return;
+  snapshot(); // V2_90: 削除前にundoチェックポイント
+  var idxs=[];
+  for(var i=0;i<strokes.length;i++){
+    if(lassoState.selected.indexOf(strokes[i])>=0) idxs.push(i);
+  }
+  idxs.sort(function(a,b){return b-a;}); // インデックスの大きい順
+  for(var k=0;k<idxs.length;k++){ strokes.splice(idxs[k],1); }
+  if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx]){
+    openFiles[currentFileIdx].strokes=strokes;
+  }
+  if(typeof verify==='function')verify('なげわ削除',{len:strokes.length});
+  _lassoClearSelection();
+  scheduleOverlay();doSave();
+}
+// アクションバー(削除ボタン)の表示/非表示/位置同期
+function _lassoShowActionBar(){
+  var bar=document.getElementById('lassoActionBar');
+  if(!bar) return;
+  bar.style.display='flex';
+  _syncLassoActionBar90();
+}
+function _lassoHideActionBar(){
+  var bar=document.getElementById('lassoActionBar');
+  if(bar) bar.style.display='none';
+}
+// V2_90: viewer.jsのrafLoopから毎フレーム呼ばれ、パン/ズーム後もバウンディング
+// ボックスの真上にアクションバーを追従させる(_syncTextInputBoxPosition88と同じ考え方)
+function _syncLassoActionBar90(){
+  var bar=document.getElementById('lassoActionBar');
+  if(!bar) return;
+  if(bar.style.display==='none'||bar.style.display==='') return;
+  if(!lassoState.selected||lassoState.selected.length===0||!lassoState.bbox){ bar.style.display='none';return; }
+  if(typeof w2s!=='function'||typeof ov==='undefined') return;
+  var r=ov.getBoundingClientRect();
+  var b=lassoState.bbox;
+  var topLeft=w2s(b.minX,b.maxY); // ワールドYは上向きのため画面上端はmaxY
+  var topRight=w2s(b.maxX,b.maxY);
+  var cx=(topLeft[0]+topRight[0])/2;
+  var topY=Math.min(topLeft[1],topRight[1]);
+  bar.style.left=(r.left+cx)+'px';
+  bar.style.top=(r.top+topY-10)+'px';
+}
+// 削除ボタンのクリックリスナー(DOM要素はindex.htmlに存在、tool.jsは常にそれより
+// 後に読み込まれるため、ここで直接addEventListenerして問題ない)
+(function(){
+  var _lassoDelBtn90=document.getElementById('lassoDeleteBtn');
+  if(_lassoDelBtn90){
+    _lassoDelBtn90.addEventListener('click',function(e){
+      if(e&&e.stopPropagation)e.stopPropagation();
+      _lassoDeleteSelected();
+    });
+  }
+})();

@@ -510,6 +510,16 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   border:1.5px dashed #00d4ff;border-radius:4px;padding:2px 6px;}
 #textInputBox textarea{border:none;outline:none;background:transparent;font-family:'NotoSansJPCanvas',sans-serif;
   min-width:60px;resize:none;overflow:hidden;white-space:pre;padding:0;margin:0;display:block;vertical-align:top;}
+/* V2_90: なげわ(lasso)ツールの選択中アクションバー。選択範囲バウンディングボックスの
+   上端中央にposition:fixedで表示する(#textInputBoxと同じ考え方)。中身は削除ボタンのみ
+   (resize/rotateは今回スコープ外) */
+#lassoActionBar{display:none;position:fixed;z-index:350;transform:translate(-50%,-100%);
+  background:rgba(10,14,20,.9);border:1.5px solid #00d4ff;border-radius:8px;padding:4px 6px;
+  align-items:center;gap:4px;box-shadow:0 2px 10px rgba(0,0,0,.45);}
+#lassoActionBar button{min-height:32px;min-width:32px;border-radius:6px;border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,80,80,.18);color:#ff6b6b;font-size:15px;font-weight:700;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;}
+#lassoActionBar button:active{background:rgba(255,80,80,.35);}
 /* V1_91: 「次へ」ボタン・件数表示・✕(マーク解除)。markPopup自体はもうクリック対象では
    なく、内部の各要素にそれぞれ役割を持たせる */
 #markCountLabel{font-size:11px;color:#ffe487;}
@@ -812,16 +822,22 @@ body.settings-open #settingsPanel{transform:translateX(0)}
        色・太さの選択ポップアップが開く
        V1_214: 蛍光ペンも3段表示(蛍光/アイコン/現在の線幅)にした -->
   <button class="tb-tool-btn tool-btn" data-tool="hl" title="蛍光ペン"><span class="tb-tool-label">蛍光</span><svg id="hlToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path id="hlToolIconFill" d="M15 3l6 6-11 11H4v-6L15 3z" fill="rgba(255,255,0,0.25)"/><line x1="11" y1="7" x2="17" y2="13"/></svg><span class="tb-tool-label" id="hlLwLabel">4</span></button>
-  <div class="tb-sep"></div>
-  <!-- V1_214: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
-       (再タップで開くeraser用ポップアップ、#colorOverlayの.co-eraser-section)を新設した -->
-  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg><span class="tb-tool-label" id="eraserSizeLabel">20</span></button>
+  <!-- V2_89: 「文字コマンドは蛍光コマンドの右に配置して」との要望で、消しゴムより前
+       (蛍光ペンの直後)へ移動した -->
   <!-- V2_80: 文字入力ツール。タップした位置にキーボードで文字を入力して配置する。
        色・太さは手書きペンの選択(currentColor/currentLW)をそのまま流用するため、
        再タップで開く色/太さポップアップもペンと同じ#colorOverlay(.co-sketch-section)を使う -->
   <!-- V2_86: ペンの#lwLabelと同じ3段表示(文字/アイコン/現在の大きさ)にした。
        色・太さはペンと共通(currentLW)のため、値自体はペン側と同じものを表示する -->
   <button class="tb-tool-btn tool-btn" data-tool="text" title="文字入力"><span class="tb-tool-label">文字</span><svg id="textToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg><span class="tb-tool-label" id="textSizeLabel">0.6</span></button>
+  <div class="tb-sep"></div>
+  <!-- V1_214: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
+       (再タップで開くeraser用ポップアップ、#colorOverlayの.co-eraser-section)を新設した -->
+  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg><span class="tb-tool-label" id="eraserSizeLabel">20</span></button>
+  <!-- V2_90: なげわ(lasso)ツール。「消しゴムボタンの右に」との要望通りここに配置。
+       囲んだ範囲のペン/文字ストロークを選択→バウンディングボックス内ドラッグで移動、
+       ✕ボタンで削除できる(resize/rotateは今回スコープ外) -->
+  <button class="tb-tool-btn tool-btn" data-tool="lasso" title="なげわ"><span class="tb-tool-label">なげわ</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3C7 3 3 6 3 10c0 2.6 1.8 4.8 4.5 6L7 20l3-1.6c.6.1 1.3.2 2 .2 5 0 9-3 9-7.3S17 3 12 3z"/><circle cx="7.3" cy="19.3" r="1.4" fill="currentColor" stroke="none"/></svg></button>
   <div class="tb-sep"></div>
   <!-- V1_205: 計測ボタン群(.dim-group)は#measureToolPopupへ移設した(HTML末尾、
        .topbarの直後を参照)。このボタンはアイコンを定規デザインに変更し、押すと
@@ -1090,6 +1106,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <div id="markPopup"><span style="font-size:15px">●</span>マーク<span id="markCountLabel"></span><button id="markNextBtn" type="button">次へ</button><span id="markClearX">✕</span></div>
       <!-- V2_80: 文字入力ツールのキーボード入力ボックス -->
       <div id="textInputBox"><textarea id="textInputField" rows="1" maxlength="300"></textarea></div>
+      <!-- V2_90: なげわ(lasso)ツールの選択中アクションバー(削除のみ。resize/rotateは対象外) -->
+      <div id="lassoActionBar"><button id="lassoDeleteBtn" type="button" title="削除">✕</button></div>
     </div>
   </div>
   <!-- V1_234: 記憶VIEWポップアップ(M_Viewer_V7.09の#vbm-pop仕様。1〜5の単一ボタン。
@@ -1608,7 +1626,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_87';
+const APP_VERSION = 'V2_92';
 
 // =========================================================
 // グローバル状態
@@ -2097,6 +2115,33 @@ function drawOverlay(){
         octx.arc(_dph228[0],_dph228[1],_dimPickRHb228,0,Math.PI*2);
         octx.fill();
       }
+      octx.restore();
+    }
+  }
+  // V2_90: なげわ(lasso)ツール — 描画中のプレビュー線、および選択中のバウンディング
+  // ボックス。ロジック本体(_lassoPointerDown/Move/Up等)はtool.jsで実装しているため
+  // ここでは描画のみを行う(lassoStateはtool.jsでvar宣言されグローバル公開)
+  if(typeof lassoState!=='undefined'&&lassoState){
+    if(currentTool==='lasso'&&lassoState.drawing&&lassoState.pts&&lassoState.pts.length>0){
+      octx.save();
+      octx.strokeStyle='#00d4ff';octx.lineWidth=1.5;octx.setLineDash([5,3]);
+      octx.beginPath();
+      for(var _lpi90=0;_lpi90<lassoState.pts.length;_lpi90++){
+        var _lp90=w2s(lassoState.pts[_lpi90].x,lassoState.pts[_lpi90].y);
+        if(_lpi90===0) octx.moveTo(_lp90[0],_lp90[1]); else octx.lineTo(_lp90[0],_lp90[1]);
+      }
+      octx.stroke();
+      octx.setLineDash([]);
+      octx.restore();
+    }
+    if(lassoState.selected&&lassoState.selected.length>0&&lassoState.bbox){
+      var _lb90=lassoState.bbox;
+      var _ltl90=w2s(_lb90.minX,_lb90.maxY); // ワールドYは上向きのため画面上端はmaxY
+      var _lbr90=w2s(_lb90.maxX,_lb90.minY);
+      octx.save();
+      octx.strokeStyle='#ffd700';octx.lineWidth=1.5;octx.setLineDash([6,4]);
+      octx.strokeRect(_ltl90[0],_ltl90[1],_lbr90[0]-_ltl90[0],_lbr90[1]-_ltl90[1]);
+      octx.setLineDash([]);
       octx.restore();
     }
   }
@@ -3984,6 +4029,10 @@ function undo(){
   const st=history.pop();strokes=st.strokes;dims=st.dims;
   // V0_140: undo後は新配列のためopenFiles[]に明示同期
   if(currentFileIdx>=0&&openFiles[currentFileIdx]){openFiles[currentFileIdx].strokes=strokes;openFiles[currentFileIdx].dims=dims;}
+  // V2_90: undoでstrokes配列が丸ごと新しいオブジェクト群に差し替わるため、なげわ(lasso)の
+  // 選択(lassoState.selected)が古い(もう配列に存在しない)オブジェクトを指したまま残る
+  // 事故を防ぐため、選択状態を必ずクリアする
+  if(typeof _lassoClearSelection==='function') _lassoClearSelection();
   scheduleOverlay();updateUndoRedo();scheduleSave();verify('Undo');
 }
 function redo(){
@@ -3992,6 +4041,8 @@ function redo(){
   const st=redoStack.pop();strokes=st.strokes;dims=st.dims;
   // V0_140: redo後は新配列のためopenFiles[]に明示同期
   if(currentFileIdx>=0&&openFiles[currentFileIdx]){openFiles[currentFileIdx].strokes=strokes;openFiles[currentFileIdx].dims=dims;}
+  // V2_90: undoと同じ理由でredo後もなげわの選択状態をクリアする
+  if(typeof _lassoClearSelection==='function') _lassoClearSelection();
   scheduleOverlay();updateUndoRedo();scheduleSave();verify('Redo');
 }
 function updateUndoRedo(){
