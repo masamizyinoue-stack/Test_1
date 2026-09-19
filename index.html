@@ -830,6 +830,18 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <!-- V2_86: ペンの#lwLabelと同じ3段表示(文字/アイコン/現在の大きさ)にした。
        色・太さはペンと共通(currentLW)のため、値自体はペン側と同じものを表示する -->
   <button class="tb-tool-btn tool-btn" data-tool="text" title="文字入力"><span class="tb-tool-label">文字</span><svg id="textToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg><span class="tb-tool-label" id="textSizeLabel">0.6</span></button>
+  <!-- V2_95: 図形ツール(四角・矢印・丸・楕円)。「文字ボタンの右側に図形ボタンを」との
+       要望への対応。雲印は次バージョンで別途対応予定のため今回は対象外。
+       新しいストローク種別は作らず、ドラッグの始点・終点から確定時に多角形近似した
+       頂点列(pts)を計算し、pen等と全く同じ形の通常ストローク{pts,color,lw,page}として
+       strokesに追加する(isText導入時に発生したs.pts前提コードのクラッシュを再発させない
+       ための設計方針)。色・太さはペンと共通のポップアップを流用する(_TOOL_COLOR_MODEに
+       'sketch'として登録)。操作方法・頂点列の計算はtool.js の shapeToolState /
+       _shapePointerDown・Move・Up / _shapeBuildPts を参照。 -->
+  <button class="tb-tool-btn tool-btn" data-tool="rect" title="四角"><span class="tb-tool-label">四角</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="arrow" title="矢印"><span class="tb-tool-label">矢印</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="19" x2="18" y2="5"/><polyline points="9 5 18 5 18 14"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="circle" title="丸"><span class="tb-tool-label">丸</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg></button>
+  <button class="tb-tool-btn tool-btn" data-tool="ellipse" title="楕円"><span class="tb-tool-label">楕円</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg></button>
   <div class="tb-sep"></div>
   <!-- V1_214: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
        (再タップで開くeraser用ポップアップ、#colorOverlayの.co-eraser-section)を新設した -->
@@ -1614,7 +1626,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
      初回書出時に読み込まれるため変更なし(exportPdfMergedHybrid190側は元々_loadJPFont()を
      呼んでいなかったため、こちらもV2_57で呼ぶよう修正済み。export.js側のコメント参照) -->
 <script src="export.js?v=262"></script>
-<script src="tool.js?v=258"></script>
+<script src="tool.js?v=259"></script>
 <script src="verify.js?v=257"></script>
 <!-- V1_195: SHXストローク文字認識(独立モジュール)。参照グリフデータ→認識エンジンの順で読む -->
 <script src="shxGlyphs.js?v=257"></script>
@@ -1626,7 +1638,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_94';
+const APP_VERSION = 'V2_95';
 
 // =========================================================
 // グローバル状態
@@ -2141,6 +2153,25 @@ function drawOverlay(){
       octx.save();
       octx.strokeStyle='#ffd700';octx.lineWidth=1.5;octx.setLineDash([6,4]);
       octx.strokeRect(_ltl90[0],_ltl90[1],_lbr90[0]-_ltl90[0],_lbr90[1]-_ltl90[1]);
+      octx.setLineDash([]);
+      octx.restore();
+    }
+  }
+  // V2_95: 図形ツール(四角・矢印・丸・楕円) — ドラッグ中のプレビュー線。
+  // ロジック本体(shapeToolState/_shapeBuildPts等)はtool.jsで実装しているため
+  // ここでは描画のみを行う。確定時と全く同じ_shapeBuildPts()を呼ぶことで、
+  // プレビュー表示と確定した図形の形が必ず一致するようにしている
+  if(typeof shapeToolState!=='undefined'&&shapeToolState&&shapeToolState.drawing&&shapeToolState.start&&shapeToolState.cur){
+    var _shPts95=(typeof _shapeBuildPts==='function')?_shapeBuildPts(shapeToolState.tool,shapeToolState.start,shapeToolState.cur):null;
+    if(_shPts95&&_shPts95.length>=2){
+      octx.save();
+      octx.strokeStyle='#00d4ff';octx.lineWidth=1.5;octx.setLineDash([5,3]);
+      octx.beginPath();
+      for(var _spi95=0;_spi95<_shPts95.length;_spi95++){
+        var _sp95=w2s(_shPts95[_spi95].x,_shPts95[_spi95].y);
+        if(_spi95===0) octx.moveTo(_sp95[0],_sp95[1]); else octx.lineTo(_sp95[0],_sp95[1]);
+      }
+      octx.stroke();
       octx.setLineDash([]);
       octx.restore();
     }

@@ -25,6 +25,133 @@ var ERASER_RADIUS_PX=20;
 // ボックス／dragging=バウンディングボックス内ドラッグでの移動中／dragStart=移動開始時
 // のワールド座標／dragOrig=移動開始時点の各ストローク座標のコピー(差分計算用)
 var lassoState={drawing:false,pts:[],selected:[],bbox:null,dragging:false,dragStart:null,dragOrig:null};
+// V2_95: 図形ツール(四角・矢印・丸・楕円)の状態。なげわ(lassoState)と同じ考え方で、
+// var宣言でグローバル公開(index.htmlのdrawOverlayがプレビュー描画のため参照する)。
+// drawing=ドラッグ中／tool=描画開始時のcurrentTool(ドラッグ中に誤って別ツールへ
+// 切り替わっても最初に選んだ図形で確定するため保持)／start=ドラッグ開始点(ワールド
+// 座標)／cur=現在のドラッグ位置(ワールド座標、プレビュー用)。
+// 【設計方針(事前調査で確定)】新しいストローク種別は作らない。四角・矢印・丸・楕円は
+// すべて既存のpen/hlストロークと同じ{pts:[{x,y},...],color,lw,page}という形の通常
+// ストロークとして、ドラッグ終了(pointerup/touchend)時に頂点列(pts)へ変換してから
+// strokesに追加する。円・楕円も中心+半径のような専用プロパティは持たせず、確定時点で
+// 32分割の多角形近似に変換してしまう。これにより、過去にisText(文字ストローク)導入時に
+// 発生した「s.pts前提コードがクラッシュした」問題を再発させない。
+var shapeToolState={drawing:false,tool:null,start:null,cur:null};
+// V2_95: currentToolが図形ツール(四角/矢印/丸/楕円)かどうかの判定。既存のcurrentTool値
+// (sketch/hl/eraser/text/lasso/select/dx/dy/dxdy/diag/dim系...)と衝突しないことを
+// 事前に全ファイル検索して確認済みの新規値のみを使う。
+function _isShapeTool(t){return t==='rect'||t==='arrow'||t==='circle'||t==='ellipse';}
+// V2_95: 円・楕円の多角形近似の分割数(目安32分割)。i=0とi=SHAPE_POLY_SEGMENTSで
+// 同じ座標になるため、pts配列は自動的に「始点に戻る」形で閉じる。
+var SHAPE_POLY_SEGMENTS=32;
+// V2_95: ドラッグ距離がこのスクリーンpx未満の場合は誤タップとみなし、図形を確定しない
+// (なげわのpoly.length<3での不成立チェックと同じ考え方の誤操作防止)。
+var SHAPE_MIN_DRAG_PX=4;
+// V2_95: 図形の頂点列(pts)を組み立てる。p0=ドラッグ開始点、p1=ドラッグ終了点(いずれも
+// ワールド座標)。ドラッグ中のプレビュー(index.html drawOverlay)もこの関数をそのまま
+// 呼んで同じ頂点列を描くため、プレビュー表示と確定形状が必ず一致する。
+function _shapePolygonPts(cx,cy,rx,ry){
+  var pts=[];
+  for(var i=0;i<SHAPE_POLY_SEGMENTS;i++){
+    var a=(i/SHAPE_POLY_SEGMENTS)*Math.PI*2;
+    pts.push({x:cx+rx*Math.cos(a),y:cy+ry*Math.sin(a)});
+  }
+  // 浮動小数の誤差(cos(2π)がcos(0)と厳密一致しない)で「始点に戻る」が僅かにズレるのを
+  // 避けるため、最後の点は計算せず先頭点の値をそのまま複製して確実に閉じる
+  pts.push({x:pts[0].x,y:pts[0].y});
+  return pts;
+}
+// V2_95: eraseAt()（消しゴム）は各ストロークの頂点(s.pts内の点そのもの)との距離でしか
+// 消去対象を判定しない(辺の途中との距離は見ない)ため、四角の頂点が4隅だけ・矢印の頂点が
+// 5点だけだと、辺の途中(例えば四角の辺の中央)を消しゴムでなぞっても頂点まで距離が
+// 遠く反応しない。ペンの手描きストロークは元々サンプリング点が密なため気付かれないが、
+// 図形ツールはドラッグ2点だけから生成するため、辺を一定間隔で分割した中間点を追加して
+// 密度をペンストローク相当に近づける(既存のeraseAt/なげわ選択判定/undo等は一切変更せず、
+// 「頂点の多い通常ストローク」として振る舞わせるだけで対応する)
+var SHAPE_EDGE_SEGMENTS=16;
+function _shapeEdgePts(a,b,segs){ // aから始まりb手前まで(bは含まない)を等間隔に分割
+  var arr=[];
+  for(var i=0;i<segs;i++){
+    var t=i/segs;
+    arr.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+  }
+  return arr;
+}
+function _shapeArrowPts(p0,p1){
+  var dx=p1.x-p0.x,dy=p1.y-p0.y;
+  var len=Math.hypot(dx,dy);
+  if(len<1e-9) return[{x:p0.x,y:p0.y},{x:p1.x,y:p1.y}];
+  var ang=Math.atan2(dy,dx);
+  var headLen=len*0.13; // 軸長の13%程度(10-15%の目安)
+  var headAng=27*Math.PI/180; // 27度程度(25-30度の目安)
+  var leftAng=ang+Math.PI-headAng,rightAng=ang+Math.PI+headAng;
+  var left={x:p1.x+headLen*Math.cos(leftAng),y:p1.y+headLen*Math.sin(leftAng)};
+  var right={x:p1.x+headLen*Math.cos(rightAng),y:p1.y+headLen*Math.sin(rightAng)};
+  // 始点→終点→矢尻左→終点→矢尻右、の順でpenの線描画としてつながりが自然になる順序
+  // (矢印は閉じたポリラインにしない=最後に始点へは戻さない)。軸線(始点→終点)は
+  // 消しゴム判定用に中間点を追加して分割する
+  var axis=_shapeEdgePts(p0,p1,SHAPE_EDGE_SEGMENTS);
+  axis.push({x:p1.x,y:p1.y});
+  return axis.concat([left,{x:p1.x,y:p1.y},right]);
+}
+function _shapeBuildPts(tool,p0,p1){
+  if(!p0||!p1) return null;
+  if(tool==='rect'){
+    // 対角の2点から矩形の4頂点+始点に戻る閉じる点。各辺は消しゴム判定用に
+    // 中間点で分割してから連結する
+    var c0={x:p0.x,y:p0.y},c1={x:p1.x,y:p0.y},c2={x:p1.x,y:p1.y},c3={x:p0.x,y:p1.y};
+    return _shapeEdgePts(c0,c1,SHAPE_EDGE_SEGMENTS)
+      .concat(_shapeEdgePts(c1,c2,SHAPE_EDGE_SEGMENTS))
+      .concat(_shapeEdgePts(c2,c3,SHAPE_EDGE_SEGMENTS))
+      .concat(_shapeEdgePts(c3,c0,SHAPE_EDGE_SEGMENTS))
+      .concat([{x:c0.x,y:c0.y}]);
+  }
+  if(tool==='circle'){
+    // 始点を中心、終点までの距離を半径とする正円(32分割の多角形近似)
+    var r=Math.hypot(p1.x-p0.x,p1.y-p0.y);
+    return _shapePolygonPts(p0.x,p0.y,r,r);
+  }
+  if(tool==='ellipse'){
+    // 始点・終点を対角とする外接矩形に内接する楕円(32分割の多角形近似)
+    var cx=(p0.x+p1.x)/2,cy=(p0.y+p1.y)/2;
+    var rx=Math.abs(p1.x-p0.x)/2,ry=Math.abs(p1.y-p0.y)/2;
+    return _shapePolygonPts(cx,cy,rx,ry);
+  }
+  if(tool==='arrow'){
+    return _shapeArrowPts(p0,p1);
+  }
+  return null;
+}
+// V2_95: なげわ(_lassoPointerDown/Move/Up)のパターンに倣い、ドラッグ開始点・終了点の
+// 2点だけを記録し、pointerup(またはtouchend)時にptsを計算してストロークを確定する。
+function _shapePointerDown(wx,wy){
+  shapeToolState.drawing=true;
+  shapeToolState.tool=currentTool;
+  shapeToolState.start={x:wx,y:wy};
+  shapeToolState.cur={x:wx,y:wy};
+  scheduleOverlay();
+}
+function _shapePointerMove(wx,wy){
+  if(!shapeToolState.drawing) return;
+  shapeToolState.cur={x:wx,y:wy};
+  scheduleOverlay();
+}
+function _shapePointerUp(){
+  if(!shapeToolState.drawing) return;
+  var tool=shapeToolState.tool,p0=shapeToolState.start,p1=shapeToolState.cur;
+  shapeToolState.drawing=false;shapeToolState.tool=null;shapeToolState.start=null;shapeToolState.cur=null;
+  if(!p0||!p1){scheduleOverlay();return;}
+  var distPx=Math.hypot(p1.x-p0.x,p1.y-p0.y)*scale;
+  if(distPx<SHAPE_MIN_DRAG_PX){scheduleOverlay();return;} // 誤タップ(ほぼ動かさず離した)は確定しない
+  var pts=_shapeBuildPts(tool,p0,p1);
+  if(!pts||pts.length<2){scheduleOverlay();return;}
+  snapshot();
+  // ①既存のpen/hlストロークと全く同じ形の通常ストロークとして追加(新しいストローク
+  // 種別は作らない)。色・太さはペンと共通のcurrentColor/currentLWをそのまま使う
+  strokes.push({pts:pts,color:{...currentColor},lw:currentLW,page:_curPage()});
+  if(typeof verify==='function')verify('図形追加',{tool:tool,len:strokes.length});
+  scheduleOverlay();doSave(); // なげわ・ペンと同様、確定時に即時保存
+}
 // V1_210: ペン等の他ツールから計測ボタンを1回押した時に、前回選んでいた計測ツールを
 // 直接復元できるようにするため記憶する。var宣言でグローバル公開(index.html側の
 // #measureToggleBtnクリックハンドラが参照するため)
@@ -278,6 +405,10 @@ function handlePointerDown(sx,sy,isPenInput){
   if(currentTool==='lasso'){
     _lassoPointerDown(wx,wy);return;
   }
+  // V2_95: 図形ツール(四角・矢印・丸・楕円)。ドラッグ開始点を記録する
+  if(_isShapeTool(currentTool)){
+    _shapePointerDown(wx,wy);return;
+  }
   // スケッチ/蛍光ペン: ペンは常に描画（マウス時はsketch/hlツール時のみ）
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     sketchPts=[{x:wx,y:wy}];sketching=true;scheduleOverlay();return;
@@ -326,6 +457,11 @@ function handlePointerMove(sx,sy,isPenInput){
     if(mouseDown) _lassoPointerMove(wx,wy);
     return;
   }
+  // V2_95: 図形ツール(四角・矢印・丸・楕円)。ドラッグ中はプレビュー用に終点を更新
+  if(_isShapeTool(currentTool)){
+    if(mouseDown) _shapePointerMove(wx,wy);
+    return;
+  }
   // スケッチ/蛍光ペン描画
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     if(sketching){sketchPts.push({x:wx,y:wy});scheduleOverlay();}return;
@@ -369,6 +505,10 @@ function handlePointerUp(sx,sy,isPenInput){
   // V2_90: なげわ(lasso)ツール。描画中なら囲み線を確定して選択、移動中なら保存して終了
   if(currentTool==='lasso'){
     _lassoPointerUp();return;
+  }
+  // V2_95: 図形ツール(四角・矢印・丸・楕円)。ドラッグ終了点からptsを計算し確定する
+  if(_isShapeTool(currentTool)){
+    _shapePointerUp();return;
   }
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     if(sketching&&sketchPts.length>1){
@@ -592,7 +732,7 @@ ov.addEventListener('touchstart',e=>{
     // に委ねる。サブ窓作成のドラッグ操作(SW.active)は対象外とし従来通り動作する
     if(typeof _textPickTarget!=='undefined'&&_textPickTarget
         &&inputMode==='freehand'&&!(window.SW&&window.SW.active)
-        &&(_fingerMeasureActive()||currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='lasso')){
+        &&(_fingerMeasureActive()||currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='lasso'||_isShapeTool(currentTool))){
       if(sketching){sketching=false;sketchPts=[];}
       panning=true;
       _panAnchorX=null;_panAnchorY=null; // V1_101: 移動距離判定の起点をパン開始のたびにリセット
@@ -615,7 +755,7 @@ ov.addEventListener('touchstart',e=>{
       _fingerMeasureDown(sx,fy);
       lastMX=sx;lastMY=fy;
     } else if(inputMode==='freehand'
-        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='lasso'||(window.SW&&window.SW.active))){
+        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='lasso'||_isShapeTool(currentTool)||(window.SW&&window.SW.active))){
       // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
       // V0_152.2: 手書きモード + サブ窓作成中(SW.active) → 指1本で対角ドラッグできるように追加
       panning=false;
@@ -674,7 +814,7 @@ ov.addEventListener('touchmove',e=>{
     const sx=t.clientX-r.left,sy=t.clientY-r.top-FINGER_CURSOR_OFFSET_Y;
     _fingerMeasureMove(sx,sy);
     lastMX=sx;lastMY=sy;
-  } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&(currentTool==='eraser'||currentTool==='lasso'))||(window.SW&&window.SW.active))){
+  } else if(fingers.length===1&&mouseDown&&!panning&&(sketching||(inputMode==='freehand'&&(currentTool==='eraser'||currentTool==='lasso'||_isShapeTool(currentTool)))||(window.SW&&window.SW.active))){
     // V0_79: 手書きモード 指1本描画中 / V0_152.2: サブ窓作成の対角ドラッグ中も含む
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
@@ -775,7 +915,7 @@ ov.addEventListener('touchend',e=>{
     }
     // V0_79: 手書きモードで指描画中だった場合はストロークを確定
     // V0_152.2: サブ窓作成の対角ドラッグ中(指を離して矩形確定)も含む
-    if(!_gestureSessionActive&&!isPen&&(sketching||(inputMode==='freehand'&&(currentTool==='eraser'||currentTool==='lasso'))||(window.SW&&window.SW.active))){
+    if(!_gestureSessionActive&&!isPen&&(sketching||(inputMode==='freehand'&&(currentTool==='eraser'||currentTool==='lasso'||_isShapeTool(currentTool)))||(window.SW&&window.SW.active))){
       handlePointerUp(lastMX,lastMY,false);
     }
     // V1_18: ダブルタップ全体表示（V0_80で誤操作防止のため一旦廃止したが再要望により復活）。
@@ -874,6 +1014,14 @@ ov.addEventListener('touchcancel',e=>{
   // スケッチ/蛍光ペンの描画中データも中断された入力なので破棄する(中途半端な線が
   // 残らないよう、確定(handlePointerUp)はせずpts配列ごと捨てる)
   if(sketching){sketching=false;sketchPts=[];scheduleOverlay();}
+  // V2_95: 図形ツール(四角・矢印・丸・楕円)のドラッグ中データも、中断された入力として
+  // 確定(_shapePointerUp)せずに破棄する(中途半端な図形が残らないように、かつ次の操作で
+  // drawing=trueのまま固まらないようにする。文字ツール(V2_92-94)・スケッチ(上記)と
+  // 同じ考え方)
+  if(typeof shapeToolState!=='undefined'&&shapeToolState.drawing){
+    shapeToolState.drawing=false;shapeToolState.tool=null;shapeToolState.start=null;shapeToolState.cur=null;
+    scheduleOverlay();
+  }
   mouseDown=false;isPen=false;panning=false;
   pinchDist=null;pinchMid=null;
   _gestureSessionActive=false;_panAnchorX=null;_panAnchorY=null;_tapStartTime=0;
@@ -895,7 +1043,7 @@ ov.addEventListener('touchcancel',e=>{
 // 維持する(下のクリックハンドラでこの値を見て「状態リセットをしない」保護を掛けている
 // ため)が、色選択が#measureToolPopupに常時表示されるようになったので、再タップ時に
 // 別ポップアップを開く処理自体は行わない(下のif(_mode==='dim')分岐を参照)
-const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',text:'sketch',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim',lineLen:'dim',ang:'dim'}; // V2_63: 角度追加 / V2_80: 文字入力(ペンと同じ色/太さポップアップを流用)
+const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',text:'sketch',rect:'sketch',arrow:'sketch',circle:'sketch',ellipse:'sketch',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim',lineLen:'dim',ang:'dim'}; // V2_63: 角度追加 / V2_80: 文字入力(ペンと同じ色/太さポップアップを流用) / V2_95: 図形ツール(四角・矢印・丸・楕円、ペンと同じ色/太さポップアップを流用)
 // V1_205: 計測ツール選択ポップアップ(#measureToolPopup、index.html)用。6つの計測ツールの
 // うちどれかが新たに選択された時、ヘッダーの計測ボタン(#measureCurrentLabel、3段表示の
 // 3段目)に選択中のツール名を表示し、ポップアップを閉じる。すでに選択中のツールの
@@ -997,6 +1145,9 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     // V2_90: 他ツールへ切り替えたら、なげわ(lasso)の選択状態(バウンディングボックス・
     // アクションバー含む)は必ずクリアする
     if(currentTool!=='lasso'&&typeof _lassoClearSelection==='function') _lassoClearSelection();
+    // V2_95: 他ツールへ切り替えたら、図形ツール(四角・矢印・丸・楕円)のドラッグ中
+    // プレビュー状態も必ずクリアする(なげわの選択状態クリアと同じ考え方)
+    if(typeof shapeToolState!=='undefined'){shapeToolState.drawing=false;shapeToolState.tool=null;shapeToolState.start=null;shapeToolState.cur=null;}
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
     // V2_84: 文字ツール選択時点でフォントの読込を先行開始しておく(実際に
@@ -1011,12 +1162,16 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
       'eraser':'消去したい線をなぞってください',
       'text':'図面をタップして文字を入力', // V2_80
       'lasso':'囲みたい範囲を線で囲んでください', // V2_90
+      'rect':'ドラッグして四角を描いてください', // V2_95
+      'arrow':'ドラッグして矢印を描いてください(始点→終点)', // V2_95
+      'circle':'ドラッグして丸を描いてください(始点が中心)', // V2_95
+      'ellipse':'ドラッグして楕円を描いてください', // V2_95
       'dxdy':'1点目を選択してください',
       'diag':'1点目を選択してください',
       'circDim':'円の円周にペンを近づける→離して確定→位置を指定',
       'radDim':'円または円弧を選択→離して確定→半径線の位置を指定'
     };
-    if(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'||currentTool==='lasso'){
+    if(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'||currentTool==='lasso'||_isShapeTool(currentTool)){
       showGuide(guideMap[currentTool]||'', 2000);
     } else if(guideMap[currentTool]){
       showGuide(guideMap[currentTool]);
