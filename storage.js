@@ -367,6 +367,7 @@ async function tryRestore(){
               b.classList.toggle('active',parseFloat(b.dataset.lw)===currentLW);
             });
             const _lwl=document.getElementById('lwLabel');if(_lwl)_lwl.textContent=currentLW;
+            const _tsl86=document.getElementById('textSizeLabel');if(_tsl86)_tsl86.textContent=currentLW; // V2_86
             if(_d2.currentHL_Color)currentHL_Color=_d2.currentHL_Color;
             if(_d2.currentHL_LW)currentHL_LW=_d2.currentHL_LW;
             if(_d2.currentDimColor)currentDimColor=_d2.currentDimColor;
@@ -473,6 +474,7 @@ async function tryRestore(){
       b.classList.toggle('active',parseFloat(b.dataset.lw)===currentLW);
     });
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
+    const tsl86=document.getElementById('textSizeLabel');if(tsl86)tsl86.textContent=currentLW; // V2_86
     if(d.currentHL_Color)currentHL_Color=d.currentHL_Color;
     if(d.currentHL_LW)currentHL_LW=d.currentHL_LW;
     if(d.currentDimColor)currentDimColor=d.currentDimColor;
@@ -608,7 +610,9 @@ function _doBkSave(){
   var _bkCf=(typeof openFiles!=='undefined'&&currentFileIdx>=0)?openFiles[currentFileIdx]:null;
   var _bkStrokes=_bkCf&&_bkCf.strokes?_bkCf.strokes:strokes;
   var _bkDims=_bkCf&&_bkCf.dims?_bkCf.dims:dims;
-  _bkPut(fk,_bkDims.slice(),_bkStrokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});}));
+  // V2_80: 文字入力ツールの文字(isText)はptsを持たないため、s.pts.slice()が
+  // クラッシュしないようptsがある場合のみ複製する
+  _bkPut(fk,_bkDims.slice(),_bkStrokes.map(function(s){return s.pts?Object.assign({},s,{pts:s.pts.slice()}):Object.assign({},s);}));
 }
 
 // クールダウン方式スケジューラ
@@ -665,7 +669,8 @@ function _dvAutoSave(){
       fileName:_dvFn,fileSize:_dvFs,
       savedAt:new Date().toISOString(),
       dims:_dvDims.slice(),
-      strokes:_dvStrokes.map(function(s){return Object.assign({},s,{pts:s.pts.slice()});})
+      // V2_80: 文字入力ツールの文字(isText)はptsを持たないため分岐（上のバックアップ保存と同じ理由）
+      strokes:_dvStrokes.map(function(s){return s.pts?Object.assign({},s,{pts:s.pts.slice()}):Object.assign({},s);})
     };
     // V1_40: 接続が無効化されていた場合に備え、transaction()呼び出しをtry/catchで
     // 囲み、失敗時はキャッシュを破棄して1回だけ再接続してから保存する

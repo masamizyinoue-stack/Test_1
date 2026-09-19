@@ -505,6 +505,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #markFitRow #fitBtn{flex:1;}
 #markPopup{display:none;min-height:48px;padding:4px 10px;font-size:12px;border:1.5px solid rgba(255,215,0,.75);border-radius:8px;background:rgba(10,14,20,.88);color:#ffd700;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 14px rgba(0,0,0,.5);user-select:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);align-items:center;justify-content:center;gap:4px;white-space:nowrap;flex-shrink:0;}
 #markPopup.visible{display:flex;}
+/* V2_80: 文字入力ツール用の入力ボックス。タップ位置にposition:fixedで表示する */
+#textInputBox{display:none;position:fixed;z-index:350;background:rgba(255,255,255,.94);
+  border:1.5px dashed #00d4ff;border-radius:4px;padding:2px 6px;}
+#textInputBox textarea{border:none;outline:none;background:transparent;font-family:'NotoSansJPCanvas',sans-serif;
+  min-width:60px;resize:none;overflow:hidden;white-space:pre;padding:0;margin:0;display:block;vertical-align:top;}
 /* V1_91: 「次へ」ボタン・件数表示・✕(マーク解除)。markPopup自体はもうクリック対象では
    なく、内部の各要素にそれぞれ役割を持たせる */
 #markCountLabel{font-size:11px;color:#ffe487;}
@@ -811,6 +816,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <!-- V1_214: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
        (再タップで開くeraser用ポップアップ、#colorOverlayの.co-eraser-section)を新設した -->
   <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg><span class="tb-tool-label" id="eraserSizeLabel">20</span></button>
+  <!-- V2_80: 文字入力ツール。タップした位置にキーボードで文字を入力して配置する。
+       色・太さは手書きペンの選択(currentColor/currentLW)をそのまま流用するため、
+       再タップで開く色/太さポップアップもペンと同じ#colorOverlay(.co-sketch-section)を使う -->
+  <!-- V2_86: ペンの#lwLabelと同じ3段表示(文字/アイコン/現在の大きさ)にした。
+       色・太さはペンと共通(currentLW)のため、値自体はペン側と同じものを表示する -->
+  <button class="tb-tool-btn tool-btn" data-tool="text" title="文字入力"><span class="tb-tool-label">文字</span><svg id="textToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg><span class="tb-tool-label" id="textSizeLabel">0.6</span></button>
   <div class="tb-sep"></div>
   <!-- V1_205: 計測ボタン群(.dim-group)は#measureToolPopupへ移設した(HTML末尾、
        .topbarの直後を参照)。このボタンはアイコンを定規デザインに変更し、押すと
@@ -1077,6 +1088,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <div class="viewmemo" id="viewmemo">
     <div id="markFitRow">
       <div id="markPopup"><span style="font-size:15px">●</span>マーク<span id="markCountLabel"></span><button id="markNextBtn" type="button">次へ</button><span id="markClearX">✕</span></div>
+      <!-- V2_80: 文字入力ツールのキーボード入力ボックス -->
+      <div id="textInputBox"><textarea id="textInputField" rows="1" maxlength="300"></textarea></div>
     </div>
   </div>
   <!-- V1_234: 記憶VIEWポップアップ(M_Viewer_V7.09の#vbm-pop仕様。1〜5の単一ボタン。
@@ -1595,7 +1608,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_79';
+const APP_VERSION = 'V2_87';
 
 // =========================================================
 // グローバル状態
@@ -1704,6 +1717,34 @@ function drawAnnotation(targetCtx, strokeFilter, noClear) {
   var _curPg65=_curPage(); // V1_65: PDFページごとに書き込みを分離するため、現在ページ以外は描画しない
   for(var si=0; si<strokes.length; si++){
     var s = strokes[si];
+    // V2_80: 文字入力ツールで配置した文字(s.isText)は線(pts)を持たないため、
+    // 通常のストローク描画とは別処理でここに分岐させる。ペン扱いのためフィルタは
+    // 蛍光ペン専用表示時(strokeFilter==='hl')のみ除外する
+    if(s.isText){
+      if((s.page||1)!==_curPg65) continue;
+      if(strokeFilter==='hl') continue;
+      var _tpx80=physX(s.x), _tpy80=physY(s.y);
+      if(_tpx80<-_mgPx||_tpx80>_cwPx+_mgPx||_tpy80<-_mgPx||_tpy80>_chPx+_mgPx) continue;
+      var _tFontPx80=Math.max(dpr,(s.lw||0.6)*20*(scale/lwRef)*dpr*PS);  // V2_81: 線幅と同じ最小1pxに統一(下限8pxで急に大きさが変わる不具合を修正)
+      atc.save();
+      // V2_84: 「もっといいフォントにしたい」との要望に対応。DXF文字・PDF書出と
+      // 同じNoto Sans JP(埋込フォント、tool.jsの_ensureCanvasJPFont80で
+      // FontFaceとして読込・登録)を使う。読込前・読込失敗時はsans-serifへ
+      // 自然にフォールバックする
+      atc.font=_tFontPx80+'px "NotoSansJPCanvas", sans-serif';
+      atc.fillStyle='rgb('+s.color.r+','+s.color.g+','+s.color.b+')';
+      atc.textBaseline='top';
+      // V2_87: 「alt+Enterで次の行に入力出来る様にして」との要望で複数行に対応。
+      // canvasのfillText()は改行(\n)を解釈しないため、行ごとに分割して1行ずつ
+      // 下にずらして描画する(行間はPDF書出(_hpDrawTextStrokes81等)と揃えて
+      // フォントサイズの1.2倍)
+      var _tLines80=(s.text||'').split('\n');
+      for(var _tli80=0;_tli80<_tLines80.length;_tli80++){
+        atc.fillText(_tLines80[_tli80],_tpx80,_tpy80+_tFontPx80*1.2*_tli80);
+      }
+      atc.restore();
+      continue;
+    }
     if(!s.pts || s.pts.length < 2) continue;
     if((s.page||1)!==_curPg65) continue;
     if(strokeFilter==='hl' && !s.hl) continue; // V1_170
@@ -3924,9 +3965,13 @@ function _diRender(){
 
 
 // Undo/Redo スナップショット
+// V2_80: 文字入力ツールで追加した文字(isText)はpts(線の点列)を持たないため、
+// 従来の s=>({...s,pts:[...s.pts]}) のままだと [...undefined] でクラッシュしていた。
+// ptsがある場合のみ複製し、無い場合(文字)はそのままコピーする共通関数にまとめた
+function _cloneStroke80(s){ return s.pts?{...s,pts:[...s.pts]}:{...s}; }
 function snapshot(){
   history.push({
-    strokes:strokes.map(s=>({...s,pts:[...s.pts]})),
+    strokes:strokes.map(_cloneStroke80),
     dims:[...dims]
   });
   if(history.length>MAX_HISTORY)history.shift();
@@ -3935,7 +3980,7 @@ function snapshot(){
 }
 function undo(){
   if(!history.length)return;
-  redoStack.push({strokes:strokes.map(s=>({...s,pts:[...s.pts]})),dims:[...dims]});
+  redoStack.push({strokes:strokes.map(_cloneStroke80),dims:[...dims]});
   const st=history.pop();strokes=st.strokes;dims=st.dims;
   // V0_140: undo後は新配列のためopenFiles[]に明示同期
   if(currentFileIdx>=0&&openFiles[currentFileIdx]){openFiles[currentFileIdx].strokes=strokes;openFiles[currentFileIdx].dims=dims;}
@@ -3943,7 +3988,7 @@ function undo(){
 }
 function redo(){
   if(!redoStack.length)return;
-  history.push({strokes:strokes.map(s=>({...s,pts:[...s.pts]})),dims:[...dims]});
+  history.push({strokes:strokes.map(_cloneStroke80),dims:[...dims]});
   const st=redoStack.pop();strokes=st.strokes;dims=st.dims;
   // V0_140: redo後は新配列のためopenFiles[]に明示同期
   if(currentFileIdx>=0&&openFiles[currentFileIdx]){openFiles[currentFileIdx].strokes=strokes;openFiles[currentFileIdx].dims=dims;}
@@ -4157,7 +4202,9 @@ function updateToolColorDots(){
   const si=document.getElementById('sketchToolIcon');
   const hi=document.getElementById('hlToolIcon');
   const hif=document.getElementById('hlToolIconFill');
+  const txi=document.getElementById('textToolIcon'); // V2_80: 文字入力もペンと同じ色を反映
   if(si&&currentColor)si.style.color=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
+  if(txi&&currentColor)txi.style.color=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
   if(hi&&currentHL_Color)hi.style.color=`rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
   if(hif&&currentHL_Color)hif.setAttribute('fill',`rgba(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b},0.25)`);
   if(currentDimColor){

@@ -226,6 +226,13 @@ function handlePointerDown(sx,sy,isPenInput){
   if(currentTool==='eraser'){
     snapshot();eraserPos={x:wx,y:wy};eraseAt(wx,wy);scheduleOverlay();return;
   }
+  // V2_80: 文字入力ツール。タップした位置にキーボード入力ボックスを開く
+  // (マウスクリック・Apple Pencilタップは常にこのhandlePointerDownへ到達するため、
+  // ここに分岐を置くだけで両方に対応できる。指(フリーハンドモード)からの利用は
+  // 下のtouchstart側ガード条件に'text'を追加することで対応している)
+  if(currentTool==='text'){
+    _openTextInputAt(wx,wy,sx,sy);return;
+  }
   // スケッチ/蛍光ペン: ペンは常に描画（マウス時はsketch/hlツール時のみ）
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
     sketchPts=[{x:wx,y:wy}];sketching=true;scheduleOverlay();return;
@@ -335,7 +342,10 @@ function eraseAt(wx,wy){
   // V1_65: 現在表示中のページ(_curPage())のstrokes/dimsのみを消しゴム対象にする。
   // 他ページの要素は(s.page||1)!==curの条件で常にtrue（=残す）扱いになるため触れない
   var cur=_curPage();
-  strokes=strokes.filter(s=>(s.page||1)!==cur||!s.pts.some(p=>Math.hypot(p.x-wx,p.y-wy)<r));
+  // V2_80: 文字入力ツールで配置した文字(s.isText)はpts(線の点列)を持たないため、
+  // 従来のs.pts.some(...)のままだとここでクラッシュしていた。文字は自身の座標
+  // (s.x,s.y)が消しゴム半径内かどうかで判定するよう分岐を追加した
+  strokes=strokes.filter(s=>(s.page||1)!==cur||(s.pts?!s.pts.some(p=>Math.hypot(p.x-wx,p.y-wy)<r):Math.hypot(s.x-wx,s.y-wy)>=r));
   dims=dims.filter(d=>(d.page||1)!==cur||Math.hypot(d.tx-wx,d.ty-wy)>=r);
   // V0_140: filter後は新配列になるためopenFiles[]に明示同期
   if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx]){
@@ -531,8 +541,9 @@ ov.addEventListener('touchstart',e=>{
       _fingerMeasureDown(sx,fy);
       lastMX=sx;lastMY=fy;
     } else if(inputMode==='freehand'
-        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||(window.SW&&window.SW.active))){
+        &&(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'||(window.SW&&window.SW.active))){
       // V0_79: 手書きモード + スケッチ/蛍光ペン → 指で描画
+      // V2_80: 手書きモード + 文字入力ツール → 指タップでも入力ボックスを開けるようにする
       // V0_152.2: 手書きモード + サブ窓作成中(SW.active) → 指1本で対角ドラッグできるように追加
       panning=false;
       handlePointerDown(sx,sy,false); // currentTool===sketch/hl/サブ窓作成中 なので描画(操作)開始
@@ -763,7 +774,7 @@ ov.addEventListener('touchend',e=>{
 // 維持する(下のクリックハンドラでこの値を見て「状態リセットをしない」保護を掛けている
 // ため)が、色選択が#measureToolPopupに常時表示されるようになったので、再タップ時に
 // 別ポップアップを開く処理自体は行わない(下のif(_mode==='dim')分岐を参照)
-const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim',lineLen:'dim',ang:'dim'}; // V2_63: 角度追加
+const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',text:'sketch',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim',lineLen:'dim',ang:'dim'}; // V2_63: 角度追加 / V2_80: 文字入力(ペンと同じ色/太さポップアップを流用)
 // V1_205: 計測ツール選択ポップアップ(#measureToolPopup、index.html)用。6つの計測ツールの
 // うちどれかが新たに選択された時、ヘッダーの計測ボタン(#measureCurrentLabel、3段表示の
 // 3段目)に選択中のツール名を表示し、ポップアップを閉じる。すでに選択中のツールの
@@ -859,18 +870,23 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     if(window.IPX&&window.IPX.active&&typeof ipxCancel==='function')ipxCancel(); // V1_48: ツール切替時は交点ピックを中止
     dimState={pts:[]};dimPendingDown=false;sketching=false;sketchPts=[];snapPt=null;scheduleOverlay();
     if(typeof updateToolColorDots==='function')updateToolColorDots();
+    // V2_84: 文字ツール選択時点でフォントの読込を先行開始しておく(実際に
+    // タップして入力ボックスを開く前に読込を終えておくことで、初回表示時から
+    // 新フォントで見えるようにする)
+    if(currentTool==='text'&&typeof _ensureCanvasJPFont84==='function') _ensureCanvasJPFont84();
 
     // ガイドメッセージ
     const guideMap={
       'sketch':'Apple Pencilまたはマウスでスケッチ',
       'hl':'蛍光ペン：Apple Pencilまたはマウスでハイライト',
       'eraser':'消去したい線をなぞってください',
+      'text':'図面をタップして文字を入力', // V2_80
       'dxdy':'1点目を選択してください',
       'diag':'1点目を選択してください',
       'circDim':'円の円周にペンを近づける→離して確定→位置を指定',
       'radDim':'円または円弧を選択→離して確定→半径線の位置を指定'
     };
-    if(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'){
+    if(currentTool==='sketch'||currentTool==='hl'||currentTool==='eraser'||currentTool==='text'){
       showGuide(guideMap[currentTool]||'', 2000);
     } else if(guideMap[currentTool]){
       showGuide(guideMap[currentTool]);
@@ -905,6 +921,11 @@ document.querySelectorAll('.lw-btn').forEach(btn=>{
     document.getElementById('colorOverlay').classList.remove('open');
     // ④ ボタン内の現在値表示を更新
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
+    // V2_86: 「文字入力ボタンの下にもペンと同じ様に今の大きさを表示して」との
+    // 要望に対応。ペンの#lwLabelと同じ仕組みで、文字ツールボタン内の
+    // #textSizeLabelも一緒に更新する(色/太さはペンと文字入力で共通(currentLW)
+    // のため、どちらのポップアップで変更してもここで両方更新すれば良い)
+    const tsl86=document.getElementById('textSizeLabel');if(tsl86)tsl86.textContent=currentLW;
     scheduleSave(); // V0_135: ペン線幅変更を保存
   });
 });
@@ -976,3 +997,123 @@ document.querySelectorAll('.dim-color-btn').forEach(btn=>{
     scheduleSave(); // V0_135: 寸法色変更を保存
   });
 });
+
+// =========================================================
+// V2_80: 文字入力ツール（タップした位置にキーボードで文字を配置）
+// =========================================================
+// 依存: strokes, currentColor, currentLW, snapshot, scheduleOverlay, doSave,
+//       _curPage, verify, ov (いずれも既存グローバル)
+var _textInputActive=false;
+// V2_84: 「文字入力のフォントをもっといいフォントにしたい」との要望に対応。
+// DXF文字・PDF書出で使っている埋込フォント(Noto Sans JP、export.jsの
+// _loadJPFontでbase64取得)を、画面のcanvas描画・入力ボックスの両方でも
+// 使えるようFontFaceとして登録する。一度登録すれば以降はブラウザの
+// フォントキャッシュ経由で即座に使われる(document.fonts.addはCSSの
+// font-family一致要素にも自動反映されるため、入力ボックス側は再描画不要)。
+// キャンバス側は読込完了時にscheduleOverlay()で1回再描画し、読込前後の
+// 見た目の差を早く解消する
+var _canvasJPFontReady84=false;
+function _ensureCanvasJPFont84(){
+  if(_canvasJPFontReady84) return;
+  _canvasJPFontReady84=true; // 二重読込防止（失敗時も再試行はしない）
+  (async function(){
+    try{
+      if(typeof _loadJPFont==='function') await _loadJPFont();
+      if(!window._notoSansJPBase64) return;
+      var ff=new FontFace('NotoSansJPCanvas','url(data:font/ttf;base64,'+window._notoSansJPBase64+')');
+      await ff.load();
+      document.fonts.add(ff);
+      if(typeof scheduleOverlay==='function') scheduleOverlay();
+    }catch(e){ console.warn('[文字入力] フォント読込失敗',e); }
+  })();
+}
+function _openTextInputAt(wx,wy,sx,sy){
+  if(_textInputActive) return; // 二重に開かない
+  var box=document.getElementById('textInputBox');
+  var inp=document.getElementById('textInputField');
+  if(!box||!inp) return;
+  _ensureCanvasJPFont84();
+  _textInputActive=true;
+  var r=ov.getBoundingClientRect();
+  // V2_85: 「タップして出来る入力枠の大きさが、選んでいる文字の大きさを反映して
+  // いない」との指摘に対応。従来はcurrentLW*20+8という入力欄専用の簡易式で、
+  // 実際に図面へ描画される文字サイズ(index.htmlの_tFontPx80、現在のズーム
+  // (scale/lwRef)にも比例する)と対応しておらず、ズーム状態によっては見た目の
+  // 大きさが一致しなかった。同じ式(dprを除いたCSS px相当。_tFontPx80は
+  // canvas実ピクセル(devicePixelRatio倍)基準のため、CSS pxの入力欄に合わせて
+  // dpr分を割った値になる)に統一し、確定後に実際に描かれる大きさとほぼ一致する
+  // ようにした
+  var _lwRef85=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:scale;
+  var fontPx=Math.max(10,Math.min(160,Math.round((currentLW||0.6)*20*(scale/_lwRef85))));
+  inp.value='';
+  inp.style.fontSize=fontPx+'px';
+  inp.style.lineHeight=(fontPx*1.2)+'px'; // V2_87: 画面描画の行間(1.2倍)と揃える
+  inp.style.height=(fontPx*1.2)+'px';
+  inp.style.color='rgb('+currentColor.r+','+currentColor.g+','+currentColor.b+')';
+  box.style.left=(r.left+sx)+'px';
+  box.style.top=(r.top+sy)+'px';
+  box.style.display='block';
+
+  // V2_87: 複数行入力に対応してtextareaになったため、行数が増えるたびに
+  // 高さをscrollHeightへ合わせて自動的に広げる(幅は元々折り返さない設定
+  // (white-space:pre)のまま)
+  function autoResize(){
+    inp.style.height='auto';
+    inp.style.height=inp.scrollHeight+'px';
+  }
+
+  function commit(){
+    var t=inp.value;
+    _closeTextInput();
+    if(t&&t.trim()){
+      snapshot();
+      strokes.push({isText:true,text:t,x:wx,y:wy,color:{...currentColor},lw:currentLW,page:_curPage()});
+      if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx]){
+        openFiles[currentFileIdx].strokes=strokes;
+      }
+      if(typeof verify==='function')verify('文字追加',{len:strokes.length});
+      scheduleOverlay();doSave(); // V0_103と同様、即時保存
+    }
+  }
+  function onKey(e){
+    // V2_87: 「alt+Enterで次の行に入力出来る様にして」との要望に対応。
+    // ブラウザ・OSによってはAlt+Enterの既定動作が改行挿入以外(ウィンドウ操作等)に
+    // 割り当てられていることがあり、既定動作に任せるだけでは確実に改行できない
+    // ため、カーソル位置に'\n'を直接挿入する(素のEnterのみ確定として扱う)
+    if(e.key==='Enter'&&e.altKey){
+      e.preventDefault();
+      var _s87=inp.selectionStart, _e87=inp.selectionEnd;
+      inp.value=inp.value.slice(0,_s87)+'\n'+inp.value.slice(_e87);
+      inp.selectionStart=inp.selectionEnd=_s87+1;
+      autoResize();
+      return;
+    }
+    if(e.key==='Enter'){e.preventDefault();commit();}
+    else if(e.key==='Escape'){e.preventDefault();_closeTextInput();}
+  }
+  function onInput(){ autoResize(); }
+  function onBlur(){ commit(); }
+  // V2_80: タップ(mousedown)の中で即座にinput.focus()すると、そのクリック確定処理
+  // (mouseup/click)に伴うブラウザの既定のフォーカス解決によって、直後に強制的に
+  // フォーカスが外れてしまう(結果、onBlur→commit()が即発火して1文字も打つ前に
+  // 入力ボックスが閉じてしまう)ことがある。フォーカス移動とblurリスナーの登録を
+  // 次のイベントループへ1回遅らせることで、このタップ確定に伴う「紛れのblur」が
+  // 収まった後にリスナーを付けられるようにし、意図しない即時クローズを防ぐ
+  setTimeout(function(){
+    if(!_textInputActive) return; // 遅延の間にEscape等で既に閉じられていた場合は何もしない
+    inp.focus();
+    inp.addEventListener('keydown',onKey);
+    inp.addEventListener('input',onInput);
+    inp.addEventListener('blur',onBlur);
+    box._cleanup80=function(){
+      inp.removeEventListener('keydown',onKey);
+      inp.removeEventListener('input',onInput);
+      inp.removeEventListener('blur',onBlur);
+    };
+  },0);
+}
+function _closeTextInput(){
+  var box=document.getElementById('textInputBox');
+  if(box){ if(box._cleanup80){box._cleanup80();box._cleanup80=null;} box.style.display='none'; }
+  _textInputActive=false;
+}

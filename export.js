@@ -203,7 +203,9 @@ async function _runPdfExport(_dlgSel){
     let mxY=isFinite(_bbFull.maxy)?_bbFull.maxy:-Infinity;
     function upd(x,y){if(!isFinite(x)||!isFinite(y))return;mnX=Math.min(mnX,x);mxX=Math.max(mxX,x);mnY=Math.min(mnY,y);mxY=Math.max(mxY,y);}
     // ペン・寸法（ユーザー追記）もboundsに含める
-    for(const s of strokes)for(const p of s.pts)upd(p.x,p.y);
+    // V2_80: 文字入力ツールで追加した文字(isText)はptsを持たないため、s.ptsに
+    // 直接forを回すとクラッシュする。ptsがある場合と文字の場合とで分岐する
+    for(const s of strokes){ if(s.pts){for(const p of s.pts)upd(p.x,p.y);} else if(s.isText){upd(s.x,s.y);} }
     for(const d of dims){
       for(const l of(d.lines||[]))upd(l.x1,l.y1),upd(l.x2,l.y2);
       if(d.tx!=null&&d.ty!=null)upd(d.tx,d.ty);
@@ -1876,7 +1878,8 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     }
     if(typeof pdfImage!=='undefined'&&pdfImage){_allExp(pdfImage.wx,pdfImage.wy);_allExp(pdfImage.wx+pdfImage.ww,pdfImage.wy-pdfImage.wh);}
     for(const img of (typeof images!=='undefined'?images:[])){_allExp(img.wx,img.wy);_allExp(img.wx+img.ww,img.wy-img.wh);}
-    for(const s of strokes)for(const p of s.pts)_allExp(p.x,p.y);
+    // V2_80: 文字(isText)はptsを持たないため分岐（206行目付近の修正と同じ理由）
+    for(const s of strokes){ if(s.pts){for(const p of s.pts)_allExp(p.x,p.y);} else if(s.isText){_allExp(s.x,s.y);} }
     for(const d of dims){
       for(const l of(d.lines||[])){_allExp(l.x1,l.y1);_allExp(l.x2,l.y2);}
       if(d.tx!=null&&d.ty!=null)_allExp(d.tx,d.ty);
@@ -2083,6 +2086,52 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
         }
         if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':1}));
       }
+    }
+
+    // V2_82: 文字入力ツール(isText)をjsPDFベクター描画する。doc.moji(7.5)と同じ
+    // 日本語埋込フォント(_hpSplitRuns/_hpSetRunFont/_hpFixChars)を流用するが、
+    // 画面描画(index.html)がtextBaseline='top'で描くのに合わせ、baseline:'top'を
+    // 指定して位置を一致させる。文字サイズは手書き線の太さ(_hpDrawStrokes170)と
+    // 同じ考え方で、現在のズーム(scale)ではなく印刷用の固定スケール(pdfScale等/
+    // lwRef比)を基準にすることで、書き出し時点の画面ズーム状態に左右されない
+    // 一定の大きさになる(画面側の20倍係数(20*(scale/lwRef))とも揃えている)
+    // V2_83: 「範囲指定書出すると文字が小さくなる」不具合を修正。線の太さ
+    // (_hpDrawStrokes170)は「用紙上での見た目の太さを一定に保つ」ため、範囲指定時
+    // あえて全体書出相当の縮小スケール(_lwScale242)を使っているが、文字は他の
+    // 図面要素(DXF線・doc.moji文字)と同様、範囲を拡大するほど用紙上で大きく
+    // 見えるのが自然な挙動(doc.mojiは常にpdfScaleを使っており、この不具合は
+    // 無い)。線と同じ考え方を誤って流用していたのが原因のため、常にpdfScale
+    // (範囲指定時は拡大された値)を使うよう修正した。
+    function _hpDrawTextStrokes81(){
+      if(typeof strokes==='undefined'||strokes.length===0) return;
+      if(!window._notoSansJPBase64) return;
+      const _curPg81=_curPage();
+      const lwRef81=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:scale;
+      for(const s of strokes){
+        if(!s.isText) continue;
+        if((s.page||1)!==_curPg81) continue;
+        if(!s.text||!s.text.trim()) continue;
+        if(!_inRange241(s.x,s.y,s.x,s.y)) continue; // V2_41
+        const fsMM=Math.max(1,(s.lw||0.6)*20*(pdfScale/lwRef81))*_sx;
+        if(fsMM<=0) continue;
+        const xmm=w2mx(s.x), ymm=w2my(s.y);
+        const col=s.color||{r:0,g:0,b:0};
+        pdf.setTextColor(col.r,col.g,col.b);
+        pdf.setFontSize(fsMM*(72/25.4));
+        const lines=_hpFixChars(s.text).split('\n');
+        for(let i=0;i<lines.length;i++){
+          const ln=lines[i];
+          if(!ln.trim()) continue;
+          const runs=_hpSplitRuns(ln);
+          let curX=xmm, curY=ymm+fsMM*1.2*i; // V2_87: top基準なので下の行ほど+方向(行間は画面側と同じ1.2倍)
+          for(const run of runs){
+            _hpSetRunFont(pdf,run.font);
+            try{ pdf.text(run.text,curX,curY,{baseline:'top'}); }catch(te81){}
+            curX+=pdf.getTextWidth(run.text);
+          }
+        }
+      }
+      pdf.setTextColor(0,0,0);
     }
 
     // V2_41: 「範囲指定書出」時、指定矩形(rangeRect238)と全く重ならない要素は
@@ -2297,6 +2346,8 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
     // 不具合の要因自体が構造的に無くなる。
     // V1_170: 蛍光ペンは7.6で文字より先に描画済みのため、ここではペンのみ描画する。
     _hpDrawStrokes170('pen');
+    // V2_82: 文字入力ツールの文字をペンと同じ最前面(上)に描画する
+    _hpDrawTextStrokes81();
 
     // ── 9. 寸法（dims）ベクター描画 ──
     // V1_155: 寸法線・矢印・センターマーク・寸法文字・アンダーバーを全てベクター化。
@@ -2511,6 +2562,7 @@ async function exportPdfMergedHybrid190(pageNums){
         _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'hl',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190);
         _hpDrawDimsPdfLib190(copied190,pgDims190,jpFont190,rgb190,degrees190,pageH190,mapper190);
         _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'pen',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190);
+        _hpDrawTextStrokesPdfLib190(copied190,pgStrokes190,jpFont190,rgb190,fitRef190,pageH190,mapper190);
         okCount190++;
       }catch(pe190){
         console.error('[PDF merge] page='+pg190,pe190);
@@ -2610,6 +2662,36 @@ function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,Li
         borderLineCap:LineCapStyle?LineCapStyle.Round:undefined
       });
     }catch(se190){ console.warn('[PDF merge] stroke draw fail',se190); }
+  }
+}
+
+// V2_82: 文字入力ツール(isText)をpdf-libで元PDFページへ直接ベクター描画する。
+// 太さ(ここではフォントサイズ)は_hpDrawStrokesPdfLib190のペン太さ計算式
+// (s.lw/fitRef)をそのまま流用し、20倍係数(画面側のフォント計算式と同じ比率)を
+// 掛けてpt単位のフォントサイズに変換する。位置は画面描画がtextBaseline='top'で
+// 描く仕様に合わせ、pdf-libのdrawText(ベースライン基準)へフォントサイズの
+// 約80%(一般的な欧文/和文フォントのアセント比率の近似値)を足して概ね同じ
+// 高さに見えるよう補正している(完全な一致ではなく近似)
+function _hpDrawTextStrokesPdfLib190(page,pgStrokes,jpFont,rgbFn,fitRef,pageH,mapper){
+  if(!jpFont) return;
+  function P196(x,y){ return mapper?mapper.pt(x,y):{x:x,y:y}; }
+  for(var i=0;i<pgStrokes.length;i++){
+    var s=pgStrokes[i];
+    if(!s.isText) continue;
+    if(!s.text||!s.text.trim()) continue;
+    var col=s.color||{r:0,g:0,b:0};
+    var pdfCol=rgbFn(col.r/255,col.g/255,col.b/255);
+    var fsPt=Math.max(1,(s.lw||0.6)*20/fitRef);
+    var lines=_hpFixChars(s.text).split('\n');
+    for(var li=0;li<lines.length;li++){
+      var ln=lines[li];
+      if(!ln.trim()) continue;
+      var baseX=s.x, baseY=s.y+fsPt*0.8+fsPt*1.2*li; // V2_87: top基準→ベースライン近似・複数行対応(行間は画面側と同じ1.2倍)
+      var q=P196(baseX,baseY);
+      try{
+        page.drawText(ln,{x:q.x,y:q.y,size:fsPt,font:jpFont,color:pdfCol});
+      }catch(txe82){ console.warn('[PDF merge] text draw fail',txe82); }
+    }
   }
 }
 
