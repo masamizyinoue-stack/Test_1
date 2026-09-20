@@ -2054,9 +2054,38 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
         const lwPx=s.hl?(s.lw*(_strokeSc242/lwRef155)):Math.max(1,s.lw*(_strokeSc242/lwRef155));
         pdf.setDrawColor(col.r,col.g,col.b);
         pdf.setLineWidth(Math.max(0.05,lwPx*_sx));
-        pdf.setLineCap('round'); pdf.setLineJoin('round');
-        if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':0.45}));
-        if(rangeRect238){
+        // V2_96: 図形ツール(四角・矢印・丸・楕円=s.shapeType)は角を鋭角に保つため
+        // lineCap/lineJoinをペンと変える(butt/miter)。ペン・蛍光ペンは従来通り
+        // round/roundのまま(手描きの丸みを維持する)
+        // V2_97: 矢印(shapeType='arrow')のみlineCapを'round'にする。矢尻は
+        // 「軸→矢尻左」「矢尻左→軸(戻り)」「軸→矢尻右」の3本を独立したpdf.line()
+        // として描画しており(1本の連続パスではないため setLineJoin は効かない)、
+        // 矢尻の付け根(軸線・左右2辺が collắp合流する頂点)をbuttキャップで
+        // 独立に描くと、各辺の太さぶんだけ向きの違う「面取り」が重なり合い、
+        // 頂点にわずかな凹み(ノッチ)が残って見える不具合があった。lwに対して
+        // 矢尻が短すぎる場合(headLen対lw比が小さい短い矢印)ほど目立つ。丸・
+        // 矩形は直角の頂点を保つ必要があるためbuttのまま据え置き、矢印だけ
+        // roundにして頂点の隙間を自然に埋める(半径はlw/2程度でごく小さく、
+        // 矢尻の鋭さ自体はほぼ変わらない)
+        if(s.shapeType==='arrow'){ pdf.setLineCap('round'); pdf.setLineJoin('round'); }
+        else if(s.shapeType){ pdf.setLineCap('butt'); pdf.setLineJoin('miter'); }
+        else { pdf.setLineCap('round'); pdf.setLineJoin('round'); }
+        if(s.hl) pdf.setGState(new pdf.GState({'stroke-opacity':(s.hlOpacity||0.45)})); // V2_98: 濃度を反映
+        if(s.shapeType){
+          // V2_96: 図形ストロークはベジェ補間(下のelse節、ペン用スムージング)を
+          // 使わず、頂点をそのまま直線で結ぶ(範囲指定書出時は_clipLine242で
+          // クリップしてから直線を引く。全体書出時はクリップなしでそのまま結ぶ)。
+          // これにより四角の角・矢印の矢尻が丸まらず、丸/楕円も多角形近似の
+          // 頂点列をそのまま辿るため輪郭が途切れない
+          for(let i=0;i<n-1;i++){
+            if(rangeRect238){
+              const cl=_clipLine242(s.pts[i].x,s.pts[i].y,s.pts[i+1].x,s.pts[i+1].y,rangeRect238);
+              if(cl) pdf.line(w2mx(cl[0]),w2my(cl[1]),w2mx(cl[2]),w2my(cl[3]));
+            } else {
+              pdf.line(w2mx(s.pts[i].x),w2my(s.pts[i].y),w2mx(s.pts[i+1].x),w2my(s.pts[i+1].y));
+            }
+          }
+        }else if(rangeRect238){
           // V2_42: 範囲指定書出時は境界で正確にクリップするため、ベジェ曲線ではなく
           // 隣接する2点ずつを直線分割してクリップ描画する(滑らかさより範囲の
           // 正確さを優先する。全体書出時は下のelse節で従来通りベジェ曲線を描く)
@@ -2530,7 +2559,7 @@ async function exportPdfMergedHybrid190(pageNums){
   if(btn190) btn190.disabled=true;
   showGuide('HD-PDFを生成中...');
   try{
-    var PDFDocument190=PDFLib.PDFDocument, rgb190=PDFLib.rgb, degrees190=PDFLib.degrees, LineCapStyle190=PDFLib.LineCapStyle;
+    var PDFDocument190=PDFLib.PDFDocument, rgb190=PDFLib.rgb, degrees190=PDFLib.degrees, LineCapStyle190=PDFLib.LineCapStyle, LineJoinStyle190=PDFLib.LineJoinStyle;
     var srcDoc190=await PDFDocument190.load(origBuf190.slice(0),{ignoreEncryption:true});
     var outDoc190=await PDFDocument190.create();
     if(typeof fontkit!=='undefined') outDoc190.registerFontkit(fontkit);
@@ -2561,9 +2590,9 @@ async function exportPdfMergedHybrid190(pageNums){
         var pgStrokes190=(typeof strokes!=='undefined'?strokes:[]).filter(function(s){return (s.page||1)===pg190;});
         var pgDims190=(typeof dims!=='undefined'?dims:[]).filter(function(d){return (d.page||1)===pg190;});
         // 蛍光ペン(下)→寸法(中)→ペン(上)の順で重ねる(exportHybridPDFの重ね順に倣う)
-        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'hl',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190);
+        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'hl',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190,LineJoinStyle190);
         _hpDrawDimsPdfLib190(copied190,pgDims190,jpFont190,rgb190,degrees190,pageH190,mapper190);
-        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'pen',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190);
+        _hpDrawStrokesPdfLib190(copied190,pgStrokes190,'pen',fitRef190,pageH190,rgb190,LineCapStyle190,mapper190,LineJoinStyle190);
         _hpDrawTextStrokesPdfLib190(copied190,pgStrokes190,jpFont190,rgb190,fitRef190,pageH190,mapper190);
         okCount190++;
       }catch(pe190){
@@ -2622,6 +2651,25 @@ function _buildSmoothSvgPath190(pts,h){
   return d.trim();
 }
 
+// V2_96: 図形ツール(四角・矢印・丸・楕円=s.shapeType)専用のSVGパス変換。
+// _buildSmoothSvgPath190のCatmull-Rom→ベジェ変換は頂点を通らず角を丸めてしまう
+// ため、図形ストロークには使わず、頂点をそのままL(直線)で結ぶだけのシンプルな
+// パスにする。closed=trueの場合は末尾にZを付けて確実に閉じる(四角・丸・楕円)
+function _buildStraightSvgPath190(pts,h,closed){
+  if(!pts||pts.length<2) return null;
+  var raw=[];
+  for(var i=0;i<pts.length;i++){
+    var x=pts[i].x, y=h-pts[i].y;
+    if(!isFinite(x)||!isFinite(y)) continue;
+    raw.push({x:+x.toFixed(3),y:+y.toFixed(3)});
+  }
+  if(raw.length<2) return null;
+  var d='M'+raw[0].x+' '+raw[0].y+' ';
+  for(var i=1;i<raw.length;i++) d+='L'+raw[i].x+' '+raw[i].y+' ';
+  if(closed) d+='Z';
+  return d.trim();
+}
+
 // V1_196: ページの/Rotate(90/180/270度)による座標系のずれを補正するマッパーを
 // 生成する。vp=pdfPage.getViewport({scale:1})(表示中の回転済みビジュアルフレーム)。
 // 本アプリの「ワールド座標」はY上向き(w2s系)だが、pdf.jsのconvertToPdfPointは
@@ -2644,7 +2692,16 @@ function _hpMakeRawMapper196(vp){
 // 別関数として実装している
 // V1_196: mapper引数を追加。ページ回転がある場合、各点をワールド座標→生PDF座標へ
 // 変換してから描画することで、書込みが回転してずれるバグを修正した
-function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,LineCapStyle,mapper){
+// V2_97: LineJoinStyle引数を追加。drawSvgPath自体にはlineJoinを指定するオプションが
+// 無く(pdf-libのAPI仕様、borderLineCapのみ)、PDFの既定のline joinはMiterのため、
+// 矢印の矢尻(軸→矢尻左→軸へ戻る→矢尻右、という1本の連続パス)にある「来た辺を
+// そのまま逆走する180度の折り返し」頂点で、miter joinがmiterLimitを超えてbevel
+// (面取り)へ自動的に切り替わり、ごくわずかな凹みが見えることがあった
+// (index.html描画・_hpDrawStrokes170と同根の問題。V2_97で3経路とも矢印だけ
+// round join/round capへ変更して修正)。drawSvgPathはlineJoinを渡せないため、
+// 矢印を描く直前だけ低レベルAPI(page.pushOperators+setLineJoin)でグラフィックス
+// ステートのline joinをRoundへ切り替え、描画後にMiterへ戻す
+function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,LineCapStyle,mapper,LineJoinStyle){
   for(var i=0;i<pgStrokes.length;i++){
     var s=pgStrokes[i];
     if(!s.pts||s.pts.length<2) continue;
@@ -2653,17 +2710,31 @@ function _hpDrawStrokesPdfLib190(page,pgStrokes,filterMode,fitRef,pageH,rgbFn,Li
     var col=s.color||{r:0,g:0,b:0};
     var lwPt=Math.max(0.1, (s.hl?s.lw:Math.max(1,s.lw)) / fitRef);
     var rawPts196=mapper?s.pts.map(function(p){return mapper.pt(p.x,p.y);}):s.pts;
-    var svgPath=_buildSmoothSvgPath190(rawPts196,pageH);
+    // V2_96: 図形ツール(s.shapeType)はベジェ補間(_buildSmoothSvgPath190、ペン用)を
+    // 使わず、頂点を直線で結ぶ_buildStraightSvgPath190を使う(四角の角・矢印の矢尻を
+    // 鋭角に保ち、丸・楕円は多角形近似の頂点列をそのまま辿って輪郭を途切れさせない)
+    var svgPath=s.shapeType
+      ? _buildStraightSvgPath190(rawPts196,pageH,_isClosedShapeType(s.shapeType))
+      : _buildSmoothSvgPath190(rawPts196,pageH);
     if(!svgPath) continue;
+    var isArrow190=(s.shapeType==='arrow');
     try{
+      if(isArrow190&&LineJoinStyle&&page.pushOperators&&window.PDFLib&&PDFLib.setLineJoin){
+        try{ page.pushOperators(PDFLib.setLineJoin(LineJoinStyle.Round)); }catch(_je190){}
+      }
       page.drawSvgPath(svgPath,{
         x:0,y:pageH,
         borderColor:rgbFn(col.r/255,col.g/255,col.b/255),
         borderWidth:lwPt,
-        borderOpacity:s.hl?0.45:1,
-        borderLineCap:LineCapStyle?LineCapStyle.Round:undefined
+        borderOpacity:s.hl?(s.hlOpacity||0.45):1, // V2_98: 濃度を反映
+        borderLineCap:LineCapStyle?(isArrow190?LineCapStyle.Round:(s.shapeType?LineCapStyle.Butt:LineCapStyle.Round)):undefined
       });
     }catch(se190){ console.warn('[PDF merge] stroke draw fail',se190); }
+    finally{
+      if(isArrow190&&LineJoinStyle&&page.pushOperators&&window.PDFLib&&PDFLib.setLineJoin){
+        try{ page.pushOperators(PDFLib.setLineJoin(LineJoinStyle.Miter)); }catch(_je190b){}
+      }
+    }
   }
 }
 

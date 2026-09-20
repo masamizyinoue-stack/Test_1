@@ -41,6 +41,12 @@ var shapeToolState={drawing:false,tool:null,start:null,cur:null};
 // (sketch/hl/eraser/text/lasso/select/dx/dy/dxdy/diag/dim系...)と衝突しないことを
 // 事前に全ファイル検索して確認済みの新規値のみを使う。
 function _isShapeTool(t){return t==='rect'||t==='arrow'||t==='circle'||t==='ellipse';}
+// V2_96: shapeType('rect'/'arrow'/'circle'/'ellipse')のうち、始点と終点が一致する
+// 閉じた多角形として扱うべきものはどれか。四角・丸・楕円は閉じる(canvas側で
+// closePath()相当/pdf側で'Z')。矢印は開いたポリライン(始点と矢尻が別の位置)のため
+// 対象外。screen描画(index.html drawAnnotation)・PDFベクター書出(export.js
+// _hpDrawStrokes170/_hpDrawStrokesPdfLib190)の3箇所すべてがこの判定関数を共通で使う
+function _isClosedShapeType(t){return t==='rect'||t==='circle'||t==='ellipse';}
 // V2_95: 円・楕円の多角形近似の分割数(目安32分割)。i=0とi=SHAPE_POLY_SEGMENTSで
 // 同じ座標になるため、pts配列は自動的に「始点に戻る」形で閉じる。
 var SHAPE_POLY_SEGMENTS=32;
@@ -77,13 +83,41 @@ function _shapeEdgePts(a,b,segs){ // aから始まりb手前まで(bは含まな
   }
   return arr;
 }
-function _shapeArrowPts(p0,p1){
+// V2_97: 矢尻(矢印の先端)が「一部だけ凹んだ不格好な塊」に見える不具合を修正。
+// 原因調査: 実際にPDF書出し(_hpDrawStrokes170)で生成される矢印を高解像度で
+// pdftoppm画像化して目視したところ、矢印を短く(かつ現在のペン太さのまま)描いた
+// 場合に矢尻がひどく歪んで見えることを確認した。原因は「矢尻の軸長に対する比率
+// (13%)」だけを見ており、線の太さ(lw)を一切考慮していなかったこと。矢印を短く
+// 描くと軸長13%の矢尻の長さが数十〜:線幅と同程度まで小さくなり、本来は細く
+// 尖った2辺であるべき矢尻が「線幅とほぼ同じ長さの塗りつぶし塊」になって
+// 潰れ、辺の途中に凹み(ノッチ)が出る(縮小画像では気づきにくいが拡大すると
+// 明確に見える)。V2_95〜V2_96はこの比率(27度/13%)を据え置いたままだったため、
+// 短い矢印・太いペンの組み合わせで常に再現する。
+// 修正方針: 矢尻の長さに「線の太さ(lw)を基準にした最小値」の下限を設け、矢尻の
+// 辺が常に線幅より十分長く(目安5倍以上)なるようにする。lwは画面表示・PDF書出し
+// 双方で「(scale/lwRef)倍」して物理太さに変換される値(V0_87〜)なので、ここでは
+// 逆に「lwRef基準のワールド座標換算値」= lw/lwRef として比較する(この換算値は
+// ズーム倍率が変わっても矢印の見た目の比率を保つ=zoomAt後も破綻しない)。
+// 併せて、矢尻の開き角度も27度→32度に広げ(25-30度の目安よりやや広めにして
+// 実物の矢印らしい"末広がり"を強調)、長さ上限を軸長の50%に制限して矢印全体が
+// 短すぎる場合に矢尻だけが軸より長くなる逆転現象も防止する。
+function _shapeArrowPts(p0,p1,lwWorld){
   var dx=p1.x-p0.x,dy=p1.y-p0.y;
   var len=Math.hypot(dx,dy);
   if(len<1e-9) return[{x:p0.x,y:p0.y},{x:p1.x,y:p1.y}];
   var ang=Math.atan2(dy,dx);
-  var headLen=len*0.13; // 軸長の13%程度(10-15%の目安)
-  var headAng=27*Math.PI/180; // 27度程度(25-30度の目安)
+  // lwWorld省略時(呼び出し元がlwを渡せない場合)は、現在のcurrentLW/fitScale(or scale)
+  // から同じ換算式で算出する。fitScale未定義・0の場合はscaleへフォールバックする
+  // (index.htmlのプレビュー描画・tool.jsの確定処理いずれから呼ばれても安全に動く)
+  if(lwWorld==null){
+    var _lwRef97=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:((typeof scale!=='undefined'&&scale>0)?scale:1);
+    // V2_103: 図形は専用のcurrentShapeLWを使う(ペンのcurrentLWとは独立)
+    var _lw97=(typeof currentShapeLW!=='undefined')?currentShapeLW:((typeof currentLW!=='undefined')?currentLW:1);
+    lwWorld=_lw97/_lwRef97;
+  }
+  var headLen=Math.max(len*0.15, lwWorld*4.5); // 軸長の15%、ただし線幅の4.5倍未満にはしない
+  headLen=Math.min(headLen, len*0.5); // 矢印全体が短い場合に矢尻だけ軸より長くならないよう上限も設ける
+  var headAng=32*Math.PI/180; // 32度程度(V2_96までの27度からやや広げ、末広がりの矢印らしさを強調)
   var leftAng=ang+Math.PI-headAng,rightAng=ang+Math.PI+headAng;
   var left={x:p1.x+headLen*Math.cos(leftAng),y:p1.y+headLen*Math.sin(leftAng)};
   var right={x:p1.x+headLen*Math.cos(rightAng),y:p1.y+headLen*Math.sin(rightAng)};
@@ -147,8 +181,17 @@ function _shapePointerUp(){
   if(!pts||pts.length<2){scheduleOverlay();return;}
   snapshot();
   // ①既存のpen/hlストロークと全く同じ形の通常ストロークとして追加(新しいストローク
-  // 種別は作らない)。色・太さはペンと共通のcurrentColor/currentLWをそのまま使う
-  strokes.push({pts:pts,color:{...currentColor},lw:currentLW,page:_curPage()});
+  // 種別は作らない)。
+  // V2_102: 色は専用のcurrentShapeColorを使う(ペンのcurrentColorとは独立)
+  // V2_103: 太さも専用のcurrentShapeLWを使う(ペンのcurrentLWとは独立)
+  // V2_96: shapeType(='rect'/'arrow'/'circle'/'ellipse')を追加。既存のcolor/lwと
+  // 同レベルの軽量な追加プロパティであり、s.pts配列の構造自体は変えない(s.ptsを前提と
+  // する既存コード(export.js/storage.js/eraseAt/なげわ選択等)は shapeTypeの有無に
+  // 関わらずそのまま動作する)。目的は描画時にペン用の丸みスムージング
+  // (drawAnnotation/_hpDrawStrokes170/_hpDrawStrokesPdfLib190のCatmull-Rom風
+  // midpoint-quadratic補間)を適用せず、鋭角を保った直線描画(lineJoin='miter')に
+  // 切り替えるための目印として使う(V2_96見た目バグ修正)
+  strokes.push({pts:pts,color:{...currentShapeColor},lw:currentShapeLW,page:_curPage(),shapeType:tool});
   if(typeof verify==='function')verify('図形追加',{tool:tool,len:strokes.length});
   scheduleOverlay();doSave(); // なげわ・ペンと同様、確定時に即時保存
 }
@@ -516,7 +559,7 @@ function handlePointerUp(sx,sy,isPenInput){
       if(currentTool==='hl'){
         // 蛍光ペン: hl:true フラグ付きで保存（V0_70）
         // V1_65: PDFの場合、現在ページ番号をpageとして付与（ページごとに書き込みを分離するため）
-        strokes.push({pts:[...sketchPts],color:{...currentHL_Color},lw:currentHL_LW,hl:true,page:_curPage()});
+        strokes.push({pts:[...sketchPts],color:{...currentHL_Color},lw:currentHL_LW,hl:true,hlOpacity:currentHLAlpha,page:_curPage()}); // V2_98: 濃度を保存
         if(typeof verify==='function')verify('蛍光追加',{len:strokes.length});
       } else {
         strokes.push({pts:[...sketchPts],color:{...currentColor},lw:currentLW,page:_curPage()}); // ③ 絶対px値で保存
@@ -1050,6 +1093,15 @@ const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',text:'sketch',re
 // アイコンを再タップした場合(下のstopImmediatePropagation分岐)はこの処理には来ない
 // (色/太さポップアップが開くだけで、選択自体は変わらないため表示更新も不要)
 const _MEASURE_TOOL_LABELS={dxdy:'水・鉛',diag:'斜め',ll:'2線間',lp:'線と点',circDim:'直径',radDim:'半径',lineLen:'線長',ang:'角度'}; // V2_63: 角度追加
+// V2_96: 図形ツール選択ポップアップ(#shapeToolPopup、index.html)用。_MEASURE_TOOL_LABELS
+// と全く同じ役割(選択された図形の名前をヘッダーの図形ボタン下段ラベル(#shapeCurrentLabel)
+// に表示し、ポップアップを閉じる)。currentTool自体は従来通り'rect'/'arrow'/'circle'/
+// 'ellipse'のまま(値は変更しない)なので、_isShapeTool/storage.js/guideMap等は無改修
+const _SHAPE_TOOL_LABELS={rect:'四角',arrow:'矢印',circle:'丸',ellipse:'楕円'};
+// V2_96: ヘッダーの図形ボタン(#shapeToggleBtn)を他ツールから押した時に、前回選んで
+// いた図形タイプを直接復元できるよう記憶する(_lastMeasureToolと同じ考え方)。
+// var宣言でグローバル公開(index.htmlの#shapeToggleBtnクリックハンドラが参照するため)
+var _lastShapeTool=null;
 // V1_219: 「計測ボタンのアイコンを、選択中の計測ツールのアイコンにしてほしい」との
 // 依頼への対応。ヘッダーの計測ボタン(#measureToolIcon)は従来ずっと定規アイコン固定
 // だったが、計測ツールが選択されている間はそのツール専用のアイコン(下記、
@@ -1093,6 +1145,29 @@ function _syncMeasureToggleBtnIcon(){
   var _mtLabel236=document.getElementById('measureCurrentLabel');
   if(_mtLabel236) _mtLabel236.textContent=_MEASURE_TOOL_LABELS[currentTool]||_MEASURE_TOOL_LABELS[_lastMeasureTool]||'未選択';
 }
+// V2_96: 図形ボタン(#shapeToolIcon)用。_MEASURE_TOOL_ICON_INNER/_syncMeasureToggleBtnIcon
+// と全く同じ仕組み(currentTool→_lastShapeToolの順でフォールバックし、一度も使って
+// いなければ汎用アイコンに戻す)。var宣言でグローバル公開(index.htmlの#shapeToggleBtn
+// クリックハンドラ・storage.js復元処理から参照するため)
+var _SHAPE_DEFAULT_ICON_INNER='<rect x="3" y="3" width="8" height="8" rx="1"/><circle cx="17.5" cy="7" r="4"/><ellipse cx="7" cy="17.5" rx="5" ry="3.5"/><line x1="15" y1="15" x2="21" y2="21"/><polyline points="16.5 15 21 15 21 19.5"/>';
+var _SHAPE_TOOL_ICON_INNER={
+  rect:'<rect x="4" y="6" width="16" height="12" rx="1"/>',
+  arrow:'<line x1="4" y1="19" x2="18" y2="5"/><polyline points="9 5 18 5 18 14"/>',
+  circle:'<circle cx="12" cy="12" r="8"/>',
+  ellipse:'<ellipse cx="12" cy="12" rx="9" ry="6"/>'
+};
+function _syncShapeToggleBtnIcon(){
+  var el=document.getElementById('shapeToolIcon');
+  if(el) el.innerHTML=_SHAPE_TOOL_ICON_INNER[currentTool]||_SHAPE_TOOL_ICON_INNER[_lastShapeTool]||_SHAPE_DEFAULT_ICON_INNER;
+  var _slbl96=document.getElementById('shapeCurrentLabel');
+  if(_slbl96) _slbl96.textContent=_SHAPE_TOOL_LABELS[currentTool]||_SHAPE_TOOL_LABELS[_lastShapeTool]||'未選択';
+  // V2_96: アイコンの色は選択中の描画色を反映する(updateToolColorDots()からも
+  // 呼ばれるが、ここでも二重に反映しておくことでツール切替直後(updateToolColorDots
+  // 呼び出し前)の一瞬の色ズレも防ぐ)。
+  // V2_102: 図形は専用のcurrentShapeColorを反映する(ペンのcurrentColorとは独立)
+  var _shColor102=(typeof currentShapeColor!=='undefined'&&currentShapeColor)?currentShapeColor:currentColor;
+  if(el&&_shColor102) el.style.color='rgb('+_shColor102.r+','+_shColor102.g+','+_shColor102.b+')';
+}
 document.querySelectorAll('.tool-btn').forEach(btn=>{
   btn.addEventListener('click',(e)=>{
     // V2_22: 「サブ窓」ボタンを押した(SW.active=true)後、範囲ドラッグを完了させずに
@@ -1130,7 +1205,9 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     if(_MEASURE_TOOL_LABELS[currentTool]){
       var _mtLabel205=document.getElementById('measureCurrentLabel');
       if(_mtLabel205) _mtLabel205.textContent=_MEASURE_TOOL_LABELS[currentTool];
-      if(typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
+      // V2_100: 計測ツールを選んでも#measureToolPopupは自動的に閉じないようにした
+      // (2点選んで計測を確定する前に色も変えたい、という要望への対応)。
+      // ポップアップ右上の「決定」ボタンを押した時だけ閉じる
       // V1_210: 次に他ツールから計測ボタンを押した時にこのツールを直接復元できるよう記憶
       // (この下のscheduleSave()で一緒に保存される)
       _lastMeasureTool=currentTool;
@@ -1141,6 +1218,30 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     var _measureBtn207=document.getElementById('measureToggleBtn');
     if(_measureBtn207) _measureBtn207.classList.toggle('tool-active',!!_MEASURE_TOOL_LABELS[currentTool]);
     _syncMeasureToggleBtnIcon(); // V1_219: 計測ボタンのアイコンを選択中ツールの形状に同期
+    // V2_96: 図形ツールが新たに選択されたら、図形ボタンの下段ラベルを更新し、
+    // 図形ツール選択ポップアップ(#shapeToolPopup)を閉じる(V1_205の計測ツールと同じ処理)
+    if(_SHAPE_TOOL_LABELS[currentTool]){
+      // V2_100: 図形の種類を選んでも#shapeToolPopupは自動的に閉じないようにした
+      // (色/太さも続けて選びたい、という要望への対応)。ポップアップ右上の
+      // 「決定」ボタンを押した時だけ閉じる…はずだったが、これが図形ツール使用不可の
+      // 原因になっていた。#shapeToolPopupは520x313px程度あり、開いたままだと図形の
+      // 種類を選んだ直後にキャンバス上をドラッグしようとしてもポップアップがその領域を
+      // 覆っていてポインタ/タッチイベントがキャンバスまで届かず、図形が全く描けなく
+      // なっていた(V2_101で消しゴムに対して行ったのと同じ理由の不具合)。
+      // V2_102: 図形の「種類」を選んだ直後は必ずキャンバス操作(ドラッグ)に移るため、
+      // 消しゴムの大きさ選択(V2_101)と同じ考え方で、種類選択時だけは自動的に
+      // ポップアップを閉じるようにする。色/太さボタン(.color-btn/.lw-btn)側の
+      // 「決定ボタンを押すまで閉じない」動作(V2_100)はそのまま維持し、ここでは
+      // 触れない
+      if(typeof _closeShapeToolPopup==='function') _closeShapeToolPopup();
+      // 次に他ツールから図形ボタンを押した時にこのツールを直接復元できるよう記憶
+      _lastShapeTool=currentTool;
+    }
+    // 図形ボタン(#shapeToggleBtn)の枠は、図形ツールがcurrentToolの時だけ色付きにする
+    // (#measureToggleBtnと同じ考え方)
+    var _shapeBtn96=document.getElementById('shapeToggleBtn');
+    if(_shapeBtn96) _shapeBtn96.classList.toggle('tool-active',!!_SHAPE_TOOL_LABELS[currentTool]);
+    if(typeof _syncShapeToggleBtnIcon==='function') _syncShapeToggleBtnIcon(); // 図形ボタンのアイコン・ラベルを選択中の図形に同期
     if(window.IPX&&window.IPX.active&&typeof ipxCancel==='function')ipxCancel(); // V1_48: ツール切替時は交点ピックを中止
     // V2_90: 他ツールへ切り替えたら、なげわ(lasso)の選択状態(バウンディングボックス・
     // アクションバー含む)は必ずクリアする
@@ -1185,35 +1286,93 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
 // =========================================================
 // カラー選択ボタン
 // =========================================================
+// V2_97: 図形ツールポップアップ(#shapeToolPopup)内にもペンと同じ.color-btn/.lw-btnを
+// 追加した(色・太さのUIそのものは複製せず、同じclass名・同じdata-color/data-lw属性の
+// ボタンをもう1箇所に増やしただけ)。
+// V2_102: 「ペン・文字・図形の色が連動して同じ色になる」との指摘への対応で、色の状態を
+// currentColor(ペン)/currentTextColor(文字)/currentShapeColor(図形)の3つに分離した。
+// ただし.color-btnのDOM自体は従来通り2箇所(#colorOverlay内=ペン/文字が共用、
+// #shapeToolPopup内=図形専用)のままで増やしていない。文字ツールは専用ポップアップを
+// 持たずペンの#colorOverlayをそのまま流用する(V2_84の設計を踏襲)ため、クリックされた
+// クリックされたボタンが#shapeToolPopup内にあるかどうかで振り分ける(そこは図形専用の
+// UIなので、まだ図形の種類を選ぶ前(currentToolがまだ'sketch'等のまま)に先に色だけ
+// 選ぶ操作をしても、確実にcurrentShapeColorへ反映されるようにするため。currentToolを
+// 見て判定する方式だと、種類選択より先に色を選んだ場合に誤ってペンの色を書き換えて
+// しまう不具合があったため、DOM上の所属で判定する方式にした)。
+// 一方、文字ツールは専用ポップアップを持たず#colorOverlayをペンと共用しているため、
+// こちらは従来通りクリック時点のcurrentToolで振り分ける
 document.querySelectorAll('.color-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const[r,g,b]=btn.dataset.color.split(',').map(Number);currentColor={r,g,b};document.getElementById('colorOverlay').classList.remove('open');if(typeof updateToolColorDots==='function')updateToolColorDots();
-    scheduleSave(); // V0_135: スケッチ色変更を保存
+    const[r,g,b]=btn.dataset.color.split(',').map(Number);
+    if(btn.closest('#shapeToolPopup')){ currentShapeColor={r,g,b}; }
+    else if(currentTool==='text'){ currentTextColor={r,g,b}; }
+    else { currentColor={r,g,b}; }
+    if(typeof _syncColorBtnActive==='function') _syncColorBtnActive();
+    // V2_100: 「選択操作をしてもポップアップは自動的に閉じない」ように変更。
+    // ポップアップ右上の「決定」ボタン(colorOverlayDoneBtn)を押した時だけ閉じる
+    if(typeof updateToolColorDots==='function')updateToolColorDots();
+    scheduleSave(); // V0_135: スケッチ/文字/図形の色変更を保存
   });
 });
+// V2_102: .color-btnのactive表示を、そのボタンがどちらの場所(#shapeToolPopup=図形専用/
+// それ以外=#colorOverlay、ペン・文字共用)にあるかで、比較対象の色状態を切り替えて
+// 同期する。#colorOverlay側はcurrentTool==='text'ならcurrentTextColor、それ以外
+// (ペン等)ならcurrentColorと比較する。ポップアップを開いた直後(openContextPopup/
+// #shapeToggleBtnクリック)・色ボタンクリック直後・保存データ復元直後に呼ぶことで、
+// 常に「今のツールの色」が正しくハイライトされるようにする
+function _syncColorBtnActive(){
+  document.querySelectorAll('.color-btn').forEach(function(b){
+    var parts=b.dataset.color.split(',').map(Number);
+    var inShapePopup=!!(b.closest&&b.closest('#shapeToolPopup'));
+    var target=inShapePopup?currentShapeColor:(currentTool==='text'?currentTextColor:currentColor);
+    if(!target) return;
+    b.classList.toggle('active', parts[0]===target.r&&parts[1]===target.g&&parts[2]===target.b);
+  });
+}
 
 // =========================================================
 // 線幅選択ボタン
 // =========================================================
+// V2_103: 「ペン・文字・図形の太さが連動して同じ値になる」との指摘への対応。
+// .color-btnで既に採用しているV2_102の振り分け方式(クリックされたボタンが
+// #shapeToolPopup内にあるかどうかで図形/それ以外を判定し、それ以外は
+// クリック時点のcurrentToolがtextかどうかで文字/ペンを判定する)を、太さにも
+// そのまま適用する。理由も.color-btnハンドラのコメントと同じ:
+// 文字ツールは専用ポップアップを持たず#colorOverlayをペンと共用しているため
+// currentToolで判定し、図形専用ポップアップ(#shapeToolPopup)はDOM上の所属で
+// 判定する(図形の種類を選ぶ前に先に太さだけ選んでもcurrentShapeLWへ確実に
+// 反映されるようにするため)
 document.querySelectorAll('.lw-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.lw-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    currentLW=parseFloat(btn.dataset.lw);
-    // ① 色選択と同じくポップアップを閉じる
-    document.getElementById('colorOverlay').classList.remove('open');
-    // ④ ボタン内の現在値表示を更新
+    const lwVal103=parseFloat(btn.dataset.lw);
+    if(btn.closest('#shapeToolPopup')){ currentShapeLW=lwVal103; }
+    else if(currentTool==='text'){ currentTextLW=lwVal103; }
+    else { currentLW=lwVal103; }
+    // V2_97/V2_103: dataset値一致ではなく、ボタンの所属先に応じた状態値との
+    // 一致で同期する(_syncLwBtnActiveに集約。_syncColorBtnActiveと同じ考え方)
+    if(typeof _syncLwBtnActive==='function') _syncLwBtnActive();
+    // V2_100: 「選択操作をしてもポップアップは自動的に閉じない」ように変更(決定ボタンで閉じる)
+    // ④ ボタン内の現在値表示を更新(ペンの#lwLabelはcurrentLW、文字の#textSizeLabelは
+    // V2_103からcurrentTextLWを表示する。図形専用の3段目ラベルは無いため対象外)
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
-    // V2_86: 「文字入力ボタンの下にもペンと同じ様に今の大きさを表示して」との
-    // 要望に対応。ペンの#lwLabelと同じ仕組みで、文字ツールボタン内の
-    // #textSizeLabelも一緒に更新する(色/太さはペンと文字入力で共通(currentLW)
-    // のため、どちらのポップアップで変更してもここで両方更新すれば良い)
-    const tsl86=document.getElementById('textSizeLabel');if(tsl86)tsl86.textContent=currentLW;
-    scheduleSave(); // V0_135: ペン線幅変更を保存
+    const tsl86=document.getElementById('textSizeLabel');if(tsl86)tsl86.textContent=currentTextLW;
+    scheduleSave(); // V0_135: 線幅/文字サイズ変更を保存
   });
 });
+// V2_103: .lw-btnのactive表示を、そのボタンがどちらの場所(#shapeToolPopup=図形専用/
+// それ以外=#colorOverlay、ペン・文字共用)にあるかで、比較対象の太さ状態を切り替えて
+// 同期する(_syncColorBtnActiveの太さ版)。#colorOverlay側はcurrentTool==='text'なら
+// currentTextLW、それ以外(ペン等)ならcurrentLWと比較する。ポップアップを開いた直後
+// (openContextPopup/#shapeToggleBtnクリック)・太さボタンクリック直後・保存データ
+// 復元直後に呼ぶことで、常に「今のツールの太さ」が正しくハイライトされるようにする
+function _syncLwBtnActive(){
+  document.querySelectorAll('.lw-btn').forEach(function(b){
+    var val=parseFloat(b.dataset.lw);
+    var inShapePopup=!!(b.closest&&b.closest('#shapeToolPopup'));
+    var target=inShapePopup?currentShapeLW:(currentTool==='text'?currentTextLW:currentLW);
+    b.classList.toggle('active', val===target);
+  });
+}
 
 // =========================================================
 // 蛍光ペン色選択ボタン（V0_70）
@@ -1224,7 +1383,7 @@ document.querySelectorAll('.hl-color-btn').forEach(btn=>{
     btn.classList.add('active');
     const[r,g,b]=btn.dataset.color.split(',').map(Number);
     currentHL_Color={r,g,b};
-    document.getElementById('colorOverlay').classList.remove('open');
+    // V2_100: 選択操作でポップアップを自動的に閉じない(決定ボタンで閉じる)
     if(typeof updateToolColorDots==='function')updateToolColorDots();
     scheduleSave(); // V0_135: 蛍光ペン色変更を保存
   });
@@ -1238,10 +1397,23 @@ document.querySelectorAll('.hl-lw-btn').forEach(btn=>{
     document.querySelectorAll('.hl-lw-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     currentHL_LW=parseFloat(btn.dataset.lw);
-    document.getElementById('colorOverlay').classList.remove('open');
+    // V2_100: 選択操作でポップアップを自動的に閉じない(決定ボタンで閉じる)
     // V1_207: 蛍光ペンボタンの3段目(id="hlLwLabel")に現在の線幅を表示する
     const hlwl=document.getElementById('hlLwLabel');if(hlwl)hlwl.textContent=currentHL_LW;
     scheduleSave(); // V0_135: 蛍光ペン線幅変更を保存
+  });
+});
+
+// =========================================================
+// V2_98: 蛍光ペン濃度(透明度)選択ボタン
+// =========================================================
+document.querySelectorAll('.hl-alpha-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.hl-alpha-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentHLAlpha=parseFloat(btn.dataset.alpha)/100;
+    // V2_100: 選択操作でポップアップを自動的に閉じない(決定ボタンで閉じる)
+    scheduleSave(); // 蛍光ペン濃度変更を保存
   });
 });
 
@@ -1253,10 +1425,14 @@ document.querySelectorAll('.er-btn').forEach(btn=>{
     document.querySelectorAll('.er-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     ERASER_RADIUS_PX=parseFloat(btn.dataset.er);
-    document.getElementById('colorOverlay').classList.remove('open');
     const erl=document.getElementById('eraserSizeLabel');if(erl)erl.textContent=ERASER_RADIUS_PX;
     if(typeof scheduleOverlay==='function')scheduleOverlay(); // 消しゴム範囲の可視化円を即反映
     scheduleSave(); // 消しゴム範囲を保存
+    // V2_101: 消しゴムは大きさしか選べないため、他ツール(ペン/文字/蛍光ペン/図形/計測)の
+    // 「決定ボタンを押すまで閉じない」方式(V2_100)とは別扱いに戻し、大きさを選んだ
+    // 瞬間にポップアップを自動的に閉じる(V2_99以前と同じ挙動)。他モードのハンドラには触れない
+    var coEr=document.getElementById('colorOverlay');
+    if(coEr&&coEr.dataset.mode==='eraser') coEr.classList.remove('open');
   });
 });
 
@@ -1268,16 +1444,9 @@ document.querySelectorAll('.dim-color-btn').forEach(btn=>{
     document.querySelectorAll('.dim-color-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     currentDimColor=btn.dataset.color;
-    document.getElementById('colorOverlay').classList.remove('open');
-    // V1_239: 「計測ボタンで色を選んだ際にポップアップが閉じない」との指摘への対応。
-    // このボタン(.dim-color-btn)はV1_214で旧#colorOverlayの.co-dim-sectionから
-    // #measureToolPopupへ移設されたが、この行(colorOverlay.classList.remove('open'))は
-    // 移設前のまま残っており、実際に開いているのは#measureToolPopupの方のため
-    // 何も閉じていなかった。_closeMeasureToolPopup()(index.html)を呼んで実際に
-    // 開いているポップアップを閉じるようにする(計測ツール未選択のままでも色だけ
-    // 選べば閉じる。既存の「ツールを選ぶと閉じる」動作(tool.js側)とは別経路のため、
-    // 両方から独立してポップアップを閉じられる)
-    if(typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
+    // V2_100: 「計測で2点選んで色も変えたい時にポップアップが消えるのがストレス」との
+    // 指摘への対応。計測線の色を選んでも#measureToolPopupは自動的に閉じないようにし、
+    // ポップアップ右上の「決定」ボタン(measureToolPopupDoneBtn)を押した時だけ閉じる
     if(typeof updateToolColorDots==='function')updateToolColorDots();
     scheduleSave(); // V0_135: 寸法色変更を保存
   });
@@ -1286,8 +1455,9 @@ document.querySelectorAll('.dim-color-btn').forEach(btn=>{
 // =========================================================
 // V2_80: 文字入力ツール（タップした位置にキーボードで文字を配置）
 // =========================================================
-// 依存: strokes, currentColor, currentLW, snapshot, scheduleOverlay, doSave,
-//       _curPage, verify, ov (いずれも既存グローバル)
+// 依存: strokes, currentTextColor, currentTextLW, snapshot, scheduleOverlay, doSave,
+//       _curPage, verify, ov (いずれも既存グローバル。V2_103でcurrentColor/currentLWから
+//       currentTextColor/currentTextLWへ変更)
 var _textInputActive=false;
 // V2_84: 「文字入力のフォントをもっといいフォントにしたい」との要望に対応。
 // DXF文字・PDF書出で使っている埋込フォント(Noto Sans JP、export.jsの
@@ -1320,9 +1490,11 @@ function _ensureCanvasJPFont84(){
 // canvas実ピクセル(devicePixelRatio倍)基準のため、CSS pxの入力欄に合わせて
 // dpr分を割った値になる)に統一し、確定後に実際に描かれる大きさとほぼ一致する
 // ようにした
+// V2_103: 「文字とペンの大きさがリンクしている」との指摘への対応で、文字は
+// 専用のcurrentTextLWを基準にする(ペンのcurrentLWとは独立)
 function _textInputFontPx85(){
   var _lwRef85=(typeof fitScale!=='undefined'&&fitScale>0)?fitScale:scale;
-  return Math.max(10,Math.min(160,Math.round((currentLW||0.6)*20*(scale/_lwRef85))));
+  return Math.max(10,Math.min(160,Math.round((currentTextLW||0.6)*20*(scale/_lwRef85))));
 }
 // V2_88: 「文字入力枠を出して画面を拡縮すると文字枠は拡縮についていかないから、
 // 入力しにくい」との指摘に対応。開いた時点の画面座標(sx,sy)に固定したままだと、
@@ -1363,7 +1535,8 @@ function _openTextInputAt(wx,wy,sx,sy){
   inp.style.fontSize=fontPx+'px';
   inp.style.lineHeight=(fontPx*1.2)+'px'; // V2_87: 画面描画の行間(1.2倍)と揃える
   inp.style.height=(fontPx*1.2)+'px';
-  inp.style.color='rgb('+currentColor.r+','+currentColor.g+','+currentColor.b+')';
+  // V2_102: 文字入力は専用のcurrentTextColorを使う(ペンのcurrentColorとは独立)
+  inp.style.color='rgb('+currentTextColor.r+','+currentTextColor.g+','+currentTextColor.b+')';
   box.style.left=(r.left+sx)+'px';
   box.style.top=(r.top+sy)+'px';
   box.style.display='block';
@@ -1381,7 +1554,9 @@ function _openTextInputAt(wx,wy,sx,sy){
     _closeTextInput();
     if(t&&t.trim()){
       snapshot();
-      strokes.push({isText:true,text:t,x:wx,y:wy,color:{...currentColor},lw:currentLW,page:_curPage()});
+      // V2_102: 文字は専用のcurrentTextColorを保存する(ペンのcurrentColorとは独立)
+      // V2_103: 太さ(フォントサイズ)も専用のcurrentTextLWを保存する(ペンのcurrentLWとは独立)
+      strokes.push({isText:true,text:t,x:wx,y:wy,color:{...currentTextColor},lw:currentTextLW,page:_curPage()});
       if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx]){
         openFiles[currentFileIdx].strokes=strokes;
       }

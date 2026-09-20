@@ -370,6 +370,15 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   padding:14px 16px;min-width:252px;max-height:80vh;overflow-y:auto;
   box-shadow:0 8px 32px rgba(0,0,0,.65);flex-direction:column;gap:14px}
 #colorOverlay.open{display:flex}
+/* V2_100: ポップアップ右上の「決定」ボタン。色/太さ/濃度/種類/計測コマンドを選んでも
+   ポップアップ自体は自動的に閉じないようにした代わりに、これを押した時だけ閉じる。
+   既存の.modal-close-btn(「閉じる」文字ボタン)と同じ枠線+透明背景パターンを踏襲しつつ、
+   小さく・右上寄せにするため専用クラスにした */
+.popup-done-row{display:flex;justify-content:flex-end;margin:-6px -6px -6px 0}
+.popup-done-btn{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;
+  border:1.5px solid var(--accent);background:rgba(46,204,113,.12);color:var(--accent);
+  cursor:pointer;-webkit-tap-highlight-color:transparent}
+.popup-done-btn:active{background:rgba(46,204,113,.3)}
 .co-hl-colors{display:flex;gap:8px;flex-wrap:wrap} /* V1_74: 10色化で折り返しが必要なため追加 */
 .hl-color-btn{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .hl-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
@@ -378,6 +387,12 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   border:1.5px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
   -webkit-tap-highlight-color:transparent;min-width:0}
 .hl-lw-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(46,204,113,.1)}
+/* V2_98: 蛍光ペン濃度ボタン。既存の蛍光線幅(.hl-lw-btn)と同じ見た目・レイアウトパターン */
+.co-hl-alpha{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.hl-alpha-btn{height:38px;border-radius:8px;font-size:14px;font-weight:600;
+  border:1.5px solid var(--border);background:transparent;color:var(--text);cursor:pointer;
+  -webkit-tap-highlight-color:transparent;min-width:0}
+.hl-alpha-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(46,204,113,.1)}
 .co-dim-colors{display:flex;gap:7px;flex-wrap:wrap}
 .dim-color-btn{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .dim-color-btn.active{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
@@ -418,6 +433,19 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #colorOverlay[data-mode="sketch"] .co-sketch-section{display:block}
 #colorOverlay[data-mode="hl"] .co-hl-section{display:block}
 #colorOverlay[data-mode="eraser"] .co-eraser-section{display:block}
+/* V2_107: 「文字の太さボタンのプリセットをペンと別にしたい」との依頼への対応。
+   #colorOverlayはペン・文字で共用しているため、太さボタン(.co-lw)をペン用
+   (#coLwPenSection)と文字用(#coLwTextSection)の2つに分け、開いた時のツール
+   (openContextPopupが設定するdata-lwctx)に応じて片方だけを表示する。
+   ID込みの詳細度でco-sketch-sectionの一般ルールより優先させる */
+#colorOverlay[data-mode="sketch"] #coLwTextSection{display:none}
+#colorOverlay[data-mode="sketch"][data-lwctx="text"] #coLwTextSection{display:block}
+#colorOverlay[data-mode="sketch"][data-lwctx="text"] #coLwPenSection{display:none}
+/* V2_101: 消しゴムは大きさを選んだ瞬間にポップアップが自動的に閉じる仕様に戻した
+   (ユーザー指摘: 消しゴムは大きさしか選べないので決定ボタンは不要)ため、
+   消しゴムモードの時だけ右上の「決定」ボタン(.popup-done-row)を非表示にする。
+   他モード(sketch/hl)では従来通り表示する */
+#colorOverlay[data-mode="eraser"] .popup-done-row{display:none}
 /* V1_214: 消しゴム範囲選択ボタン。ペン線幅(.lw-btn)・蛍光線幅(.hl-lw-btn)と同じ見た目・
    グリッド構成にし、値は画面px単位の消去半径(ERASER_RADIUS_PX)そのものを表示する */
 .co-eraser-lw{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
@@ -452,6 +480,22 @@ body.settings-open #settingsPanel{transform:translateX(0)}
    (.tb-tool-btn.activeと同色・同背景)に統一した。colorは指定しない(アイコンは
    currentDimColor、3段目ラベルは白系のまま独立して色付けするため) */
 #measureToggleBtn.tool-active{background:rgba(0,212,255,0.22);border-color:#00d4ff}
+/* V2_96: 図形ツール選択ポップアップ(#shapeToolPopup)。#measureToolPopupと全く同じ
+   見た目・位置合わせ方式(フローティング、ボタン直下)を踏襲する */
+#shapeToolPopup{display:none;position:fixed;z-index:400;top:0;left:0;
+  background:var(--sb-bg);border:1px solid var(--border);border-radius:16px;
+  padding:10px;box-shadow:0 8px 32px rgba(0,0,0,.65);flex-direction:column;gap:8px;
+  min-width:252px;max-height:80vh;overflow-y:auto} /* V2_97: 色/太さ選択を追加したため#colorOverlayと同じ最小幅・スクロールにする */
+#shapeToolPopup.open{display:flex}
+#shapeToolPopup .co-label{margin-bottom:0}
+#shapeToolPopup .shape-group-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+/* V2_97: 図形ポップアップ内の色/太さセクション間の見出しに少し余白を付ける(種類選択
+   グリッドの直後に詰まって見えないよう、#colorOverlayの.co-sketch-section相当の
+   セクション間隔をここでも再現する) */
+#shapeToolPopup .co-label:not(:first-child){margin-top:2px}
+/* V2_96: ヘッダーの図形ボタンは、選択中(いずれかの図形ツールがcurrentTool)の時だけ
+   枠に色を付ける(#measureToggleBtn.tool-activeと同じ水色glow) */
+#shapeToggleBtn.tool-active{background:rgba(0,212,255,0.22);border-color:#00d4ff}
 /* V0_98: 文字検索パネル */
 #searchOverlay{display:none;position:fixed;inset:0;z-index:299}
 #searchOverlay.open{display:block}
@@ -825,32 +869,41 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <!-- V2_89: 「文字コマンドは蛍光コマンドの右に配置して」との要望で、消しゴムより前
        (蛍光ペンの直後)へ移動した -->
   <!-- V2_80: 文字入力ツール。タップした位置にキーボードで文字を入力して配置する。
-       色・太さは手書きペンの選択(currentColor/currentLW)をそのまま流用するため、
-       再タップで開く色/太さポップアップもペンと同じ#colorOverlay(.co-sketch-section)を使う -->
+       再タップで開く色/太さポップアップはペンと同じ#colorOverlay(.co-sketch-section)を
+       流用するが、V2_102/V2_103以降は状態値自体(色=currentTextColor/太さ=currentTextLW)
+       はペン専用のcurrentColor/currentLWとは独立している -->
   <!-- V2_86: ペンの#lwLabelと同じ3段表示(文字/アイコン/現在の大きさ)にした。
-       色・太さはペンと共通(currentLW)のため、値自体はペン側と同じものを表示する -->
-  <button class="tb-tool-btn tool-btn" data-tool="text" title="文字入力"><span class="tb-tool-label">文字</span><svg id="textToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg><span class="tb-tool-label" id="textSizeLabel">0.6</span></button>
-  <!-- V2_95: 図形ツール(四角・矢印・丸・楕円)。「文字ボタンの右側に図形ボタンを」との
-       要望への対応。雲印は次バージョンで別途対応予定のため今回は対象外。
-       新しいストローク種別は作らず、ドラッグの始点・終点から確定時に多角形近似した
-       頂点列(pts)を計算し、pen等と全く同じ形の通常ストローク{pts,color,lw,page}として
-       strokesに追加する(isText導入時に発生したs.pts前提コードのクラッシュを再発させない
-       ための設計方針)。色・太さはペンと共通のポップアップを流用する(_TOOL_COLOR_MODEに
-       'sketch'として登録)。操作方法・頂点列の計算はtool.js の shapeToolState /
-       _shapePointerDown・Move・Up / _shapeBuildPts を参照。 -->
-  <button class="tb-tool-btn tool-btn" data-tool="rect" title="四角"><span class="tb-tool-label">四角</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="arrow" title="矢印"><span class="tb-tool-label">矢印</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="19" x2="18" y2="5"/><polyline points="9 5 18 5 18 14"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="circle" title="丸"><span class="tb-tool-label">丸</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg></button>
-  <button class="tb-tool-btn tool-btn" data-tool="ellipse" title="楕円"><span class="tb-tool-label">楕円</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg></button>
-  <div class="tb-sep"></div>
-  <!-- V1_214: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
-       (再タップで開くeraser用ポップアップ、#colorOverlayの.co-eraser-section)を新設した -->
-  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg><span class="tb-tool-label" id="eraserSizeLabel">20</span></button>
-  <!-- V2_90: なげわ(lasso)ツール。「消しゴムボタンの右に」との要望通りここに配置。
-       囲んだ範囲のペン/文字ストロークを選択→バウンディングボックス内ドラッグで移動、
-       ✕ボタンで削除できる(resize/rotateは今回スコープ外) -->
-  <button class="tb-tool-btn tool-btn" data-tool="lasso" title="なげわ"><span class="tb-tool-label">なげわ</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3C7 3 3 6 3 10c0 2.6 1.8 4.8 4.5 6L7 20l3-1.6c.6.1 1.3.2 2 .2 5 0 9-3 9-7.3S17 3 12 3z"/><circle cx="7.3" cy="19.3" r="1.4" fill="currentColor" stroke="none"/></svg></button>
-  <div class="tb-sep"></div>
+       V2_103以降は文字専用のcurrentTextLWを表示する(ペンのcurrentLWとは独立) -->
+  <button class="tb-tool-btn tool-btn" data-tool="text" title="文字入力"><span class="tb-tool-label">文字</span><svg id="textToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg><span class="tb-tool-label" id="textSizeLabel">0.5</span></button>
+  <!-- V2_96: 図形ツール(四角・矢印・丸・楕円)。V2_95では4つの独立ボタンを並べていたが
+       「1つの『図形』ボタン+ポップアップにまとめてほしい」との要望への対応。
+       計測ボタン(#measureToggleBtn/#measureToolPopup)と全く同じ「1つのヘッダーボタン→
+       タップでポップアップが開く→中の.tool-btnを選ぶと確定してポップアップが閉じる」
+       という既存パターンをそのまま踏襲する(ゼロから新しいUIコンポーネントは作らない)。
+       内部のcurrentTool値は従来通り'rect'/'arrow'/'circle'/'ellipse'のまま変更しない
+       (storage.jsの復元・active class同期・guideMap等、既存コードを一切変更せずに
+       済むため)。4つの.tool-btn本体は#shapeToolPopup(HTML末尾、#measureToolPopupの
+       近くを参照)へ移設した。新しいストローク種別は作らず、ドラッグの始点・終点から
+       確定時に多角形近似した頂点列(pts)を計算し、pen等と全く同じ形の通常ストローク
+       {pts,color,lw,page,shapeType}としてstrokesに追加する(isText導入時に発生した
+       s.pts前提コードのクラッシュを再発させないための設計方針。shapeTypeはV2_96で
+       追加した軽量な追加プロパティで、既存のs.pts前提コードには影響しない)。
+       色・太さの選択UI自体は#shapeToolPopup専用のものを使う(V2_97で.color-btn/.lw-btn
+       を追加済み)が、状態値(currentShapeColor/currentShapeLW、V2_102/V2_103)はペンとは
+       独立している。ヘッダーのツールボタン再タップ時の色/太さポップアップ開閉自体は
+       _TOOL_COLOR_MODEに'sketch'として登録された共通の仕組みを使う。操作方法・頂点列の
+       計算はtool.js の shapeToolState /
+       _shapePointerDown・Move・Up / _shapeBuildPts を参照。ヘッダーボタン自体の
+       アイコン・下段ラベル切替は_syncShapeToggleBtnIcon()(index.html末尾寄り)を参照。 -->
+  <button class="tb-btn" id="shapeToggleBtn" title="図形ツールを選ぶ（四角/矢印/丸/楕円）">
+  <span class="tb-tool-label">図形</span>
+  <svg id="shapeToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><circle cx="17.5" cy="7" r="4"/><ellipse cx="7" cy="17.5" rx="5" ry="3.5"/><line x1="15" y1="15" x2="21" y2="21"/><polyline points="16.5 15 21 15 21 19.5"/></svg>
+  <span class="tb-tool-label" id="shapeCurrentLabel">未選択</span>
+</button>
+  <!-- V2_106: 「計測コマンドボタンを図形の右側に移動して」との要望で、図形ボタンの
+       直後(消しゴムより前)へ移動した(V2_89の文字ボタン移動と同じパターン)。
+       クリックハンドラ・ポップアップ開閉ロジックはid/data-tool基準の汎用処理のため
+       この移動による改修は不要。 -->
   <!-- V1_205: 計測ボタン群(.dim-group)は#measureToolPopupへ移設した(HTML末尾、
        .topbarの直後を参照)。このボタンはアイコンを定規デザインに変更し、押すと
        ポップアップで計測ツールを選ぶ方式にした(第2段バー方式は画面が
@@ -873,6 +926,14 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   <svg id="measureToolIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="20" height="6" rx="1"/><line x1="6" y1="9" x2="6" y2="12"/><line x1="10" y1="9" x2="10" y2="12"/><line x1="14" y1="9" x2="14" y2="12"/><line x1="18" y1="9" x2="18" y2="12"/></svg>
   <span class="tb-tool-label" id="measureCurrentLabel">未選択</span>
 </button>
+  <div class="tb-sep"></div>
+  <!-- V1_214: 消しゴムも3段表示(消しゴム/アイコン/現在の範囲の大きさ)にし、範囲選択
+       (再タップで開くeraser用ポップアップ、#colorOverlayの.co-eraser-section)を新設した -->
+  <button class="tb-tool-btn tool-btn" data-tool="eraser" title="消しゴム"><span class="tb-tool-label">消しゴム</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-.9 2.5-.9 3.5 0l5.5 5.5c1 1 1 2.5 0 3.5L17 17"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg><span class="tb-tool-label" id="eraserSizeLabel">20</span></button>
+  <!-- V2_90: なげわ(lasso)ツール。「消しゴムボタンの右に」との要望通りここに配置。
+       囲んだ範囲のペン/文字ストロークを選択→バウンディングボックス内ドラッグで移動、
+       ✕ボタンで削除できる(resize/rotateは今回スコープ外) -->
+  <button class="tb-tool-btn tool-btn" data-tool="lasso" title="なげわ"><span class="tb-tool-label">なげわ</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3C7 3 3 6 3 10c0 2.6 1.8 4.8 4.5 6L7 20l3-1.6c.6.1 1.3.2 2 .2 5 0 9-3 9-7.3S17 3 12 3z"/><circle cx="7.3" cy="19.3" r="1.4" fill="currentColor" stroke="none"/></svg></button>
   <div class="tb-sep"></div>
   <button class="tb-btn" id="undoBtn" title="元に戻す" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">戻る</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></button>
   <button class="tb-btn" id="redoBtn" title="進む" style="font-size:18px;opacity:0.35"><span class="tb-tool-label">進む</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.95"/></svg></button>
@@ -989,6 +1050,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
      移設(id/class/data-tool属性は無変更のため、既存のクリックハンドラ・active表示は
      すべてそのまま動作する) -->
 <div id="measureToolPopup">
+  <!-- V2_100: 右上の「決定」ボタン。計測コマンドや色を選んでも自動的に閉じないので、
+       2点をタップして計測を終え、色も選び終わったらこれを押して閉じる -->
+  <div class="popup-done-row"><button type="button" id="measureToolPopupDoneBtn" class="popup-done-btn">決定</button></div>
   <div class="co-label">計測ツールを選択</div>
   <div class="dim-group">
     <div class="dim-group-btns">
@@ -1029,6 +1093,68 @@ body.settings-open #settingsPanel{transform:translateX(0)}
     <button class="dim-color-btn" data-color="#ff88ff" style="background:#f8f" title="ピンク"></button>
     <button class="dim-color-btn" data-color="#ff4444" style="background:#f44" title="赤"></button>
     <button class="dim-color-btn" data-color="#a0623c" style="background:#a0623c" title="茶"></button>
+    <!-- V2_99: 「全コマンドの色に灰色を追加」対応。計測線の色に#999999(灰)を追加 -->
+    <button class="dim-color-btn" data-color="#999999" style="background:#999999" title="灰"></button>
+  </div>
+</div>
+<!-- V2_96: 図形ツール選択ポップアップ。#shapeToggleBtnを押すと表示され(#measureToolPopup
+     と同系のフローティングポップアップ)、四角・矢印・丸・楕円のいずれかを選ぶと
+     tool.js側(currentToolを設定する箇所)でポップアップを閉じ、#shapeCurrentLabel/
+     #shapeToolIconを更新する。中の.tool-btnはV2_95でヘッダーに直接並んでいたものを
+     そのまま移設しただけ(data-tool属性は無変更のため、既存のクリックハンドラ・
+     色/太さポップアップ連携(_TOOL_COLOR_MODE)・active表示はすべてそのまま動作する) -->
+<div id="shapeToolPopup">
+  <!-- V2_100: 右上の「決定」ボタン。図形の種類や色/太さを選んでも自動的に閉じないので、
+       選び終わったらこれを押して閉じる -->
+  <div class="popup-done-row"><button type="button" id="shapeToolPopupDoneBtn" class="popup-done-btn">決定</button></div>
+  <div class="co-label">図形の種類を選択</div>
+  <div class="dim-group">
+    <div class="shape-group-btns">
+      <button class="tb-tool-btn tool-btn" data-tool="rect" title="四角"><span class="tb-tool-label">四角</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="arrow" title="矢印"><span class="tb-tool-label">矢印</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="19" x2="18" y2="5"/><polyline points="9 5 18 5 18 14"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="circle" title="丸"><span class="tb-tool-label">丸</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg></button>
+      <button class="tb-tool-btn tool-btn" data-tool="ellipse" title="楕円"><span class="tb-tool-label">楕円</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg></button>
+    </div>
+  </div>
+  <!-- V2_97: 「図形ポップアップの中で色・太さも選びたい」との要望への対応。
+       #colorOverlayの.co-sketch-section(ペン等と共通の色/太さ選択UI)を複製するのでは
+       なく、全く同じclass名(.color-btn/.lw-btn)・同じdata-color/data-lw値のボタンを
+       ここにも追加するだけに留めている。これらのクラスに対するクリックハンドラ
+       (tool.js)・保存/復元(storage.js)は既にdocument全体をquerySelectorAllしており、
+       クリック時にボタンの所属先(このポップアップかどうか)に応じた状態値へ同期する
+       (V2_102/V2_103でtool.js側もその方式に修正済み)。V2_102/V2_103以降はここでの
+       操作は専用のcurrentShapeColor/currentShapeLWを読み書きし、ペン側の色/太さ
+       ポップアップ(currentColor/currentLW、文字選択時はcurrentTextColor/currentTextLW)
+       とは独立している。
+       測ツール選択ポップアップ(#measureToolPopup)が種類選択+色選択を1つにまとめている
+       のと同じ構成に揃えた(色/太さを選んでもポップアップ自体は閉じない) -->
+  <div class="co-label">図形の色</div>
+  <div class="co-colors">
+    <button class="color-btn active" data-color="255,0,0" style="background:#f00" title="赤"></button>
+    <button class="color-btn" data-color="255,140,0" style="background:#f80" title="橙"></button>
+    <button class="color-btn" data-color="255,215,0" style="background:#ffd700" title="黄"></button>
+    <button class="color-btn" data-color="130,220,0" style="background:#82dc00" title="黄緑"></button>
+    <button class="color-btn" data-color="0,200,0" style="background:#0c8" title="緑"></button>
+    <button class="color-btn" data-color="0,200,220" style="background:#00c8dc" title="水色"></button>
+    <button class="color-btn" data-color="0,120,255" style="background:#08f" title="青"></button>
+    <button class="color-btn" data-color="140,60,230" style="background:#8c3ce6" title="紫"></button>
+    <button class="color-btn" data-color="255,0,180" style="background:#f0b" title="ピンク"></button>
+    <button class="color-btn" data-color="150,90,40" style="background:#965a28" title="茶"></button>
+    <!-- V2_99: 「全コマンドの色に灰色を追加」対応。図形の色に(128,128,128)灰を追加 -->
+    <button class="color-btn" data-color="128,128,128" style="background:#808080" title="灰"></button>
+  </div>
+  <div class="co-label">図形の太さ</div>
+  <div class="co-lw">
+    <button class="lw-btn" data-lw="0.1">0.1</button>
+    <button class="lw-btn" data-lw="0.4">0.4</button>
+    <button class="lw-btn active" data-lw="0.6">0.6</button>
+    <button class="lw-btn" data-lw="0.8">0.8</button>
+    <button class="lw-btn" data-lw="1">1</button>
+    <button class="lw-btn" data-lw="2">2</button>
+    <button class="lw-btn" data-lw="3">3</button>
+    <button class="lw-btn" data-lw="5">5</button>
+    <button class="lw-btn" data-lw="7">7</button>
+    <button class="lw-btn" data-lw="10">10</button>
   </div>
 </div>
 <div id="tabBarRow">
@@ -1337,6 +1463,9 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 </div>
 
 <div id="colorOverlay">
+  <!-- V2_100: 右上の「決定」ボタン。色/太さ/濃度を選んでも自動的に閉じないので、
+       選び終わったらこれを押して閉じる -->
+  <div class="popup-done-row"><button type="button" id="colorOverlayDoneBtn" class="popup-done-btn">決定</button></div>
   <div class="co-sketch-section">
     <div class="co-label">スケッチ色</div>
     <!-- V1_74: 10色に拡張。白・黒は背景色（白背景/濃紺背景・図面の黒線）と重なり見えなくなるため除外 -->
@@ -1351,9 +1480,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="color-btn" data-color="140,60,230" style="background:#8c3ce6" title="紫"></button>
       <button class="color-btn" data-color="255,0,180" style="background:#f0b" title="ピンク"></button>
       <button class="color-btn" data-color="150,90,40" style="background:#965a28" title="茶"></button>
+      <!-- V2_99: 「全コマンドの色に灰色を追加」対応。スケッチ色(ペン/文字と共通)に(128,128,128)灰を追加 -->
+      <button class="color-btn" data-color="128,128,128" style="background:#808080" title="灰"></button>
     </div>
   </div>
-  <div class="co-sketch-section">
+  <div class="co-sketch-section" id="coLwPenSection">
     <div class="co-label">ペン線幅</div>
     <div class="co-lw">
       <button class="lw-btn" data-lw="0.1">0.1</button> <!-- V0_159.3: 追加 -->
@@ -1367,6 +1498,24 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="lw-btn" data-lw="5">5</button>
       <button class="lw-btn" data-lw="7">7</button>
       <button class="lw-btn" data-lw="10">10</button>
+    </div>
+  </div>
+  <!-- V2_107: 文字ツール専用の太さ(文字サイズ)プリセット。ペン用(#coLwPenSection)とは
+       別DOM・別プリセット値にし、data-lwctx="text"の時だけCSSで表示切替する
+       (上記CSSコメント参照)。クリックハンドラ・保存/復元は既存の.lw-btn共通処理
+       (tool.js/storage.js、currentToolが'text'ならcurrentTextLWへ書き込む)がそのまま
+       使えるため、JS側の追加改修は最小限で済む -->
+  <div class="co-sketch-section" id="coLwTextSection">
+    <div class="co-label">文字の大きさ</div>
+    <div class="co-lw">
+      <button class="lw-btn" data-lw="0.1">0.1</button>
+      <button class="lw-btn" data-lw="0.2">0.2</button>
+      <button class="lw-btn" data-lw="0.3">0.3</button>
+      <button class="lw-btn active" data-lw="0.5">0.5</button>
+      <button class="lw-btn" data-lw="0.8">0.8</button>
+      <button class="lw-btn" data-lw="1">1</button>
+      <button class="lw-btn" data-lw="2">2</button>
+      <button class="lw-btn" data-lw="3">3</button>
     </div>
   </div>
   <div class="co-hl-section">
@@ -1383,6 +1532,8 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="hl-color-btn" data-color="255,80,160" style="background:#f050a0" title="ピンク"></button>
       <button class="hl-color-btn" data-color="255,110,110" style="background:#ff6e6e" title="赤"></button>
       <button class="hl-color-btn" data-color="220,180,120" style="background:#dcb478" title="茶"></button>
+      <!-- V2_99: 「全コマンドの色に灰色を追加」対応。蛍光色は他色と同様に明るめの(200,200,200)灰を追加 -->
+      <button class="hl-color-btn" data-color="200,200,200" style="background:#c8c8c8" title="灰"></button>
     </div>
   </div>
   <div class="co-hl-section">
@@ -1398,6 +1549,17 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="hl-lw-btn" data-lw="8">8</button>
       <button class="hl-lw-btn" data-lw="9">9</button>
       <button class="hl-lw-btn" data-lw="10">10</button>
+    </div>
+  </div>
+  <div class="co-hl-section">
+    <div class="co-label">濃度</div>
+    <!-- V2_98: 蛍光ペンの透明度を選べるようにした。既定45%は従来のハードコード値(0.45)を踏襲 -->
+    <div class="co-hl-alpha">
+      <button class="hl-alpha-btn" data-alpha="20">20%</button>
+      <button class="hl-alpha-btn" data-alpha="40">40%</button>
+      <button class="hl-alpha-btn active" data-alpha="45">45%</button>
+      <button class="hl-alpha-btn" data-alpha="60">60%</button>
+      <button class="hl-alpha-btn" data-alpha="80">80%</button>
     </div>
   </div>
   <!-- V1_214: 寸法(計測)色選択は#measureToolPopupへ移設した(計測ツール選択と同じ
@@ -1638,7 +1800,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V2_95';
+const APP_VERSION = 'V2_107';
 
 // =========================================================
 // グローバル状態
@@ -1647,9 +1809,27 @@ const APP_VERSION = 'V2_95';
 let scaleDenom=1;
 var currentTool='sketch';
 var currentColor={r:255,g:0,b:0};
+// V2_102: 「ペン・文字・図形の色が連動して同じ色になってしまう」との指摘への対応。
+// 従来はペン(currentColor)を文字入力ツール(V2_84)・図形ツール(V2_95)が共有していたが、
+// これをやめて文字・図形それぞれ専用の色状態を持たせる(currentHL_Color/currentDimColorと
+// 同じパターン)。デフォルト値は従来ペンと共有していた時と見た目が変わらないよう、
+// ペンの初期色と同じ赤にしておく
+var currentTextColor={r:255,g:0,b:0};   // 文字入力の色(V2_102で新設、従来はcurrentColorを共有)
+var currentShapeColor={r:255,g:0,b:0};  // 図形(四角/矢印/丸/楕円)の色(V2_102で新設、従来はcurrentColorを共有)
 var currentLW=0.6;
+// V2_103: 「文字とペンの大きさ(太さ)がリンクしていて一緒になっている。独立させて」
+// との指摘への対応。V2_102で色は分離したが太さ(文字の場合はフォントサイズ計算式の
+// 基準値、ペンの場合は線幅)は据え置いていたため、ペンの太さを変えると文字サイズも
+// 連動して変わってしまっていた。currentTextColor/currentShapeColorと同じパターンで、
+// 文字用・図形用にそれぞれ専用の太さ状態を新設する。デフォルト値はペンの初期値と
+// 同じ0.6にしておき、従来の見た目とは変わらないようにする
+var currentTextLW=0.5;   // 文字入力のフォントサイズ計算基準値(V2_103で新設、従来はcurrentLWを共有)
+                          // V2_107: 文字サイズのプリセットを0.1〜3の8段階に変更した際、旧デフォルト値
+                          // 0.6が新プリセットに存在しなくなったため、最も近い値0.5に変更した
+var currentShapeLW=0.6;  // 図形(四角/矢印/丸/楕円)の太さ(V2_103で新設、従来はcurrentLWを共有)
 var currentHL_Color={r:255,g:255,b:0}; // 蛍光ペン色（黄）
 var currentHL_LW=4;                     // 蛍光ペン線幅
+var currentHLAlpha=0.45;                // V2_98: 蛍光ペン濃度(透明度)。既定0.45は従来のハードコード値を踏襲
 var currentDimColor='#f39c12';          // 寸法色
 var dims=[];
 var currentFileSize=0;   // V0_103: ファイルサイズ(自動保存ID用)
@@ -1784,7 +1964,7 @@ function drawAnnotation(targetCtx, strokeFilter, noClear) {
     if(_sxMx<-_mgPx||_sxMn>_cwPx+_mgPx||_syMx<-_mgPx||_syMn>_chPx+_mgPx) continue;
     atc.save();
     if(s.hl){
-      atc.globalAlpha = 0.45;
+      atc.globalAlpha = s.hlOpacity||0.45; // V2_98: ストロークごとの濃度(未設定時は従来値0.45)
       atc.strokeStyle = 'rgb('+s.color.r+','+s.color.g+','+s.color.b+')';
       atc.lineWidth = s.lw * (scale / lwRef) * dpr * PS;  // V0_87: zoom比例
       atc.lineCap = 'round';
@@ -1794,22 +1974,43 @@ function drawAnnotation(targetCtx, strokeFilter, noClear) {
       atc.lineWidth = Math.max(dpr, s.lw * (scale / lwRef) * dpr * PS);  // V0_87: zoom比例・最小1px
       atc.lineCap = 'round';
     }
-    atc.lineJoin = 'round';
+    // V2_96: 図形ツール(四角・矢印・丸・楕円=s.shapeType)は、ペン用のCatmull-Rom風
+    // スムージング(quadraticCurveToで頂点の手前/先の中点までしか結ばない方式)を
+    // 適用すると、角が丸まる・始点付近の辺が欠けて見える(始点=中点から描き始め、
+    // 最後は正確な終点までしか戻らないため)という見た目バグが出る。s.shapeTypeが
+    // あるストロークは頂点を忠実に直線で結び、lineJoin='miter'で鋭角を保つ
+    // (四角の角・矢印の矢尻)。閉じた形状(四角・丸・楕円)はclosePath()で確実に閉じる
+    // V2_97: 矢印(shapeType='arrow')は「軸→矢尻左→軸(戻り)→矢尻右」という1本の
+    // 連続パスで描いており、矢尻左の頂点は"来た辺をそのまま逆走する"180度の
+    // 折り返しになる。miterJoinは折り返し角ではミター長が無限大になり
+    // canvasのmiterLimitで自動的にbevel(面取り)へ切り替わるため、その頂点に
+    // ごくわずかな凹み(ノッチ)が見えることがあった(V2_96で報告された「矢印の
+    // 先端がまだ少しおかしい」の原因の一つ)。矢印だけroundJoin/roundCapにして
+    // 頂点を自然に丸めて隙間なく閉じる(四角・丸・楕円は直角の頂点を保つため
+    // 従来通りmiter/buttのまま)
+    atc.lineJoin = s.shapeType ? (s.shapeType==='arrow' ? 'round' : 'miter') : 'round';
+    if(s.shapeType) atc.lineCap = (s.shapeType==='arrow') ? 'round' : 'butt'; // 図形は丸みキャップにしない(矢印のみ丸)
     atc.beginPath();
     var spts = s.pts, n = spts.length;
-    var px0 = physX(spts[0].x), py0 = physY(spts[0].y);
-    if(n === 2){
-      atc.moveTo(px0, py0);
-      atc.lineTo(physX(spts[1].x), physY(spts[1].y));
+    if(s.shapeType){
+      atc.moveTo(physX(spts[0].x), physY(spts[0].y));
+      for(var _si96=1; _si96<n; _si96++) atc.lineTo(physX(spts[_si96].x), physY(spts[_si96].y));
+      if(_isClosedShapeType(s.shapeType)) atc.closePath();
     } else {
-      var px1 = physX(spts[1].x), py1 = physY(spts[1].y);
-      atc.moveTo((px0+px1)/2, (py0+py1)/2);
-      for(var i=1; i<n-1; i++){
-        var cx = physX(spts[i].x),   cy = physY(spts[i].y);
-        var nx = physX(spts[i+1].x), ny = physY(spts[i+1].y);
-        atc.quadraticCurveTo(cx, cy, (cx+nx)/2, (cy+ny)/2);
+      var px0 = physX(spts[0].x), py0 = physY(spts[0].y);
+      if(n === 2){
+        atc.moveTo(px0, py0);
+        atc.lineTo(physX(spts[1].x), physY(spts[1].y));
+      } else {
+        var px1 = physX(spts[1].x), py1 = physY(spts[1].y);
+        atc.moveTo((px0+px1)/2, (py0+py1)/2);
+        for(var i=1; i<n-1; i++){
+          var cx = physX(spts[i].x),   cy = physY(spts[i].y);
+          var nx = physX(spts[i+1].x), ny = physY(spts[i+1].y);
+          atc.quadraticCurveTo(cx, cy, (cx+nx)/2, (cy+ny)/2);
+        }
+        atc.lineTo(physX(spts[n-1].x), physY(spts[n-1].y));
       }
-      atc.lineTo(physX(spts[n-1].x), physY(spts[n-1].y));
     }
     atc.stroke();
     atc.restore();
@@ -1819,7 +2020,7 @@ function drawAnnotation(targetCtx, strokeFilter, noClear) {
   if(sketching && sketchPts.length >= 2){
     atc.save();
     if(currentTool === 'hl'){
-      atc.globalAlpha = 0.45;
+      atc.globalAlpha = currentHLAlpha||0.45; // V2_98: 選択中の濃度をプレビューにも反映
       atc.strokeStyle = 'rgb('+currentHL_Color.r+','+currentHL_Color.g+','+currentHL_Color.b+')';
       atc.lineWidth = currentHL_LW * (scale / lwRef) * dpr * PS;  // V0_87: zoom比例
     } else {
@@ -3430,17 +3631,28 @@ document.getElementById('tabListBtn').addEventListener('click',function(e){
   e.stopPropagation();
   if(typeof _showOpenFilesListMenu==='function') _showOpenFilesListMenu(this);
 });
-// V1_214: 計測ツール選択ポップアップ(#measureToolPopup)の開閉。#colorOverlayの
-// openContextPopup()と同様に、ボタン直下に位置合わせして開く。ポップアップ内で
-// いずれかの計測ツールを選ぶとtool.js側(currentToolを設定する箇所)で自動的に閉じる
-// ため、ここでは「開く」「(閉じている状態から)開いた状態にする」「(開いている状態で
-// 再度押されたら)閉じる」の3パターンのみを扱う。
-function _closeMeasureToolPopup(){
-  var popup=document.getElementById('measureToolPopup');
-  var btn=document.getElementById('measureToggleBtn');
+// V2_100: 「ペン/蛍光/図形/文字/計測のポップアップが、色などを選ぶたびに勝手に閉じて
+// ストレス」との指摘への対応。色/太さ/濃度/種類/計測コマンドいずれを選んでもポップアップは
+// 閉じないようにし、各ポップアップ右上に新設した「決定」ボタンを押した時だけ閉じる
+// ようにした。3つのポップアップ(#colorOverlay/#measureToolPopup/#shapeToolPopup)で
+// 閉じ方(対象要素・連動して外すべきトグルボタンのactive)が異なるため、共通関数
+// _closeToolPopupById(popupId)にidベースの分岐だけをまとめ、重複を避ける
+function _closeToolPopupById(popupId){
+  var popup=document.getElementById(popupId);
   if(popup) popup.classList.remove('open');
-  if(btn) btn.classList.remove('active');
+  if(popupId==='measureToolPopup'){
+    var mBtn=document.getElementById('measureToggleBtn');
+    if(mBtn) mBtn.classList.remove('active');
+  } else if(popupId==='shapeToolPopup'){
+    var sBtn=document.getElementById('shapeToggleBtn');
+    if(sBtn) sBtn.classList.remove('active');
+  }
 }
+// V1_214: 計測ツール選択ポップアップ(#measureToolPopup)の開閉。#colorOverlayの
+// openContextPopup()と同様に、ボタン直下に位置合わせして開く。
+// V2_100: 選択操作では自動的に閉じなくなったため、ここでは「開く」「(閉じている状態から)
+// 開いた状態にする」「(開いている状態で再度押されたら)閉じる」の3パターンのみを扱う。
+function _closeMeasureToolPopup(){ _closeToolPopupById('measureToolPopup'); }
 // V1_214: 計測系ツール名の判定は、tool.js側でconst宣言された_MEASURE_TOOL_LABELSを
 // 直接参照できない(スクリプトタグをまたぐconst/letは共有されないため。storage.jsで
 // 同様の理由によりハードコード配列で判定している前例と同じ対応)ため、ここでも
@@ -3475,14 +3687,52 @@ document.getElementById('measureToggleBtn').addEventListener('click',function(e)
   popup.style.top=top+'px';popup.style.left=left+'px';
   if(e&&e.stopPropagation) e.stopPropagation();
 });
-// V1_214: ポップアップの外側をタップしたら閉じる(#colorOverlayの同種リスナーと同じ方式)
-document.addEventListener('click',function(e){
-  var popup=document.getElementById('measureToolPopup');
-  var btn=document.getElementById('measureToggleBtn');
-  if(popup&&popup.classList.contains('open')&&!popup.contains(e.target)&&e.target!==btn){
-    _closeMeasureToolPopup();
+// V2_100: 「勝手にポップアップが消えるのがストレス」との指摘に対応するため、外側タップで
+// 閉じる従来の挙動は廃止した。ポップアップ右上の「決定」ボタン(measureToolPopupDoneBtn)を
+// 押した時、または計測ボタン(#measureToggleBtn)の再タップだけで閉じるようにする
+// V2_96: 図形ツール選択ポップアップ(#shapeToolPopup)の開閉。#measureToolPopupの
+// 開閉ロジック(_closeMeasureToolPopup/#measureToggleBtnクリックハンドラ/外側タップで
+// 閉じるリスナー)を、図形ツール(rect/arrow/circle/ellipse)向けにそのまま複製したもの。
+// 「ツール再タップでポップアップ開閉」という既存パターン(ペン等の再タップで色/太さ
+// ポップアップが開く挙動)に倣い、既に図形ツールが選択中の状態でこのボタンを押すと
+// (＝実質的な「再タップ」)ポップアップが開いて図形の種類を選び直せる
+function _closeShapeToolPopup(){ _closeToolPopupById('shapeToolPopup'); }
+var _SHAPE_TOOLS_96=['rect','arrow','circle','ellipse'];
+document.getElementById('shapeToggleBtn').addEventListener('click',function(e){
+  var popup=document.getElementById('shapeToolPopup');
+  if(!popup) return;
+  if(popup.classList.contains('open')){ _closeShapeToolPopup(); return; }
+  // 現在のツールが図形系でない場合(ペン等から押した場合)、前回選んでいた図形タイプ
+  // (_lastShapeTool、tool.js側のvar)があれば、ポップアップを開かずにそのツールを
+  // 直接有効化する(該当ボタンをそのままクリックしたのと同じ処理に乗せることで、
+  // ガイド表示・下段ラベル更新・保存など既存処理を再利用する)。図形系が既に
+  // アクティブな場合、または前回の図形タイプが無い(未使用)場合は従来通りポップアップを開く
+  if(_SHAPE_TOOLS_96.indexOf(currentTool)<0 && _lastShapeTool){
+    var lastBtn96=popup.querySelector('.tool-btn[data-tool="'+_lastShapeTool+'"]');
+    if(lastBtn96){ lastBtn96.click(); if(e&&e.stopPropagation) e.stopPropagation(); return; }
   }
+  // 色/太さ選択ポップアップ(#colorOverlay)・計測ポップアップが開いていれば先に閉じ、
+  // 複数のポップアップが同時に画面に残らないようにする
+  var co96=document.getElementById('colorOverlay');
+  if(co96) co96.classList.remove('open');
+  if(typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
+  popup.classList.add('open');
+  this.classList.add('active');
+  // V2_102: 図形専用のcurrentShapeColorを正しくハイライトし直す
+  if(typeof _syncColorBtnActive==='function') _syncColorBtnActive();
+  // V2_103: 図形専用のcurrentShapeLWも正しくハイライトし直す
+  if(typeof _syncLwBtnActive==='function') _syncLwBtnActive();
+  var r96=this.getBoundingClientRect();
+  var popW96=popup.offsetWidth||220,popH96=popup.offsetHeight||120;
+  var left96=r96.left,top96=r96.bottom+6;
+  if(left96+popW96>window.innerWidth) left96=window.innerWidth-popW96-8;
+  if(left96<4) left96=4;
+  if(top96+popH96>window.innerHeight) top96=r96.top-popH96-4;
+  popup.style.top=top96+'px';popup.style.left=left96+'px';
+  if(e&&e.stopPropagation) e.stopPropagation();
 });
+// V2_100: 外側タップで閉じる従来の挙動は廃止(理由は#measureToolPopupの同種コメントを参照)。
+// ポップアップ右上の「決定」ボタン(shapeToolPopupDoneBtn)、または図形ボタンの再タップだけで閉じる
 document.getElementById('scaleDenom').addEventListener('change',e=>{scaleDenom=parseFloat(e.target.value)||1;scheduleSave();});
 // PDFページ
 document.getElementById('prevPage').addEventListener('click',async()=>{
@@ -4285,8 +4535,14 @@ function updateToolColorDots(){
   const hi=document.getElementById('hlToolIcon');
   const hif=document.getElementById('hlToolIconFill');
   const txi=document.getElementById('textToolIcon'); // V2_80: 文字入力もペンと同じ色を反映
+  const shi96=document.getElementById('shapeToolIcon'); // V2_96: 図形ツールもペンと同じ色を反映
   if(si&&currentColor)si.style.color=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
-  if(txi&&currentColor)txi.style.color=`rgb(${currentColor.r},${currentColor.g},${currentColor.b})`;
+  // V2_102: 文字・図形はそれぞれ専用のcurrentTextColor/currentShapeColorを反映する
+  // (未定義の旧データ読込直後など、万一値がまだ無い場合はcurrentColorにフォールバック)
+  const _txc102=(typeof currentTextColor!=='undefined'&&currentTextColor)?currentTextColor:currentColor;
+  const _shc102=(typeof currentShapeColor!=='undefined'&&currentShapeColor)?currentShapeColor:currentColor;
+  if(txi&&_txc102)txi.style.color=`rgb(${_txc102.r},${_txc102.g},${_txc102.b})`;
+  if(shi96&&_shc102)shi96.style.color=`rgb(${_shc102.r},${_shc102.g},${_shc102.b})`;
   if(hi&&currentHL_Color)hi.style.color=`rgb(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b})`;
   if(hif&&currentHL_Color)hif.setAttribute('fill',`rgba(${currentHL_Color.r},${currentHL_Color.g},${currentHL_Color.b},0.25)`);
   if(currentDimColor){
@@ -4305,10 +4561,24 @@ function openContextPopup(mode,anchorEl){
   // アイコンを再タップして色/太さを開くケースで、計測選択ポップアップが開いたまま
   // 裏に残ってしまうのを防ぐ)
   if(typeof _closeMeasureToolPopup==='function') _closeMeasureToolPopup();
+  // V2_96: 図形ツール選択ポップアップ(#shapeToolPopup)が開いていた場合も同様に閉じる
+  // (図形アイコンの再タップで色/太さポップアップを開く際、裏に図形選択ポップアップが
+  // 残ってしまわないようにする)
+  if(typeof _closeShapeToolPopup==='function') _closeShapeToolPopup();
   co.dataset.mode=mode;
+  // V2_107: 太さボタン(.co-lw)をペン用/文字用の2セットに分けたため、開いた時点で
+  // どちらのツール(anchorElのdata-tool)から開かれたかをdata-lwctxに記録し、
+  // CSS側(上部の#colorOverlay[data-lwctx="text"]ルール)で表示を切り替える
+  co.dataset.lwctx=(anchorEl&&anchorEl.dataset&&anchorEl.dataset.tool==='text')?'text':'pen';
   // V1_74: 色数(10色化)でポップアップの実際の高さがモードごとに変わるため、
   // 固定値(旧popW=252,popH=180)ではなく先に表示してoffsetWidth/Heightで実測する
   co.classList.add('open');
+  // V2_102: ペン/文字は色状態が分離した(currentColor/currentTextColor)ため、
+  // 開いた時点のcurrentTool(ペンか文字か)に応じて正しい方をハイライトし直す
+  if(typeof _syncColorBtnActive==='function') _syncColorBtnActive();
+  // V2_103: 太さも同様に分離した(currentLW/currentTextLW)ため、同じタイミングで
+  // ハイライトし直す
+  if(typeof _syncLwBtnActive==='function') _syncLwBtnActive();
   const rect=anchorEl.getBoundingClientRect();
   const popW=co.offsetWidth||252,popH=co.offsetHeight||180;
   let left=rect.left;
@@ -4322,11 +4592,22 @@ function openContextPopup(mode,anchorEl){
 // ポップアップは、選択中のツールアイコンをもう一度押すことで開く(tool.js側で
 // stopImmediatePropagation()して開くため、このdocumentクリックリスナーには
 // 到達しない。他の場所をタップした場合のみここで閉じる)
-document.addEventListener('click',function(e){
-  const co=document.getElementById('colorOverlay');
-  if(co.classList.contains('open')&&!co.contains(e.target)){
-    co.classList.remove('open');
-  }
+// V2_100: 外側タップで閉じる従来の挙動は廃止(「勝手にポップアップが消えるのがストレス」
+// との指摘への対応)。ポップアップ右上の「決定」ボタン(colorOverlayDoneBtn)、または
+// 選択中のツールアイコンの再タップ(openContextPopupのトグル)だけで閉じるようにする
+// V2_100: 3つのポップアップ(#colorOverlay/#measureToolPopup/#shapeToolPopup)右上に
+// 新設した「決定」ボタン。押すと該当ポップアップだけを閉じる(他の状態には触れない)
+document.getElementById('colorOverlayDoneBtn').addEventListener('click',function(e){
+  if(e&&e.stopPropagation) e.stopPropagation();
+  _closeToolPopupById('colorOverlay');
+});
+document.getElementById('measureToolPopupDoneBtn').addEventListener('click',function(e){
+  if(e&&e.stopPropagation) e.stopPropagation();
+  _closeToolPopupById('measureToolPopup');
+});
+document.getElementById('shapeToolPopupDoneBtn').addEventListener('click',function(e){
+  if(e&&e.stopPropagation) e.stopPropagation();
+  _closeToolPopupById('shapeToolPopup');
 });
 // 初期表示（ページ読み込み時: スケッチが選択済み）
 updateToolColorDots();
@@ -4385,6 +4666,53 @@ function getDimFontSize(d, PS) {
 function needsUnderbar(str){
   var digits=(str||'').replace(/[^0-9]/g,'');
   return digits.length>0&&/^[69]+$/.test(digits);
+}
+// V2_104: 寸法値文字の回転角度を正規化する共通関数。
+// 「文字が上下逆さまにならないように」との要望対応。
+// 寸法線のスクリーン空間角度(screenAng, -180°〜180°)をそのままctx.rotateに使うと、
+// 寸法線が左向き(角度が90°〜270°/-90°〜-180°の範囲)の場合、文字も一緒に180°
+// 回転してしまい上下逆さま(読みにくい)になる。この関数は角度を-90°〜+90°の範囲に
+// 正規化し(90°を超えたら-180°、-90°未満なら+180°して180°反転)、常に文字が
+// 上下逆さまにならない向き(基本は下が画面下、または右下方向)で表示されるようにする。
+// 全ての寸法コマンド(水平/鉛直/斜め/直径/半径/線と点/2線間/線の長さ)で共通利用し、
+// 画面描画・PDF書出し(jsPDF/pdf-lib)のいずれもこの関数が返したd.tangleを再利用する
+// ことで、両者の見た目を一致させている。
+// V2_105: 垂直に近い(±90°付近)寸法線で、文字の下端が左右どちらを向くかが
+// 計測時に選んだ点や側(=始点/終点の順序、法線のどちら側に点を取ったか等)に
+// よって不定になる不具合の対応。
+// 原因: 上の-90°〜+90°への正規化は「同じ物理的な向きの角度が180°反転して
+// 範囲外に出た場合」だけを180°反転で範囲内に畳み込む仕組みのため、通常は
+// 始点/終点をどちらの順で選んでも同じ最終角度に収束する。ところが寸法線が
+// ちょうど90°(または-90°)付近になる場合、+90°側と-90°側は「上下逆さま」
+// ではない(=このロジックの畳み込み対象外)ため、どちらも正規化されずに
+// そのまま残ってしまい、点の選び方や基準線のごくわずかな傾き方向の違い
+// (鉄骨図面では水平・垂直な線がほとんどのため、法線方向がちょうど±90°
+// 付近になりやすい)によって+90°になったり-90°になったりしてしまう。
+// ctx.rotate()は時計回りが正、かつ文字はtextBaseline='bottom'で
+// ローカル(0,-gap)を基準に描画される(=回転前のローカル+Y方向が文字の下端)
+// ため、回転後の下端方向ベクトルは(-sinθ, cosθ)になる。これが画面右
+// (+X方向)を向くのはθ=-90°の時のみ(θ=+90°では画面左を向いてしまう)。
+// そこで、θがちょうど90°/-90°(実質的にちょうど、浮動小数点誤差含む)の
+// 場合は常にθ=-90°に統一し、「文字の下端は常に画面右側を向く」という
+// 一貫した向きにする。
+// 上記の「90°/-90°をまたぐ180°反転」ロジック自体は変更しないため、
+// 既存の「上下逆さま防止」の挙動には影響しない。
+function normalizeDimTextAngle(screenAng){
+  var a=screenAng;
+  if(a>Math.PI/2) a=a-Math.PI;
+  else if(a<-Math.PI/2) a=a+Math.PI;
+  // V2_105追記: 90°/-90°ちょうど(または浮動小数点誤差で実質ちょうど)の場合のみを
+  // 対象とする。これより有意に(1°などのオーダーで)90°からずれている場合は、上の
+  // 180°反転により始点/終点や側の選び方によらず数学的に厳密に同じ値へ収束する
+  // (差分は常にちょうど180°のため、90°/-90°の特異点を跨がない限り必ず一致する)。
+  // よってこの許容差は「ちょうど垂直な基準線(dx=0またはdy=0)」で生じる浮動小数点
+  // 誤差(~1e-14オーダー)のみを吸収できれば十分であり、ここを広げすぎると逆に
+  // このEPS自体の境界で新たな不定さを生んでしまう。
+  var VERT_EPS=1e-6; // ラジアン(約0.00006°)
+  if(Math.abs(a-Math.PI/2)<VERT_EPS||Math.abs(a+Math.PI/2)<VERT_EPS){
+    a=-Math.PI/2; // 常に「文字の下端が画面右側を向く」側に統一
+  }
+  return a;
 }
 function drawDimEntity(ctx,d){
   var PS=1; // V0_95: PDF時もPS=1固定（PSCALE倍しない）
@@ -4560,7 +4888,7 @@ function buildDim(p1,p2,pArrow,type){
     // 寸法線方向角度（drawDimEntityのctx.rotateで使用）
     var screenAng=Math.atan2(-uy,ux);  // Y軸反転を考慮したスクリーン空間の角度
     // 文字が逆さにならないよう-90°〜90°の範囲に正規化
-    tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
+    tangle=normalizeDimTextAngle(screenAng);
     lines.push({x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y});
     lines.push({x1:p1.x,y1:p1.y,x2:ep1x+nx2*sig2*ext2,y2:ep1y+ny2*sig2*ext2});
     lines.push({x1:p2.x,y1:p2.y,x2:ep2x+nx2*sig2*ext2,y2:ep2y+ny2*sig2*ext2});
@@ -4885,7 +5213,7 @@ function buildCircDimPhi(ent,p3){
   var ep1x=p1x-ux*ext, ep1y=p1y-uy*ext;
   // スクリーン空間の角度: w2sがY軸反転するため atan2(-uy, ux) を使用
   var screenAng=Math.atan2(-uy,ux);
-  var tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
+  var tangle=normalizeDimTextAngle(screenAng);
   return{
     lines:[{x1:ep1x,y1:ep1y,x2:ep2x,y2:ep2y}],
     arrows:[{x:p1x,y:p1y,angle:screenAng+Math.PI},{x:p2x,y:p2y,angle:screenAng}],
@@ -4961,7 +5289,7 @@ function buildRadDim(ent,p3){
   var ep2y=(distP3>r+ext)?p3.y:ey+uy*ext;
   // スクリーン空間の角度: w2sがY軸反転するため atan2(-uy, ux) を使用
   var screenAng=Math.atan2(-uy,ux);
-  var tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
+  var tangle=normalizeDimTextAngle(screenAng);
   return{
     lines:[{x1:cx,y1:cy,x2:ep2x,y2:ep2y}],
     arrows:[{x:ex,y:ey,angle:screenAng+Math.PI}], // 円周上で内向き（中心方向）
@@ -5226,7 +5554,7 @@ function buildLinePtDim(line,pt,pArrow){
     {x:d2.x,y:d2.y,angle:screenAng}
   ];
   var tx2=(d1.x+d2.x)/2,ty2=(d1.y+d2.y)/2;
-  var tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
+  var tangle=normalizeDimTextAngle(screenAng);
   var sd1=w2s(d1.x,d1.y),sd2=w2s(d2.x,d2.y);
   var pxLen=Math.hypot(sd2[0]-sd1[0],sd2[1]-sd1[1]);
   if(pxLen<60){
@@ -5558,7 +5886,7 @@ function buildLLDim(line1,line2,pArrow){
     {x:foot2.x,y:foot2.y,angle:screenAng}
   ];
   var tx2=(foot1.x+foot2.x)/2,ty2=(foot1.y+foot2.y)/2;
-  var tangle=(screenAng>Math.PI/2)?screenAng-Math.PI:(screenAng<-Math.PI/2)?screenAng+Math.PI:screenAng;
+  var tangle=normalizeDimTextAngle(screenAng);
   var sd1=w2s(foot1.x,foot1.y),sd2=w2s(foot2.x,foot2.y);
   var pxLen=Math.hypot(sd2[0]-sd1[0],sd2[1]-sd1[1]);
   if(pxLen<60){
@@ -6046,7 +6374,7 @@ function buildArcLenDim226(e,pArrow){
   var midPrev=offPts[Math.max(0,midIdx-1)];
   var dtx=mid.x-midPrev.x,dty=mid.y-midPrev.y;
   var screenAngle=(Math.abs(dtx)<1e-9&&Math.abs(dty)<1e-9)?0:Math.atan2(-dty,dtx);
-  var tangle=(screenAngle>Math.PI/2)?screenAngle-Math.PI:(screenAngle<-Math.PI/2)?screenAngle+Math.PI:screenAngle;
+  var tangle=normalizeDimTextAngle(screenAngle);
 
   return {lines:lines,arrows:[],dots:dots,text:formatDim(len/sd),tx:mid.x,ty:mid.y,tangle:tangle,
     color:currentDimColor||'#f39c12',worldFontH:17/(scale||1),fixedTextPx:17,page:_curPage()};
