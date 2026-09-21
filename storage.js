@@ -416,6 +416,7 @@ async function tryRestore(){
             document.querySelectorAll('.hl-alpha-btn').forEach(b=>{ // V2_98
               b.classList.toggle('active',Math.round(parseFloat(b.dataset.alpha))===Math.round(currentHLAlpha*100));
             });
+            const _hal117=document.getElementById('hlAlphaLabel');if(_hal117)_hal117.textContent=Math.round(currentHLAlpha*100)+'%'; // V2_117
             document.querySelectorAll('.dim-color-btn').forEach(b=>{
               b.classList.toggle('active',b.dataset.color===currentDimColor);
             });
@@ -547,6 +548,7 @@ async function tryRestore(){
     document.querySelectorAll('.hl-alpha-btn').forEach(b=>{ // V2_98
       b.classList.toggle('active',Math.round(parseFloat(b.dataset.alpha))===Math.round(currentHLAlpha*100));
     });
+    const hal117=document.getElementById('hlAlphaLabel');if(hal117)hal117.textContent=Math.round(currentHLAlpha*100)+'%'; // V2_117
     document.querySelectorAll('.dim-color-btn').forEach(b=>{
       b.classList.toggle('active',b.dataset.color===currentDimColor);
     });

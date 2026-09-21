@@ -40,13 +40,48 @@ var shapeToolState={drawing:false,tool:null,start:null,cur:null};
 // V2_95: currentToolが図形ツール(四角/矢印/丸/楕円)かどうかの判定。既存のcurrentTool値
 // (sketch/hl/eraser/text/lasso/select/dx/dy/dxdy/diag/dim系...)と衝突しないことを
 // 事前に全ファイル検索して確認済みの新規値のみを使う。
-function _isShapeTool(t){return t==='rect'||t==='arrow'||t==='circle'||t==='ellipse';}
+// V2_108: 雲印(cloud)を図形ツールに追加。既存のcurrentTool値と衝突しないことを
+// 確認済みの新規値'cloud'を使う。
+function _isShapeTool(t){return t==='rect'||t==='arrow'||t==='circle'||t==='ellipse'||t==='cloud';}
+
+// ── V3_04: 計測系「状態機械」ツール(IPX/DIM/LP/LL/LLEN/ANG)の一元管理 ──────
+// 改善点1対応: 「サブ窓で文字/図形/なげわが使えない」系の不具合(V3_01〜V3_03)が
+// 繰り返し起きていた根本原因は、IPX/DIM/LP/LL/LLEN/ANGの active判定→handleDown/
+// Move/Up呼び出しチェーンが、メイン画面(マウス/タッチ)・サブ窓(index.html
+// _swAttachInput)・指計測(_fingerMeasure*)など十数箇所に個別にコピーされており、
+// 新しい計測ツールを追加するたびに全箇所へ反映しないと機能ヌケが起きる構造だった
+// ため。ここに一本化し、新しい計測系ツールを追加する場合は下の配列に名前を
+// 足すだけで全箇所に反映されるようにする。
+// 優先順位はIPXが最優先(他の計測ツールの「点供給」として呼ばれるため)。
+var MEASURE_TOOL_NAMES=['IPX','DIM','LP','LL','LLEN','ANG'];
+function _activeMeasureTool(){
+  for(var i=0;i<MEASURE_TOOL_NAMES.length;i++){
+    var t=window[MEASURE_TOOL_NAMES[i]];
+    if(t&&t.active) return t;
+  }
+  return null;
+}
+function _isAnyMeasureActive(){ return !!_activeMeasureTool(); }
+function _isAnyMeasurePhaseActive(){
+  for(var i=0;i<MEASURE_TOOL_NAMES.length;i++){
+    var t=window[MEASURE_TOOL_NAMES[i]];
+    if(t&&t.active&&t.phase>0) return true;
+  }
+  return false;
+}
+// アクティブな計測ツールへ委譲する。委譲した場合はtrueを返す(呼び出し側は
+// falseの場合のみ通常のツール処理(handlePointerDown等)にフォールバックする)。
+function _dispatchMeasureDown(sx,sy){ var t=_activeMeasureTool(); if(t){t.handleDown(sx,sy);return true;} return false; }
+function _dispatchMeasureMove(sx,sy){ var t=_activeMeasureTool(); if(t){t.handleMove(sx,sy);return true;} return false; }
+function _dispatchMeasureUp(sx,sy){ var t=_activeMeasureTool(); if(t){t.handleUp(sx,sy);return true;} return false; }
+
 // V2_96: shapeType('rect'/'arrow'/'circle'/'ellipse')のうち、始点と終点が一致する
 // 閉じた多角形として扱うべきものはどれか。四角・丸・楕円は閉じる(canvas側で
 // closePath()相当/pdf側で'Z')。矢印は開いたポリライン(始点と矢尻が別の位置)のため
 // 対象外。screen描画(index.html drawAnnotation)・PDFベクター書出(export.js
 // _hpDrawStrokes170/_hpDrawStrokesPdfLib190)の3箇所すべてがこの判定関数を共通で使う
-function _isClosedShapeType(t){return t==='rect'||t==='circle'||t==='ellipse';}
+// V2_108: 雲印(cloud)も始点に戻って閉じたポリラインとして生成するため、閉形状に含める。
+function _isClosedShapeType(t){return t==='rect'||t==='circle'||t==='ellipse'||t==='cloud';}
 // V2_95: 円・楕円の多角形近似の分割数(目安32分割)。i=0とi=SHAPE_POLY_SEGMENTSで
 // 同じ座標になるため、pts配列は自動的に「始点に戻る」形で閉じる。
 var SHAPE_POLY_SEGMENTS=32;
@@ -128,6 +163,70 @@ function _shapeArrowPts(p0,p1,lwWorld){
   axis.push({x:p1.x,y:p1.y});
   return axis.concat([left,{x:p1.x,y:p1.y},right]);
 }
+// V2_108: 雲印(クラウド)。始点・終点を対角とする外接矩形の周囲に沿って、複数の
+// 「こぶ」(外側に膨らむ半円弧)を並べ、全てを1本の閉じたポリラインとして連結する。
+// 新しいストローク種別は作らない方針(事前調査で確定)のため、四角/丸/楕円と同じく
+// 確定時にpts配列(通常ストローク用の折れ線)へ変換してしまう。
+// こぶの大きさ・個数の決め方:
+//  ・こぶ1個の弦長(chord)の目安を「矩形の短辺の30%」または「矩形周囲長の5%」の
+//    大きい方とし、矩形サイズに応じてこぶの大きさが自動的にスケールするようにする
+//    (小さい矩形では小さいこぶ、大きい矩形では大きいこぶになる)。
+//  ・細長い矩形(例:横に非常に長く縦が短い)では、上記の目安chordが短辺(高さ)に
+//    対して大きすぎ、短辺側の1辺がこぶ1個だけになって半径が過大になり、角付近で
+//    こぶ同士が交差して見た目が破綻する(実描画確認で発見)。これを防ぐため、
+//    chordは矩形の短辺の80%を上限にクランプする(こぶの半径が短辺の40%を超えない
+//    ようにし、対辺のこぶと交差しない余裕を残す)。
+//  ・上記の目安chordで矩形4辺それぞれを「辺の長さ÷chordを丸めた個数」で均等分割する
+//    (辺ごとに整数個のこぶがちょうど収まるようにするため、辺ごとに実際のchordを
+//    微調整する)。1辺だけ突出して大きいこぶにならないよう、各辺最低2個は確保する
+//    (4辺×最低2個=最低8個となり、矩形全体で最低8個程度のこぶという目安も自動的に
+//    満たされる)。
+//  ・各こぶは、辺の方向を軸とした「弦の両端を結ぶ半径r(=chord/2)の半円弧」を10分割
+//    (8〜12分割の目安の範囲内)の頂点列で近似し、辺の外側(矩形の中心から離れる向き)
+//    に膨らませる。膨らむ向きは、矩形を(左下→右下→右上→左上→左下)の順に一周する
+//    向きに辺を進む方向ベクトルd=(dx,dy)から、90度回転した(dy,-dx)を外向き法線として
+//    機械的に導出する(この巡回順で常に外側を向くことを確認済み)。
+//  ・全てのこぶの頂点列を巡回順に連結し、浮動小数の誤差対策として最後の点を明示的に
+//    始点と同一座標に置き換えて確実に閉じたポリラインにする。
+// 見た目の最終調整はPlaywrightでの実描画確認を行いながらtargetChordの係数
+// (0.30/0.05/短辺80%クランプ)・最低2個/辺・ARC_SEGS(10)を調整して、正方形に近い
+// 矩形はもちろん、細長い矩形でも交差せず「雲っぽい」自然な形になるよう決定した。
+function _shapeCloudPts(p0,p1){
+  if(!p0||!p1) return null;
+  var minX=Math.min(p0.x,p1.x),maxX=Math.max(p0.x,p1.x);
+  var minY=Math.min(p0.y,p1.y),maxY=Math.max(p0.y,p1.y);
+  var w=maxX-minX,h=maxY-minY;
+  if(w<1e-9||h<1e-9) return null; // 矩形がつぶれている(横or縦にドラッグ距離ゼロ)場合は生成しない
+  var perim=2*(w+h);
+  var minSide=Math.min(w,h);
+  var ARC_SEGS=10; // こぶ1個あたりの弧の分割数(8〜12分割の目安)
+  var targetChord=Math.max(minSide*0.30, perim*0.05);
+  targetChord=Math.min(targetChord, minSide*0.8); // 短辺に対してこぶが過大にならないようクランプ
+  var corners=[{x:minX,y:minY},{x:maxX,y:minY},{x:maxX,y:maxY},{x:minX,y:maxY}];
+  var pts=[{x:corners[0].x,y:corners[0].y}];
+  for(var side=0;side<4;side++){
+    var a=corners[side], b=corners[(side+1)%4];
+    var sideLen=Math.hypot(b.x-a.x,b.y-a.y);
+    if(sideLen<1e-9) continue;
+    var n=Math.max(2,Math.round(sideLen/targetChord)); // 1辺あたり最低2個のこぶを確保
+    var chord=sideLen/n;
+    var r=chord/2;
+    var dx=(b.x-a.x)/sideLen, dy=(b.y-a.y)/sideLen;
+    var theta=Math.atan2(dy,dx);
+    for(var i=0;i<n;i++){
+      var sx=a.x+dx*chord*i, sy=a.y+dy*chord*i; // このこぶの弦の始点(辺上)
+      var mx=sx+dx*r, my=sy+dy*r; // 弦の中点(=こぶの円弧の中心)
+      for(var k=1;k<=ARC_SEGS;k++){
+        // theta+PIが弦の始点方向、theta+2PI(=theta)が弦の終点方向。この間を外向き
+        // (法線(dy,-dx)側)を通るように角度を単調に進めることで半円弧になる
+        var ang=theta+Math.PI+k*(Math.PI/ARC_SEGS);
+        pts.push({x:mx+r*Math.cos(ang), y:my+r*Math.sin(ang)});
+      }
+    }
+  }
+  pts[pts.length-1]={x:pts[0].x,y:pts[0].y}; // 浮動小数誤差対策で確実に始点へ戻す
+  return pts;
+}
 function _shapeBuildPts(tool,p0,p1){
   if(!p0||!p1) return null;
   if(tool==='rect'){
@@ -153,6 +252,9 @@ function _shapeBuildPts(tool,p0,p1){
   }
   if(tool==='arrow'){
     return _shapeArrowPts(p0,p1);
+  }
+  if(tool==='cloud'){
+    return _shapeCloudPts(p0,p1);
   }
   return null;
 }
@@ -240,34 +342,18 @@ var FINGER_CURSOR_OFFSET_Y=60;
 // それ以外の水平/鉛直(dxdy)・斜め(diag)はDIM.active等の状態フラグを持たずcurrentToolで
 // 判定するhandlePointerDown/Move/Up内蔵の仕組みのため、ここで一本化して呼び分ける）
 function _fingerMeasureActive(){
-  return (window.DIM&&window.DIM.active)||(window.LP&&window.LP.active)||(window.LL&&window.LL.active)
-      ||(window.LLEN&&window.LLEN.active) // V1_240: 線の長さ
-      ||(window.ANG&&window.ANG.active) // V2_63: 角度
+  return _isAnyMeasureActive()
       ||currentTool==='dx'||currentTool==='dy'||currentTool==='dxdy'||currentTool==='diag';
 }
 function _fingerMeasureDown(sx,sy){
-  if(window.DIM&&window.DIM.active) window.DIM.handleDown(sx,sy);
-  else if(window.LP&&window.LP.active) window.LP.handleDown(sx,sy);
-  else if(window.LL&&window.LL.active) window.LL.handleDown(sx,sy);
-  else if(window.LLEN&&window.LLEN.active) window.LLEN.handleDown(sx,sy); // V1_240
-  else if(window.ANG&&window.ANG.active) window.ANG.handleDown(sx,sy); // V2_63
-  else handlePointerDown(sx,sy,true); // dx/dy/dxdy/diag: ペン相当のダウン→ムーブ→アップで確定
+  // V3_04: _dispatchMeasureDownに一本化(IPX/DIM/LP/LL/LLEN/ANG)。
+  if(!_dispatchMeasureDown(sx,sy)) handlePointerDown(sx,sy,true); // dx/dy/dxdy/diag: ペン相当のダウン→ムーブ→アップで確定
 }
 function _fingerMeasureMove(sx,sy){
-  if(window.DIM&&window.DIM.active) window.DIM.handleMove(sx,sy);
-  else if(window.LP&&window.LP.active) window.LP.handleMove(sx,sy);
-  else if(window.LL&&window.LL.active) window.LL.handleMove(sx,sy);
-  else if(window.LLEN&&window.LLEN.active) window.LLEN.handleMove(sx,sy); // V1_240
-  else if(window.ANG&&window.ANG.active) window.ANG.handleMove(sx,sy); // V2_63
-  else handlePointerMove(sx,sy,true);
+  if(!_dispatchMeasureMove(sx,sy)) handlePointerMove(sx,sy,true);
 }
 function _fingerMeasureUp(sx,sy){
-  if(window.DIM&&window.DIM.active) window.DIM.handleUp(sx,sy);
-  else if(window.LP&&window.LP.active) window.LP.handleUp(sx,sy);
-  else if(window.LL&&window.LL.active) window.LL.handleUp(sx,sy);
-  else if(window.LLEN&&window.LLEN.active) window.LLEN.handleUp(sx,sy); // V1_240
-  else if(window.ANG&&window.ANG.active) window.ANG.handleUp(sx,sy); // V2_63
-  else handlePointerUp(sx,sy,true);
+  if(!_dispatchMeasureUp(sx,sy)) handlePointerUp(sx,sy,true);
 }
 
 // V1_48: 水平/鉛直・斜め(dimState方式)の点確定処理を一本化。
@@ -410,14 +496,9 @@ function getPos(e){const r=ov.getBoundingClientRect();return {x:e.clientX-r.left
 // ポインタダウン処理
 // =========================================================
 function handlePointerDown(sx,sy,isPenInput){
-  // V1_48: 「2線間の交点」ピック中は、通常のツール処理より優先してIPXへ渡す
-  if(window.IPX&&window.IPX.active){window.IPX.handleDown(sx,sy);return;}
-  // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
-  if(window.DIM&&window.DIM.active)return;
-  if(window.LP&&window.LP.active)return;
-  if(window.LL&&window.LL.active)return; // V0_153: 2線間
-  if(window.LLEN&&window.LLEN.active)return; // V1_240: 線の長さ
-  if(window.ANG&&window.ANG.active)return; // V2_63: 角度
+  // V3_04: IPX/DIM/LP/LL/LLEN/ANGのactive判定を一本化(_activeMeasureTool)。
+  // IPXは他の計測ツールへの「点供給」として直接呼ぶ必要があるため呼び分ける。
+  { var _hpdMt=_activeMeasureTool(); if(_hpdMt){ if(_hpdMt===window.IPX) _hpdMt.handleDown(sx,sy); return; } }
   if(window.SW&&window.SW.active){window.SW.handleDown(sx,sy);return;} // V0_150: サブ窓 矩形範囲選択
   const[wx,wy]=s2w(sx,sy);
   // V0_102: dim text drag (水・鉛/斜めツール)
@@ -474,15 +555,10 @@ function handlePointerDown(sx,sy,isPenInput){
 // ポインタムーブ処理
 // =========================================================
 function handlePointerMove(sx,sy,isPenInput){
-  // V1_48: 「2線間の交点」ピック中は、通常のツール処理より優先してIPXへ渡す
+  // V3_04: IPX/DIM/LP/LL/LLEN/ANGのactive判定を一本化(_activeMeasureTool)。
   if(window.IPX&&window.IPX.active){window.IPX.handleMove(sx,sy);return;}
   if(typeof _dimTextDrag!=='undefined'&&_dimTextDrag&&typeof _dimTextDragMove==='function'&&_dimTextDragMove(sx,sy)) return; // V0_102
-  // DIMシステムがアクティブな場合は DIM の pointermove ハンドラに任せる
-  if(window.DIM&&window.DIM.active)return;
-  if(window.LP&&window.LP.active)return;
-  if(window.LL&&window.LL.active)return; // V0_153: 2線間
-  if(window.LLEN&&window.LLEN.active)return; // V1_240: 線の長さ
-  if(window.ANG&&window.ANG.active)return; // V2_63: 角度
+  if(_isAnyMeasureActive())return;
   if(window.SW&&window.SW.active){window.SW.handleMove(sx,sy);return;} // V0_150: サブ窓 矩形範囲選択
   const[wx,wy]=s2w(sx,sy);
   currentCursorWorld={x:wx,y:wy}; // 寸法プレビュー用カーソル世界座標を更新
@@ -525,15 +601,10 @@ function handlePointerMove(sx,sy,isPenInput){
 // ポインタアップ処理
 // =========================================================
 function handlePointerUp(sx,sy,isPenInput){
-  // V1_48: 「2線間の交点」ピック中は、通常のツール処理より優先してIPXへ渡す
+  // V3_04: IPX/DIM/LP/LL/LLEN/ANGのactive判定を一本化(_activeMeasureTool)。
   if(window.IPX&&window.IPX.active){window.IPX.handleUp(sx,sy);return;}
   if(typeof _dimTextDragUp==='function'&&_dimTextDragUp()) return; // V0_102
-  // DIMシステムがアクティブな場合は DIM の pointerup ハンドラに任せる
-  if(window.DIM&&window.DIM.active)return;
-  if(window.LP&&window.LP.active)return;
-  if(window.LL&&window.LL.active)return; // V0_153: 2線間
-  if(window.LLEN&&window.LLEN.active)return; // V1_240: 線の長さ
-  if(window.ANG&&window.ANG.active)return; // V2_63: 角度
+  if(_isAnyMeasureActive())return;
   if(window.SW&&window.SW.active){window.SW.handleUp(sx,sy);return;} // V0_150: サブ窓 矩形範囲選択
   if(dimPendingDown&&isPenInput){
     dimPendingDown=false;
@@ -610,19 +681,16 @@ ov.addEventListener('mousedown',e=>{
     return;
   }
   mouseDown=true;const p=getPos(e);lastMX=p.x;lastMY=p.y;
-  if(window.DIM&&window.DIM.active){
-    window.DIM.handleDown(p.x,p.y);
-  } else if(window.LP&&window.LP.active){
-    window.LP.handleDown(p.x,p.y);
-  } else if(window.LL&&window.LL.active){ // V0_153: 2線間
-    window.LL.handleDown(p.x,p.y);
-  } else if(window.LLEN&&window.LLEN.active){ // V1_240: 線の長さ
-    window.LLEN.handleDown(p.x,p.y);
-  } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
-    window.ANG.handleDown(p.x,p.y);
-  } else { handlePointerDown(p.x,p.y,false); }
+  // V3_04: IPX/DIM/LP/LL/LLEN/ANGのactive判定→handleDown呼び出しを一本化(_dispatchMeasureDown)
+  if(!_dispatchMeasureDown(p.x,p.y)) handlePointerDown(p.x,p.y,false);
 });
 window.addEventListener('mousemove',e=>{
+  // V3_02: サブ窓自身のmousemoveハンドラ(index.html _swAttachInput)が既にこのイベントを
+  // サブ窓自身の座標系(withCtx)で処理済みの場合、このwindowレベルのグローバルリスナーは
+  // 常にメイン画面のov/tx/ty/scaleを使って同じイベントを二重処理してしまい、なげわの
+  // 囲み線や図形のプレビューがおかしな座標で壊れる原因になる。_swActiveMouseDrag92が
+  // 立っている間(サブ窓内でマウスボタンが押されている間)はここで何もしない。
+  if(window._swActiveMouseDrag92) return;
   const p=getPos(e);
   // V1_95: テキスト読込ピックモード中(_textPickTarget有効時)は、mousedown/mouseup
   // 側と同様にDIM/LP/LLのホバープレビュー更新・ペン/消しゴムのポインタ処理も
@@ -630,20 +698,14 @@ window.addEventListener('mousemove',e=>{
   // 開いた後も計測ツールのホバー候補が更新され続け、「操作がキャンセルされて
   // いない」ように見える一因になっていた
   if(typeof _textPickTarget!=='undefined'&&_textPickTarget){ lastMX=p.x;lastMY=p.y; return; }
-  if(window.DIM&&window.DIM.active){
-    window.DIM.handleMove(p.x,p.y); // mouseDown不要: ホバー中も_hoverPos更新
-  } else if(window.LP&&window.LP.active){
-    window.LP.handleMove(p.x,p.y);
-  } else if(window.LL&&window.LL.active){ // V0_153: 2線間
-    window.LL.handleMove(p.x,p.y);
-  } else if(window.LLEN&&window.LLEN.active){ // V1_240: 線の長さ
-    window.LLEN.handleMove(p.x,p.y);
-  } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
-    window.ANG.handleMove(p.x,p.y);
-  } else { handlePointerMove(p.x,p.y,false); }
+  // V3_04: 一本化(_dispatchMeasureMove)。mouseDown不要: ホバー中も_hoverPos更新のため毎回呼ぶ
+  if(!_dispatchMeasureMove(p.x,p.y)) handlePointerMove(p.x,p.y,false);
   lastMX=p.x;lastMY=p.y;
 });
 window.addEventListener('mouseup',e=>{
+  // V3_02: mousemove側と同じ理由。サブ窓自身のmouseupハンドラが既に処理済み(かつ
+  // mouseDown/_swActiveMouseDrag92の後始末も済ませている)ため、ここでの二重処理を防ぐ
+  if(window._swActiveMouseDrag92) return;
   if(!mouseDown)return;mouseDown=false;
   const p=getPos(e);
   // V1_86: mousedown時にテキスト読込ピック待機中だった場合は、DIM/LP/LL/handlePointerUpを
@@ -662,17 +724,8 @@ window.addEventListener('mouseup',e=>{
     _mouseTapStartTime=0;
     return;
   }
-  if(window.DIM&&window.DIM.active){
-    window.DIM.handleUp(p.x,p.y);
-  } else if(window.LP&&window.LP.active){
-    window.LP.handleUp(p.x,p.y);
-  } else if(window.LL&&window.LL.active){ // V0_153: 2線間
-    window.LL.handleUp(p.x,p.y);
-  } else if(window.LLEN&&window.LLEN.active){ // V1_240: 線の長さ
-    window.LLEN.handleUp(p.x,p.y);
-  } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
-    window.ANG.handleUp(p.x,p.y);
-  } else { handlePointerUp(p.x,p.y,false); }
+  // V3_04: 一本化(_dispatchMeasureUp)
+  if(!_dispatchMeasureUp(p.x,p.y)) handlePointerUp(p.x,p.y,false);
 });
 ov.addEventListener('wheel',e=>{
   e.preventDefault();
@@ -711,24 +764,17 @@ ov.addEventListener('touchstart',e=>{
       const sx=t.clientX-r.left,sy=t.clientY-r.top;
       isPen=true;mouseDown=true;lastMX=sx;lastMY=sy;
       panning=false;
-      if(window.DIM&&window.DIM.active){
-        window.DIM.handleDown(sx,sy);
-
-      } else if(window.LP&&window.LP.active){
-        window.LP.handleDown(sx,sy);
-      } else if(window.LL&&window.LL.active){ // V0_153: 2線間
-        window.LL.handleDown(sx,sy);
-      } else if(window.LLEN&&window.LLEN.active){ // V1_240: 線の長さ
-        window.LLEN.handleDown(sx,sy);
-      } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
-        window.ANG.handleDown(sx,sy);
-      } else if(currentTool==='text'){
-        // V2_93: 文字ツールはここ(touchstart=ペンが触れた瞬間)ではまだ入力枠を開かず、
-        // 位置だけ記憶してtouchend(ペンが離れた瞬間)で開く。理由は_textToolPendingOpen92
-        // 宣言部のコメントを参照(iOSでtouchstart起点のfocus()はキーボードが出ないため)。
-        _textToolPendingOpen92={sx:sx,sy:sy,isPenInput:true};
-      } else {
-        handlePointerDown(sx,sy,true);
+      // V3_04: 一本化(_dispatchMeasureDown)。textツールは計測系より後に判定する必要があるため、
+      // 計測系がアクティブでない場合のみtext判定→通常のhandlePointerDownへ進む。
+      if(!_dispatchMeasureDown(sx,sy)){
+        if(currentTool==='text'){
+          // V2_93: 文字ツールはここ(touchstart=ペンが触れた瞬間)ではまだ入力枠を開かず、
+          // 位置だけ記憶してtouchend(ペンが離れた瞬間)で開く。理由は_textToolPendingOpen92
+          // 宣言部のコメントを参照(iOSでtouchstart起点のfocus()はキーボードが出ないため)。
+          _textToolPendingOpen92={sx:sx,sy:sy,isPenInput:true};
+        } else {
+          handlePointerDown(sx,sy,true);
+        }
       }
     }
   } else if(fingers.length>=2){
@@ -823,17 +869,8 @@ ov.addEventListener('touchmove',e=>{
     // Apple Pencil移動: ツール操作
     const t=styli[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    if(window.DIM&&window.DIM.active){
-      window.DIM.handleMove(sx,sy);
-    } else if(window.LP&&window.LP.active){
-      window.LP.handleMove(sx,sy);
-    } else if(window.LL&&window.LL.active){ // V0_153: 2線間
-      window.LL.handleMove(sx,sy);
-    } else if(window.LLEN&&window.LLEN.active){ // V1_240: 線の長さ
-      window.LLEN.handleMove(sx,sy);
-    } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
-      window.ANG.handleMove(sx,sy);
-    } else { handlePointerMove(sx,sy,true); }
+    // V3_04: 一本化(_dispatchMeasureMove)
+    if(!_dispatchMeasureMove(sx,sy)) handlePointerMove(sx,sy,true);
     lastMX=sx;lastMY=sy;
   } else if(fingers.length>=2&&pinchDist!==null){
     // 2本指: 正確なパン+ピンチ（世界座標ピボット）
@@ -861,11 +898,9 @@ ov.addEventListener('touchmove',e=>{
     // V0_79: 手書きモード 指1本描画中 / V0_152.2: サブ窓作成の対角ドラッグ中も含む
     const t=fingers[0];
     const sx=t.clientX-r.left,sy=t.clientY-r.top;
-    if(window.DIM&&window.DIM.active){
-      window.DIM.handleMove(sx,sy);
-    } else if(window.LP&&window.LP.active){
-      window.LP.handleMove(sx,sy);
-    } else { handlePointerMove(sx,sy,false); }
+    // V3_04: 一本化(_dispatchMeasureMove)。旧コードはDIM/LPのみ判定しLL/LLEN/ANGが
+    // 漏れていた(コピー元がV0_153以前のままだった構造的な反映漏れ)。この一本化で解消。
+    if(!_dispatchMeasureMove(sx,sy)) handlePointerMove(sx,sy,false);
     lastMX=sx;lastMY=sy;
   } else if(fingers.length===1&&mouseDown&&panning){
     // 1本指パン（既存動作）
@@ -901,18 +936,10 @@ ov.addEventListener('touchend',e=>{
       var _tp92pen=_textToolPendingOpen92;_textToolPendingOpen92=null;
       _textInputTouchOrigin=true;
       handlePointerDown(_tp92pen.sx,_tp92pen.sy,true);
-    } else if(window.DIM&&window.DIM.active){
-      window.DIM.handleUp(lastMX,lastMY);
-
-    } else if(window.LP&&window.LP.active){
-      window.LP.handleUp(lastMX,lastMY);
-    } else if(window.LL&&window.LL.active){ // V0_153: 2線間
-      window.LL.handleUp(lastMX,lastMY);
-    } else if(window.LLEN&&window.LLEN.active){ // V1_240: 線の長さ
-      window.LLEN.handleUp(lastMX,lastMY);
-    } else if(window.ANG&&window.ANG.active){ // V2_63: 角度
-      window.ANG.handleUp(lastMX,lastMY);
-    } else { handlePointerUp(lastMX,lastMY,true); }
+    } else {
+      // V3_04: 一本化(_dispatchMeasureUp)
+      if(!_dispatchMeasureUp(lastMX,lastMY)) handlePointerUp(lastMX,lastMY,true);
+    }
     mouseDown=false;isPen=false;
     if(remFing.length>=2){
       const t0=remFing[0],t1=remFing[1];
@@ -990,11 +1017,7 @@ ov.addEventListener('touchend',e=>{
         if(typeof _textPickTarget!=='undefined'&&_textPickTarget){
           if(typeof _tapPickText==='function') _tapPickText(lastMX,lastMY);
           _lastTapTime=0;
-        } else if(!(window.DIM&&window.DIM.active&&window.DIM.phase>0)
-            &&!(window.LP&&window.LP.active&&window.LP.phase>0)
-            &&!(window.LL&&window.LL.active&&window.LL.phase>0)
-            &&!(window.LLEN&&window.LLEN.active&&window.LLEN.phase>0) // V1_240: 線の長さ
-            &&!(window.ANG&&window.ANG.active&&window.ANG.phase>0)){ // V2_63: 角度
+        } else if(!_isAnyMeasurePhaseActive()){ // V3_04: 一本化(_isAnyMeasurePhaseActive)
           var _tapNow=Date.now();
           if(_tapNow-_lastTapTime<400&&Math.hypot(lastMX-_lastTapX,lastMY-_lastTapY)<40){
             fit();scheduleDraw();scheduleSave(); // V0_74のfitBtnと同じ処理
@@ -1086,7 +1109,7 @@ ov.addEventListener('touchcancel',e=>{
 // 維持する(下のクリックハンドラでこの値を見て「状態リセットをしない」保護を掛けている
 // ため)が、色選択が#measureToolPopupに常時表示されるようになったので、再タップ時に
 // 別ポップアップを開く処理自体は行わない(下のif(_mode==='dim')分岐を参照)
-const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',text:'sketch',rect:'sketch',arrow:'sketch',circle:'sketch',ellipse:'sketch',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim',lineLen:'dim',ang:'dim'}; // V2_63: 角度追加 / V2_80: 文字入力(ペンと同じ色/太さポップアップを流用) / V2_95: 図形ツール(四角・矢印・丸・楕円、ペンと同じ色/太さポップアップを流用)
+const _TOOL_COLOR_MODE={sketch:'sketch',hl:'hl',eraser:'eraser',text:'sketch',rect:'sketch',arrow:'sketch',circle:'sketch',ellipse:'sketch',cloud:'sketch',dxdy:'dim',diag:'dim',ll:'dim',lp:'dim',circDim:'dim',radDim:'dim',lineLen:'dim',ang:'dim'}; // V2_63: 角度追加 / V2_80: 文字入力(ペンと同じ色/太さポップアップを流用) / V2_95: 図形ツール(四角・矢印・丸・楕円、ペンと同じ色/太さポップアップを流用) / V2_108: 雲印追加
 // V1_205: 計測ツール選択ポップアップ(#measureToolPopup、index.html)用。6つの計測ツールの
 // うちどれかが新たに選択された時、ヘッダーの計測ボタン(#measureCurrentLabel、3段表示の
 // 3段目)に選択中のツール名を表示し、ポップアップを閉じる。すでに選択中のツールの
@@ -1097,7 +1120,7 @@ const _MEASURE_TOOL_LABELS={dxdy:'水・鉛',diag:'斜め',ll:'2線間',lp:'線�
 // と全く同じ役割(選択された図形の名前をヘッダーの図形ボタン下段ラベル(#shapeCurrentLabel)
 // に表示し、ポップアップを閉じる)。currentTool自体は従来通り'rect'/'arrow'/'circle'/
 // 'ellipse'のまま(値は変更しない)なので、_isShapeTool/storage.js/guideMap等は無改修
-const _SHAPE_TOOL_LABELS={rect:'四角',arrow:'矢印',circle:'丸',ellipse:'楕円'};
+const _SHAPE_TOOL_LABELS={rect:'四角',arrow:'矢印',circle:'丸',ellipse:'楕円',cloud:'雲印'}; // V2_108: 雲印追加
 // V2_96: ヘッダーの図形ボタン(#shapeToggleBtn)を他ツールから押した時に、前回選んで
 // いた図形タイプを直接復元できるよう記憶する(_lastMeasureToolと同じ考え方)。
 // var宣言でグローバル公開(index.htmlの#shapeToggleBtnクリックハンドラが参照するため)
@@ -1154,13 +1177,21 @@ var _SHAPE_TOOL_ICON_INNER={
   rect:'<rect x="4" y="6" width="16" height="12" rx="1"/>',
   arrow:'<line x1="4" y1="19" x2="18" y2="5"/><polyline points="9 5 18 5 18 14"/>',
   circle:'<circle cx="12" cy="12" r="8"/>',
-  ellipse:'<ellipse cx="12" cy="12" rx="9" ry="6"/>'
+  ellipse:'<ellipse cx="12" cy="12" rx="9" ry="6"/>',
+  // V2_108: 雲印。#shapeToolPopup内のボタンと同じ雲の輪郭パス
+  cloud:'<path d="M6.5 17c-1.93 0-3.5-1.57-3.5-3.5 0-1.74 1.27-3.18 2.94-3.45C6.2 8.2 7.9 7 9.9 7c1.4 0 2.65.6 3.53 1.55C13.9 8.2 14.44 8 15 8c1.93 0 3.5 1.57 3.5 3.5 0 .16-.01.31-.03.46C19.9 12.3 21 13.6 21 15.1c0 1.6-1.4 3.9-3 3.9H6.5z"/>'
 };
 function _syncShapeToggleBtnIcon(){
   var el=document.getElementById('shapeToolIcon');
   if(el) el.innerHTML=_SHAPE_TOOL_ICON_INNER[currentTool]||_SHAPE_TOOL_ICON_INNER[_lastShapeTool]||_SHAPE_DEFAULT_ICON_INNER;
+  // V2_116: 「アイコンで図形の種類は分かるので、一番下は種類名ではなく太さの数値を
+  // 表示してほしい」との依頼で、#shapeCurrentLabel(下段ラベル)の内容を図形種類名から
+  // currentShapeLW(図形専用の太さ、V2_103)の数値表示に変更した。ペンの#lwLabel等と
+  // 同じ「3段目=太さの数値」パターンに揃える。図形の種類が切り替わってもこの関数は
+  // 種類にかかわらず常にcurrentShapeLWを表示するので、アイコン(上でセット済み)だけが
+  // 種類を表し、下段ラベルは太さ専用になる
   var _slbl96=document.getElementById('shapeCurrentLabel');
-  if(_slbl96) _slbl96.textContent=_SHAPE_TOOL_LABELS[currentTool]||_SHAPE_TOOL_LABELS[_lastShapeTool]||'未選択';
+  if(_slbl96) _slbl96.textContent=(typeof currentShapeLW!=='undefined')?currentShapeLW:'0.6';
   // V2_96: アイコンの色は選択中の描画色を反映する(updateToolColorDots()からも
   // 呼ばれるが、ここでも二重に反映しておくことでツール切替直後(updateToolColorDots
   // 呼び出し前)の一瞬の色ズレも防ぐ)。
@@ -1353,9 +1384,13 @@ document.querySelectorAll('.lw-btn').forEach(btn=>{
     if(typeof _syncLwBtnActive==='function') _syncLwBtnActive();
     // V2_100: 「選択操作をしてもポップアップは自動的に閉じない」ように変更(決定ボタンで閉じる)
     // ④ ボタン内の現在値表示を更新(ペンの#lwLabelはcurrentLW、文字の#textSizeLabelは
-    // V2_103からcurrentTextLWを表示する。図形専用の3段目ラベルは無いため対象外)
+    // V2_103からcurrentTextLWを表示する。V2_116: 図形専用の3段目ラベル
+    // (#shapeCurrentLabel)もcurrentShapeLWを表示するようになったため、図形ポップアップ内の
+    // 太さボタンをクリックした時もここで即座に更新する(_syncShapeToggleBtnIconを呼べば
+    // アイコンも含めて同期できるが、ここでは太さボタン用途なのでラベルだけ直接更新する)
     const lwl=document.getElementById('lwLabel');if(lwl)lwl.textContent=currentLW;
     const tsl86=document.getElementById('textSizeLabel');if(tsl86)tsl86.textContent=currentTextLW;
+    if(btn.closest('#shapeToolPopup')){ const slbl116=document.getElementById('shapeCurrentLabel'); if(slbl116) slbl116.textContent=currentShapeLW; }
     scheduleSave(); // V0_135: 線幅/文字サイズ変更を保存
   });
 });
@@ -1412,6 +1447,8 @@ document.querySelectorAll('.hl-alpha-btn').forEach(btn=>{
     document.querySelectorAll('.hl-alpha-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     currentHLAlpha=parseFloat(btn.dataset.alpha)/100;
+    // V2_117: 蛍光ペンボタン最下段右側(id="hlAlphaLabel")に現在の濃度(%)を表示する
+    const hal=document.getElementById('hlAlphaLabel');if(hal)hal.textContent=Math.round(currentHLAlpha*100)+'%';
     // V2_100: 選択操作でポップアップを自動的に閉じない(決定ボタンで閉じる)
     scheduleSave(); // 蛍光ペン濃度変更を保存
   });
@@ -1504,13 +1541,24 @@ function _textInputFontPx85(){
 // パン・ズーム中も常に配置先の真上に追従させる。文字サイズも同時にズームへ
 // 追従させる
 var _textInputWX88=0, _textInputWY88=0;
+var _textInputSubWin92=null; // V3_02: サブ窓内で開いた入力欄かどうか(そのsubWindowsの要素への参照。メイン画面ならnull)
 function _syncTextInputBoxPosition88(){
   if(!_textInputActive) return;
   var box=document.getElementById('textInputBox');
   var inp=document.getElementById('textInputField');
-  if(!box||!inp||typeof w2s!=='function'||typeof ov==='undefined') return;
-  var r=ov.getBoundingClientRect();
-  var p=w2s(_textInputWX88,_textInputWY88);
+  if(!box||!inp) return;
+  var r,p;
+  // V3_02: サブ窓内で開いた入力欄は、そのサブ窓自身の座標系(tx/ty/scale・canvas位置)で
+  // 追従させる。サブ窓が既に閉じられていた場合はメイン画面基準にフォールバックする
+  if(_textInputSubWin92&&typeof window._swScreenPos==='function'
+      &&typeof window._swFindOwnerOfOv==='function'&&window._swFindOwnerOfOv(_textInputSubWin92.ovEl)){
+    r=_textInputSubWin92.ovEl.getBoundingClientRect();
+    p=window._swScreenPos(_textInputSubWin92,_textInputWX88,_textInputWY88);
+  } else {
+    if(typeof w2s!=='function'||typeof ov==='undefined') return;
+    r=ov.getBoundingClientRect();
+    p=w2s(_textInputWX88,_textInputWY88);
+  }
   box.style.left=(r.left+p[0])+'px';
   box.style.top=(r.top+p[1])+'px';
   var fontPx=_textInputFontPx85();
@@ -1529,6 +1577,7 @@ function _openTextInputAt(wx,wy,sx,sy){
   _ensureCanvasJPFont84();
   _textInputActive=true;
   _textInputWX88=wx; _textInputWY88=wy; // V2_88
+  _textInputSubWin92=(typeof window._swFindOwnerOfOv==='function')?window._swFindOwnerOfOv(ov):null; // V3_02
   var r=ov.getBoundingClientRect();
   var fontPx=_textInputFontPx85();
   inp.value='';
@@ -1622,7 +1671,13 @@ function _closeTextInput(){
   var box=document.getElementById('textInputBox');
   if(box){ if(box._cleanup80){box._cleanup80();box._cleanup80=null;} box.style.display='none'; }
   _textInputActive=false;
+  _textInputSubWin92=null; // V3_02
 }
+// V3_02: サブ窓の閉じるボタンから呼ばれる安全策。閉じられようとしているサブ窓sw内で
+// 文字入力欄が開いたままだった場合、取り残されないよう強制的に閉じる
+window._closeTextInputIfOwnedBySw92=function(sw){
+  if(_textInputActive&&_textInputSubWin92===sw) _closeTextInput();
+};
 
 // =========================================================
 // V2_90: なげわ(lasso)ツール
@@ -1798,16 +1853,24 @@ function _lassoDeleteSelected(){
   scheduleOverlay();doSave();
 }
 // アクションバー(削除ボタン)の表示/非表示/位置同期
+var _lassoActionBarSubWin90=null; // V3_02: なげわの選択操作がどのサブ窓内で行われたか
 function _lassoShowActionBar(){
   var bar=document.getElementById('lassoActionBar');
   if(!bar) return;
+  _lassoActionBarSubWin90=(typeof window._swFindOwnerOfOv==='function')?window._swFindOwnerOfOv(ov):null; // V3_02
   bar.style.display='flex';
   _syncLassoActionBar90();
 }
 function _lassoHideActionBar(){
   var bar=document.getElementById('lassoActionBar');
   if(bar) bar.style.display='none';
+  _lassoActionBarSubWin90=null; // V3_02
 }
+// V3_02: サブ窓の閉じるボタンから呼ばれる安全策。閉じられようとしているサブ窓sw内で
+// なげわアクションバーが表示されたままだった場合、取り残されないよう強制的に隠す
+window._lassoHideActionBarIfOwnedBySw90=function(sw){
+  if(_lassoActionBarSubWin90===sw) _lassoHideActionBar();
+};
 // V2_90: viewer.jsのrafLoopから毎フレーム呼ばれ、パン/ズーム後もバウンディング
 // ボックスの真上にアクションバーを追従させる(_syncTextInputBoxPosition88と同じ考え方)
 function _syncLassoActionBar90(){
@@ -1815,11 +1878,21 @@ function _syncLassoActionBar90(){
   if(!bar) return;
   if(bar.style.display==='none'||bar.style.display==='') return;
   if(!lassoState.selected||lassoState.selected.length===0||!lassoState.bbox){ bar.style.display='none';return; }
-  if(typeof w2s!=='function'||typeof ov==='undefined') return;
-  var r=ov.getBoundingClientRect();
+  var r,topLeft,topRight;
   var b=lassoState.bbox;
-  var topLeft=w2s(b.minX,b.maxY); // ワールドYは上向きのため画面上端はmaxY
-  var topRight=w2s(b.maxX,b.maxY);
+  // V3_02: サブ窓内で選択された場合は、そのサブ窓自身の座標系で追従させる。
+  // サブ窓が既に閉じられていた場合はメイン画面基準にフォールバックする
+  if(_lassoActionBarSubWin90&&typeof window._swScreenPos==='function'
+      &&typeof window._swFindOwnerOfOv==='function'&&window._swFindOwnerOfOv(_lassoActionBarSubWin90.ovEl)){
+    r=_lassoActionBarSubWin90.ovEl.getBoundingClientRect();
+    topLeft=window._swScreenPos(_lassoActionBarSubWin90,b.minX,b.maxY);
+    topRight=window._swScreenPos(_lassoActionBarSubWin90,b.maxX,b.maxY);
+  } else {
+    if(typeof w2s!=='function'||typeof ov==='undefined') return;
+    r=ov.getBoundingClientRect();
+    topLeft=w2s(b.minX,b.maxY); // ワールドYは上向きのため画面上端はmaxY
+    topRight=w2s(b.maxX,b.maxY);
+  }
   var cx=(topLeft[0]+topRight[0])/2;
   var topY=Math.min(topLeft[1],topRight[1]);
   bar.style.left=(r.left+cx)+'px';

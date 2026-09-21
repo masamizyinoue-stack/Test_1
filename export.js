@@ -2422,13 +2422,32 @@ async function exportHybridPDF(_collectInto182,rangeRect238){
         pdf.setDrawColor(dr,dg,db); pdf.setFillColor(dr,dg,db); pdf.setTextColor(dr,dg,db);
         // V1_156: 画面表示(dimensionTextMode='fixed')の比率(17px基準)をmmへ換算
         const worldH=d.worldFontH||(17/(scale||1));
-        const fsMM=Math.max(DIM_MIN_TEXT_MM, worldH*pdfScale*_sx*1.5); // 文字サイズ(表示用、変更なし)
         // V2_43: 「範囲指定書出しの線が太すぎる」との要望により、寸法線・矢印・
-        // センターマークの太さ/サイズは、範囲指定書出時のみ全体書出相当の
-        // スケール(_lwScale242)を基準にする。文字サイズ(fsMM)・文字との間隔(gapMM)
-        // は従来通り拡大表示のまま(全体書出時はlwBaseMM===fsMMとなり計算結果は不変)
-        const _dimLwSc242=rangeRect238?_lwScale242:pdfScale;
-        const lwBaseMM=Math.max(DIM_MIN_TEXT_MM, worldH*_dimLwSc242*_sx*1.5);
+        // センターマークの太さ/サイズを、範囲指定書出時のみ全体書出相当の固定
+        // スケール(_lwScale242)を基準にする変更を行った。
+        // V2_110: 文字サイズ(fsMM)も同じ固定スケール(_lwScale242)に合わせて統一した
+        // (寸法値の文字が線・矢印に対して巨大化して見える不具合の対策として)。
+        // → しかしユーザー実機検証の結果、この診断は逆だったことが判明した。
+        // 範囲指定書出は「指定範囲をA3全面に拡大表示する」機能であり、その拡大率
+        // (pdfScale)に応じて寸法値の文字が大きく見えるのは本来正しい挙動だった。
+        // 真の原因は逆に、寸法線・矢印・センターマークの太さが_lwScale242という
+        // 「全体書出時相当の固定倍率」のまま拡大表示に追従せず「変わらなかった」
+        // ことで、文字だけが拡大されて線が取り残され、バランスが崩れて見えていた点
+        // にあった。V2_110で文字サイズの方を線に合わせて縮小してしまったため、
+        // 今度は逆に文字が小さすぎる結果になった。
+        // V2_111: 診断を訂正し、逆方向に修正する。文字サイズ(fsMM)はV2_109以前の
+        // pdfScale基準の計算に戻し(範囲指定時も拡大表示に追従、全体書出は元々不変)、
+        // 寸法線・矢印・センターマークの太さ(lwBaseMM)の方を、範囲指定書出時も
+        // 文字と同じpdfScale基準にする(=_lwScale242を使うのをやめる)。これにより
+        // 拡大率が変わっても文字と線が同じ比率で追従し、狭い範囲・広い範囲どちらを
+        // 指定してもバランスが保たれる。全体書出時はpdfScaleと_lwScale242が元々
+        // 実質同一のため、全体書出の見た目は本修正の前後で変化しない。
+        // (V2_43が対策した「範囲指定書出の線が太すぎる」問題は、DXF図形本体の線幅
+        // (_lwMM)・手書き線(_strokeSc242)・破線パターン(_dashMM)側の話であり、
+        // それらは本修正の対象外(_lwScale242基準のまま)なので、V2_43が解決した
+        // 問題が再発することはない)
+        const fsMM=Math.max(DIM_MIN_TEXT_MM, worldH*pdfScale*_sx*1.5);
+        const lwBaseMM=Math.max(DIM_MIN_TEXT_MM, worldH*pdfScale*_sx*1.5); // V2_111: pdfScale基準(fsMMと同じ拡大率)に統一
         const lineMM=Math.max(0.05, lwBaseMM/17);
         const arrowLenMM=lwBaseMM*(10/(17*1.5));
         const arrowWMM=lwBaseMM*(4/(17*1.5));
