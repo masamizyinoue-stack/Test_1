@@ -52,7 +52,8 @@
      定義して修正した */
   --bg-panel:#10151c;
 }
-body{display:flex;flex-direction:column;width:100vw;height:100vh;overflow:hidden;
+html{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none} /* V3_14: iPadOS新方式の上端ぼかし(スクロール端エフェクト)対策。文書自体を固定しスクロール対象から外す */
+body{position:fixed;inset:0;display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;
   background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;font-size:14px}
 .topbar{height:62px;min-height:62px;background:var(--topbar-bg);border-bottom:1px solid var(--border);
@@ -1833,7 +1834,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V3_13';
+const APP_VERSION = 'V3_14';
 
 // =========================================================
 // グローバル状態
