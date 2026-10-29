@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="DXF View"> <!-- V1_06: ホーム画面追加時の表示名 -->
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"> <!-- V1_06 -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black"> <!-- V1_06 / V3_13: iPadOS新バージョンで、black-translucent(状態バー下へ画面が潜り込む方式)だと状態バー領域に半透明ぼかしが掛かり、画面上部(ツールバー)がぼやけて見えるため、状態バーを不透明な黒(blackでアプリ領域が状態バーの下から始まる)に変更 -->
 <!-- V1_06: ホーム画面アイコンが表示されない不具合の修正。参照先の画像ファイルが
      存在していなかったため、実ファイル(apple-touch-icon.png等)を新規作成して追加。
      iOSは複数サイズのうち最適なものを自動選択するため主要サイズを列挙する -->
@@ -1833,7 +1833,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V3_10';
+const APP_VERSION = 'V3_13';
 
 // =========================================================
 // グローバル状態
@@ -3913,7 +3913,13 @@ document.getElementById('pdfThumbResetBtn').addEventListener('click',function(){
   _buildPdfThumbGrid();
 });
 
-function closePdfThumbOverlay(){document.getElementById('pdfThumbOverlay').classList.remove('open');}
+function closePdfThumbOverlay(){
+  document.getElementById('pdfThumbOverlay').classList.remove('open');
+  // V3_11: 一覧を閉じている間は画面内判定・生成処理を止める(背景でのメモリ消費防止)。
+  // _pdfThumbCache自体は保持したままにするので、次回開いた際は直前まで表示していた
+  // ページのサムネイルだけがそのまま残り、それ以外は再度スクロールに応じて生成される
+  if(_pdfThumbObserver){_pdfThumbObserver.disconnect();_pdfThumbObserver=null;}
+}
 document.getElementById('pdfThumbBtn').addEventListener('click',function(){
   if(!pdfDoc){showGuide('PDFが開かれていません',1500);return;}
   document.getElementById('pdfThumbOverlay').classList.add('open');
@@ -4004,6 +4010,29 @@ function _pdfThumbFillCell(cell,overview,crop){
 // 全ページの「全体」サムネイルを中解像度でレンダリングしグリッドに敷き詰め、図面番号
 // モードがONなら右下クロップも高解像度で別途生成する。既に同一pdfDoc・同一幅%/高さ%で
 // 生成済みのキャッシュがあればそれを再利用し、PDFの再描画は行わない
+// V3_11: 「PDFで一覧にして、プレビュー(サムネイル一覧)をスクロールさせていたら不具合が
+// 出て再起動が必要になった」との報告への対応。iPad(Safari)で確認されたこの症状は、
+// Safari自体が表示している「問題が繰り返し発生したため、Webページが再度読み込まれました」
+// という定型メッセージで、タブがメモリ不足で強制終了・再読込された状態を指す。
+// 【原因】従来の_buildPdfThumbGrid()は、一覧を開いた瞬間に「全ページ」分の
+// サムネイル(overview、幅900px基準)と図面番号欄クロップ(crop、最大25倍スケールで
+// ページ全体をレンダリングしてから一部を切り出す、V1_165の技法)を、表示位置に関係なく
+// 一括生成してcanvas要素のままキャッシュ配列(overviews/crops)に保持し続けていた。
+// 50ページを超える鉄骨図面PDF(1ページあたりのcanvasが数MB)では、これだけで数百MBの
+// メモリを一覧を開いた直後から専有し、スクロールで画面外のセルが増えてもキャッシュは
+// 一切解放されないため、ページ数が多いPDFほど確実にメモリ上限へ到達し、iPad Safariの
+// タブが強制終了(=ユーザーが見た「不具合」「再起動」)していた。
+// 【修正内容】IntersectionObserverを使い、実際に画面内(または近傍)に表示された
+// セルのみを都度生成する「遅延生成」に変更した。さらに、画面から大きく離れた
+// (rootMarginの外に出た)セルはoverview/cropのcanvasをキャッシュから解放し、
+// プレースホルダー表示に戻す「使用中解放(エビクション)」を行うことで、スクロール中に
+// 手元に保持され続けるサムネイルの数を常に一定範囲(画面内+前後の余白分)に抑える。
+// これにより総ページ数によらずメモリ使用量が頭打ちになり、再度スクロールして戻れば
+// 該当ページだけ即座に再生成される(生成自体は1ページあたり短時間で終わるため体感上の
+// 支障は小さい)。一覧を閉じた際はIntersectionObserverを破棄して背景での生成も止める
+var _pdfThumbObserver=null;
+var _pdfThumbGenerating=null; // Set<pageNo>: 生成処理が進行中のページ(同一ページの二重生成防止)
+
 async function _buildPdfThumbGrid(){
   var grid=document.getElementById('pdfThumbGrid');
   grid.innerHTML='';
@@ -4021,6 +4050,7 @@ async function _buildPdfThumbGrid(){
     cache.cropWPct=cfg.widthPct;cache.cropHPct=cfg.heightPct;
     cache.cropOffXPct=cfg.offXPct;cache.cropOffYPct=cfg.offYPct;
   }
+  _pdfThumbGenerating=new Set();
   var cells=[];
   for(var i=1;i<=total;i++){
     var cell=_pdfThumbCellHtml(i,total);
@@ -4028,12 +4058,45 @@ async function _buildPdfThumbGrid(){
     cells.push(cell);
     if(cache.overviews[i-1]) _pdfThumbFillCell(cell,cache.overviews[i-1],cache.crops[i-1]);
   }
+  // V3_11: 一括生成ループの代わりに、実際に画面内(rootMargin分の余白込み)へ入った
+  // セルだけを対象にする監視を張る。旧・古い監視は必ず破棄してから作り直す
+  if(_pdfThumbObserver) _pdfThumbObserver.disconnect();
+  // V3_11: #pdfThumbGrid自体がoverflow-y:autoのスクロールコンテナ(CSS参照)のため、
+  // それをそのままrootに指定する(ラップ要素を探す必要はない)
+  _pdfThumbObserver=new IntersectionObserver(function(entries){
+    entries.forEach(function(ent){
+      var cellEl=ent.target;
+      var pg=parseInt(cellEl.dataset.pg,10);
+      if(!pg||_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
+      if(ent.isIntersecting){
+        _pdfThumbGenPage(pg,cache,cells,cfg);
+      } else {
+        // V3_11: 画面から離れたセルはcanvasを解放してメモリを戻す(再度近づけば
+        // isIntersecting=trueで即座に作り直される。生成中のものは完了時の
+        // 「_pdfThumbCache!==cache」判定に引っかからないよう、値そのものは消すが
+        // 生成中フラグは自然に完了させる)
+        cache.overviews[pg-1]=null;
+        cache.crops[pg-1]=null;
+        var wrap=cellEl.querySelector('.pdf-thumb-imgwrap');
+        if(wrap){wrap.innerHTML='';wrap.textContent='…';}
+      }
+    });
+  },{root:grid,rootMargin:'600px 0px',threshold:0.01});
+  cells.forEach(function(c){_pdfThumbObserver.observe(c);});
+}
+
+// V3_11: 1ページ分の「全体」サムネイル(overview)と、必要なら図面番号欄クロップ(crop)を
+// 生成し、キャッシュとセル表示へ反映する。IntersectionObserverから、画面内に入った
+// ページ番号ごとに呼ばれる(同一ページの多重生成は_pdfThumbGeneratingで防止する)
+async function _pdfThumbGenPage(p,cache,cells,cfg){
+  if(cache.overviews[p-1]&&(!cfg.modeOn||cache.crops[p-1])) return; // 既に揃っている
+  if(_pdfThumbGenerating.has(p)) return; // 生成中(結果はどのみち反映されるため二重実行しない
+  _pdfThumbGenerating.add(p);
   var RENDER_TARGET_W=900; // 「全体」サムネイル用の基準幅(px)。図面番号欄の鮮明さは別途高解像度クロップが担う
-  for(var p=1;p<=total;p++){
-    if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return; // 生成中にファイル/ページ集合が変わったら中断
-    if(cache.overviews[p-1]) continue; // 生成済み
-    try{
+  try{
+    if(!cache.overviews[p-1]){
       var page=await pdfDoc.getPage(p);
+      if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
       var vp1=page.getViewport({scale:1});
       var rs=Math.min(3,Math.max(0.5,RENDER_TARGET_W/vp1.width));
       var vp=page.getViewport({scale:rs});
@@ -4055,24 +4118,25 @@ async function _buildPdfThumbGrid(){
           scale=_svScale234;tx=_svTx234;ty=_svTy234;fitScale=_svFit234;pdfPageNum=_svPn234;
         }
       }
-      cache.overviews[p-1]=c;
-      var cellNow=cells[p-1];
-      if(cellNow&&cellNow.isConnected) _pdfThumbFillCell(cellNow,c,cache.crops[p-1]);
-    }catch(e){console.warn('[ページサムネイル:全体]',e);}
-  }
-  if(!cfg.modeOn) return;
-  for(var q=1;q<=total;q++){
-    if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
-    if(cache.crops[q-1]) continue; // 生成済み
-    try{
-      var page2=await pdfDoc.getPage(q);
+      // V3_11: 生成が終わる間にセルが画面外へ出てエビクションされていたら、
+      // このページのcanvasは保持しない(結果を捨てる。再度近づけば作り直される)
+      var cellEl=cells[p-1];
+      var stillWanted=cellEl&&cellEl.isConnected&&_pdfThumbObserver;
+      if(stillWanted) cache.overviews[p-1]=c;
+      if(cellEl&&cellEl.isConnected) _pdfThumbFillCell(cellEl,stillWanted?c:null,cache.crops[p-1]);
+    }
+    if(!cfg.modeOn) return;
+    if(!cache.crops[p-1]){
+      var page2=await pdfDoc.getPage(p);
       var cropCanvas=await _pdfThumbRenderCrop(page2,cfg.widthPct,cfg.heightPct,cfg.offXPct,cfg.offYPct);
       if(_pdfThumbCache!==cache||cache.doc!==pdfDoc) return;
-      cache.crops[q-1]=cropCanvas;
-      var cellNow2=cells[q-1];
-      if(cellNow2&&cellNow2.isConnected) _pdfThumbFillCell(cellNow2,cache.overviews[q-1],cropCanvas);
-    }catch(e){console.warn('[ページサムネイル:図面番号クロップ]',e);}
-  }
+      var cellEl2=cells[p-1];
+      var stillWanted2=cellEl2&&cellEl2.isConnected&&_pdfThumbObserver;
+      if(stillWanted2) cache.crops[p-1]=cropCanvas;
+      if(cellEl2&&cellEl2.isConnected) _pdfThumbFillCell(cellEl2,cache.overviews[p-1],stillWanted2?cropCanvas:null);
+    }
+  }catch(e){console.warn('[ページサムネイル生成:'+p+']',e);}
+  finally{ _pdfThumbGenerating.delete(p); }
 }
 
 // =========================================================

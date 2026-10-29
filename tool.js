@@ -625,6 +625,22 @@ function handlePointerUp(sx,sy,isPenInput){
     _shapePointerUp();return;
   }
   if(isPenInput||currentTool==='sketch'||currentTool==='hl'){
+    // V3_12: 「蛍光ペンを選んだ状態で、ドラッグせずクリック(タップ)1回だけでも
+    // 蛍光の点を打てるようにしてほしい」との要望対応。従来はsketchPts.length>1
+    // (=実際に動かした場合)でなければストローク自体を破棄しており、ちょうど1点
+    // (ドラッグなしでクリック/タップしただけ)の場合は何も描画されなかった
+    // (viewer.js側の描画ループもpts.length<2のストロークを描画しない、
+    // smoothPath()もpts.length<2では何もしない、という二重の理由で元々
+    // 「点」を打つ手段が無かった)。ここでちょうど1点の場合は同じ座標をもう1点
+    // 複製して2点にし、以降の「2点ストローク」として保存する。描画側は
+    // lineCap='round'のため、同一座標の2点(長さ0の線)はまん丸の点として
+    // 描画される(ペン/蛍光ペンどちらでも、現在の太さに応じた大きさの点になる。
+    // 両ツールで共通のこの分岐を使っているため、ペン側でも同様にタップで
+    // 点が打てるようになるが、従来「タップでは何も起きない」だった状態からの
+    // 純粋な改善であり、既存のドラッグ描画の見た目・挙動は一切変更していない)
+    if(sketching&&sketchPts.length===1){
+      sketchPts.push({x:sketchPts[0].x,y:sketchPts[0].y});
+    }
     if(sketching&&sketchPts.length>1){
       snapshot();
       if(currentTool==='hl'){
