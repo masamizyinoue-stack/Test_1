@@ -1290,7 +1290,8 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
       // ポップアップを閉じるようにする。色/太さボタン(.color-btn/.lw-btn)側の
       // 「決定ボタンを押すまで閉じない」動作(V2_100)はそのまま維持し、ここでは
       // 触れない
-      if(typeof _closeShapeToolPopup==='function') _closeShapeToolPopup();
+      // V3_21: 図形の種類を選んでもポップアップを自動で閉じない(ペン/蛍光と同じ挙動に統一)。閉じるのは「決定」ボタン、
+      // 図形ボタン再タップ、または図面エリアで描き始めた時(V3_15の外側操作で閉じる処理)。従来のV2_102の自動クローズは廃止
       // 次に他ツールから図形ボタンを押した時にこのツールを直接復元できるよう記憶
       _lastShapeTool=currentTool;
     }
@@ -1542,6 +1543,7 @@ function _ensureCanvasJPFont84(){
       await ff.load();
       document.fonts.add(ff);
       if(typeof scheduleOverlay==='function') scheduleOverlay();
+      if(typeof scheduleDraw==='function') scheduleDraw(); // V3_18: DXF文字(本体canvas)も再描画
     }catch(e){ console.warn('[文字入力] フォント読込失敗',e); }
   })();
 }

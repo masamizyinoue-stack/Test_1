@@ -1355,6 +1355,19 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       </label>
     </div>
   </div>
+  <div class="sp-section"> <!-- V3_18: DXF文字の字体 -->
+    <div class="sp-label">DXF文字の字体</div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="dxfFontMode" id="dxfFontNoto" value="noto" checked style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>Noto Sans JP<small style="display:block;font-size:11px;opacity:0.6;margin-top:2px">太字のゴシック体(初回のみ読込あり)</small></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)">
+        <input type="radio" name="dxfFontMode" id="dxfFontStd" value="std" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+        <span>標準(従来)</span>
+      </label>
+    </div>
+  </div>
   <div class="sp-section">
     <div class="sp-label">寸法文字サイズ</div>
     <div style="display:flex;flex-direction:column;gap:10px;padding:4px 0">
@@ -1834,7 +1847,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V3_17';
+const APP_VERSION = 'V3_23';
 
 // =========================================================
 // グローバル状態
@@ -4702,6 +4715,19 @@ function openContextPopup(mode,anchorEl){
 // 選択中のツールアイコンの再タップ(openContextPopupのトグル)だけで閉じるようにする
 // V2_100: 3つのポップアップ(#colorOverlay/#measureToolPopup/#shapeToolPopup)右上に
 // 新設した「決定」ボタン。押すと該当ポップアップだけを閉じる(他の状態には触れない)
+// V3_18: DXF文字の字体切替(設定パネル)。選択はlocalStorage('dxfNotoFont')に保存
+(function(){
+  var rN=document.getElementById('dxfFontNoto'),rS=document.getElementById('dxfFontStd');
+  if(!rN||!rS) return;
+  (_dxfNotoFontOn?rN:rS).checked=true;
+  function apply(){
+    _dxfNotoFontOn=rN.checked;
+    try{localStorage.setItem('dxfNotoFont',_dxfNotoFontOn?'1':'0');}catch(e){}
+    if(_dxfNotoFontOn&&typeof _ensureCanvasJPFont84==='function') _ensureCanvasJPFont84();
+    scheduleDraw();
+  }
+  rN.addEventListener('change',apply); rS.addEventListener('change',apply);
+})();
 document.getElementById('colorOverlayDoneBtn').addEventListener('click',function(e){
   if(e&&e.stopPropagation) e.stopPropagation();
   _closeToolPopupById('colorOverlay');
@@ -6059,7 +6085,13 @@ function buildLLDim(line1,line2,pArrow){
   var tangle=normalizeDimTextAngle(screenAng);
   var sd1=w2s(foot1.x,foot1.y),sd2=w2s(foot2.x,foot2.y);
   var pxLen=Math.hypot(sd2[0]-sd1[0],sd2[1]-sd1[1]);
-  if(pxLen<60){
+  // V3_22: 「寸法値が矢印の中央でなく右端の線の上へずれ、右の補助線だけ長く伸びる」との指摘への対応。
+  // 従来は寸法線が60px未満だと必ず数値を線の延長上へ逃がしていたが、数値は寸法線の上側に描くため
+  // 矢印とは重ならない。数値の幅(桁数×約10.5px)+8px未満の時だけ逃がし、それ以外は中央に置く
+  var _llTextW=String(formatDim(dist/sd)).length*10.5;
+  // V3_23: V3_22の条件でも、ズームアウトした状態で作成すると寸法線が数px〜20px程度になり逃がし配置が選ばれてしまう
+  // (その後ズームインして見ると右端の線だけ長く、数値が右にずれて見える)。寸法線がほぼ点(12px未満)の時だけ逃がす
+  if(pxLen<12){
     // 寸法線が短すぎて数値が収まらない場合、line1の方向へ数値を逃がす(既存LP版と同趣旨)
     // V2_114: buildLinePtDimと全く同じ理由(32/scaleが作成時のビュー拡大率に反比例し、
     // ズームアウトして作成すると引出線がワールド座標上で巨大化してdims[]に固定
