@@ -1847,7 +1847,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V3_30';
+const APP_VERSION = 'V3_31';
 
 // =========================================================
 // グローバル状態
@@ -2332,7 +2332,7 @@ function drawOverlay(){
   // ヒットテスト本体)と完全に同一の計算式を使う(DXF/PDFでパディング等の係数が異なる点も
   // _isDxfMoji203フラグで同様に分岐)。デフォルト非表示で、#textHitBoxToggleBtnを押した
   // 時(_showTextHitBoxes===true)かつ文字読込ピックモード中(_textPickTarget)のみ描く
-  if(_textPickTarget&&_showTextHitBoxes){
+  if(typeof _textPickTarget!=='undefined'&&_textPickTarget&&typeof _showTextHitBoxes!=='undefined'&&_showTextHitBoxes){ // V3_31: 起動時の宣言前参照エラーを防止
     var _isDxfMoji203=!!(doc&&doc.moji);
     var _mojiArr203=_isDxfMoji203?doc.moji:((typeof pdfMoji!=='undefined'&&pdfMoji)?pdfMoji:[]);
     if(_mojiArr203&&_mojiArr203.length>0){
