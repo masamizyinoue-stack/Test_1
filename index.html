@@ -448,6 +448,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 #colorOverlay[data-mode="sketch"][data-lwctx="text"] #coLwPenSection{display:none}
 /* V3_32: 文字スタンプ欄。文字ツール選択中だけ表示する */
 #colorOverlay #coStampSection{display:none}
+#colorOverlay #coTextFontSection{display:none}
+#colorOverlay[data-mode="sketch"][data-lwctx="text"] #coTextFontSection{display:block}
+#colorOverlay .fontSel{width:100%;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+.sp-section .fontSel{width:100%;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+#colorOverlay .fontSample,.sp-section .fontSample{display:block;font-size:15px;margin-top:6px}
 #colorOverlay[data-mode="sketch"][data-lwctx="text"] #coStampSection{display:block}
 #stampList{display:flex;flex-wrap:wrap;gap:6px;max-width:280px;margin-bottom:6px}
 .stamp-chip{display:inline-flex;align-items:center;border:1px solid #888;border-radius:6px;background:rgba(255,255,255,.08);color:inherit;font-size:13px;padding:0;overflow:hidden}
@@ -1373,12 +1378,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
   </div>
   <div class="sp-section"> <!-- V3_18/V3_37: DXF文字の字体(複数選択) -->
     <div class="sp-label">DXF文字の字体</div>
-    <div id="dxfFontList" style="display:flex;flex-direction:column;gap:10px;padding:4px 0"></div>
-  </div>
-  <div class="sp-section"> <!-- V3_38: 文字ツールの字体 -->
-    <div class="sp-label">文字ツール(書き込み文字)の字体</div>
-    <div style="font-size:11px;opacity:0.6;margin-bottom:4px">画面表示のみ。PDF書出しはNoto Sans JPで出力されます</div>
-    <div id="textFontList" style="display:flex;flex-direction:column;gap:10px;padding:4px 0"></div>
+    <div id="dxfFontList" style="padding:4px 0"></div>
   </div>
   <div class="sp-section">
     <div class="sp-label">寸法文字サイズ</div>
@@ -1576,6 +1576,11 @@ body.settings-open #settingsPanel{transform:translateX(0)}
       <button class="lw-btn" data-lw="2">2</button>
       <button class="lw-btn" data-lw="3">3</button>
     </div>
+  </div>
+  <!-- V3_49: 文字ツールの字体(設定メニューから移設)。文字ツールのポップアップ(data-lwctx="text")のみ表示 -->
+  <div class="co-sketch-section" id="coTextFontSection">
+    <div class="co-label">字体</div>
+    <div id="textFontList" style="padding:2px 0"></div>
   </div>
   <!-- V3_32: 文字スタンプ(よく使う文字の登録)。選ぶと図面タップで直接配置、もう一度押すと解除 -->
   <div class="co-sketch-section" id="coStampSection">
@@ -1865,7 +1870,7 @@ body.settings-open #settingsPanel{transform:translateX(0)}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-sync.js?v=257"></script>
 <script>
-const APP_VERSION = 'V3_47';
+const APP_VERSION = 'V3_49';
 
 // =========================================================
 // グローバル状態
@@ -2010,7 +2015,7 @@ function drawAnnotation(targetCtx, strokeFilter, noClear) {
       // 同じNoto Sans JP(埋込フォント、tool.jsの_ensureCanvasJPFont80で
       // FontFaceとして読込・登録)を使う。読込前・読込失敗時はsans-serifへ
       // 自然にフォールバックする
-      atc.font=(typeof _textFontCss==='function')?_textFontCss(_tFontPx80):(_tFontPx80+'px "NotoSansJPCanvas", sans-serif'); // V3_38: 文字ツールの字体選択
+      atc.font=(typeof _textFontCssFor==='function')?_textFontCssFor(s.font,_tFontPx80):((typeof _textFontCss==='function')?_textFontCss(_tFontPx80):(_tFontPx80+'px "NotoSansJPCanvas", sans-serif')); // V3_38: 文字ツールの字体選択
       atc.fillStyle='rgb('+s.color.r+','+s.color.g+','+s.color.b+')';
       atc.textBaseline='top';
       // V2_87: 「alt+Enterで次の行に入力出来る様にして」との要望で複数行に対応。
@@ -4738,25 +4743,27 @@ function openContextPopup(mode,anchorEl){
   // V3_37/V3_38: 字体一覧を生成(各項目は実際の字体で見本表示)。DXF文字='dxfFontKind' / 文字ツール='textFontKind'をlocalStorageに保存
   if(typeof DXF_FONTS==='undefined') return;
   function build(boxId,radioName,getKind,setKind,isText){
+    // V3_49: 一覧(ラジオ縦並び)をプルダウン1行に変更。選択中の字体で見本文字を1行表示
     var box=document.getElementById(boxId); if(!box) return;
+    var sel=document.createElement('select'); sel.className='fontSel';
     Object.keys(DXF_FONTS).forEach(function(k){
       var f=DXF_FONTS[k];
-      var lb=document.createElement('label');
-      lb.style.cssText='display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text)';
-      var r=document.createElement('input');
-      r.type='radio'; r.name=radioName; r.value=k; r.checked=(k===getKind());
-      r.style.cssText='width:18px;height:18px;accent-color:var(--accent);cursor:pointer';
-      var sp=document.createElement('span');
-      sp.appendChild(document.createTextNode(f.label));
-      var sm=document.createElement('small'); sm.style.cssText='display:block;font-size:11px;opacity:0.6;margin-top:2px'; sm.textContent=(k==='noto'?'★PDF書出しと同じ字体(印刷と一致)／'+f.desc:f.desc+'／※PDF書出しは内蔵Noto Sans JPになります');// V3_47
-      sp.appendChild(sm);
-      var bold=isText?(k==='noto'?false:f.bold):f.bold;
-      var sample=document.createElement('span');
-      sample.textContent='寸法 ABC 123 基礎梁'; sample.style.cssText='display:block;font-size:15px;margin-top:3px;font-weight:'+(bold?'700':'400')+';font-family:'+f.stack;
-      sp.appendChild(sample);
-      lb.appendChild(r); lb.appendChild(sp); box.appendChild(lb);
-      r.addEventListener('change',function(){ if(r.checked) setKind(k); });
+      var o=document.createElement('option'); o.value=k;
+      o.textContent=(k==='noto'?'★ ':'')+f.label+(k==='noto'?'(PDFと同じ)':'');
+      sel.appendChild(o);
     });
+    sel.value=getKind();
+    var sample=document.createElement('span'); sample.className='fontSample'; sample.textContent='寸法 ABC 123 基礎梁';
+    var note=document.createElement('small'); note.style.cssText='display:block;font-size:11px;opacity:0.6;margin-top:2px';
+    function refresh(){
+      var k=sel.value,f=DXF_FONTS[k];
+      var bold=isText?(k==='noto'?false:f.bold):f.bold;
+      sample.style.fontWeight=bold?'700':'400'; sample.style.fontFamily=f.stack;
+      note.textContent=(k==='noto'?'PDF書出しと同じ字体(印刷と一致)':'※PDF書出しは内蔵Noto Sans JPになります');
+    }
+    refresh();
+    box.appendChild(sel); box.appendChild(sample); box.appendChild(note);
+    sel.addEventListener('change',function(){ setKind(sel.value); refresh(); });
   }
   build('dxfFontList','dxfFontMode',function(){return _dxfFontKind;},function(k){
     _dxfFontKind=k; _dxfNotoFontOn=(k==='noto');

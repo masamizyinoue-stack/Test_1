@@ -1255,6 +1255,8 @@ function _dxfFontFamily(){return DXF_FONTS[_dxfFontKind].stack;}
 var _textFontKind=(function(){try{var k=localStorage.getItem('textFontKind');return (k&&DXF_FONTS[k])?k:'noto';}catch(e){return 'noto';}})();
 function _textFontBold(){ return _textFontKind==='noto'?false:!!DXF_FONTS[_textFontKind].bold; }
 function _textFontCss(px){ return (_textFontBold()?'bold ':'')+px+'px '+DXF_FONTS[_textFontKind].stack; }
+// V3_49: 書き込み文字ごとに「書いた時の字体」(s.font)を保持。未記録(旧データ)はnoto扱い
+function _textFontCssFor(kind,px){ var k=(kind&&DXF_FONTS[kind])?kind:'noto'; return ((k==='noto')?'':(DXF_FONTS[k].bold?'bold ':''))+px+'px '+DXF_FONTS[k].stack; }
 function drawText(ctx,e,darkBg){
   if(!e.text||!e.text.trim()) return;
   const[sx,sy]=w2s(e.x,e.y);

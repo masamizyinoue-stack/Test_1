@@ -1262,7 +1262,7 @@ document.querySelectorAll('.tool-btn').forEach(btn=>{
     }
     document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');currentTool=btn.dataset.tool;
-    // V3_47: 別のコマンドを選んだら、開いている色/太さ・計測・図形ポップアップを閉じる
+    // V3_48: 別のコマンドを選んだら、開いている色/太さ・計測・図形ポップアップを閉じる
     // (ペン/蛍光ペン等のポップアップを開いたまま文字などへ切り替えても残っていた不具合の修正)。
     // 計測/図形ポップアップ内で同系統のツールを選ぶ場合だけは開いたままにする
     if(typeof _closeToolPopupById==='function'){
@@ -1622,7 +1622,7 @@ function _openTextInputAt(wx,wy,sx,sy){
   if(typeof _activeStamp!=='undefined'&&_activeStamp){
     _textInputTouchOrigin=false;
     snapshot();
-    strokes.push({isText:true,text:_activeStamp,x:wx,y:wy,color:{...currentTextColor},lw:currentTextLW,page:_curPage()});
+    strokes.push({isText:true,text:_activeStamp,x:wx,y:wy,color:{...currentTextColor},lw:currentTextLW,page:_curPage(),font:_textFontKind});
     if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx]){ openFiles[currentFileIdx].strokes=strokes; }
     if(typeof verify==='function')verify('スタンプ配置',{len:strokes.length});
     scheduleOverlay();doSave();
@@ -1663,7 +1663,7 @@ function _openTextInputAt(wx,wy,sx,sy){
       snapshot();
       // V2_102: 文字は専用のcurrentTextColorを保存する(ペンのcurrentColorとは独立)
       // V2_103: 太さ(フォントサイズ)も専用のcurrentTextLWを保存する(ペンのcurrentLWとは独立)
-      strokes.push({isText:true,text:t,x:wx,y:wy,color:{...currentTextColor},lw:currentTextLW,page:_curPage()});
+      strokes.push({isText:true,text:t,x:wx,y:wy,color:{...currentTextColor},lw:currentTextLW,page:_curPage(),font:_textFontKind});
       if(typeof openFiles!=='undefined'&&currentFileIdx>=0&&openFiles[currentFileIdx]){
         openFiles[currentFileIdx].strokes=strokes;
       }
